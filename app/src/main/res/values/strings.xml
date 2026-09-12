@@ -43,6 +43,23 @@
     <string name="med_kit_name_too_long">Название длиннее %1$d символов.</string>
     <string name="med_kit_location_too_long">Место хранения длиннее %1$d символов.</string>
 
+    <!-- Убрать аптечку -->
+    <string name="med_kit_menu">Что можно с аптечкой</string>
+    <string name="med_kit_remove">Убрать аптечку</string>
+    <string name="med_kit_remove_title">Убрать «%1$s»?</string>
+    <string name="med_kit_remove_empty">В ней ничего нет — уйдёт только сама аптечка.</string>
+    <string name="med_kit_remove_with_packages">Внутри %1$d упаковок. Решите, что с ними делать.</string>
+    <string name="med_kit_remove_transfer">Перенести лекарства в другую аптечку</string>
+    <string name="med_kit_remove_with_drugs">Выбросить вместе с лекарствами</string>
+    <string name="med_kit_remove_consequences">Упаковки и их история остатка исчезнут. Лечение и приёмы останутся.</string>
+    <string name="med_kit_remove_nowhere">Переносить некуда: другой местной аптечки пока нет.</string>
+    <string name="med_kit_remove_target_title">Куда перенести лекарства</string>
+    <string name="med_kit_remove_and_transfer">Перенести и убрать</string>
+    <string name="med_kit_remove_needs_network">Общую аптечку убирают на сервере: нужна связь.</string>
+    <string name="med_kit_remove_gone">Этой аптечки больше нет.</string>
+    <string name="med_kit_remove_target_gone">Выбранной аптечки больше нет — выберите другую.</string>
+    <string name="action_remove">Убрать</string>
+
     <!-- Упаковки -->
     <string name="pack_new">Новая упаковка</string>
     <string name="pack_edit">Правка упаковки</string>

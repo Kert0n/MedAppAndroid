@@ -2,6 +2,8 @@ package com.kert0n.medapp.feature.packs
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.kert0n.medapp.domain.medkit.MedKit
+import com.kert0n.medapp.feature.medkits.MedKitRemoval
 import com.kert0n.medapp.presentation.medkit.MedKitPresentationDTO
 import com.kert0n.medapp.presentation.medkit.toPresentationDTO
 import com.kert0n.medapp.presentation.pack.PackagePresentationDTO
@@ -26,6 +28,7 @@ import kotlinx.coroutines.flow.flatMapLatest
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.flow.update
+import kotlinx.coroutines.launch
 
 /**
  * Содержимое аптечки (PLAN H3 №4) и все лекарства сразу (№5) — один экран с двумя областями
@@ -45,6 +48,7 @@ import kotlinx.coroutines.flow.update
 class MedKitContentsViewModel @Inject constructor(
     private val packages: PackageStorageRepository,
     private val medKits: MedKitStorageRepository,
+    private val removal: MedKitRemoval,
     private val clock: Clock
 ) : ViewModel() {
 
@@ -53,13 +57,17 @@ class MedKitContentsViewModel @Inject constructor(
 
     private val today: LocalDate get() = LocalDate.now(clock)
 
+    /** О чём экран сейчас спрашивает, убирая аптечку; `null` — не спрашивает ни о чём. */
+    private val removing = MutableStateFlow<Removing?>(null)
+
     val state: StateFlow<State> = request.filterNotNull()
         .flatMapLatest { query ->
             combine(
                 medKits.observeAll(today),
                 packages.list(query, today),
-                choicesOf(query.medKitId)
-            ) { kits, packs, choices ->
+                choicesOf(query.medKitId),
+                removing
+            ) { kits, packs, choices, removing ->
                 State(
                     medKit = kits.firstOrNull { it.id == query.medKitId }?.toPresentationDTO(),
                     everywhere = query.medKitId == null,
@@ -70,7 +78,12 @@ class MedKitContentsViewModel @Inject constructor(
                     categories = choices.categories,
                     forms = choices.forms,
                     query = query,
-                    today = today
+                    today = today,
+                    // Куда переносить: местные аптечки, кроме этой. Общая требует связи (C3).
+                    others = kits
+                        .filter { it.id != query.medKitId && it.publication == MedKit.Publication.LOCAL }
+                        .map { it.toPresentationDTO() },
+                    removing = removing
                 )
             }
         }
@@ -88,6 +101,41 @@ class MedKitContentsViewModel @Inject constructor(
     fun filter(filter: PackageQuery.Filter?) = request.update { it?.copy(filter = filter) }
 
     fun sort(sort: PackageQuery.Sort) = request.update { it?.copy(sort = sort) }
+
+    /** Спросить, убирать ли аптечку: пустую — просто подтвердить, непустую — выбрать судьбу. */
+    fun askToRemove() {
+        removing.value = Removing.Asking
+    }
+
+    /** Выбор аптечки назначения — отдельный шаг: «перенести» без «куда» не бывает. */
+    fun pickTarget() {
+        removing.value = Removing.PickingTarget()
+    }
+
+    fun chooseTarget(medKitId: Uuid) {
+        removing.value = Removing.PickingTarget(medKitId)
+    }
+
+    fun dismissRemoval() {
+        removing.value = null
+    }
+
+    /**
+     * Убрать аптечку. [transferTo] `null` — выбросить вместе с лекарствами. [onRemoved] зовётся
+     * только когда убрано: отказ остаётся на экране названной причиной.
+     */
+    fun remove(transferTo: Uuid? = null, onRemoved: () -> Unit) {
+        val medKitId = request.value?.medKitId ?: return
+        viewModelScope.launch {
+            when (val outcome = removal.remove(medKitId, transferTo)) {
+                MedKitRemoval.Outcome.REMOVED -> {
+                    removing.value = null
+                    onRemoved()
+                }
+                else -> removing.value = Removing.Refused(outcome)
+            }
+        }
+    }
 
     /** Сбросить: запрос ни при чём, если человек просто не нашёл нужного. */
     fun reset() = request.update { it?.let { query -> PackageQuery(medKitId = query.medKitId) } }
@@ -120,10 +168,28 @@ class MedKitContentsViewModel @Inject constructor(
         val forms: List<FormPresentationDTO> = emptyList(),
         val query: PackageQuery = PackageQuery(),
         /** Просрочка считается на сегодня, и сегодня знают часы, а не база. */
-        val today: LocalDate = LocalDate.MIN
+        val today: LocalDate = LocalDate.MIN,
+        val others: List<MedKitPresentationDTO> = emptyList(),
+        val removing: Removing? = null
     ) {
         /** Ищут или сужают — значит пустота значит «не нашлось», а не «здесь ничего нет». */
         val isNarrowed: Boolean get() = query.searchText.isNotEmpty() || query.filter != null
+    }
+
+    /**
+     * Шаги разговора об удалении аптечки (PLAN H3). Каждый — свой вопрос человеку, и различает
+     * их то, что он в этот момент выбирает.
+     */
+    sealed interface Removing {
+
+        /** Убирать ли вообще: у пустой это весь разговор. */
+        data object Asking : Removing
+
+        /** Куда перенести лекарства; `null` — ещё не выбрано. */
+        data class PickingTarget(val target: Uuid? = null) : Removing
+
+        /** Убрать не вышло, и сказано почему. */
+        data class Refused(val reason: MedKitRemoval.Outcome) : Removing
     }
 
     private data class Choices(

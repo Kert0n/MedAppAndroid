@@ -1,5 +1,7 @@
 package com.kert0n.medapp.feature.packs
 
+import com.kert0n.medapp.feature.medkits.MedKitRemoval
+import com.kert0n.medapp.fixture.DirectTransactions
 import com.kert0n.medapp.fixture.FakeMedKits
 import com.kert0n.medapp.fixture.FakePackages
 import com.kert0n.medapp.fixture.HOME_KIT
@@ -53,7 +55,12 @@ class MedKitContentsViewModelTest {
     )
 
     private fun TestScope.viewModel(medKitId: Uuid? = HOME_KIT): MedKitContentsViewModel {
-        val viewModel = MedKitContentsViewModel(packages, medKits, clock)
+        val viewModel = MedKitContentsViewModel(
+            packages = packages,
+            medKits = medKits,
+            removal = MedKitRemoval(medKits, packages, DirectTransactions),
+            clock = clock
+        )
         backgroundScope.launch(UnconfinedTestDispatcher(testScheduler)) { viewModel.state.collect {} }
         viewModel.open(medKitId)
         return viewModel
@@ -160,5 +167,54 @@ class MedKitContentsViewModelTest {
         contents.reset()
 
         assertEquals(PackageQuery(medKitId = HOME_KIT), contents.state.value.query)
+    }
+
+    /**
+     * Убрать аптечку вместе с лекарствами: пачек не остаётся, а экран знает, что уходить (PLAN
+     * H3, ТЗ 4.1.1.2.3.1).
+     */
+    @Test
+    fun removingWithTheDrugsEmptiesTheMedKitAndLeavesTheScreen() = runTest {
+        val contents = viewModel()
+        contents.askToRemove()
+
+        var left = false
+        contents.remove { left = true }
+
+        assertTrue(left)
+        assertTrue(medKits.medKits.none { it.id == HOME_KIT })
+        assertEquals(listOf("Нурофен"), packages.packages.map { it.name })
+    }
+
+    /** С переносом лекарства целы и лежат в названной аптечке (ТЗ 4.1.1.2.3.2). */
+    @Test
+    fun removingWithATransferKeepsTheDrugs() = runTest {
+        val contents = viewModel()
+        contents.askToRemove()
+        contents.pickTarget()
+        contents.chooseTarget(SHARED_KIT)
+
+        contents.remove(transferTo = SHARED_KIT) {}
+
+        assertTrue(medKits.medKits.none { it.id == HOME_KIT })
+        assertEquals(
+            listOf(SHARED_KIT, SHARED_KIT),
+            packages.packages.map { it.medKit.id }
+        )
+    }
+
+    /** Отказ остаётся на экране причиной, а не исчезает молча. */
+    @Test
+    fun aRefusalIsShownAndNothingIsRemoved() = runTest {
+        val contents = viewModel()
+        contents.askToRemove()
+
+        contents.remove(transferTo = Uuid.random()) {}
+
+        assertEquals(
+            MedKitContentsViewModel.Removing.Refused(MedKitRemoval.Outcome.TARGET_GONE),
+            contents.state.value.removing
+        )
+        assertTrue(medKits.medKits.any { it.id == HOME_KIT })
     }
 }

@@ -101,7 +101,8 @@ private fun MedAppNavHost(navController: NavHostController, modifier: Modifier =
                 medKitId = route.medKitId,
                 onBack = { navController.popBackStack() },
                 onOpen = { navController.navigate(Route.PackageCard(it)) },
-                onAdd = { navController.navigate(Route.PackageForm(route.medKitId)) }
+                onAdd = { navController.navigate(Route.PackageForm(route.medKitId)) },
+                onEdit = { navController.navigate(Route.MedKitForm(route.medKitId)) }
             )
         }
         composable<Route.PackageForm>(typeMap = RouteTypes) { entry ->

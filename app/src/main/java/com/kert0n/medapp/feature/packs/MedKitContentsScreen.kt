@@ -9,19 +9,25 @@ import androidx.compose.foundation.layout.defaultMinSize
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.selection.selectable
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.DropdownMenu
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.FloatingActionButton
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
+import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.RadioButton
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -29,6 +35,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
@@ -37,6 +44,7 @@ import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.kert0n.medapp.R
 import com.kert0n.medapp.domain.pack.ExpiryDate
+import com.kert0n.medapp.feature.medkits.MedKitRemoval
 import com.kert0n.medapp.storage.pack.PackageQuery
 import com.kert0n.medapp.ui.EmptyState
 import com.kert0n.medapp.ui.LoadingState
@@ -58,6 +66,7 @@ fun MedKitContentsScreen(
     onOpen: (Uuid) -> Unit,
     onAdd: () -> Unit,
     modifier: Modifier = Modifier,
+    onEdit: () -> Unit = {},
     viewModel: MedKitContentsViewModel = hiltViewModel()
 ) {
     LaunchedEffect(medKitId) { viewModel.open(medKitId) }
@@ -76,6 +85,10 @@ fun MedKitContentsScreen(
                             contentDescription = stringResource(R.string.action_back)
                         )
                     }
+                },
+                actions = {
+                    // У всех лекарств сразу хозяина нет: править и убирать там нечего.
+                    if (!state.everywhere) MedKitMenu(onEdit = onEdit, onRemove = viewModel::askToRemove)
                 }
             )
         },
@@ -144,7 +157,151 @@ fun MedKitContentsScreen(
             }
         }
     }
+    state.removing?.let { Removal(state, it, viewModel, onRemoved = onBack) }
 }
+
+/** Что можно сделать с самой аптечкой: править её сведения и убрать её целиком (PLAN H3). */
+@Composable
+private fun MedKitMenu(onEdit: () -> Unit, onRemove: () -> Unit) {
+    var open by remember { mutableStateOf(false) }
+    IconButton(onClick = { open = true }) {
+        Icon(
+            painterResource(R.drawable.ic_more_vert),
+            contentDescription = stringResource(R.string.med_kit_menu)
+        )
+    }
+    DropdownMenu(expanded = open, onDismissRequest = { open = false }) {
+        DropdownMenuItem(
+            text = { Text(stringResource(R.string.med_kit_edit)) },
+            onClick = {
+                open = false
+                onEdit()
+            }
+        )
+        DropdownMenuItem(
+            text = { Text(stringResource(R.string.med_kit_remove)) },
+            onClick = {
+                open = false
+                onRemove()
+            }
+        )
+    }
+}
+
+/**
+ * Разговор об удалении аптечки (PLAN H3). Пустую достаточно подтвердить; у непустой человек
+ * выбирает судьбу лекарств, и оба пути названы последствиями, а не словом «удалить».
+ */
+@Composable
+private fun Removal(
+    state: MedKitContentsViewModel.State,
+    step: MedKitContentsViewModel.Removing,
+    viewModel: MedKitContentsViewModel,
+    onRemoved: () -> Unit
+) {
+    val name = state.medKit?.name.orEmpty()
+    when (step) {
+        MedKitContentsViewModel.Removing.Asking -> AlertDialog(
+            onDismissRequest = viewModel::dismissRemoval,
+            title = { Text(stringResource(R.string.med_kit_remove_title, name)) },
+            text = {
+                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    val inside = state.packs?.size ?: 0
+                    if (inside == 0) {
+                        Text(stringResource(R.string.med_kit_remove_empty))
+                    } else {
+                        Text(stringResource(R.string.med_kit_remove_with_packages, inside))
+                        if (state.others.isEmpty()) {
+                            Text(
+                                stringResource(R.string.med_kit_remove_nowhere),
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                        } else {
+                            TextButton(
+                                onClick = viewModel::pickTarget,
+                                modifier = Modifier.fillMaxWidth().defaultMinSize(minHeight = 48.dp)
+                            ) { Text(stringResource(R.string.med_kit_remove_transfer)) }
+                        }
+                        Text(
+                            stringResource(R.string.med_kit_remove_consequences),
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    }
+                }
+            },
+            confirmButton = {
+                TextButton(onClick = { viewModel.remove(onRemoved = onRemoved) }) {
+                    Text(
+                        stringResource(
+                            if (state.packs.isNullOrEmpty()) R.string.action_remove
+                            else R.string.med_kit_remove_with_drugs
+                        )
+                    )
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = viewModel::dismissRemoval) {
+                    Text(stringResource(R.string.action_cancel))
+                }
+            }
+        )
+
+        is MedKitContentsViewModel.Removing.PickingTarget -> AlertDialog(
+            onDismissRequest = viewModel::dismissRemoval,
+            title = { Text(stringResource(R.string.med_kit_remove_target_title)) },
+            text = {
+                Column {
+                    for (kit in state.others) {
+                        Row(
+                            Modifier
+                                .fillMaxWidth()
+                                .defaultMinSize(minHeight = 48.dp)
+                                .selectable(
+                                    selected = step.target == kit.id,
+                                    onClick = { viewModel.chooseTarget(kit.id) }
+                                ),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            RadioButton(selected = step.target == kit.id, onClick = null)
+                            Text(kit.name, modifier = Modifier.padding(start = 12.dp))
+                        }
+                    }
+                }
+            },
+            confirmButton = {
+                TextButton(
+                    enabled = step.target != null,
+                    onClick = { viewModel.remove(transferTo = step.target, onRemoved = onRemoved) }
+                ) { Text(stringResource(R.string.med_kit_remove_and_transfer)) }
+            },
+            dismissButton = {
+                TextButton(onClick = viewModel::dismissRemoval) {
+                    Text(stringResource(R.string.action_cancel))
+                }
+            }
+        )
+
+        is MedKitContentsViewModel.Removing.Refused -> AlertDialog(
+            onDismissRequest = viewModel::dismissRemoval,
+            title = { Text(stringResource(R.string.med_kit_remove_title, name)) },
+            text = { Text(stringResource(step.reason.text)) },
+            confirmButton = {
+                TextButton(onClick = viewModel::dismissRemoval) {
+                    Text(stringResource(R.string.action_cancel))
+                }
+            }
+        )
+    }
+}
+
+/** Текст отказа — его свойство: экран не подбирает слова сам. */
+private val MedKitRemoval.Outcome.text: Int
+    get() = when (this) {
+        MedKitRemoval.Outcome.NEEDS_NETWORK -> R.string.med_kit_remove_needs_network
+        MedKitRemoval.Outcome.TARGET_GONE -> R.string.med_kit_remove_target_gone
+        MedKitRemoval.Outcome.TARGET_IS_THE_SAME -> R.string.med_kit_remove_nowhere
+        else -> R.string.med_kit_remove_gone
+    }
 
 /**
  * Чем сузить список. Фильтр ровно один, и нажатие на выбранный его снимает: иначе выйти из
