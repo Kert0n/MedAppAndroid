@@ -2122,6 +2122,15 @@ Backoff: начальная задержка 2 секунды, удвоение 
 Полку и коробку, которые были у нас к началу чтения и которых к укладке нет, снимок не
 возвращает: их убрали, пока он летел.
 
+**Вступление — тот же снимок, только одной полки.** `joinMedKit` отвечает `MedKitDTO` с
+содержимым, и `SnapshotApplier.join` разрешает и кладёт его тем же путём и той же дверью —
+утверждения о целом в нём нет, и пропажи оно не объявляет. Действие человека — сценарий
+`feature/medkits/MedKitJoining`: связь обязательна (C3), а потерянный ответ — обычное дело.
+Сервер вступил, до нас ответ не дошёл, повтор тем же кодом отвечает 409 без номера полки; тогда
+сценарий читает полный снимок, и появившаяся в нём ровно одна полка — это она. Так же разбирается
+ответ, которого нет вовсе (обрыв, 5xx). Исходы — те, что экран делает по-разному: вступили (открыть
+полку), уже в ней, код недействителен (единственный текст B6), сервера нет.
+
 **Снимок не перезаписывает пользовательские локальные сведения.** Это запрет на замену срока,
 заметки, цены и других личных полей серверными умолчаниями, а не запрет на транзакционную запись
 любых локальных таблиц. `SnapshotApplier` (`queue/`) пишет серверные поля и снимок в записи о коробке;
@@ -2582,7 +2591,7 @@ com.kert0n.medapp
 │              ErrorMessage — платформа, а не правило
 ├─ platform/   notifications/, scanner/, credentials/, connectivity/, clipboard/
 └─ feature/    bootstrap/ (AppStart, AppStartState, AppStartViewModel, SetupScreen),
-               medkits/ (MedKitRemoval, MedKitPublishing), packages/ (PackageRemoval, PackageRelocation),
+               medkits/ (MedKitRemoval, MedKitPublishing, MedKitJoining), packages/ (PackageRemoval, PackageRelocation),
                courses/ (CourseClosing), schedule/, intake/ (IntakeConfirmation), sharing/, analytics/,
                scanner/, settings/, syncstatus/
 ```

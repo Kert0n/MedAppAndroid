@@ -1,6 +1,7 @@
 package com.kert0n.medapp.feature.medkits
 
 import com.kert0n.medapp.domain.course.CourseDraft
+import com.kert0n.medapp.domain.medkit.InvitationKey
 import com.kert0n.medapp.domain.medkit.MedKit
 import com.kert0n.medapp.domain.pack.PackageStatus
 import com.kert0n.medapp.domain.stock.StockMovement
@@ -26,6 +27,7 @@ import com.kert0n.medapp.fixture.packageRepository
 import com.kert0n.medapp.fixture.plannedIntake
 import com.kert0n.medapp.fixture.queueService
 import com.kert0n.medapp.fixture.queueStorage
+import com.kert0n.medapp.fixture.snapshotStorage
 import com.kert0n.medapp.fixture.source
 import com.kert0n.medapp.fixture.transactions
 import com.kert0n.medapp.network.medkit.MembershipPostNetworkDTO
@@ -37,6 +39,7 @@ import com.kert0n.medapp.network.value.toQuantityUnit
 import com.kert0n.medapp.queue.PackageSnapshotResolver
 import com.kert0n.medapp.queue.QueueHttpTransport
 import com.kert0n.medapp.queue.QueueWorker
+import com.kert0n.medapp.queue.SnapshotApplier
 import com.kert0n.medapp.queue.StoredSyncOperation
 import com.kert0n.medapp.queue.SyncCommand
 import com.kert0n.medapp.queue.SyncOperationStatus
@@ -488,7 +491,8 @@ class SharedMedKitProbe {
      * Анна переставила полку в общую, куда Борис вступил **только на сервере**: у него на устройстве
      * этой полки нет. Снимок называет незнакомую полку — это не «подождать», а утрата доступа:
      * операция закрыта, а не отложена навсегда; коробки у Бориса нет, лечение без источника (E6).
-     * Когда в приложении появится чтение общих полок, этот случай станет прыжком (сценарий 3).
+     * Следующий полный снимок приносит Борису и полку, и коробку на ней: сервер назвал полку нашей,
+     * и у нас её не было (E4).
      */
     @Test
     fun theBoxJumpsIntoAShelfBorisDoesNotHaveOnHisDevice(): Unit = runBlocking {
@@ -505,6 +509,12 @@ class SharedMedKitProbe {
         assertTrue("операции Бориса закрыты, а не ждут", boris.statuses().none { it == SyncOperationStatus.PENDING || it == SyncOperationStatus.ANSWERED })
         assertEquals(IntakeAccounting.REMOTE_REFUSED, boris.accountingOf(shared.intakes[1]))
         assertBorisLostTheBox(shared.box)
+
+        // У Бориса на сервере могут быть и другие полки, а база у пробы всякий раз свежая: снимок
+        // приносит все, каких у него нет, и дача среди них.
+        val read = boris.refresh()
+        assertTrue("дача не пришла: ${read.arrived}", dacha in read.arrived)
+        assertEquals(dacha, requireNotNull(boris.packages.find(shared.box)).medKit.id)
     }
 
     /** Коробки у Бориса нет, остаток ушёл в историю утратой доступа, лечение без источника, но идёт. */
@@ -528,6 +538,8 @@ class SharedMedKitProbe {
         private val transactions = database.transactions()
         val vocabulary = VocabularyResolver(VocabularyRoomRepository(database.vocabulary()), api)
         private val snapshots = PackageSnapshotResolver(vocabulary, database.queueStorage())
+        private val reading = SnapshotApplier(api, database.snapshotStorage(), vocabulary, snapshots, clock)
+        private val joining = MedKitJoining(reading)
         private val worker = QueueWorker(database.queueStorage(), QueueHttpTransport(api), vocabulary, snapshots, clock)
         val packages = database.packageRepository()
         private val courses = database.courseRepository()
@@ -566,18 +578,23 @@ class SharedMedKitProbe {
             assertTrue("полка не доведена: ${published.status}", published.acceptsInvitations)
         }
 
-        /** Вступление и то, что приложение пока не умеет само: положить полку с коробками к себе. */
+        /**
+         * Вступление — сценарием приложения: полка приходит «Общей аптечкой» вместе с коробками, и
+         * класть её руками пробе больше нечем (PLAN C0).
+         */
         suspend fun join(invitation: String) {
-            val joined = success(api.joinMedKit(MembershipPostNetworkDTO(invitation)))
-            database.medKits().upsert(
-                medKit(id = joined.id, name = "Общая", publication = MedKit.Publication.PUBLISHED, participantCount = joined.participantCount)
-                    .toMedKitStorageEntity()
-            )
-            val at = clock.instant()
-            for (dto in joined.packages) {
-                val resolved = snapshots.resolve(dto, at) as PackageSnapshotResolver.Resolution.Resolved
-                packages.applySnapshot(resolved.snapshot, at)
-            }
+            val outcome = joining.join(InvitationKey(invitation))
+            val joined = (outcome as? MedKitJoining.Outcome.Joined)?.medKitId
+                ?: throw AssertionError("вступление не состоялось: $outcome")
+            assertEquals("Общая аптечка", requireNotNull(database.medKits().find(joined)).name)
+        }
+
+        /** Полный снимок, как его читает приложение: легло всё, что названо. */
+        suspend fun refresh(): SnapshotApplier.Outcome.Applied {
+            val outcome = reading.refresh()
+            val applied = outcome as? SnapshotApplier.Outcome.Applied ?: throw AssertionError("снимок не прочитан: $outcome")
+            assertEquals("пропуски снимка: ${applied.skipped}", emptyList<String>(), applied.skipped)
+            return applied
         }
 
         /** Лечение из коробки: пять доз по две штуки выделено, три плановых приёма по дням. */

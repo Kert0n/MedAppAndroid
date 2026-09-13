@@ -1,21 +1,31 @@
 package com.kert0n.medapp.queue
 
 import com.kert0n.medapp.domain.Unavailability
+import com.kert0n.medapp.domain.medkit.InvitationKey
 import com.kert0n.medapp.network.account.asUnavailability
-import com.kert0n.medapp.network.server.ApiResult
+import com.kert0n.medapp.network.medkit.MedKitNetworkDTO
+import com.kert0n.medapp.network.medkit.MembershipPostNetworkDTO
 import com.kert0n.medapp.network.pack.PackageSnapshot
+import com.kert0n.medapp.network.server.ApiFailure
+import com.kert0n.medapp.network.server.ApiResult
 import com.kert0n.medapp.network.server.MedAppApi
 import com.kert0n.medapp.network.value.VocabularyResolver
 import java.time.Clock
+import java.time.Instant
 import javax.inject.Inject
 import javax.inject.Singleton
+import kotlin.uuid.Uuid
 
 /**
- * Читает у сервера полное состояние и кладёт его к себе (PLAN E4). Дешёвой сверки не существует —
+ * Читает у сервера, что нам доступно, и кладёт это к себе (PLAN E4). Дешёвой сверки не существует —
  * состав полки и число участников чужой расход не двигают (B6), — поэтому спрашивается всё сразу:
  * `GET /v1/users/me` отвечает не списком изменений, а **утверждением о целом**: вот полки, которые
  * я вижу, и вот всё, что на них лежит. Поэтому полка, которой у нас нет, в нём — штатный случай:
  * нас позвали, а ответ на вступление потерялся, — и заводится она здесь же.
+ *
+ * Вступление — тот же снимок, только одной полки: сервер отвечает на него полкой с содержимым, и
+ * разрешается и ложится она тем же путём ([join]). Утверждения о целом в нём нет, и пропажи оно не
+ * объявляет.
  *
  * Сеть между транзакциями, а не внутри (F5): сначала читается ответ, потом он разрешается в домен,
  * и только разрешённое ложится одной записью. Промах словаря дочитывается один раз за чтение —
@@ -47,10 +57,66 @@ class SnapshotApplier @Inject constructor(
         // Полку, которой у нас не было, снимок заводит: сервер назвал её нашей — вступили, а ответ
         // на вступление потерялся. Была и пропала, пока снимок летел, — её убрали, не заводим.
         val arriving = participants.keys - knew.heldMedKits
+        val resolution = resolve(read.medKits, arriving, at)
+        // Чего в снимке нет, к тому доступа больше нет. Считается это по названным номерам, а не
+        // по разрешённым: коробка, которую не удалось разрешить, названа сервером и не пропала.
+        val named = read.medKits.flatMapTo(HashSet()) { medKit -> medKit.packages.map { it.pack.id } }
+        val snapshot = ServerSnapshot(
+            participants = participants,
+            packages = resolution.packages,
+            goneMedKits = knew.medKits - participants.keys,
+            gonePackages = knew.packages - named,
+            arrivedMedKits = arriving,
+            heldPackages = knew.heldPackages
+        )
+        storage.lay(snapshot, at)
+        return Outcome.Applied(
+            medKits = participants.size,
+            packages = resolution.packages.size,
+            skipped = resolution.skipped,
+            arrived = arriving
+        )
+    }
+
+    /**
+     * Вступление по ключу приглашения: сервер отвечает полкой с содержимым, и она ложится одной
+     * записью — полка «Общей аптечкой» (C0), коробки со своими записями. Что делать, когда ответа
+     * нет или сервер говорит «уже вступили», решает сценарий: механизм отвечает только тем, что
+     * услышал.
+     */
+    suspend fun join(key: InvitationKey): Joining {
+        val at = clock.instant()
+        val knew = storage.serverKnows()
+        val joined = when (val answer = api.joinMedKit(MembershipPostNetworkDTO(key.value))) {
+            is ApiResult.Success -> answer.value
+            is ApiResult.Failure -> return when (val failure = answer.failure) {
+                // Неизвестный, истёкший ключ и вышедший пригласивший неразличимы (B6).
+                ApiFailure.NotFound -> Joining.InvitationInvalid
+                ApiFailure.Conflict -> Joining.AlreadyMember
+                ApiFailure.OutcomeUnknown -> Joining.OutcomeUnknown
+                else -> Joining.Refused(failure.asUnavailability())
+            }
+        }
+        val arriving = setOf(joined.id) - knew.heldMedKits
+        val resolution = resolve(listOf(joined), arriving, at)
+        val snapshot = ServerSnapshot(
+            participants = mapOf(joined.id to joined.participantCount),
+            packages = resolution.packages,
+            goneMedKits = emptySet(),
+            gonePackages = emptySet(),
+            arrivedMedKits = arriving,
+            heldPackages = knew.heldPackages
+        )
+        storage.lay(snapshot, at)
+        return Joining.Joined(joined.id)
+    }
+
+    /** Коробки названных полок — в домен; [arriving] — полки, которые этот же ответ и заводит. */
+    private suspend fun resolve(medKits: List<MedKitNetworkDTO>, arriving: Set<Uuid>, at: Instant): Resolution {
         val resolved = ArrayList<PackageSnapshot>()
         val skipped = ArrayList<String>()
         var vocabularyRefreshable = true
-        for (medKit in read.medKits) {
+        for (medKit in medKits) {
             for (dto in medKit.packages) {
                 var resolution = snapshots.resolve(dto, at, arriving)
                 if (resolution is PackageSnapshotResolver.Resolution.Unresolved && !resolution.stop && vocabularyRefreshable) {
@@ -67,30 +133,45 @@ class SnapshotApplier @Inject constructor(
                 }
             }
         }
-        // Чего в снимке нет, к тому доступа больше нет. Считается это по названным номерам, а не
-        // по разрешённым: коробка, которую не удалось разрешить, названа сервером и не пропала.
-        val named = read.medKits.flatMapTo(HashSet()) { medKit -> medKit.packages.map { it.pack.id } }
-        val snapshot = ServerSnapshot(
-            participants = participants,
-            packages = resolved,
-            goneMedKits = knew.medKits - participants.keys,
-            gonePackages = knew.packages - named,
-            arrivedMedKits = arriving,
-            heldPackages = knew.heldPackages
-        )
-        storage.lay(snapshot, at)
-        return Outcome.Applied(medKits = participants.size, packages = resolved.size, skipped = skipped)
+        return Resolution(resolved, skipped)
     }
+
+    private class Resolution(val packages: List<PackageSnapshot>, val skipped: List<String>)
 
     /**
      * Чем кончилось чтение. Различает поведение экрана состояния синхронизации: прочитали — видно
-     * время последнего успешного обновления, и [skipped] говорит, что легло не всё; не прочитали —
-     * названа причина, а кэш остаётся прежним (PLAN E4, H3 №28).
+     * время последнего успешного обновления, и [Applied.skipped] говорит, что легло не всё; не
+     * прочитали — названа причина, а кэш остаётся прежним (PLAN E4, H3 №28). [Applied.arrived] —
+     * полки, которые снимок завёл: по ним вступление с потерянным ответом узнаёт свою полку.
      */
     sealed interface Outcome {
 
-        data class Applied(val medKits: Int, val packages: Int, val skipped: List<String>) : Outcome
+        data class Applied(
+            val medKits: Int,
+            val packages: Int,
+            val skipped: List<String>,
+            val arrived: Set<Uuid>
+        ) : Outcome
 
         data class Refused(val reason: Unavailability) : Outcome
+    }
+
+    /** Что сервер ответил на вступление — ровно те случаи, которые сценарий разбирает по-разному. */
+    sealed interface Joining {
+
+        /** Вступили: полка [medKitId] с содержимым уже лежит у нас. */
+        data class Joined(val medKitId: Uuid) : Joining
+
+        /** 409: мы уже в этой полке — возможно, прошлый ответ потерялся. Номера полки сервер не даёт. */
+        data object AlreadyMember : Joining
+
+        /** Ключ неизвестен, истёк или пригласивший вышел: для нас это одно (B6). */
+        data object InvitationInvalid : Joining
+
+        /** Запрос уходил, а ответа нет: вступление могло состояться. */
+        data object OutcomeUnknown : Joining
+
+        /** Сервера сейчас нет — связи, ответа или нашей учётки. */
+        data class Refused(val reason: Unavailability) : Joining
     }
 }

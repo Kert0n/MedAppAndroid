@@ -1,6 +1,7 @@
 package com.kert0n.medapp.queue
 
 import com.kert0n.medapp.domain.Unavailability
+import com.kert0n.medapp.domain.medkit.InvitationKey
 import com.kert0n.medapp.domain.medkit.MedKit
 import com.kert0n.medapp.domain.medkit.MedKitRef
 import com.kert0n.medapp.domain.value.DosageForm
@@ -100,13 +101,22 @@ class SnapshotApplierTest {
     }
 
     /** Сервер: снимок по `/users/me`, словарь по своим путям; `online = false` — связи нет вовсе. */
-    private fun applier(storage: Laid, snapshot: String?, online: Boolean = true): SnapshotApplier {
+    private fun applier(
+        storage: Laid,
+        snapshot: String?,
+        online: Boolean = true,
+        joined: Pair<HttpStatusCode, String>? = null
+    ): SnapshotApplier {
         var units = 0
         val api = MedAppApi(
             medAppHttpClient(
                 MockEngine { request ->
                     if (!online) throw java.io.IOException("нет связи")
                     val path = request.url.encodedPath
+                    if (path.endsWith("/med-kit-memberships")) {
+                        val (status, body) = requireNotNull(joined) { "вступления в этом тесте нет" }
+                        return@MockEngine respond(body, status, headersOf(HttpHeaders.ContentType, "application/json"))
+                    }
                     val body = when {
                         path.endsWith("/users/me") -> snapshot ?: throw java.io.IOException("нет связи")
                         path.endsWith("/quantity-units") -> {
@@ -132,7 +142,7 @@ class SnapshotApplierTest {
 
         val outcome = applier(storage, snapshotJson(drug(PACK, HOME_KIT), drug(OTHER_PACK, HOME_KIT))).refresh()
 
-        assertEquals(SnapshotApplier.Outcome.Applied(medKits = 1, packages = 2, skipped = emptyList()), outcome)
+        assertEquals(SnapshotApplier.Outcome.Applied(medKits = 1, packages = 2, skipped = emptyList(), arrived = emptySet()), outcome)
         assertEquals(1, storage.calls)
         assertEquals(mapOf(HOME_KIT to 2L), storage.snapshot.participants)
         assertEquals(listOf(PACK, OTHER_PACK), storage.snapshot.packages.map { it.pack.id })
@@ -151,7 +161,7 @@ class SnapshotApplierTest {
             snapshotJson(drug(PACK, HOME_KIT), also = shelfJson(SHARED_KIT, drug(OTHER_PACK, SHARED_KIT)))
         ).refresh()
 
-        assertEquals(SnapshotApplier.Outcome.Applied(medKits = 2, packages = 2, skipped = emptyList()), outcome)
+        assertEquals(SnapshotApplier.Outcome.Applied(medKits = 2, packages = 2, skipped = emptyList(), arrived = setOf(SHARED_KIT)), outcome)
         assertEquals(setOf(SHARED_KIT), storage.snapshot.arrivedMedKits)
         assertEquals(SHARED_KIT, storage.snapshot.packages.single { it.pack.id == OTHER_PACK }.pack.medKit.id)
     }
@@ -182,7 +192,7 @@ class SnapshotApplierTest {
 
         val outcome = applier(storage, snapshotJson(drug(PACK, HOME_KIT, unitId = MILLILITRES.id))).refresh()
 
-        assertEquals(SnapshotApplier.Outcome.Applied(medKits = 1, packages = 1, skipped = emptyList()), outcome)
+        assertEquals(SnapshotApplier.Outcome.Applied(medKits = 1, packages = 1, skipped = emptyList(), arrived = emptySet()), outcome)
         assertEquals(MILLILITRES, storage.snapshot.packages.single().pack.quantity.unit)
     }
 
@@ -223,6 +233,42 @@ class SnapshotApplierTest {
         val outcome = applier(storage, snapshot = null, online = false).refresh()
 
         assertEquals(SnapshotApplier.Outcome.Refused(Unavailability.NO_CONNECTION), outcome)
+        assertEquals(0, storage.calls)
+    }
+
+    /**
+     * Вступление — тот же снимок, только одной полки: сервер отвечает полкой с содержимым, и она
+     * ложится одной записью, заводясь у нас. Утверждения о целом в нём нет — пропажи оно не
+     * объявляет (PLAN C0, E4).
+     */
+    @Test
+    fun joiningLaysTheShelfWithItsBoxesAndDeclaresNothingGone() = runTest {
+        val storage = Laid(knowledge(medKits = setOf(HOME_KIT), packages = setOf(PACK)))
+        val shelf = """{"id":"$SHARED_KIT","userCount":3,"drugs":[${drug(OTHER_PACK, SHARED_KIT)}]}"""
+
+        val joining = applier(storage, snapshot = null, joined = HttpStatusCode.Created to shelf)
+            .join(InvitationKey("ключ"))
+
+        assertEquals(SnapshotApplier.Joining.Joined(SHARED_KIT), joining)
+        assertEquals(mapOf(SHARED_KIT to 3L), storage.snapshot.participants)
+        assertEquals(setOf(SHARED_KIT), storage.snapshot.arrivedMedKits)
+        assertEquals(listOf(OTHER_PACK), storage.snapshot.packages.map { it.pack.id })
+        assertEquals(emptySet<Uuid>(), storage.snapshot.goneMedKits)
+        assertEquals(emptySet<Uuid>(), storage.snapshot.gonePackages)
+    }
+
+    /** «Уже вступили» и «код недействителен» — ответы, а не снимок: класть нечего. */
+    @Test
+    fun joiningRefusalsLayNothing() = runTest {
+        val storage = Laid(knowledge())
+
+        val already = applier(storage, snapshot = null, joined = HttpStatusCode.Conflict to "").join(InvitationKey("ключ"))
+        val invalid = applier(storage, snapshot = null, joined = HttpStatusCode.NotFound to "").join(InvitationKey("ключ"))
+        val unknown = applier(storage, snapshot = null, joined = HttpStatusCode.BadGateway to "").join(InvitationKey("ключ"))
+
+        assertEquals(SnapshotApplier.Joining.AlreadyMember, already)
+        assertEquals(SnapshotApplier.Joining.InvitationInvalid, invalid)
+        assertEquals(SnapshotApplier.Joining.OutcomeUnknown, unknown)
         assertEquals(0, storage.calls)
     }
 }
