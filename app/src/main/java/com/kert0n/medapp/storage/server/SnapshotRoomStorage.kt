@@ -24,6 +24,11 @@ import kotlin.uuid.Uuid
  * решает дверь `PackageDao.applySnapshot` по версиям; что появилось и чего не стало — решено в
  * очереди, а у знакомой полки снимок трогает **только** число участников: название и место
  * хранения серверу неизвестны (F1).
+ *
+ * Оба пути смотрят на нынешнее состояние одинаково. Положительный не кладёт коробку с запросом в
+ * полёте и не возвращает убранную; отрицательный кончает только то, о чём сервер знает и ждать
+ * нечего **на момент укладки**, а не на момент чтения. Односторонняя проверка стоила коробки:
+ * снимок, начатый до уноса домой, кончал коробку, которая к этому мигу была уже местной и целой.
  */
 class SnapshotRoomStorage @Inject constructor(
     private val database: MedAppDatabase,
@@ -72,12 +77,22 @@ class SnapshotRoomStorage @Inject constructor(
             if (removed || medKits.find(resolved.pack.medKit.id) == null) continue
             packages.applySnapshot(resolved, observedAt = at)
         }
+        // «Сервер знал, и ждать нечего» посчитано до запроса, а применяется после него — и за это
+        // время человек мог унести коробку домой, пометить её или сделать её полку местной.
+        // Поэтому тот же вопрос задаётся второй раз, уже здесь: отсутствие кончает только то, о чём
+        // ждать нечего **и сейчас**. Остальное объяснит ответ на его собственную команду (PLAN E4).
+        val knownPackages = packages.knownToServer().toSet()
+        val knownMedKits = medKits.knownToServer().toSet()
         // Коробка кончается своим переходом, полка уходит вместе с содержимым — обе двери те же,
         // какими пользуется ответ сервера на нашу команду (PLAN D3, E6).
         for (packageId in snapshot.gonePackages) {
+            if (packageId !in knownPackages) continue
             val pkg = packages.find(packageId)?.toDomain(words) ?: continue
             packages.end(pkg.ended(), courses, words, at)
         }
-        for (medKitId in snapshot.goneMedKits) medKits.loseAccess(medKitId, packages, courses, words, at)
+        for (medKitId in snapshot.goneMedKits) {
+            if (medKitId !in knownMedKits) continue
+            medKits.loseAccess(medKitId, packages, courses, words, at)
+        }
     }
 }
