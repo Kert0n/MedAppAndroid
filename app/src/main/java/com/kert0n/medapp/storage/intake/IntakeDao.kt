@@ -62,6 +62,17 @@ interface IntakeDao {
     @Query("SELECT * FROM intakes WHERE course_id IN (:courseIds) ORDER BY scheduled_at")
     suspend fun ofCourses(courseIds: List<Uuid>): List<IntakeStorageRow>
 
+    /**
+     * Когда из каждой из названных коробок брали последний раз — самый поздний мой приём из неё,
+     * курсовой или разовый, по моменту, который назвал человек: приём задним числом назад его не
+     * сдвигает (PLAN D4). Одним чтением на порцию — списку пачек, а не по пачке.
+     */
+    @Query(
+        "SELECT taken_package_id AS package_id, MAX(answered_at) AS last_used_at FROM intakes " +
+            "WHERE status = 'TAKEN' AND taken_package_id IN (:packageIds) GROUP BY taken_package_id"
+    )
+    suspend fun lastTakenFrom(packageIds: List<Uuid>): List<PackageLastUseStorageRow>
+
     @Upsert
     suspend fun upsert(intake: IntakeStorageEntity)
 

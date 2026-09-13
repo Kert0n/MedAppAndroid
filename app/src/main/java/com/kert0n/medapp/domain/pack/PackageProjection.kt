@@ -14,7 +14,10 @@ import kotlin.uuid.Uuid
  * [availability] — оценка с незакрытыми командами очереди поверх, [hasUnconfirmedChanges] —
  * вложено ли в неё незакрытое изменение остатка (PLAN E1); [quantity] — подтверждённое.
  * [status] — решение о самой коробке, которое ещё не подтвердили: вопрос не о числе, и экран
- * показывает его отдельно.
+ * показывает его отдельно. [holdingCourseId] — идущий курс, которому коробка назначена (другому
+ * её не отдать); [lastUsedAt] — момент самого позднего моего приёма из неё, курсового или
+ * разового; приёмов не было — `null`. Обе вещи знает не коробка, а те, кто её держит и брал,
+ * и приносит их тот, кто читал (PLAN D4).
  */
 data class PackageProjection(
     val id: Uuid,
@@ -26,6 +29,8 @@ data class PackageProjection(
     val claims: Claims?,
     val availability: PackageAvailability,
     val hasUnconfirmedChanges: Boolean,
+    val holdingCourseId: Uuid?,
+    val lastUsedAt: Instant?,
     val status: PackageStatus = PackageStatus.ACTIVE
 ) {
     init {

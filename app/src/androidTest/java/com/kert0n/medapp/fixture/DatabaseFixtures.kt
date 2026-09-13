@@ -70,7 +70,7 @@ suspend fun rejectedByDatabase(block: suspend () -> Unit): Throwable =
  * владельцев несколько DAO; собирать их в каждом тесте заново значило бы повторять граф руками.
  */
 fun MedAppDatabase.packageRepository() = com.kert0n.medapp.storage.pack.PackageRoomRepository(
-    this, packages(), courses(), syncOperations(), vocabulary()
+    this, packages(), courses(), syncOperations(), intakes(), vocabulary()
 )
 
 fun MedAppDatabase.courseRepository() = com.kert0n.medapp.storage.course.CourseRoomRepository(

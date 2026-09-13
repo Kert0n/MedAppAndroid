@@ -73,9 +73,13 @@ fun pack(
     claims = claims
 )
 
-/** Проекция пачки без очереди и выделений: оценка равна подтверждённому остатку. */
-fun Package.projected(hasUnconfirmedChanges: Boolean = false): PackageProjection =
-    projection(PackageAvailability(this, effective = quantity), hasUnconfirmedChanges)
+/** Проекция пачки без очереди, выделений и приёмов: оценка равна подтверждённому остатку. */
+fun Package.projected(
+    hasUnconfirmedChanges: Boolean = false,
+    holdingCourseId: Uuid? = null,
+    lastUsedAt: Instant? = null
+): PackageProjection =
+    projection(PackageAvailability(this, effective = quantity), hasUnconfirmedChanges, holdingCourseId, lastUsedAt)
 
 /**
  * Оставшаяся после перехода коробка. Тест, который её ждёт, говорит об этом прямо, а не молча

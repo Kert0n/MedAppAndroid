@@ -71,7 +71,7 @@ class CourseRoomRepository @Inject constructor(
     private suspend fun coveragesOf(plans: List<CourseInProgress>, words: Vocabulary): Map<Uuid, CourseCoverage> {
         val ids = plans.flatMap { plan -> plan.course.sources.map { it.pkg.id } }.distinct()
         val living = ids.chunkedForQuery().flatMap { packages.among(it) }.map { it.toDomain(words) }
-        val projected = packages.projectionsOf(living, queue, words).associateBy { it.id }
+        val projected = packages.projectionsOf(living, queue, intakes, words).associateBy { it.id }
         return plans.associate { plan ->
             val availability = Availability(
                 plan.course.sources.associate { source ->

@@ -17,6 +17,7 @@ import com.kert0n.medapp.storage.course.toSourceStorageEntities
 import com.kert0n.medapp.storage.course.toStorageEntity as toCourseStorageEntity
 import com.kert0n.medapp.storage.database.MedAppDatabase
 import com.kert0n.medapp.storage.database.observing
+import com.kert0n.medapp.storage.intake.IntakeDao
 import com.kert0n.medapp.storage.server.SyncOperationDao
 import com.kert0n.medapp.storage.value.VocabularyDao
 import java.time.Instant
@@ -31,6 +32,7 @@ class PackageRoomRepository @Inject constructor(
     private val packages: PackageDao,
     private val courses: CourseDao,
     private val queue: SyncOperationDao,
+    private val intakes: IntakeDao,
     private val vocabulary: VocabularyDao
 ) : PackageStorageRepository {
 
@@ -143,7 +145,7 @@ class PackageRoomRepository @Inject constructor(
     private suspend fun projectionOf(id: Uuid): PackageProjection? = database.withTransaction {
         val words = vocabulary.snapshot()
         val pkg = packages.find(id)?.toDomain(words) ?: return@withTransaction null
-        packages.projectionsOf(listOf(pkg), queue, words).single()
+        packages.projectionsOf(listOf(pkg), queue, intakes, words).single()
     }
 
     /**
@@ -163,14 +165,14 @@ class PackageRoomRepository @Inject constructor(
         database.withTransaction {
             val words = vocabulary.snapshot()
             val found = packages.matching(query, today).map { it.toDomain(words) }
-            val projected = packages.projectionsOf(found, queue, words)
+            val projected = packages.projectionsOf(found, queue, intakes, words)
             if (query.filter != PackageQuery.Filter.HasFree) projected
             else projected.filter { !it.availability.freeForAnyone.isZero }
         }
 
     private companion object {
 
-        /** Из чего складывается доступность: пачка с её сведениями и бронями, очередь, выделения. */
+        /** Из чего складывается проекция: пачка с её сведениями и бронями, очередь, выделения, приёмы. */
         val AVAILABILITY_TABLES = arrayOf(
             "packages",
             "package_records",
@@ -179,7 +181,8 @@ class PackageRoomRepository @Inject constructor(
             "sync_operations",
             "courses",
             "course_sources",
-            "active_package_assignments"
+            "active_package_assignments",
+            "intakes"
         )
     }
 }

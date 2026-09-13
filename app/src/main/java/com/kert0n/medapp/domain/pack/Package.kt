@@ -56,9 +56,15 @@ class Package(
 
     /**
      * Как пачку видит экран: состояние вместе с доступностью, посчитанной тем, кто читал очередь и
-     * выделения (PLAN D4, E1). Величина — наружу уходит она, а не сущность.
+     * выделения, курсом, который её держит, и моментом последнего моего приёма из неё (PLAN D4,
+     * E1). Величина — наружу уходит она, а не сущность.
      */
-    fun projection(availability: PackageAvailability, hasUnconfirmedChanges: Boolean): PackageProjection =
+    fun projection(
+        availability: PackageAvailability,
+        hasUnconfirmedChanges: Boolean,
+        holdingCourseId: Uuid?,
+        lastUsedAt: Instant?
+    ): PackageProjection =
         PackageProjection(
             id = id,
             medKit = medKit,
@@ -69,6 +75,8 @@ class Package(
             claims = claims,
             availability = availability,
             hasUnconfirmedChanges = hasUnconfirmedChanges,
+            holdingCourseId = holdingCourseId,
+            lastUsedAt = lastUsedAt,
             status = status
         )
 
