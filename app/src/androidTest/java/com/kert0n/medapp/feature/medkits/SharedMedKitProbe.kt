@@ -1,7 +1,5 @@
 package com.kert0n.medapp.feature.medkits
 
-import android.os.Bundle
-import androidx.test.platform.app.InstrumentationRegistry
 import com.kert0n.medapp.domain.course.CourseDraft
 import com.kert0n.medapp.domain.medkit.MedKit
 import com.kert0n.medapp.domain.pack.PackageStatus
@@ -14,6 +12,7 @@ import com.kert0n.medapp.feature.intake.IntakeConfirmation
 import com.kert0n.medapp.fixture.COURSE
 import com.kert0n.medapp.fixture.FIRST_PLANNED_AT
 import com.kert0n.medapp.fixture.FIRST_SCHEDULED_ON
+import com.kert0n.medapp.fixture.ProbeAccounts
 import com.kert0n.medapp.fixture.Scenarios
 import com.kert0n.medapp.fixture.activeCourse
 import com.kert0n.medapp.fixture.courseRecord
@@ -29,17 +28,11 @@ import com.kert0n.medapp.fixture.queueService
 import com.kert0n.medapp.fixture.queueStorage
 import com.kert0n.medapp.fixture.source
 import com.kert0n.medapp.fixture.transactions
-import com.kert0n.medapp.network.account.AccessTokens
-import com.kert0n.medapp.network.account.AccountCredentials
-import com.kert0n.medapp.network.account.CredentialSource
-import com.kert0n.medapp.network.account.CredentialsSaved
-import com.kert0n.medapp.network.account.StoredAccount
 import com.kert0n.medapp.network.medkit.MedKitPublication
 import com.kert0n.medapp.network.medkit.MembershipPostNetworkDTO
 import com.kert0n.medapp.network.server.ApiFailure
 import com.kert0n.medapp.network.server.ApiResult
 import com.kert0n.medapp.network.server.MedAppApi
-import com.kert0n.medapp.network.server.medAppHttpClient
 import com.kert0n.medapp.network.value.VocabularyResolver
 import com.kert0n.medapp.network.value.toQuantityUnit
 import com.kert0n.medapp.queue.PackageSnapshotResolver
@@ -53,11 +46,9 @@ import com.kert0n.medapp.queue.medkit.MedKitPublishing
 import com.kert0n.medapp.storage.intake.toStorageEntity as toIntakeStorageEntity
 import com.kert0n.medapp.storage.medkit.toStorageEntity as toMedKitStorageEntity
 import com.kert0n.medapp.storage.value.VocabularyRoomRepository
-import io.ktor.client.engine.okhttp.OkHttp
 import java.math.BigDecimal
 import java.time.Clock
 import java.time.Duration
-import java.time.Instant
 import kotlin.uuid.Uuid
 import kotlinx.coroutines.runBlocking
 import org.junit.After
@@ -67,7 +58,6 @@ import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Assume.assumeTrue
 import org.junit.Before
-import org.junit.BeforeClass
 import org.junit.Test
 
 /**
@@ -88,49 +78,7 @@ import org.junit.Test
  */
 class SharedMedKitProbe {
 
-    private class Fixed(private val account: AccountCredentials) : CredentialSource {
-        override suspend fun read(): StoredAccount = StoredAccount.Present(account)
-        override suspend fun save(credentials: AccountCredentials): CredentialsSaved =
-            error("проба учёток не заводит: они заведены один раз и лежат в local.properties")
-
-        override suspend fun confirm(): CredentialsSaved = CredentialsSaved.SAVED
-    }
-
     companion object {
-        private var annasApi: MedAppApi? = null
-        private var borisApi: MedAppApi? = null
-
-        /** Почему проба не идёт; `null` — идёт. */
-        private var skipReason: String? = null
-
-        /** Клиенты — на весь прогон: пропуск выдаётся один раз на пользователя, сервер считает выдачи. */
-        @BeforeClass
-        @JvmStatic
-        fun connect() {
-            val arguments = InstrumentationRegistry.getArguments()
-            val baseUrl = arguments.getString("probeBaseUrl")
-            val anna = credentials(arguments, "A")
-            val boris = credentials(arguments, "B")
-            when {
-                baseUrl.isNullOrBlank() -> skipReason = "сценарии двух людей включаются только -Pprobe"
-                anna == null || boris == null -> skipReason = "пробные пользователи не заведены: scripts/register-probe-users.sh"
-                else -> {
-                    annasApi = api(baseUrl, anna)
-                    borisApi = api(baseUrl, boris)
-                }
-            }
-        }
-
-        private fun credentials(arguments: Bundle, user: String): AccountCredentials? {
-            val login = arguments.getString("probeLogin$user")
-            val key = arguments.getString("probeKey$user")
-            if (login.isNullOrBlank() || key.isNullOrBlank()) return null
-            return AccountCredentials(Uuid.parse(login), key)
-        }
-
-        private fun api(baseUrl: String, account: AccountCredentials) =
-            MedAppApi(medAppHttpClient(OkHttp.create(), baseUrl, tokens = AccessTokens(Fixed(account))))
-
         private fun <T> success(result: ApiResult<T>): T = when (result) {
             is ApiResult.Success -> result.value
             is ApiResult.Failure -> throw AssertionError("ожидался успех: $result")
@@ -147,9 +95,11 @@ class SharedMedKitProbe {
 
     @Before
     fun open(): Unit = runBlocking {
+        // Клиенты общие на весь прогон: пропуск выдаётся один раз на пользователя (ProbeAccounts).
+        val skipReason = ProbeAccounts.skipReason
         assumeTrue(skipReason.orEmpty(), skipReason == null)
-        anna = Device(requireNotNull(annasApi))
-        boris = Device(requireNotNull(borisApi))
+        anna = Device(requireNotNull(ProbeAccounts.anna))
+        boris = Device(requireNotNull(ProbeAccounts.boris))
         success(anna.vocabulary.refresh())
         success(boris.vocabulary.refresh())
         unit = success(anna.api.quantityUnits()).first().toQuantityUnit()
@@ -157,7 +107,7 @@ class SharedMedKitProbe {
 
     @After
     fun close(): Unit = runBlocking {
-        if (skipReason != null) return@runBlocking
+        if (ProbeAccounts.skipReason != null) return@runBlocking
         val left = shelves.filter { shelf ->
             val result = anna.api.deleteMedKit(shelf)
             result is ApiResult.Failure && result.failure != ApiFailure.NotFound
