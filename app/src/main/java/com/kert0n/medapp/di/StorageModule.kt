@@ -8,6 +8,7 @@ import com.kert0n.medapp.storage.medkit.MedKitRoomRepository
 import com.kert0n.medapp.storage.medkit.MedKitStorageRepository
 import com.kert0n.medapp.storage.pack.PackageRoomRepository
 import com.kert0n.medapp.storage.pack.PackageStorageRepository
+import com.kert0n.medapp.storage.server.QueueBacklogRoomStorage
 import com.kert0n.medapp.storage.server.QueueRoomStorage
 import com.kert0n.medapp.storage.server.SnapshotRoomStorage
 import com.kert0n.medapp.storage.server.SyncOperationRoomRepository
@@ -15,6 +16,7 @@ import com.kert0n.medapp.storage.server.SyncOperationStorageRepository
 import com.kert0n.medapp.storage.stock.StockMovementRoomRepository
 import com.kert0n.medapp.storage.stock.StockMovementStorageRepository
 import com.kert0n.medapp.network.value.VocabularyStore
+import com.kert0n.medapp.queue.QueueBacklog
 import com.kert0n.medapp.queue.QueueStorage
 import com.kert0n.medapp.queue.SnapshotStorage
 import com.kert0n.medapp.queue.Transactions
@@ -76,6 +78,11 @@ abstract class StorageModule {
     @Binds
     @Singleton
     abstract fun queueStorage(implementation: QueueRoomStorage): QueueStorage
+
+    /** Остаток очереди — планировщику заходов без живого процесса (PLAN E4). */
+    @Binds
+    @Singleton
+    abstract fun queueBacklog(implementation: QueueBacklogRoomStorage): QueueBacklog
 
     /** Чтение полного снимка кладёт его через свой порт — одной транзакцией (PLAN E4). */
     @Binds

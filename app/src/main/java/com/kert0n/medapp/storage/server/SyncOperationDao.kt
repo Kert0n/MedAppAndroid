@@ -166,6 +166,16 @@ interface SyncOperationDao {
     )
     suspend fun nextDueAt(now: Instant): Instant?
 
+    /**
+     * Ближайший срок среди **всех** незакрытых операций, прошедший в том числе: ждущая связи срока
+     * не имеет и отвечает началом эпохи. `null` — незакрытых нет. В отличие от [nextDueAt], вопрос
+     * здесь не «когда проснуться процессу», а «надо ли будить процесс вовсе» (PLAN E4).
+     */
+    @Query(
+        "SELECT MIN(COALESCE(not_before, 0)) FROM sync_operations WHERE status IN ('PENDING', 'SENDING', 'ANSWERED')"
+    )
+    suspend fun earliestDueOfUnclosed(): Instant?
+
     /** Замораживает запрос и берёт в отправку — только если операция ещё не закрыта. */
     @Query(
         "UPDATE sync_operations SET status = 'SENDING', " +
