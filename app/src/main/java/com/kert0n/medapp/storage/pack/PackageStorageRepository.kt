@@ -30,6 +30,12 @@ interface PackageStorageRepository {
 
     suspend fun find(id: Uuid): Package?
 
+    /**
+     * Проекция внутри транзакции сценария — та же, что несёт [observe], с командами, которые
+     * сценарий только что поставил: сколько в коробке будет после всех незакрытых решений (E1).
+     */
+    suspend fun projection(id: Uuid): PackageProjection?
+
     /** Список экрана: `today` приходит аргументом, потому что база системных часов не читает. */
     fun list(query: PackageQuery, today: LocalDate): Flow<List<PackageProjection>>
 

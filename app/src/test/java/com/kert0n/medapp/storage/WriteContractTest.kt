@@ -66,6 +66,7 @@ class WriteContractTest {
         // Упаковка
         "PackageStorageRepository.observe" to (Shape.READ by "(Uuid): Flow<PackageProjection>"),
         "PackageStorageRepository.find" to (Shape.READ by "(Uuid): Package"),
+        "PackageStorageRepository.projection" to (Shape.READ by "(Uuid): PackageProjection"),
         "PackageStorageRepository.list" to (Shape.READ by "(PackageQuery, LocalDate): Flow<List<PackageProjection>>"),
         "PackageStorageRepository.contentsOf" to (Shape.READ by "(Uuid): List<Package>"),
         "PackageStorageRepository.observeSyncState" to (Shape.READ by "(Uuid): Flow<PackageSyncState>"),

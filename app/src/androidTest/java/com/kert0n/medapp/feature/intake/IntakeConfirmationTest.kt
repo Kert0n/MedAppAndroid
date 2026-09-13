@@ -284,6 +284,23 @@ class IntakeConfirmationTest {
     }
 
     /**
+     * Доза и пункт в таблетках, а пачку теперь считают в миллилитрах, и их меньше дозы: числа
+     * разных единиц не сравниваются — отказ по единице, а не по нехватке.
+     *
+     * Красная проверка: сравнить числа до акта по пачке — `INSUFFICIENT`.
+     */
+    @Test
+    fun aSmallPackageInAnotherUnitIsRefusedByUnitNotByShortage() = runTest {
+        activate()
+        packages.add(pack(id = OTHER_PACK, quantity = millilitres("1")))
+
+        val refused = confirmation.confirm(INTAKE, OTHER_PACK, dose("2"), FIRST_PLANNED_AT).exceptionOrNull()
+
+        assertEquals(IntakeRejected.Reason.UNIT_MISMATCH, (refused as IntakeRejected).reason)
+        assertEquals(IntakeStatus.PLANNED, requireNotNull(intakes.find(INTAKE)).status)
+    }
+
+    /**
      * Пачка вне источников курса той же единицей: пункт курса принимают из пачки курса, а такой
      * приём — внеплановый факт, и пункт им не закрывается (PLAN D5). Отказ до записи: ни остатка,
      * ни статуса, ни команды.

@@ -63,7 +63,11 @@ class PackageAdjusting @Inject constructor(
         return after
     }
 
-    /** Полка, отвечающая серверу: команда-разница и пометка; число — то, что покажет проекция. */
+    /**
+     * Полка, отвечающая серверу: команда-разница и пометка; число — то, что покажет проекция, со
+     * всеми незакрытыми решениями по коробке, а не с одним этим: прежний пересчёт, ещё не
+     * доехавший, в нём уже учтён.
+     */
     private suspend fun announce(pkg: Package, action: Action, now: Instant): Quantity {
         val command = when (action) {
             is Action.Recount -> PackageSyncCommand.CorrectStock(pkg.id, seen = action.seen, actual = action.actual)
@@ -73,7 +77,7 @@ class PackageAdjusting @Inject constructor(
             check(packages.mark(pkg.id, PackageStatus.CHANGING)) { "пачка прочитана этой же транзакцией" }
             true
         }
-        return command.onto(pkg.quantity)
+        return checkNotNull(packages.projection(pkg.id)) { "пачка прочитана этой же транзакцией" }.availability.effective
     }
 
     /**

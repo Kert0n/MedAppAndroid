@@ -51,6 +51,8 @@ class PackageRoomRepository @Inject constructor(
     override suspend fun find(id: Uuid): Package? =
         packages.find(id)?.toDomain(vocabulary.snapshot())
 
+    override suspend fun projection(id: Uuid): PackageProjection? = projectionOf(id)
+
     override fun list(query: PackageQuery, today: LocalDate): Flow<List<PackageProjection>> =
         onChange { listing(query, today) }
 

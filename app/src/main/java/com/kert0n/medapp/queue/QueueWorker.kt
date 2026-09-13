@@ -137,7 +137,7 @@ class QueueWorker @Inject constructor(
             }
             is ApiResult.Failure -> when (val failure = result.failure) {
                 // Версия устарела — сервер отверг запрос до применения; 409 о версии не говорит.
-                ApiFailure.PreconditionFailed -> Step.Settled(stale(taken.command, request))
+                ApiFailure.PreconditionFailed -> Step.Settled(stale(taken, request))
                 ApiFailure.Conflict -> Step.Settled(conflict(taken.command))
                 ApiFailure.PreconditionRequired -> Step.Settled(refused(taken.command, RefusalReason.INVALID))
                 is ApiFailure.Invalid ->
@@ -208,16 +208,18 @@ class QueueWorker @Inject constructor(
      * Версия устарела — сервер отверг запрос до применения, в журнал он не попал: гонка длиной в
      * секунды. Любая команда пачки готовится заново по свежему состоянию под тем же номером —
      * разница человека ложится поверх чужого изменения, а сводима ли она, решает подготовка
-     * (PLAN E3, C1). У курсового расхода прежде смотрится бронь: потерянный ответ, за которым
-     * пришёл отказ по версии, оставляет след в `mine`, и тогда расход применён.
+     * (PLAN E3, C1). Прежде смотрится, не применён ли запрос уже: у курсового расхода потерянный
+     * ответ оставляет след в `mine`; у пересчёта, чей исход неизвестен, — число, к которому он
+     * вёл. Разница, переподготовленная поверх себя же, применилась бы дважды.
      */
-    private suspend fun stale(command: SyncCommand, request: PreparedRequest): Delivery = when (command) {
+    private suspend fun stale(operation: SyncOperation, request: PreparedRequest): Delivery = when (val command = operation.command) {
         is PackageSyncCommand -> snapshotThen(command.packageId) { snapshot ->
-            if (command is PackageSyncCommand.Consume && command.provenAppliedBy(snapshot, request)) {
-                Delivery.Applied(PackageState.Present(snapshot))
-            } else {
-                Delivery.Stale(snapshot)
+            val applied = when (command) {
+                is PackageSyncCommand.Consume -> command.provenAppliedBy(snapshot, request)
+                is PackageSyncCommand.CorrectStock -> operation.outcomeUnknown && command.provenAppliedBy(snapshot, request)
+                else -> false
             }
+            if (applied) Delivery.Applied(PackageState.Present(snapshot)) else Delivery.Stale(snapshot)
         }
         is MedKitSyncCommand -> Delivery.Refused(RefusalReason.STALE, PackageState.None)
         else -> command.unknownRoot()

@@ -144,6 +144,24 @@ class SyncCommandStorageConverterTest {
         )
     }
 
+    /**
+     * Пересчёт версии 1 нёс одно абсолютное число: разницы из него не восстановить, и строка — не
+     * повреждённая, а неизвестной версии. Виды, чей формат не менялся, с версии 1 читаются.
+     */
+    @Test
+    fun anAbsoluteRecountOfVersionOneIsOfUnknownVersionWhileOtherKindsStillRead() {
+        val oldRecount = """{"packageId":"$PACK","actual":"10","actualUnitId":"${TABLETS.id}"}"""
+        assertNull(SyncCommandStorageConverter.commandOf("PACKAGE_CORRECT_STOCK", oldRecount, 1, VOCABULARY))
+
+        val delete = PackageSyncCommand.Delete(OTHER_PACK)
+        assertEquals(
+            delete,
+            SyncCommandStorageConverter.commandOf(
+                SyncCommandStorageConverter.kindOf(delete), SyncCommandStorageConverter.payloadOf(delete), 1, VOCABULARY
+            )
+        )
+    }
+
     /** Вид команды, которого эта сборка не знает, — обычное следствие обновления приложения. */
     @Test
     fun anUnknownKindIsUnreadableToo() {

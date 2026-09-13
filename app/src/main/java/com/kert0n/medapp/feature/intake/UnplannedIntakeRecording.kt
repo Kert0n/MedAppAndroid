@@ -54,12 +54,12 @@ class UnplannedIntakeRecording @Inject constructor(
         val pkg = packages.find(packageId) ?: return@run Outcome.Rejected(IntakeRejected.Reason.PACKAGE_UNUSABLE)
         val taken = pkg.take(amount, at).getOrElse { return@run Outcome.Rejected((it as IntakeRejected).reason) }
         val spendsLocally = !pkg.medKit.answersToServer
-        if (spendsLocally && amount.quantity.amount > pkg.quantity.amount) return@run Outcome.Rejected(IntakeRejected.Reason.INSUFFICIENT)
+        if (spendsLocally && !pkg.quantity.covers(amount)) return@run Outcome.Rejected(IntakeRejected.Reason.INSUFFICIENT)
         // Занятое — моё выделение и чужие брони: домен считает от факта, а не от очереди (D4).
         val myAllocation = courses.courseHolding(pkg.id)?.let { courses.openPlan(it).allocatedOf(pkg.ref) }
             ?: Quantity.zero(pkg.quantity.unit)
         val free = PackageAvailability(pkg, effective = pkg.quantity, myAllocation = myAllocation).freeForAnyone
-        if (amount.quantity.amount > free.amount && !touchingReservedConfirmed) return@run Outcome.TouchesReserved(free)
+        if (!free.covers(amount) && !touchingReservedConfirmed) return@run Outcome.TouchesReserved(free)
 
         val now = clock.instant()
         val intake = UnplannedIntake(Uuid.random(), taken)

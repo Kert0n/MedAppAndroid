@@ -31,7 +31,6 @@ import com.kert0n.medapp.storage.medkit.toStorageEntity as toMedKitStorageEntity
 import com.kert0n.medapp.fixture.save
 import com.kert0n.medapp.storage.intake.toStorageEntity as toIntakeStorageEntity
 import com.kert0n.medapp.storage.value.toStorageEntity
-import java.util.concurrent.Executors
 import kotlin.uuid.Uuid
 import kotlinx.coroutines.test.runTest
 import org.junit.After
@@ -56,7 +55,9 @@ class ObjectReferencesTest {
     fun openDatabase() = runTest {
         val context = InstrumentationRegistry.getInstrumentation().targetContext
         database = Room.inMemoryDatabaseBuilder(context, MedAppDatabase::class.java)
-            .setQueryCallback({ sql, _ -> synchronized(queries) { queries += sql } }, Executors.newSingleThreadExecutor())
+            // Колбэк — в том же потоке, что запрос: иначе подсчёт мог бы прочитать список раньше,
+            // чем в него дописаны чтения, и пустой счёт прошёл бы проверку.
+            .setQueryCallback({ sql, _ -> synchronized(queries) { queries += sql } }, { command -> command.run() })
             .build()
         database.vocabulary().save(
             units = listOf(TABLETS, MILLILITRES).map { it.toStorageEntity() },
@@ -127,7 +128,7 @@ class ObjectReferencesTest {
         val recordReads = synchronized(queries) {
             queries.filter { it.trimStart().startsWith("SELECT", ignoreCase = true) && it.contains("FROM `package_records`") }
         }
-        assertTrue("чтений package_records: ${recordReads.size}", recordReads.size <= 2)
+        assertTrue("чтений package_records: ${recordReads.size}", recordReads.size in 1..2)
         assertTrue(recordReads.all { it.contains("WHERE `id` IN (") })
     }
 }

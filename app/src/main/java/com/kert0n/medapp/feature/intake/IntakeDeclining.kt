@@ -20,8 +20,8 @@ import kotlin.uuid.Uuid
  * может числом доз.
  *
  * Переход условный — из `PLANNED` (F2, F5): пункт, отвеченный тем временем, не перетирается, и
- * повтор ничего не меняет. Прошлое отмечается раньше (F4). Момент называет человек ([at]):
- * отказаться можно и задним числом.
+ * повтор ничего не меняет. Момент называет человек ([at]): отказаться можно и задним числом —
+ * и от пункта прошлого дня, который иначе стал бы неответом.
  */
 class IntakeDeclining @Inject constructor(
     private val intakes: IntakeStorageRepository,
@@ -38,9 +38,11 @@ class IntakeDeclining @Inject constructor(
         if (intake.status != IntakeStatus.PLANNED) return@run Outcome.ALREADY_ANSWERED
         val course = courses.openPlan(intake.courseId)
         val now = clock.instant()
-        calendar.missOverdue(course, now)
+        // Сначала сам пункт: отмеченный неответом прошлый пункт отказа уже не принял бы, и момент
+        // человека пропал бы. Остальное прошлое — следом, до достройки окна (F4).
         val declined = intakes.record(IntakeOutcome(intake.miss(at), expected = setOf(IntakeStatus.PLANNED), recordedAt = now))
         if (!declined) return@run Outcome.ALREADY_ANSWERED
+        calendar.missOverdue(course, now)
         // Доза уехала вперёд: окно календаря достраивается на один пункт (F4).
         calendar.extend(course, now)
         Outcome.DECLINED

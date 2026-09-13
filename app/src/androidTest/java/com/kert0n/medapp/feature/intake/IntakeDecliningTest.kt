@@ -90,6 +90,27 @@ class IntakeDecliningTest {
         assertEquals(IntakeDeclining.Outcome.ALREADY_ANSWERED, scenarios.intakeDeclining.decline(today.id, now))
     }
 
+    /**
+     * Вчерашний пункт, на который не ответили: человек говорит, что отказался вечером. Отказ ложится
+     * названным моментом, а не неответом конца дня — пункт сам себя не отмечает раньше отказа.
+     *
+     * Красная проверка: отметить прошлое до отказа — `ALREADY_ANSWERED`, и момент человека пропал.
+     */
+    @Test
+    fun yesterdaysUnansweredItemIsDeclinedAtTheNamedMoment() = runTest {
+        val id = treated()
+        val yesterday = items(id).first()
+        val evening = Instant.parse("2027-03-10T17:00:00Z")
+        val tomorrow = Scenarios(database, now.plusSeconds(24 * 60 * 60))
+
+        val outcome = tomorrow.intakeDeclining.decline(yesterday.id, evening)
+
+        assertEquals(IntakeDeclining.Outcome.DECLINED, outcome)
+        val declined = items(id).first { it.id == yesterday.id }
+        assertEquals(IntakeStatus.MISSED, declined.status)
+        assertEquals(evening, declined.answer?.at)
+    }
+
     @Test
     fun aTakenItemIsNotDeclinedAndAnUnknownOneIsGone() = runTest {
         val id = treated()

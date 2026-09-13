@@ -198,6 +198,18 @@ sealed interface PackageSyncCommand : SyncCommand {
         /** Уходит ли итог ниже нуля: тогда сказанное человеком с серверным числом не сводится. */
         fun conflictsWith(confirmed: Quantity): Boolean =
             confirmed.amount + actual.amount < seen.amount
+
+        /**
+         * Применился ли уже этот пересчёт, чей ответ потерян, а повтор получил отказ по версии:
+         * у сервера ровно то число, к которому вёл запрос, и оно не то, от которого запрос
+         * отсчитывался. Разница — не абсолютное число: переподготовленная, она легла бы поверх
+         * самой себя (PLAN E3). Пересчёт в ноль уходит удалением и узнаётся по 404 ([emptiedBy]).
+         */
+        fun provenAppliedBy(snapshot: PackageSnapshot, prepared: PreparedRequest): Boolean {
+            val before = prepared.quantityBefore ?: return false
+            val target = onto(before)
+            return target != before && snapshot.pack.quantity == target
+        }
     }
 
     /** Перенести упаковку в другую аптечку. */

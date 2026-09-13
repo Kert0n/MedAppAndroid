@@ -141,6 +141,25 @@ class PackageAdjustingTest {
         assertEquals(sync, database.packageRepository().observeSyncState(PACK).first())
     }
 
+    /**
+     * Пересчёт 20 → 15 ещё не доехал, а человек выбросил ещё две: в коробке 13, и зажим идёт под
+     * 13 — под всю очередь, как в проекции, а не под последнюю разницу поверх подтверждённых 20.
+     *
+     * Красная проверка: зажимать по одной последней разнице — 18 таблеток, и выделение остаётся
+     * семью дозами после первого пересчёта.
+     */
+    @Test
+    fun aSecondSharedAdjustmentClampsUnderTheWholeQueue() = runTest {
+        shared()
+        holdByACourse()
+
+        adjusting.adjust(PACK, PackageAdjusting.Action.Recount(seen = tablets("20"), actual = tablets("15")))
+        adjusting.adjust(PACK, PackageAdjusting.Action.Dispose(seen = tablets("15"), amount = tablets("2")))
+
+        assertEquals(tablets("13"), database.packageRepository().observe(PACK).first()?.availability?.effective)
+        assertEquals(Doses(6), allocated())
+    }
+
     @Test
     fun aSharedDisposalIsTheSameRecountWithLess() = runTest {
         shared()

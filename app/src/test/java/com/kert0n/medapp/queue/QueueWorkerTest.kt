@@ -666,6 +666,34 @@ class QueueWorkerTest {
         assertEquals(Delivery.Refused(RefusalReason.CONFLICT, PackageState.None), refusing.settled.single().second)
     }
 
+    /**
+     * Пересчёт 20 → 17 уехал, ответ потерян, повтор получил 412: у сервера 17 — ровно то, к чему вёл
+     * запрос. Это применение, а не гонка: переподготовленная разница легла бы поверх себя, 17 → 14.
+     * Если же число не то — гонка, и разница кладётся заново.
+     */
+    @Test
+    fun aRecountWithALostAnswerThatAlreadyLandedIsNotAppliedTwice() = runTest {
+        val recount = PackageSyncCommand.CorrectStock(PACK, seen = tablets("20"), actual = tablets("17"))
+        val frozen = recount.toPreparedRequest(INTAKE, PackageSyncState(PACK, ResourceVersion(3)), tablets("20"), null, EARLIER)
+        val lost = Storage(listOf(operation(recount, status = SyncOperationStatus.SENDING, attempts = 1, prepared = frozen, outcomeUnknown = true)))
+        val refusing = Transport { ApiResult.Failure(ApiFailure.PreconditionFailed) }
+        refusing.snapshotAnswer = ApiResult.Success(snapshot) // у сервера 17
+
+        worker(lost, refusing).drain()
+
+        assertEquals(1, refusing.sent.size)
+        assertEquals(Delivery.Applied(PackageState.Present(resolved(snapshot))), lost.settled.single().second)
+
+        // Первая отправка по свежим 17 ведёт к 14, и 412 застаёт те же 17: запрос не применялся.
+        val raced = Storage(listOf(operation(recount)))
+        val again = transport(fresh = snapshot) { ApiResult.Failure(ApiFailure.PreconditionFailed) }
+        again.snapshotAnswer = ApiResult.Success(snapshot)
+
+        worker(raced, again).drain()
+
+        assertEquals(Delivery.Stale(resolved(snapshot)), raced.settled.first().second)
+    }
+
     @Test
     fun invalidInputIsRefusedAndTheTruthRead() = runTest {
         val describe = PackageSyncCommand.Describe(
