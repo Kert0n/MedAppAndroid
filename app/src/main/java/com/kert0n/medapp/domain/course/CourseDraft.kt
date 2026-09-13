@@ -80,8 +80,8 @@ class CourseDraft(
         changed(title = title, note = note, updatedAt = at)
 
     /**
-     * Доза задаётся только у черновика: у назначенного курса она неизменна, а другое лечение —
-     * это отмена курса и новый черновик (PLAN D5). Единица дозы — единица лечения; уже
+     * Доза черновика; у начатого лечения её меняет `Course.changeDose` (PLAN D5). Единица дозы —
+     * единица лечения; уже
      * подключённые пачки другой единицы под неё не годятся, и такая смена отвергается.
      */
     fun setDose(dose: Dose, at: Instant): Result<CourseDraft> {
@@ -100,8 +100,8 @@ class CourseDraft(
     }
 
     /**
-     * Расписание задаётся только у черновика, как и доза; редакция растёт, потому что меняется
-     * состав будущих пунктов.
+     * Расписание черновика; у начатого лечения его меняет `Course.changeSchedule`. Редакция растёт,
+     * потому что меняется состав будущих пунктов.
      */
     fun setSchedule(schedule: CourseSchedule, at: Instant): CourseDraft =
         changed(schedule = schedule, revision = revision.next(), updatedAt = at)

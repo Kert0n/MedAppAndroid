@@ -89,7 +89,7 @@ class WriteContractTest {
         "CourseStorageRepository.courseHolding" to (Shape.READ by "(Uuid): Uuid"),
         "CourseStorageRepository.rename" to (Shape.NAMED_FIELDS by "(Uuid, String, String): Boolean"),
         // `long` — редакция: `value class Revision` на JVM разворачивается в своё число.
-        "CourseStorageRepository.setTotalDoses" to (Shape.GUARDED by "(Course, long): Boolean"),
+        "CourseStorageRepository.amend" to (Shape.GUARDED by "(Course, long): Boolean"),
         "CourseStorageRepository.updateSources" to (Shape.GUARDED by "(Course, long): Boolean"),
         "CourseStorageRepository.reallocate" to (Shape.ACTION by "(CourseReallocation): Boolean"),
         "CourseStorageRepository.activate" to (Shape.ACTION by "(CourseDraft\$Activation, List<CourseIntake>): Unit"),

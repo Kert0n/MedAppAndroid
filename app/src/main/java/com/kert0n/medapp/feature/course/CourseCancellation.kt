@@ -27,7 +27,7 @@ class CourseCancellation @Inject constructor(
     suspend fun cancel(id: Uuid): Outcome = transactions.run {
         val record = courses.findRecord(id) ?: return@run Outcome.GONE
         if (!record.isOpen) return@run Outcome.ALREADY_FINISHED
-        val course = checkNotNull(courses.findPlan(id)) { "у идущего эпизода есть план" }
+        val course = courses.openPlan(id)
         val now = clock.instant()
         val ofCourse = intakes.ofCourse(id).filterIsInstance<CourseIntake>()
         closing.close(course, CourseCompletion.Closing.of(record, CourseRecord.Outcome.CANCELLED, ofCourse, now), now)

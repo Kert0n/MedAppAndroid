@@ -18,7 +18,11 @@ import com.kert0n.medapp.fixture.pack
 import com.kert0n.medapp.fixture.schedule
 import com.kert0n.medapp.fixture.source
 import com.kert0n.medapp.fixture.tablets
+import com.kert0n.medapp.fixture.CAPSULE_FORM
+import com.kert0n.medapp.fixture.MILLILITRES
 import java.math.BigDecimal
+import java.time.Instant
+import java.time.LocalDate
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNull
@@ -181,5 +185,42 @@ class CourseTest {
 
         assertTrue(treatment.isSource(pack(id = PACK).ref))
         assertFalse(treatment.isSource(pack(id = OTHER_PACK).ref))
+    }
+
+    /**
+     * Изменение лечения — тот же курс с другим назначением (PLAN C1, D5): доза и форма меняются,
+     * пока под ними нет пачек другой единицы и формы; редакция растёт.
+     */
+    @Test
+    fun aTreatmentChangesItsDoseAndFormUnlessPackagesDisagree() {
+        val bare = activeCourse()
+        val held = activeCourse(sources = listOf(source(PACK, 3)))
+
+        val halved = bare.changeDose(dose("1"), LATER).getOrThrow()
+        assertEquals(dose("1"), halved.dose)
+        assertEquals(bare.revision.next(), halved.revision)
+        assertEquals(dose("1"), held.changeDose(dose("1"), LATER).getOrThrow().dose)
+        assertEquals(
+            CourseRejected.Reason.UNIT_MISMATCH,
+            (held.changeDose(Dose(Quantity(BigDecimal.ONE, MILLILITRES)), LATER).exceptionOrNull() as CourseRejected).reason
+        )
+        assertEquals(
+            CourseRejected.Reason.FORM_MISMATCH,
+            (held.changeForm(CAPSULE_FORM, LATER).exceptionOrNull() as CourseRejected).reason
+        )
+        assertEquals(bare, bare.changeDose(bare.dose, LATER).getOrThrow().also { assertEquals(bare.revision, it.revision) })
+    }
+
+    /** Новое расписание не начинается раньше сегодняшнего дня своей зоны: прошлое уже случилось. */
+    @Test
+    fun aNewScheduleDoesNotStartInThePast() {
+        val treatment = activeCourse()
+        val at = Instant.parse("2027-03-10T12:00:00Z")
+
+        val tomorrow = treatment.changeSchedule(schedule(start = LocalDate.of(2027, 3, 11)), at).getOrThrow()
+        val yesterday = treatment.changeSchedule(schedule(start = LocalDate.of(2027, 3, 9)), at)
+
+        assertEquals(LocalDate.of(2027, 3, 11), tomorrow.schedule.start)
+        assertEquals(CourseRejected.Reason.SCHEDULE_IN_PAST, (yesterday.exceptionOrNull() as CourseRejected).reason)
     }
 }

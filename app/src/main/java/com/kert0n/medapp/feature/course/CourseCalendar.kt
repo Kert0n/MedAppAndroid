@@ -8,6 +8,7 @@ import com.kert0n.medapp.domain.pack.Availability
 import com.kert0n.medapp.domain.pack.PackageAvailability
 import com.kert0n.medapp.domain.value.Doses
 import com.kert0n.medapp.domain.value.Quantity
+import com.kert0n.medapp.storage.intake.IntakeOutcome
 import com.kert0n.medapp.storage.intake.IntakeStorageRepository
 import com.kert0n.medapp.storage.pack.PackageStorageRepository
 import java.time.Duration
@@ -54,6 +55,22 @@ class CourseCalendar @Inject constructor(
             )
         }
         return intakes.materialise(planned)
+    }
+
+    /**
+     * Неотвеченные пункты, чей день **в зоне курса** кончился, — `MISSED` условным переходом из
+     * `PLANNED`: ответ, пришедший тем временем, не перетирается. Моментом ответа служит конец дня
+     * пункта — тогда неответ и наступил (PLAN D6). Возвращает число пропущенных.
+     */
+    suspend fun missOverdue(course: Course, now: Instant): Int {
+        val zone = course.schedule.zone
+        val today = now.atZone(zone).toLocalDate()
+        val overdue = intakes.ofCourse(course.id).filterIsInstance<CourseIntake>()
+            .filter { it.status == IntakeStatus.PLANNED && it.slot.localDate.isBefore(today) }
+        return overdue.count { intake ->
+            val endOfDay = intake.slot.localDate.plusDays(1).atStartOfDay(zone).toInstant()
+            intakes.record(IntakeOutcome(intake.miss(endOfDay), expected = setOf(IntakeStatus.PLANNED), recordedAt = now))
+        }
     }
 
     /**

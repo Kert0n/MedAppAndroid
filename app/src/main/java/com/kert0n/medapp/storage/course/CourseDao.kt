@@ -75,7 +75,7 @@ interface CourseDao {
      * исключение ключа.
      *
      * Меняются только редакция, время правки, источники и число доз мимо плана: доза и
-     * расписание действующего курса неизменны, и пересчёт обеспечения их не касается.
+     * расписание меняет изменение лечения, и пересчёт обеспечения их не касается.
      */
     @Transaction
     suspend fun updateAllocations(
@@ -113,41 +113,6 @@ interface CourseDao {
         takenOffPlan: Int,
         updatedAt: Instant
     ): Int
-
-    /**
-     * Число доз правится у плана и в снимке записи одной транзакцией: назначение лежит в двух
-     * строках и разойтись им нельзя (PLAN F5). Запись условна по редакции, как и выделения; ноль
-     * строк значит «плана уже нет», и снимок записи тогда тоже не трогается.
-     */
-    @Transaction
-    suspend fun updateTotalDoses(
-        id: Uuid,
-        totalDoses: Int,
-        expected: Revision,
-        revision: Revision,
-        updatedAt: Instant
-    ): Boolean {
-        if (setTotalDosesIfRevisionIs(id, expected.number, totalDoses, revision.number, updatedAt) == 0) {
-            return false
-        }
-        setRecordTotalDoses(id, totalDoses)
-        return true
-    }
-
-    @Query(
-        "UPDATE courses SET total_doses = :totalDoses, revision = :revision, updated_at = :updatedAt " +
-            "WHERE id = :id AND revision = :expected"
-    )
-    suspend fun setTotalDosesIfRevisionIs(
-        id: Uuid,
-        expected: Long,
-        totalDoses: Int,
-        revision: Long,
-        updatedAt: Instant
-    ): Int
-
-    @Query("UPDATE course_records SET total_doses = :totalDoses WHERE id = :id")
-    suspend fun setRecordTotalDoses(id: Uuid, totalDoses: Int)
 
     @Upsert
     suspend fun upsertCourse(course: CourseStorageEntity)

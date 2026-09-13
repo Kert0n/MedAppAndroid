@@ -6,6 +6,7 @@ import com.kert0n.medapp.fixture.OTHER_PACK
 import com.kert0n.medapp.fixture.PACK
 import com.kert0n.medapp.fixture.activeCourse
 import com.kert0n.medapp.fixture.course
+import com.kert0n.medapp.fixture.courseRepository
 import com.kert0n.medapp.fixture.courseRecord
 import com.kert0n.medapp.fixture.inMemoryDatabase
 import com.kert0n.medapp.fixture.save
@@ -188,32 +189,25 @@ class CourseDaoTest {
     }
 
     /**
-     * Число доз правится у плана и в снимке записи одной транзакцией: назначение лежит в двух
-     * строках, и разойтись им нельзя (PLAN F5). Запись условна по редакции.
+     * Изменённое назначение ложится в план и в снимок записи одной транзакцией: назначение лежит в
+     * двух строках, и разойтись им нельзя (PLAN F5). Запись условна по редакции.
      */
     @Test
-    fun totalDosesAreRevisedInThePlanAndInTheRecordTogether() = runTest {
+    fun anAmendedPrescriptionGoesIntoThePlanAndTheRecordTogether() = runTest {
         val plan = activeCourse()
         courses.saveCourse(plan.toStorageEntity(), plan.schedule.toTimeStorageEntities(COURSE), emptyList())
         courses.upsertRecord(courseRecord(prescription = plan.prescription).toStorageEntity())
         val shortened = plan.setTotalDoses(3.doses, LATER)
+        val repository = database.courseRepository()
 
-        assertTrue(
-            courses.updateTotalDoses(COURSE, 3, expected = plan.revision, revision = shortened.revision, updatedAt = LATER)
-        )
-        assertEquals(3.doses, requireNotNull(courses.findPlan(COURSE)).toPlan(VOCABULARY).totalDoses)
-        assertEquals(shortened.revision, requireNotNull(courses.findPlan(COURSE)).toPlan(VOCABULARY).revision)
-        assertEquals(
-            3.doses,
-            requireNotNull(courses.findRecord(COURSE)).toDomain(VOCABULARY).prescription.totalDoses
-        )
+        assertTrue(repository.amend(shortened, expected = plan.revision))
+        assertEquals(3.doses, requireNotNull(repository.findPlan(COURSE)).totalDoses)
+        assertEquals(shortened.revision, requireNotNull(repository.findPlan(COURSE)).revision)
+        assertEquals(3.doses, requireNotNull(repository.findRecord(COURSE)).prescription.totalDoses)
 
         // Правка из устаревшей редакции не ложится ни в план, ни в запись.
-        assertEquals(
-            false,
-            courses.updateTotalDoses(COURSE, 5, expected = plan.revision, revision = shortened.revision.next(), updatedAt = LATER)
-        )
-        assertEquals(3.doses, requireNotNull(courses.findRecord(COURSE)).toDomain(VOCABULARY).prescription.totalDoses)
+        assertEquals(false, repository.amend(shortened.setTotalDoses(5.doses, LATER), expected = plan.revision))
+        assertEquals(3.doses, requireNotNull(repository.findRecord(COURSE)).prescription.totalDoses)
     }
 
     /** Доза мимо плана ложится вместе с пересчитанными выделениями, условно по редакции. */

@@ -5,6 +5,7 @@ import com.kert0n.medapp.domain.course.CourseProgress
 import com.kert0n.medapp.domain.pack.PackageAfter
 import com.kert0n.medapp.domain.pack.PackageAvailability
 import com.kert0n.medapp.feature.course.CourseClosing
+import com.kert0n.medapp.feature.course.openPlan
 import com.kert0n.medapp.domain.intake.CourseIntake
 import com.kert0n.medapp.domain.intake.IntakeProjection
 import com.kert0n.medapp.domain.intake.IntakeRejected
@@ -62,7 +63,7 @@ class IntakeConfirmation @Inject constructor(
             return Result.success(Confirmed(intake.projection(), sync.accounting, episodeClosed = !record.isOpen))
         }
         if (!record.isOpen) return rejected(IntakeRejected.Reason.EPISODE_CLOSED)
-        val course = checkNotNull(courses.findPlan(intake.courseId)) { "у идущего эпизода есть план" }
+        val course = courses.openPlan(intake.courseId)
         val pkg = packages.find(packageId) ?: return rejected(IntakeRejected.Reason.PACKAGE_UNUSABLE)
         if (amount.unit != intake.unit) return rejected(IntakeRejected.Reason.UNIT_MISMATCH)
         // Пункт курса принимают из пачки курса; из любой другой это внеплановый факт, и пункт им

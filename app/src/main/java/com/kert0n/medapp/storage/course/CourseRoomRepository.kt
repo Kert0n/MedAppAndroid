@@ -130,14 +130,22 @@ class CourseRoomRepository @Inject constructor(
         true
     }
 
-    override suspend fun setTotalDoses(course: Course, expected: Revision): Boolean =
-        courses.updateTotalDoses(
-            id = course.id,
-            totalDoses = course.totalDoses.count,
-            expected = expected,
-            revision = course.revision,
-            updatedAt = course.updatedAt
+    override suspend fun amend(course: Course, expected: Revision): Boolean = database.withTransaction {
+        val stored = courses.findPlan(course.id) ?: return@withTransaction false
+        if (stored.isDraft || stored.course.revision != expected.number) return@withTransaction false
+        check(courses.sourcePackagesOf(course.id).toSet() == course.sources.map { it.pkg.id }.toSet()) {
+            "изменение лечения не меняет состав пачек: смена состава — updateSources"
+        }
+        val record = checkNotNull(courses.findRecord(course.id)) { "у идущего лечения есть запись эпизода" }
+            .toDomain(vocabulary.snapshot())
+        courses.saveCourse(
+            course = course.toStorageEntity(),
+            times = course.schedule.toTimeStorageEntities(course.id),
+            sources = course.medicine.toSourceStorageEntities(course.id)
         )
+        courses.upsertRecord(record.withPrescription(course.prescription).toStorageEntity())
+        true
+    }
 
     override suspend fun activate(
         activation: CourseDraft.Activation,

@@ -34,6 +34,9 @@ class CourseRejected(val reason: Reason) : IllegalStateException(reason.name) {
         FORM_MISSING,
 
         /** Активировать нельзя: не названо, сколько всего доз, — или названо ноль. */
-        TOTAL_DOSES_MISSING
+        TOTAL_DOSES_MISSING,
+
+        /** Новое расписание начинается раньше сегодняшнего дня: пункты в прошлом не заводят. */
+        SCHEDULE_IN_PAST
     }
 }

@@ -1,17 +1,10 @@
 package com.kert0n.medapp.feature.course
 
-import com.kert0n.medapp.domain.intake.CourseIntake
-import com.kert0n.medapp.domain.intake.IntakeStatus
 import com.kert0n.medapp.queue.Transactions
 import com.kert0n.medapp.storage.course.CourseStorageRepository
-import com.kert0n.medapp.storage.intake.IntakeOutcome
-import com.kert0n.medapp.storage.intake.IntakeStorageRepository
 import java.time.Clock
-import java.time.Instant
-import java.time.ZoneId
 import javax.inject.Inject
 import javax.inject.Singleton
-import kotlin.uuid.Uuid
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 
@@ -27,7 +20,6 @@ import kotlinx.coroutines.sync.withLock
 @Singleton
 class CourseUpkeep @Inject constructor(
     private val courses: CourseStorageRepository,
-    private val intakes: IntakeStorageRepository,
     private val calendar: CourseCalendar,
     private val transactions: Transactions,
     private val clock: Clock
@@ -43,29 +35,11 @@ class CourseUpkeep @Inject constructor(
         for (id in courses.planIds()) {
             transactions.run {
                 val course = courses.findPlan(id) ?: return@run
-                missed += missOverdue(id, course.schedule.zone, now)
+                missed += calendar.missOverdue(course, now)
                 planned += calendar.extend(course, now)
             }
         }
         Report(missed, planned)
-    }
-
-    /**
-     * Неотвеченные пункты, чей день кончился, — `MISSED` условным переходом из `PLANNED`: ответ,
-     * пришедший тем временем, не перетирается. Моментом ответа служит конец дня пункта — тогда
-     * неответ и наступил.
-     */
-    internal suspend fun missOverdue(courseId: Uuid, zone: ZoneId, now: Instant): Int {
-        val today = now.atZone(zone).toLocalDate()
-        var missed = 0
-        val overdue = intakes.ofCourse(courseId).filterIsInstance<CourseIntake>()
-            .filter { it.status == IntakeStatus.PLANNED && it.slot.localDate.isBefore(today) }
-        for (intake in overdue) {
-            val endOfDay = intake.slot.localDate.plusDays(1).atStartOfDay(zone).toInstant()
-            val outcome = IntakeOutcome(intake.miss(endOfDay), expected = setOf(IntakeStatus.PLANNED), recordedAt = now)
-            if (intakes.record(outcome)) missed++
-        }
-        return missed
     }
 
     data class Report(val missed: Int, val planned: Int)

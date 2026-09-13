@@ -114,6 +114,39 @@ class Course(
         updatedAt = at
     )
 
+    /**
+     * Врач сменил дозу — это то же лечение (PLAN C1, D5): отвеченные пункты помнят прежнюю дозу, а
+     * будущие перестраиваются. Единица дозы — единица лечения, и подключённые пачки другой единицы
+     * под неё не годятся: сначала отвязать.
+     */
+    fun changeDose(dose: Dose, at: Instant): Result<Course> {
+        if (dose == this.dose) return Result.success(this)
+        if (!medicine.isEmpty && dose.unit != unit) return rejected(CourseRejected.Reason.UNIT_MISMATCH)
+        return Result.success(changed(prescription = prescription.copy(dose = dose), revision = revision.next(), updatedAt = at))
+    }
+
+    /** Другая форма под подключёнными пачками — другой препарат: сначала отвязать (PLAN D5). */
+    fun changeForm(form: DosageForm, at: Instant): Result<Course> {
+        if (form == this.form) return Result.success(this)
+        if (!medicine.isEmpty) return rejected(CourseRejected.Reason.FORM_MISMATCH)
+        return Result.success(changed(prescription = prescription.copy(form = form), revision = revision.next(), updatedAt = at))
+    }
+
+    /**
+     * Другое расписание — в том числе другая зона — то же лечение, и будущие пункты перестраиваются
+     * по нему. Прошлое уже случилось: новое расписание не начинается раньше сегодняшнего дня своей
+     * зоны, иначе в нём завелись бы пункты, на которые отвечать поздно (PLAN D5).
+     */
+    fun changeSchedule(schedule: CourseSchedule, at: Instant): Result<Course> {
+        if (schedule == this.schedule) return Result.success(this)
+        if (schedule.start.isBefore(at.atZone(schedule.zone).toLocalDate())) {
+            return rejected(CourseRejected.Reason.SCHEDULE_IN_PAST)
+        }
+        return Result.success(changed(prescription = prescription.copy(schedule = schedule), revision = revision.next(), updatedAt = at))
+    }
+
+    private fun <T> rejected(reason: CourseRejected.Reason): Result<T> = Result.failure(CourseRejected(reason))
+
     val allocatedDosesTotal: Doses get() = medicine.allocatedTotal
 
     /**
