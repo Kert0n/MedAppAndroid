@@ -1,5 +1,7 @@
 package com.kert0n.medapp.feature.medkits
 
+import kotlinx.coroutines.flow.first
+import com.kert0n.medapp.feature.course.SourceEditing
 import com.kert0n.medapp.fixture.confirmed
 import com.kert0n.medapp.domain.medkit.InvitationKey
 import com.kert0n.medapp.domain.medkit.MedKit
@@ -362,6 +364,7 @@ class SharedMedKitProbe {
     @Test
     fun annaLeavesTheShelfToTheOthers(): Unit = runBlocking {
         val shared = sharedShelfWithBorisTreated()
+        val coverageBefore = boris.database.courseRepository().observeCoverage(boris.course).first()
 
         assertEquals(
             MedKitRemoval.Outcome.MARKED,
@@ -373,6 +376,9 @@ class SharedMedKitProbe {
         assertEquals(listOf(SyncOperationStatus.APPLIED), anna.statuses().distinct())
         assertNull(anna.database.medKits().find(shared.shelf))
         assertNull(anna.packages.find(shared.box))
+        // Выход Анны обеспечения Бориса не трогает: оно то же, что до её выхода, — и после его сверки.
+        boris.refresh()
+        assertEquals(coverageBefore, boris.database.courseRepository().observeCoverage(boris.course).first())
 
         boris.confirm(shared.intakes[1], shared.box)
         boris.drain()
@@ -382,6 +388,47 @@ class SharedMedKitProbe {
         assertAmount("16", BigDecimal(success(boris.api.packageSnapshot(shared.box)).pack.amount))
         assertEquals(ApiFailure.NotFound, failure(anna.api.packageSnapshot(shared.box)))
         assertEquals(listOf(shared.box), boris.database.courses().sourcePackagesOf(boris.course))
+    }
+
+    /**
+     * Борис выходит из полки Анны: его лечение остаётся идти — теряется только источник с
+     * покинутой полки, вторая коробка дома держится, приёмы на месте (PLAN C1 «Курсы при выходе»).
+     */
+    @Test
+    fun borisLeavesTheShelfAndKeepsHisCourse(): Unit = runBlocking {
+        val shared = sharedShelfWithBorisTreated()
+        val home = boris.addBox(boris.localShelf("Дом Бориса"), "10")
+        boris.attachSecondSource(home)
+
+        assertEquals(MedKitRemoval.Outcome.MARKED, boris.scenarios().medKitRemoval.remove(shared.shelf, MedKitRemoval.Fate.LeaveToOthers))
+        boris.drain()
+
+        assertEquals(listOf(SyncOperationStatus.APPLIED), boris.statuses().distinct())
+        assertNull(boris.database.medKits().find(shared.shelf))
+        assertNull(boris.packages.find(shared.box))
+        assertEquals(listOf(home), boris.database.courses().sourcePackagesOf(boris.course))
+        assertTrue(requireNotNull(boris.database.courses().findRecord(boris.course)).toDomain(boris.vocabulary.snapshot()).isOpen)
+        assertEquals(IntakeAccounting.REMOTE_APPLIED, boris.accountingOf(shared.intakes[0]))
+        // У Анны коробка на месте, с тем, что Борис успел принять.
+        assertAmount("18", serverAmount(shared.box))
+    }
+
+    /** Борис унёс коробку домой до выхода: источник остаётся, выход его не касается. */
+    @Test
+    fun borisCarriesTheBoxHomeBeforeLeaving(): Unit = runBlocking {
+        val shared = sharedShelfWithBorisTreated()
+        val home = boris.localShelf("Дом Бориса")
+
+        assertEquals(PackageRelocation.Outcome.MOVED, boris.scenarios().packageRelocation.move(shared.box, home))
+        boris.drain()
+        assertEquals(MedKitRemoval.Outcome.MARKED, boris.scenarios().medKitRemoval.remove(shared.shelf, MedKitRemoval.Fate.LeaveToOthers))
+        boris.drain()
+
+        assertEquals(listOf(SyncOperationStatus.APPLIED), boris.statuses().distinct())
+        val carried = requireNotNull(boris.packages.find(shared.box))
+        assertEquals(home, carried.medKit.id)
+        assertEquals(listOf(shared.box), boris.database.courses().sourcePackagesOf(boris.course))
+        assertEquals(ApiFailure.NotFound, failure(anna.api.packageSnapshot(shared.box)))
     }
 
     /**
@@ -621,6 +668,14 @@ class SharedMedKitProbe {
             course = draft.id
             return database.intakeRepository().ofCourse(course).filterIsInstance<CourseIntake>()
                 .sortedBy { it.plannedAt }.take(3).map { it.id }
+        }
+
+        /** Вторая коробка в лечение, последней в расходе, с одной дозой. */
+        suspend fun attachSecondSource(box: Uuid) {
+            val plan = requireNotNull(courses.findPlan(course))
+            val sources = plan.sources.map { SourceEditing.Source(it.pkg.id, it.allocatedDoses) } + SourceEditing.Source(box, Doses(1))
+            val outcome = scenarios().sourceEditing.save(course, plan.revision, sources)
+            assertTrue("источник не подключён: $outcome", outcome is SourceEditing.Outcome.Saved)
         }
 
         suspend fun confirm(intake: Uuid, box: Uuid) {

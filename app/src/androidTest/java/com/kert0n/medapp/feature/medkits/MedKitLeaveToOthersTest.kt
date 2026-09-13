@@ -1,5 +1,8 @@
 package com.kert0n.medapp.feature.medkits
 
+import com.kert0n.medapp.domain.value.Doses
+import com.kert0n.medapp.feature.packages.PackageRelocation
+import com.kert0n.medapp.feature.course.SourceEditing
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import com.kert0n.medapp.domain.course.CourseDraft
 import com.kert0n.medapp.domain.medkit.MedKit
@@ -138,5 +141,43 @@ class MedKitLeaveToOthersTest {
         assertEquals(MedKitRemoval.Outcome.NOT_SHARED, removal.remove(HOME_KIT, MedKitRemoval.Fate.LeaveToOthers))
         assertNotNull(database.medKits().find(HOME_KIT))
         assertEquals(MedKitRemoval.Outcome.MED_KIT_GONE, removal.remove(Uuid.random(), MedKitRemoval.Fate.LeaveToOthers))
+    }
+
+    /**
+     * Коробку унесли домой до выхода — она уже на местной полке, и выход её не касается: курс
+     * держит оба источника, теряется только то, что осталось на покинутой полке (PLAN C1 «Курсы
+     * при выходе», E6).
+     */
+    @Test
+    fun aBoxCarriedHomeBeforeLeavingStaysASource() = runTest {
+        val scenarios = Scenarios(database, LATER)
+        val third = Uuid.random()
+        database.packageRepository().add(pack(id = third, name = "Оставшаяся", medKit = medKit(id = SHARED_KIT).ref, quantity = tablets("9"), form = TABLET_FORM))
+        val plan = requireNotNull(database.courseRepository().findPlan(COURSE))
+        scenarios.sourceEditing.save(
+            COURSE, plan.revision,
+            listOf(SourceEditing.Source(PACK, Doses(3)), SourceEditing.Source(OTHER_PACK, Doses(5)), SourceEditing.Source(third, Doses(1)))
+        )
+        assertEquals(PackageRelocation.Outcome.MOVED, scenarios.packageRelocation.move(PACK, HOME_KIT))
+        // Унос — тоже команда; сервер согласился, коробка дома и обычная.
+        settleAll()
+
+        assertEquals(MedKitRemoval.Outcome.MARKED, removal.remove(SHARED_KIT, MedKitRemoval.Fate.LeaveToOthers))
+        settleAll()
+
+        assertNull(database.medKits().find(SHARED_KIT))
+        assertNotNull(database.packageRepository().find(PACK))
+        assertNull(database.packageRepository().find(third))
+        assertEquals(listOf(PACK, OTHER_PACK).sorted(), database.courses().sourcePackagesOf(COURSE).sorted())
+        assertNotNull(database.courses().findRecord(COURSE))
+    }
+
+    /** Сервер согласился со всем, что ждёт, — тем же путём, что и в бою: эффектами закрытия. */
+    private suspend fun settleAll() {
+        for (row in database.syncOperations().all()) {
+            val stored = row.toDomain(VOCABULARY) as StoredSyncOperation.Readable
+            if (stored.operation.status.isClosed) continue
+            database.queueStorage().settle(stored.operation.id, Delivery.Applied(PackageState.None).settlement(stored.operation.command), LATER)
+        }
     }
 }
