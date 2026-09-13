@@ -14,6 +14,8 @@ import com.kert0n.medapp.fixture.COURSE
 import com.kert0n.medapp.fixture.HOME_KIT
 import com.kert0n.medapp.fixture.LATER
 import com.kert0n.medapp.fixture.PACK
+import com.kert0n.medapp.fixture.OTHER_PACK
+import com.kert0n.medapp.fixture.medKitRepository
 import com.kert0n.medapp.fixture.SHARED_KIT
 import com.kert0n.medapp.fixture.Scenarios
 import com.kert0n.medapp.fixture.TABLET_FORM
@@ -72,6 +74,11 @@ class PackageRelocationTest {
                 medKit(id = kit, publication = MedKit.Publication.PUBLISHED, participantCount = 2).toMedKitStorageEntity()
             )
         }
+    }
+
+    /** Полка, о которой принято решение: публикация уже назвала серверу своё содержимое. */
+    private suspend fun publishing(kit: Uuid) {
+        database.medKitRepository().mark(kit, MedKitStatus.PUBLISHING)
     }
 
     private suspend fun commands(): List<SyncCommand> = database.syncOperations().all()
@@ -263,5 +270,33 @@ class PackageRelocationTest {
         assertEquals(PackageRelocation.Outcome.TARGET_IS_THE_SAME, relocation.move(PACK, HOME_KIT))
         assertEquals(PackageRelocation.Outcome.GONE, relocation.move(Uuid.random(), SHARED_KIT))
         assertEquals(HOME_KIT, database.packageRepository().find(PACK)?.medKit?.id)
+    }
+
+    /**
+     * Решение о полке не обходят переносом. Из публикуемой полки коробку не уносят: её создание
+     * уже стоит в очереди, и коробка оказалась бы у сервера мимо своей двери либо не оказалась бы
+     * вовсе. В публикуемую не кладут: серверу о её содержимом уже сказано, и эта коробка в
+     * сказанное не вошла (PLAN E5, решение владельца 2026-09-13).
+     */
+    @Test
+    fun aShelfWaitingForItsOwnAnswerIsNotWalkedAroundByAMove() = runTest {
+        publish(SHARED_KIT)
+        publishing(HOME_KIT)
+
+        assertEquals(PackageRelocation.Outcome.ORIGIN_BUSY, relocation.move(PACK, SHARED_KIT))
+
+        assertEquals(HOME_KIT, requireNotNull(database.packageRepository().find(PACK)).medKit.id)
+        assertTrue(commands().isEmpty())
+    }
+
+    @Test
+    fun aShelfWaitingForItsOwnAnswerTakesNoNewBoxes() = runTest {
+        database.packageRepository().add(pack(id = OTHER_PACK, quantity = tablets("5"), form = TABLET_FORM))
+        publishing(SHARED_KIT)
+
+        assertEquals(PackageRelocation.Outcome.TARGET_BUSY, relocation.move(OTHER_PACK, SHARED_KIT))
+
+        assertEquals(HOME_KIT, requireNotNull(database.packageRepository().find(OTHER_PACK)).medKit.id)
+        assertTrue(commands().isEmpty())
     }
 }
