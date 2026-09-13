@@ -45,8 +45,11 @@ class CourseClamping @Inject constructor(
         announceClaims(course, clamped, now)
     }
 
-    /** Бронь — `выделено × доза`: изменился зажим — изменилась и она (PLAN D5). */
-    private suspend fun announceClaims(before: Course, after: Course, now: Instant) {
+    /**
+     * Бронь — `выделено × доза`: изменилось выделение — зажимом, счётом доз мимо плана —
+     * изменилась и она, и уезжает разницей по каждой пачке (PLAN D5).
+     */
+    suspend fun announceClaims(before: Course, after: Course, now: Instant) {
         for (source in after.sources) {
             val claim = after.allocatedOf(source.pkg)
             if (before.allocatedOf(source.pkg) == claim) continue

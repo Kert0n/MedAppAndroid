@@ -169,6 +169,12 @@ class Scenarios(database: MedAppDatabase, now: java.time.Instant) {
     val sourceEditing = com.kert0n.medapp.feature.course.SourceEditing(
         courses, database.intakeRepository(), packages, courseCalendar, queue, transactions, clock
     )
+    val intakeDeclining = com.kert0n.medapp.feature.intake.IntakeDeclining(
+        database.intakeRepository(), courses, courseCalendar, transactions, clock
+    )
+    val courseOffPlanCounting = com.kert0n.medapp.feature.course.CourseOffPlanCounting(
+        courses, database.intakeRepository(), courseCalendar, courseClamping, courseClosing, transactions, clock
+    )
     val intakeConfirmation = com.kert0n.medapp.feature.intake.IntakeConfirmation(
         database.intakeRepository(), courses, packages, transactions, queue, courseClosing, courseCalendar, clock
     )
