@@ -2886,7 +2886,11 @@ PR: `course/` и `intake/` появились в PR 3, хранение — в P
 по `id`, и наружу они не уходят: `Flow` из репозитория несёт **доменную проекцию** — величину с
 равенством по содержимому, которую сущность строит сама (`Package.projection(availability, …)`,
 `MedKit.projection()`, `Course`/`CourseDraft`/`CourseRecord`/`Intake.projection()`), собранную
-одним чтением в одной транзакции. Сущность отдают только `suspend find*` — внутрь транзакции
+одним чтением в одной транзакции. Поток такой проекции строится одной дверью
+`storage/database/observing(таблицы) { чтение }`: база уведомляет об изменении таблиц, значение
+читается транзакцией, а таблицы словаря добавляются всегда — переименованная единица новость для
+экрана, даже когда строки не менялись (разбор #22). Поток DAO этого не даёт: он видит только таблицы
+своего запроса и читает словарь уже вне своей транзакции. Сущность отдают только `suspend find*` — внутрь транзакции
 сценария, который её читал. Адаптер представления строит `PackagePresentationDTO` /
 `MedKitPresentationDTO` из проекции, затем состояние экрана; как проекция собрана, он не знает.
 Вложить саму сущность в `data class UiState` недостаточно: его `equals` снова сравнит только id.
@@ -4140,7 +4144,7 @@ ANDROID_SERIAL=emulator-5554 ./gradlew :app:connectedDebugAndroidTest -Pprobe
 (`grep -rn '^import com.kert0n.medapp.network' app/src/main/java/com/kert0n/medapp/feature` — пусто).
 Эмулятор — уже запущенный `emulator-5554`, новых не поднимать. Итог инструментальных читать из
 `app/build/outputs/androidTest-results/connected/debug/TEST-*.xml`: `AssumptionViolatedException` у
-`RegistrationProbe` — пропуск, не провал. **Эталон после B14: 713 unit, 379
+`RegistrationProbe` — пропуск, не провал. **Эталон после B14: 713 unit, 380
 инструментальных, 1 пропуск, 0 провалов** — каждый PR записывает свой. Тесты поднимают `HiltTestApplication` и
 падений на старте не видят: после правки графа Hilt/WorkManager и после правки схемы запускается
 настоящий `MedApp` на эмуляторе (`adb shell pm clear com.kert0n.medapp`, затем

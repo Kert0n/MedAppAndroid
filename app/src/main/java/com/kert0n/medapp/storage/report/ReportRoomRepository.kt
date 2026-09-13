@@ -1,6 +1,5 @@
 package com.kert0n.medapp.storage.report
 
-import androidx.room.withTransaction
 import com.kert0n.medapp.domain.intake.CourseIntake
 import com.kert0n.medapp.domain.intake.Intake
 import com.kert0n.medapp.domain.course.CourseProgress
@@ -17,6 +16,7 @@ import com.kert0n.medapp.domain.report.SpendingPeriod
 import com.kert0n.medapp.storage.course.CourseDao
 import com.kert0n.medapp.storage.database.MedAppDatabase
 import com.kert0n.medapp.storage.database.chunkedForQuery
+import com.kert0n.medapp.storage.database.observing
 import com.kert0n.medapp.storage.intake.IntakeDao
 import com.kert0n.medapp.storage.pack.PackageDao
 import com.kert0n.medapp.storage.value.VocabularyDao
@@ -36,44 +36,38 @@ class ReportRoomRepository @Inject constructor(
 ) : ReportStorageRepository {
 
     override fun observeSpending(period: SpendingPeriod, zone: ZoneId): Flow<Spending> =
-        database.invalidationTracker.createFlow(*SPENDING_TABLES).map { spending(period, zone) }
+        database.observing(*SPENDING_TABLES) { spending(period, zone) }
 
-    /** Приёмы и записи их эпизодов — одной транзакцией: отчёт о состоянии, которое было в базе. */
-    private suspend fun spending(period: SpendingPeriod, zone: ZoneId): Spending = database.withTransaction {
+    /** Приёмы и записи их эпизодов; транзакцию держит поток — отчёт о состоянии, которое было в базе. */
+    private suspend fun spending(period: SpendingPeriod, zone: ZoneId): Spending {
         val words = vocabulary.snapshot()
         val taken = intakes.takenBetween(period.startsAt(zone), period.endsBefore(zone)).map { it.toDomain(words) }
         val episodeIds = taken.mapNotNull { it.courseIdOrNull() }.distinct()
-        Spending.of(taken, recordsOf(episodeIds, words))
+        return Spending.of(taken, recordsOf(episodeIds, words))
     }
 
     override fun observeFutureSpending(horizon: SpendingHorizon): Flow<FutureSpending> =
-        database.invalidationTracker.createFlow(*PLAN_TABLES).map {
-            database.withTransaction {
-                val words = vocabulary.snapshot()
-                val plans = plans(words)
-                FutureSpending.of(plans, recordsOf(plans.map { it.course.id }, words), horizon)
-            }
+        database.observing(*PLAN_TABLES) {
+            val words = vocabulary.snapshot()
+            val plans = plans(words)
+            FutureSpending.of(plans, recordsOf(plans.map { it.course.id }, words), horizon)
         }
 
     override fun observeStockSummary(): Flow<StockSummary> =
-        database.invalidationTracker.createFlow(*STOCK_TABLES).map {
-            database.withTransaction {
-                val words = vocabulary.snapshot()
-                StockSummary.of(packages.all().map { it.toDomain(words) })
-            }
+        database.observing(*STOCK_TABLES) {
+            val words = vocabulary.snapshot()
+            StockSummary.of(packages.all().map { it.toDomain(words) })
         }
 
     override fun observeDayPlan(date: LocalDate, zone: ZoneId): Flow<DayPlan> =
-        database.invalidationTracker.createFlow(*PLAN_TABLES).map {
-            database.withTransaction {
-                val words = vocabulary.snapshot()
-                val scheduled = intakes.scheduledOn(date).map { it.toDomain(words) as CourseIntake }
-                val oneOffs = intakes.unplannedBetween(date.atStartOfDay(zone).toInstant(), date.plusDays(1).atStartOfDay(zone).toInstant())
-                    .map { it.toDomain(words) as UnplannedIntake }
-                val inProgress = plans(words)
-                val records = recordsOf(scheduled.map { it.courseId } + inProgress.map { it.course.id }, words)
-                DayPlan.of(date, scheduled, oneOffs, inProgress, records)
-            }
+        database.observing(*PLAN_TABLES) {
+            val words = vocabulary.snapshot()
+            val scheduled = intakes.scheduledOn(date).map { it.toDomain(words) as CourseIntake }
+            val oneOffs = intakes.unplannedBetween(date.atStartOfDay(zone).toInstant(), date.plusDays(1).atStartOfDay(zone).toInstant())
+                .map { it.toDomain(words) as UnplannedIntake }
+            val inProgress = plans(words)
+            val records = recordsOf(scheduled.map { it.courseId } + inProgress.map { it.course.id }, words)
+            DayPlan.of(date, scheduled, oneOffs, inProgress, records)
         }
 
     /** Идущие лечения с их прогрессом: пункты всех курсов — порциями, а не по курсу. */

@@ -2,11 +2,14 @@ package com.kert0n.medapp.storage.template
 
 import com.kert0n.medapp.domain.template.PackageTemplate
 import com.kert0n.medapp.domain.template.TemplateQuery
+import androidx.room.withTransaction
+import com.kert0n.medapp.storage.database.MedAppDatabase
 import com.kert0n.medapp.storage.value.VocabularyDao
 import java.time.Instant
 import javax.inject.Inject
 
 class PackageTemplateRoomRepository @Inject constructor(
+    private val database: MedAppDatabase,
     private val templates: PackageTemplateDao,
     private val vocabulary: VocabularyDao
 ) : PackageTemplateStorageRepository {
@@ -14,8 +17,9 @@ class PackageTemplateRoomRepository @Inject constructor(
     override suspend fun remember(templates: List<PackageTemplate>, at: Instant) =
         this.templates.upsert(templates.map { it.toStorageEntity(at) })
 
-    override suspend fun search(query: TemplateQuery, limit: Int): List<PackageTemplate> {
+    /** Карточки и словарь — одной транзакцией: форма, записанная между ними, не останется без объекта. */
+    override suspend fun search(query: TemplateQuery, limit: Int): List<PackageTemplate> = database.withTransaction {
         val words = vocabulary.snapshot()
-        return templates.search(query.text.lowercase(), limit).map { it.toDomain(words) }
+        templates.search(query.text.lowercase(), limit).map { it.toDomain(words) }
     }
 }

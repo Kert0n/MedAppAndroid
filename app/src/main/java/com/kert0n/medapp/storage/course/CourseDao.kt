@@ -19,18 +19,10 @@ interface CourseDao {
     @Query("SELECT * FROM courses WHERE id = :id")
     suspend fun findPlan(id: Uuid): CourseStorageRow?
 
-    @Transaction
-    @Query("SELECT * FROM courses WHERE id = :id")
-    fun observePlan(id: Uuid): Flow<CourseStorageRow?>
-
     /** Черновики — те, у кого имя ещё живёт здесь, то есть лечение не начато (PLAN D5). */
     @Transaction
     @Query("SELECT * FROM courses WHERE title IS NOT NULL ORDER BY updated_at DESC")
-    fun observeDrafts(): Flow<List<CourseStorageRow>>
-
-    @Transaction
-    @Query("SELECT * FROM courses WHERE title IS NULL ORDER BY created_at")
-    fun observePlans(): Flow<List<CourseStorageRow>>
+    suspend fun drafts(): List<CourseStorageRow>
 
     /** Идущие лечения целиком — отчётам, которые считают по всем сразу (PLAN H6). */
     @Transaction
@@ -45,10 +37,6 @@ interface CourseDao {
     @Query("SELECT * FROM course_records WHERE id = :id")
     suspend fun findRecord(id: Uuid): CourseRecordStorageRow?
 
-    @Transaction
-    @Query("SELECT * FROM course_records WHERE id = :id")
-    fun observeRecord(id: Uuid): Flow<CourseRecordStorageRow?>
-
     /** Записи эпизодов по номерам — порцией, которую называет вызывающий (`chunkedForQuery`). */
     @Transaction
     @Query("SELECT * FROM course_records WHERE id IN (:ids)")
@@ -57,7 +45,7 @@ interface CourseDao {
     /** Аналитика читает записи: идущее и законченное лечение для неё одной формы (PLAN H6). */
     @Transaction
     @Query("SELECT * FROM course_records ORDER BY started_at DESC")
-    fun observeRecords(): Flow<List<CourseRecordStorageRow>>
+    suspend fun records(): List<CourseRecordStorageRow>
 
     /**
      * Черновик целиком: план, его времена и его источники. Времена и источники переписываются

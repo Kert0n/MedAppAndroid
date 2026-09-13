@@ -12,6 +12,7 @@ import com.kert0n.medapp.storage.course.toSourceStorageEntities
 import com.kert0n.medapp.storage.course.toStorageEntity as toCourseStorageEntity
 import com.kert0n.medapp.storage.database.MedAppDatabase
 import com.kert0n.medapp.storage.database.chunkedForQuery
+import com.kert0n.medapp.storage.database.observing
 import com.kert0n.medapp.domain.pack.PackageAfter
 import com.kert0n.medapp.storage.pack.PackageDao
 import com.kert0n.medapp.storage.pack.end
@@ -33,14 +34,12 @@ class IntakeRoomRepository @Inject constructor(
 ) : IntakeStorageRepository {
 
     override fun observeOfCourse(courseId: Uuid): Flow<List<IntakeProjection>> =
-        intakes.observeOfCourse(courseId).map { rows ->
-            val words = vocabulary.snapshot()
-            rows.map { it.toDomain(words).projection() }
-        }
+        database.observing("intakes", "package_records") { ofCourse(courseId).map { it.projection() } }
 
-    override suspend fun ofCourse(courseId: Uuid): List<Intake> {
+    /** Строки и словарь — одной транзакцией: единица, записанная между ними, не потеряется. */
+    override suspend fun ofCourse(courseId: Uuid): List<Intake> = database.withTransaction {
         val words = vocabulary.snapshot()
-        return intakes.ofCourse(courseId).map { it.toDomain(words) }
+        intakes.ofCourse(courseId).map { it.toDomain(words) }
     }
 
     override suspend fun find(id: Uuid): Intake? = intakes.find(id)?.toDomain(vocabulary.snapshot())
