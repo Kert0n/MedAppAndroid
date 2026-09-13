@@ -42,6 +42,7 @@ import com.kert0n.medapp.queue.SyncCommand
 import com.kert0n.medapp.queue.SyncOperationStatus
 import com.kert0n.medapp.queue.intake.IntakeAccounting
 import com.kert0n.medapp.feature.packages.PackageRelocation
+import com.kert0n.medapp.feature.packages.PackageRemoval
 import com.kert0n.medapp.storage.intake.toStorageEntity as toIntakeStorageEntity
 import com.kert0n.medapp.storage.medkit.toStorageEntity as toMedKitStorageEntity
 import com.kert0n.medapp.storage.value.VocabularyRoomRepository
@@ -227,6 +228,188 @@ class SharedMedKitProbe {
         assertAmount("16", jumped.quantity.amount)
         assertEquals(listOf(shared.box), boris.database.courses().sourcePackagesOf(COURSE))
         assertNotNull(success(boris.api.packageSnapshot(shared.box)).claims.mine)
+    }
+
+    /**
+     * Анна переставила **одну коробку** в общую полку, которую Борис тоже видит. Сервер сохраняет
+     * его бронь — она держится на том, что он видит коробку, — и его приём доставляется как ни в
+     * чём не бывало. Полка, с которой коробку забрали, у обоих остаётся.
+     */
+    @Test
+    fun annaMovesTheBoxIntoAShelfBorisAlsoSees(): Unit = runBlocking {
+        val shared = sharedShelfWithBorisTreated()
+        val dacha = anna.localShelf("Дача")
+        anna.publish(dacha)
+        boris.join(success(anna.api.createInvitation(dacha)).key)
+
+        assertEquals(PackageRelocation.Outcome.MARKED, anna.scenarios().packageRelocation.move(shared.box, dacha))
+        anna.drain()
+
+        assertEquals(listOf(SyncOperationStatus.APPLIED), anna.statuses().distinct())
+        val moved = requireNotNull(anna.packages.find(shared.box))
+        assertEquals(dacha, moved.medKit.id)
+        assertEquals(PackageStatus.ACTIVE, moved.status)
+        // Бронь спрашивается у самого Бориса: `mine` в снимке — доля того, кто его читает.
+        assertNotNull("бронь Бориса цела: он видит цель", success(boris.api.packageSnapshot(shared.box)).claims.mine)
+        assertNotNull("полка Анны на месте", anna.database.medKits().find(shared.shelf))
+
+        boris.confirm(shared.intakes[1], shared.box)
+        boris.drain()
+
+        assertEquals(IntakeAccounting.REMOTE_APPLIED, boris.accountingOf(shared.intakes[1]))
+        assertEquals(dacha, requireNotNull(boris.packages.find(shared.box)).medKit.id)
+        assertEquals(listOf(shared.box), boris.database.courses().sourcePackagesOf(COURSE))
+    }
+
+    /**
+     * Анна переставила одну коробку в свою общую полку, где Бориса нет. Для него коробка исчезла:
+     * сервер снял его бронь вместе с доступом, следующий приём кончается утратой доступа, а лечение
+     * теряет источник и продолжается.
+     */
+    @Test
+    fun annaMovesTheBoxIntoAShelfBorisDoesNotSee(): Unit = runBlocking {
+        val shared = sharedShelfWithBorisTreated()
+        val own = anna.localShelf("Моя общая")
+        anna.publish(own)
+
+        assertEquals(PackageRelocation.Outcome.MARKED, anna.scenarios().packageRelocation.move(shared.box, own))
+        anna.drain()
+
+        assertEquals(listOf(SyncOperationStatus.APPLIED), anna.statuses().distinct())
+        assertEquals(own, requireNotNull(anna.packages.find(shared.box)).medKit.id)
+        assertEquals(
+            "бронь Бориса снята вместе с доступом", 0,
+            BigDecimal(success(anna.api.packageSnapshot(shared.box)).claims.total).signum()
+        )
+
+        boris.confirm(shared.intakes[1], shared.box)
+        boris.drain()
+
+        assertEquals(IntakeAccounting.REMOTE_REFUSED, boris.accountingOf(shared.intakes[1]))
+        assertBorisLostTheBox(shared.box)
+    }
+
+    /**
+     * Анна унесла **одну коробку** домой. Она сразу у неё, местная и с тем, что в ней осталось на
+     * самом деле: приём Бориса, доставленный раньше, учтён. Сервер коробку забыл, полка осталась —
+     * Борис узнаёт об этом своим следующим приёмом.
+     */
+    @Test
+    fun annaCarriesTheBoxHome(): Unit = runBlocking {
+        val shared = sharedShelfWithBorisTreated()
+        val home = anna.localShelf("Дом")
+
+        assertEquals(PackageRelocation.Outcome.MOVED, anna.scenarios().packageRelocation.move(shared.box, home))
+        anna.drain()
+
+        assertEquals(listOf(SyncOperationStatus.APPLIED), anna.statuses().distinct())
+        val carried = requireNotNull(anna.packages.find(shared.box))
+        assertEquals(home, carried.medKit.id)
+        assertEquals(PackageStatus.ACTIVE, carried.status)
+        assertAmount("18", carried.quantity.amount)
+        assertEquals(ApiFailure.NotFound, failure(anna.api.packageSnapshot(shared.box)))
+        assertNotNull("полка осталась у всех", anna.database.medKits().find(shared.shelf))
+
+        boris.confirm(shared.intakes[1], shared.box)
+        boris.drain()
+
+        assertEquals(IntakeAccounting.REMOTE_REFUSED, boris.accountingOf(shared.intakes[1]))
+        assertBorisLostTheBox(shared.box)
+    }
+
+    /**
+     * Анна выбросила **одну коробку** из общей полки. До ответа сервера коробка у неё цела и
+     * помечена — иначе отказ уничтожил бы то, что у Бориса живо, — а ответ уносит её со следом
+     * утилизации. У Бориса это утрата доступа, и лечение теряет источник.
+     */
+    @Test
+    fun annaThrowsTheBoxAway(): Unit = runBlocking {
+        val shared = sharedShelfWithBorisTreated()
+
+        assertEquals(PackageRemoval.Outcome.MARKED, anna.scenarios().packageRemoval.remove(shared.box))
+        assertEquals(PackageStatus.REMOVING, requireNotNull(anna.packages.find(shared.box)).status)
+        anna.drain()
+
+        assertEquals(listOf(SyncOperationStatus.APPLIED), anna.statuses().distinct())
+        assertNull(anna.packages.find(shared.box))
+        assertEquals(ApiFailure.NotFound, failure(anna.api.packageSnapshot(shared.box)))
+        val words = anna.vocabulary.snapshot()
+        assertTrue(
+            "след утилизации остался",
+            anna.database.stockMovements().ofPackage(shared.box).any { it.toDomain(words) is StockMovement.Disposal }
+        )
+
+        boris.confirm(shared.intakes[1], shared.box)
+        boris.drain()
+
+        assertEquals(IntakeAccounting.REMOTE_REFUSED, boris.accountingOf(shared.intakes[1]))
+        assertBorisLostTheBox(shared.box)
+    }
+
+    /**
+     * Анна оставила лекарства остальным и вышла из полки. У неё коробки потеряны, а полки нет в
+     * списке; у Бориса полка и коробка целы, и лечение идёт дальше как шло.
+     */
+    @Test
+    fun annaLeavesTheShelfToTheOthers(): Unit = runBlocking {
+        val shared = sharedShelfWithBorisTreated()
+
+        assertEquals(
+            MedKitRemoval.Outcome.MARKED,
+            anna.scenarios().medKitRemoval.remove(shared.shelf, MedKitRemoval.Fate.LeaveToOthers)
+        )
+        assertEquals(PackageStatus.LOST, requireNotNull(anna.packages.find(shared.box)).status)
+        anna.drain()
+
+        assertEquals(listOf(SyncOperationStatus.APPLIED), anna.statuses().distinct())
+        assertNull(anna.database.medKits().find(shared.shelf))
+        assertNull(anna.packages.find(shared.box))
+        val words = anna.vocabulary.snapshot()
+        assertTrue(
+            "утрата доступа записана",
+            anna.database.stockMovements().ofPackage(shared.box).any { it.toDomain(words) is StockMovement.AccessLoss }
+        )
+
+        boris.confirm(shared.intakes[1], shared.box)
+        boris.drain()
+
+        assertEquals(IntakeAccounting.REMOTE_APPLIED, boris.accountingOf(shared.intakes[1]))
+        // Спрашивает Борис: вышедшая Анна коробку уже не видит, и это тоже часть ожидаемого.
+        assertAmount("16", BigDecimal(success(boris.api.packageSnapshot(shared.box)).pack.amount))
+        assertEquals(ApiFailure.NotFound, failure(anna.api.packageSnapshot(shared.box)))
+        assertEquals(listOf(shared.box), boris.database.courses().sourcePackagesOf(COURSE))
+    }
+
+    /**
+     * Анна выбросила полку целиком, вместе с лекарствами. Полка исчезает у всех: у Анны остаются
+     * следы утилизации, у Бориса — утрата доступа и лечение без источника.
+     */
+    @Test
+    fun annaThrowsTheWholeShelfAway(): Unit = runBlocking {
+        val shared = sharedShelfWithBorisTreated()
+
+        assertEquals(
+            MedKitRemoval.Outcome.MARKED,
+            anna.scenarios().medKitRemoval.remove(shared.shelf, MedKitRemoval.Fate.ThrowAway)
+        )
+        assertEquals(PackageStatus.REMOVING, requireNotNull(anna.packages.find(shared.box)).status)
+        anna.drain()
+
+        assertEquals(listOf(SyncOperationStatus.APPLIED), anna.statuses().distinct())
+        assertNull(anna.database.medKits().find(shared.shelf))
+        assertNull(anna.packages.find(shared.box))
+        assertEquals(ApiFailure.NotFound, failure(anna.api.medKit(shared.shelf)))
+        val words = anna.vocabulary.snapshot()
+        assertTrue(
+            "след утилизации остался",
+            anna.database.stockMovements().ofPackage(shared.box).any { it.toDomain(words) is StockMovement.Disposal }
+        )
+
+        boris.confirm(shared.intakes[1], shared.box)
+        boris.drain()
+
+        assertEquals(IntakeAccounting.REMOTE_REFUSED, boris.accountingOf(shared.intakes[1]))
+        assertBorisLostTheBox(shared.box)
     }
 
     /**
