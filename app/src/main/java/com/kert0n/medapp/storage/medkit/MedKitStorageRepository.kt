@@ -2,7 +2,7 @@ package com.kert0n.medapp.storage.medkit
 
 import com.kert0n.medapp.domain.medkit.MedKit
 import com.kert0n.medapp.domain.medkit.MedKitProjection
-import com.kert0n.medapp.network.pack.PackageSnapshot
+import com.kert0n.medapp.domain.medkit.MedKitStatus
 import java.time.Instant
 import kotlin.uuid.Uuid
 import kotlinx.coroutines.flow.Flow
@@ -26,15 +26,30 @@ interface MedKitStorageRepository {
      */
     fun observeSyncedAt(id: Uuid): Flow<Instant?>
 
-    suspend fun save(medKit: MedKit, syncedAt: Instant? = null)
+    /** Новая полка: заводится местной, обвязки синхронизации у неё ещё нет (PLAN D2). */
+    suspend fun add(medKit: MedKit)
+
+    /**
+     * Название и место хранения — названными полями к полке, прочитанной в той же транзакции:
+     * публикацию, число участников, пометку и обвязку синхронизации правка не трогает (PLAN D2,
+     * F5). `false` — полки больше нет.
+     */
+    suspend fun describe(medKitId: Uuid, name: String, location: String?): Boolean
+
+    /**
+     * Строка аптечки уходит. Содержимое к этому моменту уже переехало или удалено — что с ним
+     * делать, решает сценарий, а не хранение (PLAN E6, F5). `false` — аптечки и так нет.
+     */
+    suspend fun delete(id: Uuid): Boolean
+
+    /**
+     * Решение по полке принято, а сервер ещё не ответил: полка получает пометку [status] своим
+     * переходом (PLAN E1, E6). Снимает её закрытие команды в очереди, поэтому `ACTIVE` сюда не
+     * передают. `false` — аптечки больше нет.
+     */
+    suspend fun mark(medKitId: Uuid, status: MedKitStatus): Boolean
 
     /** Снимок трогает только число участников: остального сервер о нашей аптечке не знает. */
     suspend fun applyServerParticipants(id: Uuid, participantCount: Long, syncedAt: Instant)
 
-    /**
-     * Момент передачи ответственности серверу (PLAN E5): аптечка становится опубликованной, а
-     * ответы на создание её пачек — первым подтверждённым остатком и версиями — одной транзакцией.
-     * До неё истина — устройство и очереди нет; после — сервер, и изменения идут командами.
-     */
-    suspend fun published(medKit: MedKit, snapshots: List<PackageSnapshot>, at: Instant)
 }

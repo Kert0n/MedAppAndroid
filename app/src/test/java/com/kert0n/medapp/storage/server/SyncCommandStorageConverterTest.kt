@@ -24,7 +24,7 @@ import com.kert0n.medapp.fixture.millilitres
 import com.kert0n.medapp.network.value.VocabularyMiss
 
 /**
- * Круговой тест по **всем одиннадцати** видам команд: исчерпывающего `when` по обоим корням
+ * Круговой тест по **всем двенадцати** видам команд: исчерпывающего `when` по обоим корням
  * сразу у маркера нет, и закрытость набора держит именно этот перечень (PLAN E2, PR 4).
  */
 class SyncCommandStorageConverterTest {
@@ -40,15 +40,17 @@ class SyncCommandStorageConverterTest {
 
     private val everyKind: List<SyncCommand> = listOf(
         PackageSyncCommand.Create(PACK, HOME_KIT, tablets("20"), facts),
+        PackageSyncCommand.Create(PACK, HOME_KIT, tablets("20"), facts, fromMedKitId = SHARED_KIT),
         PackageSyncCommand.Describe(PACK, facts, facts.copy(name = "Paracetamol", category = null)),
-        PackageSyncCommand.CorrectStock(PACK, tablets("18.5")),
+        PackageSyncCommand.CorrectStock(PACK, tablets("20"), tablets("18.5")),
         PackageSyncCommand.Move(PACK, SHARED_KIT),
         PackageSyncCommand.Delete(PACK),
+        PackageSyncCommand.Withdraw(PACK, SHARED_KIT, tablets("20")),
         PackageSyncCommand.Consume(PACK, dose("1.5"), INTAKE),
         PackageSyncCommand.Consume(PACK, dose("1.5"), INTAKE, claimAfter = tablets("4")),
         PackageSyncCommand.SetClaim(PACK, tablets("6")),
         PackageSyncCommand.ReleaseClaim(PACK),
-        MedKitSyncCommand.Create(HOME_KIT),
+        MedKitSyncCommand.Publish(HOME_KIT),
         MedKitSyncCommand.Delete(HOME_KIT),
         MedKitSyncCommand.Delete(HOME_KIT, transferTo = SHARED_KIT),
         MedKitSyncCommand.Leave(SHARED_KIT)
@@ -69,15 +71,23 @@ class SyncCommandStorageConverterTest {
     }
 
     @Test
-    fun elevenKindsAndNoMore() {
+    fun twelveKindsAndNoMore() {
         assertEquals(
             listOf(
                 "PACKAGE_CREATE", "PACKAGE_DESCRIBE", "PACKAGE_CORRECT_STOCK", "PACKAGE_MOVE",
-                "PACKAGE_DELETE", "PACKAGE_CONSUME", "PACKAGE_SET_CLAIM", "PACKAGE_RELEASE_CLAIM",
-                "MEDKIT_CREATE", "MEDKIT_DELETE", "MEDKIT_LEAVE"
+                "PACKAGE_DELETE", "PACKAGE_WITHDRAW", "PACKAGE_CONSUME", "PACKAGE_SET_CLAIM", "PACKAGE_RELEASE_CLAIM",
+                "MEDKIT_PUBLISH", "MEDKIT_DELETE", "MEDKIT_LEAVE"
             ),
             everyKind.map(SyncCommandStorageConverter::kindOf).distinct()
         )
+    }
+
+    /** Полка, с которой коробку принесли, переживает перезапуск: по ней её и возвращают. */
+    @Test
+    fun theShelfABoxCameFromSurvivesTheRoundTrip() {
+        val carried = PackageSyncCommand.Create(PACK, HOME_KIT, tablets("20"), facts, fromMedKitId = SHARED_KIT)
+        assertEquals(SHARED_KIT, (roundTrip(carried) as PackageSyncCommand.Create).fromMedKitId)
+        assertNull((roundTrip(PackageSyncCommand.Create(PACK, HOME_KIT, tablets("20"), facts)) as PackageSyncCommand.Create).fromMedKitId)
     }
 
     /** Пустая бронь и заполненная — разные команды, и различать их должен именно payload. */
@@ -108,10 +118,15 @@ class SyncCommandStorageConverterTest {
     fun commandNamesThePackageItTouchesAndMedKitCommandsDoNot() {
         assertEquals(PACK, SyncCommandStorageConverter.packageIdOf(PackageSyncCommand.Delete(PACK)))
         assertNull(SyncCommandStorageConverter.packageIdOf(MedKitSyncCommand.Leave(HOME_KIT)))
-        assertEquals(HOME_KIT, SyncCommandStorageConverter.medKitIdOf(MedKitSyncCommand.Create(HOME_KIT)))
+        assertEquals(HOME_KIT, SyncCommandStorageConverter.medKitIdOf(MedKitSyncCommand.Publish(HOME_KIT)))
         assertEquals(
             SHARED_KIT,
             SyncCommandStorageConverter.medKitIdOf(PackageSyncCommand.Move(PACK, SHARED_KIT))
+        )
+        // Унесённая домой коробка действует на полке, откуда её унесли: там её и снимают.
+        assertEquals(
+            HOME_KIT,
+            SyncCommandStorageConverter.medKitIdOf(PackageSyncCommand.Withdraw(PACK, HOME_KIT, tablets("20")))
         )
     }
 
@@ -125,6 +140,24 @@ class SyncCommandStorageConverterTest {
                 payload = SyncCommandStorageConverter.payloadOf(command),
                 payloadVersion = SyncCommandStorageConverter.PAYLOAD_VERSION + 1,
                 vocabulary = VOCABULARY
+            )
+        )
+    }
+
+    /**
+     * Пересчёт версии 1 нёс одно абсолютное число: разницы из него не восстановить, и строка — не
+     * повреждённая, а неизвестной версии. Виды, чей формат не менялся, с версии 1 читаются.
+     */
+    @Test
+    fun anAbsoluteRecountOfVersionOneIsOfUnknownVersionWhileOtherKindsStillRead() {
+        val oldRecount = """{"packageId":"$PACK","actual":"10","actualUnitId":"${TABLETS.id}"}"""
+        assertNull(SyncCommandStorageConverter.commandOf("PACKAGE_CORRECT_STOCK", oldRecount, 1, VOCABULARY))
+
+        val delete = PackageSyncCommand.Delete(OTHER_PACK)
+        assertEquals(
+            delete,
+            SyncCommandStorageConverter.commandOf(
+                SyncCommandStorageConverter.kindOf(delete), SyncCommandStorageConverter.payloadOf(delete), 1, VOCABULARY
             )
         )
     }
@@ -163,7 +196,7 @@ class SyncCommandStorageConverterTest {
     /** Единица вне снимка — промах словаря, а не порча payload: он лечится чтением, а не человеком. */
     @Test
     fun aUnitMissingFromTheSnapshotIsAVocabularyMissNotAFormatError() {
-        val command = PackageSyncCommand.CorrectStock(PACK, millilitres("10"))
+        val command = PackageSyncCommand.CorrectStock(PACK, millilitres("20"), millilitres("10"))
         val refusal = runCatching {
             SyncCommandStorageConverter.commandOf(
                 kind = SyncCommandStorageConverter.kindOf(command),

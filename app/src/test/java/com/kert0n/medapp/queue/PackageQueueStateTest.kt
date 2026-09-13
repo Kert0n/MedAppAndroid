@@ -9,6 +9,8 @@ import com.kert0n.medapp.fixture.TABLET_FORM
 import com.kert0n.medapp.fixture.millilitres
 import com.kert0n.medapp.fixture.pack
 import com.kert0n.medapp.fixture.dose
+import com.kert0n.medapp.domain.value.Quantity
+import com.kert0n.medapp.fixture.TABLETS
 import com.kert0n.medapp.fixture.tablets
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
@@ -81,7 +83,7 @@ class PackageQueueStateTest {
      */
     @Test
     fun aCommandInAnotherUnitIsLeftOutOfTheNumberAndNamed() {
-        val stale = PackageSyncCommand.CorrectStock(PACK, tablets("30"))
+        val stale = PackageSyncCommand.CorrectStock(PACK, seen = tablets("20"), actual = tablets("30"))
         val state = PackageQueueState(pack(quantity = millilitres("100")), listOf(stale, consume("3")))
 
         assertEquals(millilitres("100"), state.amount)
@@ -90,22 +92,26 @@ class PackageQueueStateTest {
     }
 
     @Test
-    fun recountReplacesTheValueInsteadOfSubtracting() {
-        // Пересчёт — не дельта: он может оказаться и больше прежнего.
+    fun recountLaysItsDifferenceOverTheNumberBeforeIt() {
+        // Человек видел 17 (20 без трёх, ещё не уехавших) и насчитал 30: разница +13 ложится
+        // поверх того, что было к этому моменту, — и может оказаться больше прежнего.
         val state = PackageQueueState(
             pack(quantity = tablets("20")),
-            unclosed = listOf(consume("3"), PackageSyncCommand.CorrectStock(PACK, tablets("30")))
+            unclosed = listOf(consume("3"), PackageSyncCommand.CorrectStock(PACK, seen = tablets("17"), actual = tablets("30")))
         )
         assertEquals(tablets("30"), state.amount)
     }
 
     @Test
-    fun projectedRecountAgreesWithWhatThePackWouldConfirm() {
-        // Очередь проецирует то же, что пачка потом подтвердит переходом `correctTo`.
-        val stored = pack(quantity = tablets("20"))
-        val recount = PackageSyncCommand.CorrectStock(PACK, tablets("30"))
-        val state = PackageQueueState(stored, listOf(recount))
-        assertEquals(stored.correctTo(tablets("30")).quantity, state.amount)
+    fun aRecountBelowZeroShowsZero() {
+        // Видел 20, назвал 5, а сервер тем временем подтвердил 10: −15 поверх 10 — ноль на экране,
+        // а отказ такому пересчёту даст подготовка (C1).
+        val state = PackageQueueState(
+            pack(quantity = tablets("10")),
+            unclosed = listOf(PackageSyncCommand.CorrectStock(PACK, seen = tablets("20"), actual = tablets("5")))
+        )
+        assertEquals(tablets("0"), state.amount)
+        assertTrue(state.hasUnconfirmedChanges)
     }
 
     @Test

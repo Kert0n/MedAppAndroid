@@ -8,14 +8,13 @@ import com.kert0n.medapp.fixture.medKit
 import com.kert0n.medapp.fixture.pack
 import com.kert0n.medapp.fixture.withShared
 import org.junit.Assert.assertEquals
-import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNotEquals
-import org.junit.Assert.assertTrue
 import org.junit.Test
 
 /**
- * Ссылка на пачку — то, что о ней знает чужой агрегат: тождество, имя, единица, форма, годность
- * для запаса и аптечка. Остатка и переходов у ссылки нет: списать из курса нечем (PLAN C1).
+ * Ссылка на пачку — то, что о ней знает чужой агрегат: тождество, имя, единица, форма. Ни
+ * остатка, ни места, ни переходов: списать из курса нечем, а есть ли коробка сейчас, знает
+ * только живая пачка (PLAN C1, D3).
  */
 class PackageRefTest {
 
@@ -26,14 +25,6 @@ class PackageRefTest {
         assertEquals("Парацетамол", ref.name)
         assertEquals(TABLETS, ref.unit)
         assertEquals(TABLET_FORM, ref.form)
-        assertEquals(HOME_KIT, ref.medKit.id)
-        assertTrue(ref.suppliesStock)
-    }
-
-    @Test
-    fun refOfAnArchivedPackDoesNotSupplyStock() {
-        assertFalse(pack().archive().ref.suppliesStock)
-        assertFalse(pack().loseAccess().ref.suppliesStock)
     }
 
     @Test

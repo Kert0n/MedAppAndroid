@@ -6,6 +6,7 @@ import com.kert0n.medapp.fixture.OTHER_PACK
 import com.kert0n.medapp.fixture.PACK
 import com.kert0n.medapp.fixture.activeCourse
 import com.kert0n.medapp.fixture.inMemoryDatabase
+import com.kert0n.medapp.fixture.save
 import com.kert0n.medapp.fixture.pack
 import com.kert0n.medapp.fixture.rejectedByDatabase
 import com.kert0n.medapp.fixture.source
@@ -44,7 +45,7 @@ class ActivePackageAssignmentDaoTest {
         database = inMemoryDatabase()
         for (id in listOf(PACK, OTHER_PACK)) {
             val pkg = pack(id = id)
-            database.packages().save(pkg.toPackageStorageEntity(), pkg.toDetailsStorageEntity())
+            database.packages().save(pkg)
         }
         for (id in listOf(COURSE, secondCourse)) {
             val plan = activeCourse(id = id, sources = listOf(source(PACK, 1)))
@@ -121,15 +122,28 @@ class ActivePackageAssignmentDaoTest {
         assertEquals(secondCourse, courses.courseHolding(PACK))
     }
 
-    /** Занятую пачку не удалить молча, и занятый план не исчезнуть в обход транзакции. */
+    /** Занятый план не исчезает в обход транзакции: назначение держит его ключом. */
     @Test
-    fun neitherPackageNorPlanDisappearsWhileTheAssignmentStands() = runTest {
+    fun aHeldPlanDoesNotDisappearBehindTheTransaction() = runTest {
         courses.assignPackage(ActivePackageAssignmentStorageEntity(PACK, COURSE))
 
-        val packageRefusal = rejectedByDatabase { database.packages().delete(PACK) }
-        assertTrue("$packageRefusal", packageRefusal is SQLiteConstraintException)
+        val refusal = rejectedByDatabase { courses.deletePlan(COURSE) }
 
-        val planRefusal = rejectedByDatabase { courses.deletePlan(COURSE) }
-        assertTrue("$planRefusal", planRefusal is SQLiteConstraintException)
+        assertTrue("$refusal", refusal is SQLiteConstraintException)
+    }
+
+    /**
+     * Занятость пачки снимает курс, а не схема: пока назначение есть, строки пачки не убрать.
+     * Каскад освободил бы её молча — мимо редакции курса, которая занятость и охраняет
+     * (PLAN D3, D5, F2).
+     */
+    @Test
+    fun aPackageAssignedToACourseIsNotRemovedSilently() = runTest {
+        courses.assignPackage(ActivePackageAssignmentStorageEntity(PACK, COURSE))
+
+        val refusal = runCatching { database.packages().delete(PACK) }.exceptionOrNull()
+
+        assertTrue("$refusal", refusal is SQLiteConstraintException)
+        assertEquals(COURSE, courses.courseHolding(PACK))
     }
 }

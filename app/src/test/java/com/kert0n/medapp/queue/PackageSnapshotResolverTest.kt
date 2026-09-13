@@ -68,7 +68,7 @@ class PackageSnapshotResolverTest {
         override suspend fun answered(id: Uuid, answer: RawResponse, at: Instant) = error("не для этого теста")
         override suspend fun defer(id: Uuid, reason: String, at: Instant, notBefore: Instant) = error("не для этого теста")
         override suspend fun settle(id: Uuid, settlement: Settlement, at: Instant) = error("не для этого теста")
-        override suspend fun enqueue(queued: QueuedCommand, at: Instant) = error("не для этого теста")
+        override suspend fun enqueue(queued: QueuedCommand, shelf: kotlin.uuid.Uuid, at: Instant) = error("не для этого теста")
     }
 
     private fun resolver(online: Boolean): PackageSnapshotResolver {
@@ -102,12 +102,25 @@ class PackageSnapshotResolverTest {
         assertEquals(4L, resolved.snapshot.sync.version?.number)
     }
 
+    /**
+     * Полка, которой у нас нет, — не «ещё не дочитали», а «коробка ушла туда, где нас нет»: ответ
+     * окончательный, и словарь ради него не читается (PLAN E3, E6).
+     */
     @Test
-    fun anUnknownMedKitIsUnresolvedAndDoesNotStopThePass() = runTest {
+    fun anUnknownMedKitMeansTheBoxIsElsewhereForGood() = runTest {
         val resolution = resolver(online = true).resolve(dto(snapshotJson.replace(HOME_KIT.toString(), SHARED_KIT.toString())), EARLIER)
-        val unresolved = resolution as PackageSnapshotResolver.Resolution.Unresolved
-        assertEquals("аптечка $SHARED_KIT неизвестна", unresolved.reason)
-        assertFalse(unresolved.stop)
+        assertEquals(PackageSnapshotResolver.Resolution.Elsewhere(SHARED_KIT), resolution)
+    }
+
+    /** Ту же полку полный снимок приносит сам: коробке на ней есть куда лечь (PLAN E4). */
+    @Test
+    fun aMedKitTheSnapshotBringsResolvesTheBoxOntoIt() = runTest {
+        val resolution = resolver(online = false).resolve(
+            dto(snapshotJson.replace(HOME_KIT.toString(), SHARED_KIT.toString())), EARLIER, arriving = setOf(SHARED_KIT)
+        )
+        val resolved = resolution as PackageSnapshotResolver.Resolution.Resolved
+        assertEquals(SHARED_KIT, resolved.snapshot.pack.medKit.id)
+        assertEquals(MedKit.Publication.PUBLISHED, resolved.snapshot.pack.medKit.publication)
     }
 
     @Test

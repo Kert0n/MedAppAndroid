@@ -40,12 +40,19 @@ class MedKitTest {
         assertFalse(kit(publication = MedKit.Publication.LOCAL).acceptsInvitations)
     }
 
+    /**
+     * Ответ сервера делает полку общей и больше ничего не трогает. Приглашений она при этом ещё не
+     * выдаёт: содержимое едет своими командами, и половины полки приглашённому не показывают
+     * (PLAN D2, E5).
+     */
     @Test
-    fun publishingIsOneTransitionAndKeepsEverythingElse() {
-        val local = kit(publication = MedKit.Publication.LOCAL)
-        val published = local.publish()
+    fun theServerAnswerMakesTheShelfSharedAndKeepsEverythingElse() {
+        val local = kit(publication = MedKit.Publication.LOCAL).markPublishing()
+        val published = local.published()
         assertEquals(MedKit.Publication.PUBLISHED, published.publication)
-        assertTrue(published.acceptsInvitations)
+        assertTrue(published.answersToServer)
+        assertFalse(published.acceptsInvitations)
+        assertTrue(published.settled().acceptsInvitations)
         assertEquals(local.id, published.id)
         assertEquals(local.name, published.name)
         assertEquals(local.participantCount, published.participantCount)
@@ -53,7 +60,13 @@ class MedKitTest {
 
     @Test(expected = IllegalStateException::class)
     fun publishedKitIsNotPublishedTwice() {
-        kit(publication = MedKit.Publication.PUBLISHED).publish()
+        kit(publication = MedKit.Publication.PUBLISHED).published()
+    }
+
+    /** Общей полка становится только по своему решению: без пометки отвечать нечему. */
+    @Test(expected = IllegalStateException::class)
+    fun aShelfNobodyDecidedToPublishDoesNotBecomeShared() {
+        kit(publication = MedKit.Publication.LOCAL).published()
     }
 
     @Test

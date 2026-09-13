@@ -15,5 +15,6 @@ data class MedKitProjection(
     val participantCount: Long,
     val createdAt: Instant,
     val isShared: Boolean,
-    val acceptsInvitations: Boolean
+    val acceptsInvitations: Boolean,
+    val status: MedKitStatus = MedKitStatus.ACTIVE
 )

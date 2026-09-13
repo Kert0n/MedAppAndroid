@@ -5,6 +5,7 @@ import com.kert0n.medapp.domain.medkit.MedKit
 import com.kert0n.medapp.fixture.HOME_KIT
 import com.kert0n.medapp.fixture.SHARED_KIT
 import com.kert0n.medapp.fixture.inMemoryDatabase
+import com.kert0n.medapp.fixture.save
 import com.kert0n.medapp.fixture.medKit
 import com.kert0n.medapp.fixture.pack
 import com.kert0n.medapp.fixture.rejectedByDatabase
@@ -84,7 +85,7 @@ class MedKitDaoTest {
     @Test
     fun aMedKitWithPackagesCannotBeDeleted() = runTest {
         val pkg = pack(medKit = medKit(id = HOME_KIT).ref)
-        database.packages().save(pkg.toStorageEntity(PackageSyncState(pkg.id)), pkg.toDetailsStorageEntity())
+        database.packages().save(pkg, PackageSyncState(pkg.id))
 
         val refusal = rejectedByDatabase { medKits.delete(HOME_KIT) }
 

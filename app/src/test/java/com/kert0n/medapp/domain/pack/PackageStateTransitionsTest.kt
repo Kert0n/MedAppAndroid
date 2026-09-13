@@ -1,42 +1,34 @@
 package com.kert0n.medapp.domain.pack
 
+import com.kert0n.medapp.domain.medkit.MedKitStatus
+import com.kert0n.medapp.domain.value.Dose
 import com.kert0n.medapp.domain.value.Money
 
 import com.kert0n.medapp.fixture.HOME_KIT
+import com.kert0n.medapp.fixture.LATER
 import com.kert0n.medapp.fixture.SHARED_KIT
 import com.kert0n.medapp.fixture.factsOf
 import com.kert0n.medapp.fixture.expiry
 import com.kert0n.medapp.fixture.withShared
+import com.kert0n.medapp.fixture.left
 import com.kert0n.medapp.fixture.medKit
 import com.kert0n.medapp.fixture.pack
-import com.kert0n.medapp.fixture.dose
 import com.kert0n.medapp.fixture.tablets
 
 import java.math.BigDecimal
+import kotlin.uuid.Uuid
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNull
-import org.junit.Assert.assertSame
+import org.junit.Assert.assertThrows
+import org.junit.Assert.assertTrue
 import org.junit.Test
 
 /**
- * Переходы упаковки. Кончившаяся пачка архивируется, а не исчезает: иначе история приёмов за
- * прошлый месяц оборвалась бы вместе с ней (PLAN D3).
- */
-/**
- * Переходы, меняющие сведения, принадлежность и две оси состояния. Жизненный цикл и доступ
- * независимы: выбросить свою часть общей пачки и выйти из аптечки можно в любом порядке (PLAN D3).
+ * Переходы, меняющие сведения и принадлежность. Состояний жизни у коробки нет: она либо есть, либо
+ * её нет, и утрата доступа — запись в истории о том, что из учёта ушло (PLAN D3, D7). Статус говорит
+ * только о решении, которое ещё не подтверждено, и помеченной к уходу коробкой не пользуются (E1).
  */
 class PackageStateTransitionsTest {
-
-    @Test(expected = IllegalStateException::class)
-    fun inaccessiblePackIsNotEdited() {
-        pack(access = Package.Access.LOST).describe(factsOf(pack()))
-    }
-
-    @Test(expected = IllegalStateException::class)
-    fun inaccessiblePackIsNotMoved() {
-        pack(access = Package.Access.LOST).moveTo(medKit(id = SHARED_KIT, name = "Общая").ref)
-    }
 
     @Test
     fun editReplacesTheWholeDescriptiveState() {
@@ -86,49 +78,66 @@ class PackageStateTransitionsTest {
     }
 
     @Test
-    fun archivingTwiceIsNotAnError() {
-        val archived = pack().archive()
-        assertSame(archived, archived.archive())
+    fun aShelfBeingRemovedTakesNothingWhileAPublishedOneStillDoes() {
+        // Убираемая полка вот-вот уйдёт: положенная в неё коробка уехала бы с ней, ничего человеку
+        // не сказав. Публикуемой это не касается — ею пользуются, пока сервер её заводит (E5, E6).
+        val removing = medKit(id = SHARED_KIT, name = "Общая", status = MedKitStatus.REMOVING).ref
+        assertThrows(IllegalStateException::class.java) { pack().moveTo(removing) }
+        val publishing = medKit(id = SHARED_KIT, name = "Общая", status = MedKitStatus.PUBLISHING).ref
+        assertEquals(SHARED_KIT, pack().moveTo(publishing).medKit.id)
     }
 
     @Test
-    fun archivingAnInaccessiblePackRemovesItFromTheList() {
-        assertEquals(
-            Package.Lifecycle.ARCHIVED,
-            pack(access = Package.Access.LOST).archive().lifecycle
-        )
+    fun theAnswerOfAShelfCarriesEvenAMarkedBoxAndKeepsItsMark() {
+        // Переезд по ответу полки — не пользование: ни своя пометка коробки, ни пометка полки его
+        // не отменяют, иначе ответ было бы нечем применить (PLAN E1, E6).
+        val shared = pack(medKit = medKit(id = SHARED_KIT, name = "Общая").ref)
+        val home = medKit(id = HOME_KIT, status = MedKitStatus.REMOVING).ref
+        val carried = shared.markChanging().movedByAnswer(home)
+        assertEquals(HOME_KIT, carried.medKit.id)
+        assertEquals(PackageStatus.CHANGING, carried.status)
+        assertEquals(PackageStatus.REMOVING, shared.markRemoving().movedByAnswer(home).status)
+    }
+
+    @Test(expected = IllegalArgumentException::class)
+    fun theAnswerDoesNotMoveABoxIntoTheShelfItAlreadyLiesIn() {
+        pack(medKit = medKit(id = HOME_KIT).ref).movedByAnswer(medKit(id = HOME_KIT).ref)
+    }
+
+    /**
+     * Унесли при 20, дома выпили одну — у нас 19; полка к снятию подтвердила 17: сосед выпил три.
+     * Коробка хранит оба изменения — 16 (PLAN E6).
+     */
+    @Test
+    fun aBoxCarriedHomeKeepsBothTheShelfsAndItsOwnChanges() {
+        val atHome = pack(quantity = tablets("19"))
+        assertEquals(tablets("16"), atHome.rebased(from = tablets("20"), onto = tablets("17")).left().quantity)
+        assertTrue(atHome.rebased(from = tablets("20"), onto = tablets("1")) is PackageAfter.Ended)
     }
 
     @Test
-    fun losingAccessDropsTheClaimsSnapshot() {
-        // Сервер снял брони каскадом по участию: держать их снимок значило бы показывать
-        // чужие брони на пачке, которой у нас больше нет.
-        val shared = pack(claims = Claims(BigDecimal("5"), BigDecimal("2")))
-        val lost = shared.loseAccess()
-        assertEquals(Package.Access.LOST, lost.access)
-        assertEquals(Package.Lifecycle.ACTIVE, lost.lifecycle)
-        assertNull(lost.claims)
+    fun aBoxMarkedToGoIsReadOnly() {
+        for (marked in listOf(pack().markRemoving(), pack().markLost())) {
+            assertTrue(marked.take(Dose(tablets("1")), LATER).isFailure)
+            assertThrows(IllegalStateException::class.java) { marked.dispose(tablets("1")) }
+            assertThrows(IllegalStateException::class.java) { marked.correctTo(tablets("5")) }
+            assertThrows(IllegalStateException::class.java) { marked.describe(factsOf(marked)) }
+            assertThrows(IllegalStateException::class.java) { marked.moveTo(medKit(id = SHARED_KIT).ref) }
+        }
     }
 
     @Test
-    fun losingAccessTwiceIsNotAnError() {
-        val lost = pack().loseAccess()
-        assertSame(lost, lost.loseAccess())
+    fun aBoxBeingChangedIsStillInUseAndTheAnswerSettlesIt() {
+        val changing = pack().markChanging()
+        assertEquals(PackageStatus.CHANGING, changing.status)
+        assertTrue(changing.take(Dose(tablets("1")), LATER).isSuccess)
+        assertEquals(PackageStatus.ACTIVE, changing.settled().status)
     }
 
     @Test
-    fun archivedPackCanAlsoLoseAccess() {
-        // Две оси, а не одна: выбросить свою часть общей пачки и потом выйти из аптечки — это
-        // два разных события, и оба остаются записанными.
-        val lost = pack(quantity = tablets("2")).consume(dose("2")).loseAccess()
-        assertEquals(Package.Lifecycle.ARCHIVED, lost.lifecycle)
-        assertEquals(Package.Access.LOST, lost.access)
-    }
-
-    @Test
-    fun losingAccessKeepsWhatWasLeft() {
-        // Остаток недоступной пачки помним: он нужен движению ACCESS_LOST и отчёту.
-        val lost = pack(quantity = tablets("7")).loseAccess()
-        assertEquals(tablets("7"), lost.quantity)
+    fun theEndOfAMarkedBoxIsNotRefused() {
+        // Конец — ответ на решение, а не пользование: помеченная коробка обязана уметь кончиться.
+        assertEquals(pack().id, pack().markRemoving().ended().record.id)
+        assertEquals(pack().id, pack().markLost().ended().record.id)
     }
 }

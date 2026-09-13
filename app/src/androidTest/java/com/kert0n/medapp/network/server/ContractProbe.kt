@@ -1,12 +1,6 @@
 package com.kert0n.medapp.network.server
 
-import android.os.Bundle
-import androidx.test.platform.app.InstrumentationRegistry
-import com.kert0n.medapp.network.account.AccessTokens
 import com.kert0n.medapp.network.account.AccountCredentials
-import com.kert0n.medapp.network.account.CredentialSource
-import com.kert0n.medapp.network.account.CredentialsSaved
-import com.kert0n.medapp.network.account.StoredAccount
 import com.kert0n.medapp.network.medkit.MedKitPostNetworkDTO
 import com.kert0n.medapp.network.medkit.MembershipPostNetworkDTO
 import com.kert0n.medapp.network.pack.ClaimPatchNetworkDTO
@@ -15,7 +9,6 @@ import com.kert0n.medapp.network.pack.PackagePatchNetworkDTO
 import com.kert0n.medapp.network.pack.PackagePostNetworkDTO
 import com.kert0n.medapp.network.pack.PackageSnapshotNetworkDTO
 import com.kert0n.medapp.network.pack.PackageSyncNetworkDTO
-import io.ktor.client.engine.okhttp.OkHttp
 import kotlin.uuid.Uuid
 import kotlinx.coroutines.runBlocking
 import org.junit.After
@@ -33,6 +26,7 @@ import com.kert0n.medapp.queue.PreparedRequest
 import com.kert0n.medapp.queue.pack.PackageSyncCommand
 import com.kert0n.medapp.network.pack.PackageSyncState
 import com.kert0n.medapp.queue.pack.toPreparedRequest
+import com.kert0n.medapp.fixture.ProbeAccounts
 import java.math.BigDecimal
 import java.time.Instant
 
@@ -48,14 +42,6 @@ import java.time.Instant
  */
 class ContractProbe {
 
-    private class Fixed(private val account: AccountCredentials) : CredentialSource {
-        override suspend fun read(): StoredAccount = StoredAccount.Present(account)
-        override suspend fun save(credentials: AccountCredentials): CredentialsSaved =
-            error("проба учёток не заводит: они заведены один раз и лежат в local.properties")
-
-        override suspend fun confirm(): CredentialsSaved = CredentialsSaved.SAVED
-    }
-
     companion object {
         private lateinit var owner: MedAppApi
         private lateinit var guest: MedAppApi
@@ -66,44 +52,19 @@ class ContractProbe {
         /** Почему проба не идёт; `null` — идёт. Пропуск виден в отчёте у каждого теста. */
         private var skipReason: String? = null
 
+        /** Клиенты общие на весь прогон проб: пропуск выдаётся один раз на пользователя ([ProbeAccounts]). */
         @BeforeClass
         @JvmStatic
         fun connect() {
-            val arguments = InstrumentationRegistry.getArguments()
-            val baseUrl = arguments.getString("probeBaseUrl")
-            val ownerCredentials = credentials(arguments, "A")
-            val guestCredentials = credentials(arguments, "B")
-            if (baseUrl.isNullOrBlank()) {
-                skipReason = "проба контракта включается только -Pprobe"
-                return
-            }
-            if (ownerCredentials == null || guestCredentials == null) {
-                skipReason = "пробные пользователи не заведены: scripts/register-probe-users.sh"
-                return
-            }
-            ownerAccount = ownerCredentials
-            owner = api(baseUrl, ownerCredentials)
-            guest = api(baseUrl, guestCredentials)
-            anonymous = api(baseUrl, account = null)
+            skipReason = ProbeAccounts.skipReason
+            if (skipReason != null) return
+            ownerAccount = requireNotNull(ProbeAccounts.annaAccount)
+            owner = requireNotNull(ProbeAccounts.anna)
+            guest = requireNotNull(ProbeAccounts.boris)
+            anonymous = requireNotNull(ProbeAccounts.anonymous)
             unit = runBlocking { success(owner.quantityUnits()).first().id }
         }
 
-        private fun credentials(arguments: Bundle, user: String): AccountCredentials? {
-            val login = arguments.getString("probeLogin$user")
-            val key = arguments.getString("probeKey$user")
-            if (login.isNullOrBlank() || key.isNullOrBlank()) return null
-            return AccountCredentials(Uuid.parse(login), key)
-        }
-
-        private fun api(baseUrl: String, account: AccountCredentials?) = MedAppApi(
-            medAppHttpClient(
-                OkHttp.create(),
-                baseUrl,
-                tokens = account?.let { AccessTokens(Fixed(it)) }
-            )
-        )
-
-        /** Успех, в том числе с `null` — пачка кончилась и уничтожена; отказ — провал пробы. */
         /** Готовый запрос очереди — примитивами, как его и шлёт `QueueHttpTransport`. */
         private suspend fun MedAppApi.send(request: PreparedRequest) =
             send(request.method, request.path, request.query, request.body)

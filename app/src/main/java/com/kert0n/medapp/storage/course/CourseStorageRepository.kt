@@ -1,6 +1,7 @@
 package com.kert0n.medapp.storage.course
 
 import com.kert0n.medapp.domain.course.Course
+import com.kert0n.medapp.domain.course.CourseCompletion
 import com.kert0n.medapp.domain.course.CourseDraft
 import com.kert0n.medapp.domain.course.CourseDraftProjection
 import com.kert0n.medapp.domain.course.CourseProjection
@@ -29,13 +30,25 @@ interface CourseStorageRepository {
 
     suspend fun findPlan(id: Uuid): Course?
 
+    /** Номера идущих лечений — тому, кто поддерживает их календарь (PLAN F4). */
+    suspend fun planIds(): List<Uuid>
+
     /**
      * Черновик целиком: назначение, времена и источники по порядку. Запись условна: лечение,
      * начатое между открытием экрана и сохранением, черновиком поверх не затирается — активация
-     * уничтожает черновик, а не прячет его, а конец лечения уничтожает и план. `false` —
-     * черновика больше нет: лечение идёт или уже закончилось.
+     * уничтожает черновик, а не прячет его, а конец лечения уничтожает и план. [expected] —
+     * редакция, из которой черновик правили; `null` — черновик новый, и под его номером ещё нет ни
+     * черновика, ни эпизода. `false` — писать некуда: черновика больше нет, он другой редакции, или
+     * номер уже занят (PLAN F5).
      */
-    suspend fun saveDraft(draft: CourseDraft): Boolean
+    suspend fun saveDraft(draft: CourseDraft, expected: Revision?): Boolean
+
+    /**
+     * Черновик уходит целиком — со временами и выбранными пачками. Отменять в нём нечего: броней у
+     * него нет, пунктов он не породил (PLAN D5). `false` — черновика нет: удалён или лечение уже
+     * началось, и тогда не тронуто ничего.
+     */
+    suspend fun discardDraft(id: Uuid): Boolean
 
     /** Аналитика читает записи: идущее и законченное лечение для неё одной формы (PLAN H6). */
     fun observeRecords(): Flow<List<CourseRecordProjection>>
@@ -57,11 +70,12 @@ interface CourseStorageRepository {
     suspend fun courseHolding(packageId: Uuid): Uuid?
 
     /**
-     * Число доз, поправленное у плана: ложится в план и в снимок записи эпизода одной
-     * транзакцией, условно по редакции [expected], из которой план правили. `false` — плана
-     * уже нет либо он другой редакции; ни одна из двух строк тогда не тронута.
+     * Изменённое лечение — доза, форма, расписание, число доз, выделения под них — ложится в план,
+     * его времена и снимок назначения в записи эпизода одной транзакцией, условно по редакции
+     * [expected], из которой план правили (PLAN D5, F5). Состав пачек изменение не меняет: смена
+     * состава — [updateSources]. `false` — плана уже нет либо он другой редакции; не тронуто ничего.
      */
-    suspend fun setTotalDoses(course: Course, expected: Revision): Boolean
+    suspend fun amend(course: Course, expected: Revision): Boolean
 
     /**
      * Пересчитанные выделения и число доз мимо плана — условно по редакции, из которой считали
@@ -75,7 +89,8 @@ interface CourseStorageRepository {
      * Изменённый состав препарата — пачка привязана, отвязана или переставлена — с его
      * выделениями: источники и назначения пачек активному курсу пишутся одной транзакцией, потому
      * что это два представления одного отношения (PLAN F1, F2). Условно по редакции [expected];
-     * `false` — плана уже нет. Пачку, занятую другим курсом, отвергает база.
+     * `false` — писать некуда: плана уже нет, он другой редакции, либо состав называет коробку,
+     * которой больше нет (PLAN F5). Пачку, занятую другим курсом, отвергает база.
      */
     suspend fun updateSources(course: Course, expected: Revision): Boolean
 
@@ -93,7 +108,11 @@ interface CourseStorageRepository {
      * Конец лечения: запись закрывается **вместе** с удалением плана. Строки `courses` после
      * этого не существует, а `course_records` остаётся навсегда (PLAN D5, F5).
      *
+     * Принимает [CourseCompletion.Closing] целиком: закрытая запись и отменённые пункты — половины
+     * одного события, и порознь их не бывает. Разобрать их на аргументы значило бы позволить
+     * записать одну без другой.
+     *
      * Будущие пункты отменяются, назначения освобождаются; снятие броней ставит служба очереди.
      */
-    suspend fun close(record: CourseRecord, cancelled: List<CourseIntake> = emptyList())
+    suspend fun close(closing: CourseCompletion.Closing)
 }

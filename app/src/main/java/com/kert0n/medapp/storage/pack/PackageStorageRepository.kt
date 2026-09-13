@@ -2,8 +2,10 @@ package com.kert0n.medapp.storage.pack
 
 import com.kert0n.medapp.domain.pack.Claims
 import com.kert0n.medapp.domain.pack.Package
+import com.kert0n.medapp.domain.pack.PackageEnding
 import com.kert0n.medapp.domain.pack.PackageProjection
 import com.kert0n.medapp.domain.pack.PackageFacts
+import com.kert0n.medapp.domain.pack.PackageStatus
 import com.kert0n.medapp.network.pack.PackageSnapshot
 import com.kert0n.medapp.network.pack.PackageSyncState
 import com.kert0n.medapp.storage.course.CourseReallocation
@@ -28,6 +30,12 @@ interface PackageStorageRepository {
 
     suspend fun find(id: Uuid): Package?
 
+    /**
+     * Проекция внутри транзакции сценария — та же, что несёт [observe], с командами, которые
+     * сценарий только что поставил: сколько в коробке будет после всех незакрытых решений (E1).
+     */
+    suspend fun projection(id: Uuid): PackageProjection?
+
     /** Список экрана: `today` приходит аргументом, потому что база системных часов не читает. */
     fun list(query: PackageQuery, today: LocalDate): Flow<List<PackageProjection>>
 
@@ -47,11 +55,30 @@ interface PackageStorageRepository {
     suspend fun describe(packageId: Uuid, facts: PackageFacts): Boolean
 
     /**
-     * Доступ к пачке утрачен: вышли из аптечки, её унесли или удалили. Брони снимаются вместе с
-     * доступом — их больше не существует, — поэтому обе записи ложатся одной транзакцией
-     * (PLAN D5). `false` — пачки больше нет.
+     * Коробки больше нет — **единственная дверь** к этому, и звать её можно только с [PackageEnding],
+     * который построил переход пачки. Одной транзакцией ложится всё, чего порознь не бывает
+     * (PLAN D3, F5):
+     *
+     * - источник, снятый **доменным переходом** у каждого лечения, которое коробку держало, — и у
+     *   начатого, и у черновика, — с ростом редакции;
+     * - живая строка со своими частями: сведениями и бронями.
+     *
+     * Запись о коробке и приёмы, которые за неё держатся, остаются (D6). `false` — пачки и так нет.
      */
-    suspend fun loseAccess(packageId: Uuid): Boolean
+    suspend fun end(ending: PackageEnding, at: Instant): Boolean
+
+    /**
+     * Решение по коробке принято, а полка ещё не ответила: коробка получает пометку [status]
+     * своим переходом (PLAN E1). Снимает пометку не сценарий, а закрытие команды в очереди, поэтому
+     * `ACTIVE` сюда не передают. `false` — пачки больше нет.
+     */
+    suspend fun mark(packageId: Uuid, status: PackageStatus): Boolean
+
+    /**
+     * Живые пачки аптечки — сущности для сценария, который разбирает её по коробкам в своей
+     * транзакции: переставляет или выбрасывает каждую доменным переходом (PLAN E6).
+     */
+    suspend fun contentsOf(medKitId: Uuid): List<Package>
 
     /**
      * Снимок переписывает серверную часть целиком и не касается личных сведений (PLAN E4).
@@ -71,16 +98,16 @@ interface PackageStorageRepository {
     suspend fun saveClaims(packageId: Uuid, claims: Claims?)
 
     /**
-     * Пересчёт, утилизация и перенос: движение и новое состояние пачки ложатся одной транзакцией
-     * вместе с пересчитанными выделениями [reallocation] (PLAN F5). Команду серверу, если она
-     * нужна, ставит служба очереди в той же транзакции — репозиторий про очередь не знает.
+     * Пересчёт, утилизация и перенос: новое состояние пачки ложится одной транзакцией вместе с
+     * пересчитанными выделениями [reallocation] (PLAN F5). Команду серверу, если она нужна, ставит
+     * служба очереди в той же транзакции — репозиторий про очередь не знает.
      *
-     * Переход применяется к нынешнему состоянию пачки, прочитанному в той же транзакции, поэтому
-     * «было» в истории — настоящее «было». Обвязка синхронизации при этом не трогается: версии и
-     * время сверки принадлежат снимку сервера, а не действию человека (PLAN E4).
+     * Переход применяется к нынешнему состоянию пачки, прочитанному в той же транзакции: утилизация
+     * не списывает в минус от давно изменившегося числа. Обвязка синхронизации при этом не
+     * трогается: версии и время сверки принадлежат снимку сервера, а не действию человека (PLAN E4).
      *
-     * Откат не оставляет ни движения без остатка, ни остатка без следа в истории. `false` —
-     * пачки больше нет: писать переход некуда.
+     * Кончившаяся коробка (пересчёт в ноль, утилизация всего) строки не оставляет; запись о ней
+     * остаётся (PLAN D3). `false` — пачки больше нет: писать переход некуда.
      */
     suspend fun adjust(
         adjustment: PackageAdjustment,

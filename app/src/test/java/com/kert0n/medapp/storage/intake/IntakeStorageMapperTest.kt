@@ -1,6 +1,8 @@
 package com.kert0n.medapp.storage.intake
 
 import com.kert0n.medapp.domain.intake.CourseIntake
+import com.kert0n.medapp.domain.intake.IntakeAnswer
+import com.kert0n.medapp.domain.intake.TakenDose
 import com.kert0n.medapp.domain.intake.IntakeStatus
 import com.kert0n.medapp.domain.intake.UnplannedIntake
 import com.kert0n.medapp.fixture.COURSE
@@ -64,10 +66,17 @@ class IntakeStorageMapperTest {
         assertEquals(IntakeStatus.TAKEN, restored.status)
         assertEquals(taken.taken, restored.taken)
         assertEquals(OTHER_PACK, restored.taken?.pkg?.id)
-        assertEquals(SHARED_KIT, restored.taken?.pkg?.medKit?.id)
         assertEquals(PACK, restored.plannedPackage?.id)
     }
 
+    /**
+     * Пачку удалили, а приём был: строка приёма отдаёт количество и момент, а ссылка на пачку
+     * пуста — её обнулила сама схема (`SET NULL`, PLAN D6, F1). История лечения держится на
+     * записи эпизода и на самом приёме.
+     *
+     * Красная проверка: потребовать пачку при чтении — прошлое станет нечитаемым ровно тогда,
+     * когда человек выбросил аптечку.
+     */
     /** Сосед сменил единицу пачки на сервере: приёмы в таблетках читаются по-прежнему. */
     @Test
     fun historyIsReadableAfterThePackChangedItsUnit() {

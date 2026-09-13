@@ -6,6 +6,8 @@ import androidx.room.Query
 import androidx.room.Transaction
 import androidx.room.Upsert
 import com.kert0n.medapp.domain.course.Revision
+import com.kert0n.medapp.domain.pack.PackageRef
+import com.kert0n.medapp.domain.value.Vocabulary
 import java.time.Instant
 import kotlin.uuid.Uuid
 import kotlinx.coroutines.flow.Flow
@@ -17,31 +19,33 @@ interface CourseDao {
     @Query("SELECT * FROM courses WHERE id = :id")
     suspend fun findPlan(id: Uuid): CourseStorageRow?
 
-    @Transaction
-    @Query("SELECT * FROM courses WHERE id = :id")
-    fun observePlan(id: Uuid): Flow<CourseStorageRow?>
-
     /** Черновики — те, у кого имя ещё живёт здесь, то есть лечение не начато (PLAN D5). */
     @Transaction
     @Query("SELECT * FROM courses WHERE title IS NOT NULL ORDER BY updated_at DESC")
-    fun observeDrafts(): Flow<List<CourseStorageRow>>
+    suspend fun drafts(): List<CourseStorageRow>
 
+    /** Идущие лечения целиком — отчётам, которые считают по всем сразу (PLAN H6). */
     @Transaction
     @Query("SELECT * FROM courses WHERE title IS NULL ORDER BY created_at")
-    fun observePlans(): Flow<List<CourseStorageRow>>
+    suspend fun plans(): List<CourseStorageRow>
+
+    /** Номера идущих лечений: у плана нет имени — оно живёт в записи эпизода (PLAN F1). */
+    @Query("SELECT id FROM courses WHERE title IS NULL")
+    suspend fun planIds(): List<Uuid>
 
     @Transaction
     @Query("SELECT * FROM course_records WHERE id = :id")
     suspend fun findRecord(id: Uuid): CourseRecordStorageRow?
 
+    /** Записи эпизодов по номерам — порцией, которую называет вызывающий (`chunkedForQuery`). */
     @Transaction
-    @Query("SELECT * FROM course_records WHERE id = :id")
-    fun observeRecord(id: Uuid): Flow<CourseRecordStorageRow?>
+    @Query("SELECT * FROM course_records WHERE id IN (:ids)")
+    suspend fun recordsAmong(ids: List<Uuid>): List<CourseRecordStorageRow>
 
     /** Аналитика читает записи: идущее и законченное лечение для неё одной формы (PLAN H6). */
     @Transaction
     @Query("SELECT * FROM course_records ORDER BY started_at DESC")
-    fun observeRecords(): Flow<List<CourseRecordStorageRow>>
+    suspend fun records(): List<CourseRecordStorageRow>
 
     /**
      * Черновик целиком: план, его времена и его источники. Времена и источники переписываются
@@ -64,10 +68,12 @@ interface CourseDao {
      * Пересчитанные выделения живого плана. Запись условна по редакции: план, закрытый или уже
      * пересчитанный между чтением и записью, не возвращается и не переписывается результатом,
      * посчитанным из прошлого состава — ноль изменённых строк значит, что писать некуда
-     * (PLAN D5, F5).
+     * (PLAN D5, F5). Состав из коробок, которых больше нет, тоже некуда писать: курс, прочитанный
+     * до того, как коробку выбросили, не воскрешает её источником — ответ `false`, а не
+     * исключение ключа.
      *
      * Меняются только редакция, время правки, источники и число доз мимо плана: доза и
-     * расписание действующего курса неизменны, и пересчёт обеспечения их не касается.
+     * расписание меняет изменение лечения, и пересчёт обеспечения их не касается.
      */
     @Transaction
     suspend fun updateAllocations(
@@ -75,6 +81,8 @@ interface CourseDao {
         sources: List<CourseSourceStorageEntity>,
         expected: Revision
     ): Boolean {
+        val named = sources.map { it.packageId }
+        if (livingPackagesAmong(named).size != named.size) return false
         val revised = reviseIfRevisionIs(
             course.id, expected.number, course.revision, course.takenOffPlan, course.updatedAt
         )
@@ -104,41 +112,6 @@ interface CourseDao {
         updatedAt: Instant
     ): Int
 
-    /**
-     * Число доз правится у плана и в снимке записи одной транзакцией: назначение лежит в двух
-     * строках и разойтись им нельзя (PLAN F5). Запись условна по редакции, как и выделения; ноль
-     * строк значит «плана уже нет», и снимок записи тогда тоже не трогается.
-     */
-    @Transaction
-    suspend fun updateTotalDoses(
-        id: Uuid,
-        totalDoses: Int,
-        expected: Revision,
-        revision: Revision,
-        updatedAt: Instant
-    ): Boolean {
-        if (setTotalDosesIfRevisionIs(id, expected.number, totalDoses, revision.number, updatedAt) == 0) {
-            return false
-        }
-        setRecordTotalDoses(id, totalDoses)
-        return true
-    }
-
-    @Query(
-        "UPDATE courses SET total_doses = :totalDoses, revision = :revision, updated_at = :updatedAt " +
-            "WHERE id = :id AND revision = :expected"
-    )
-    suspend fun setTotalDosesIfRevisionIs(
-        id: Uuid,
-        expected: Long,
-        totalDoses: Int,
-        revision: Long,
-        updatedAt: Instant
-    ): Int
-
-    @Query("UPDATE course_records SET total_doses = :totalDoses WHERE id = :id")
-    suspend fun setRecordTotalDoses(id: Uuid, totalDoses: Int)
-
     @Upsert
     suspend fun upsertCourse(course: CourseStorageEntity)
 
@@ -164,6 +137,17 @@ interface CourseDao {
     @Query("SELECT package_id FROM course_sources WHERE course_id = :courseId")
     suspend fun sourcePackagesOf(courseId: Uuid): List<Uuid>
 
+    /**
+     * Какое лечение держит эту коробку источником — по составу, а не по назначениям: назначения
+     * бывают только у начатого, а состав есть и у черновика (PLAN D5, F1).
+     */
+    @Query("SELECT course_id FROM course_sources WHERE package_id = :packageId")
+    suspend fun coursesHolding(packageId: Uuid): List<Uuid>
+
+    /** Какие из названных коробок ещё есть: источником бывает только живая (PLAN D3). */
+    @Query("SELECT id FROM packages WHERE id IN (:packageIds)")
+    suspend fun livingPackagesAmong(packageIds: List<Uuid>): List<Uuid>
+
     @Query("DELETE FROM courses WHERE id = :id")
     suspend fun deletePlan(id: Uuid)
 
@@ -185,4 +169,40 @@ interface CourseDao {
 
     @Query("DELETE FROM active_package_assignments WHERE course_id = :courseId")
     suspend fun releaseAssignmentsOf(courseId: Uuid)
+}
+
+/**
+ * Источник не переживает коробку: **каждое** лечение, державшее пачку [pkg], теряет её доменным
+ * переходом — с ростом редакции и освобождением назначения, — а не молча каскадом схемы
+ * (PLAN D5, F5). Зовётся один раз, из двери конца коробки, и только оттуда.
+ *
+ * Лечение ищется по составу, а не по назначениям: назначения бывают только у начатого, а состав
+ * есть и у черновика, и вырезанный каскадом источник черновика человек обнаружил бы сам, вернувшись
+ * к недоделанному курсу.
+ */
+suspend fun CourseDao.releaseSource(pkg: PackageRef, vocabulary: Vocabulary, at: Instant) {
+    for (courseId in coursesHolding(pkg.id)) {
+        val row = findPlan(courseId) ?: continue
+        if (row.isDraft) {
+            val draft = row.toDraft(vocabulary).detach(pkg, at)
+            saveCourse(
+                course = draft.toStorageEntity(),
+                times = draft.schedule?.toTimeStorageEntities(draft.id).orEmpty(),
+                sources = draft.medicine.toSourceStorageEntities(draft.id)
+            )
+        } else {
+            val plan = row.toPlan(vocabulary)
+            val detached = plan.detach(pkg, at)
+            // Ноль изменённых строк здесь незаконен: план прочитан этой же транзакцией. Молча
+            // пропустить значило бы оставить курс с источником, которого уже нет.
+            check(
+                updateAllocations(
+                    detached.toStorageEntity(),
+                    detached.medicine.toSourceStorageEntities(detached.id),
+                    plan.revision
+                )
+            ) { "курс $courseId прочитан этой же транзакцией, а выделения писать некуда" }
+        }
+    }
+    releasePackage(pkg.id)
 }

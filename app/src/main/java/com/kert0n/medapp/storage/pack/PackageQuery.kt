@@ -14,8 +14,7 @@ data class PackageQuery(
     val medKitId: Uuid? = null,
     val text: String = "",
     val filter: Filter? = null,
-    val sort: Sort = Sort.NAME,
-    val includeArchived: Boolean = false
+    val sort: Sort = Sort.NAME
 ) {
     /**
      * Текст поиска в том виде, в каком его сравнивает база. Приведение к нижнему регистру
@@ -68,6 +67,5 @@ suspend fun PackageDao.matching(
     until = (query.filter as? PackageQuery.Filter.ExpiringWithin)?.let { today.plusDays(it.days) },
     category = (query.filter as? PackageQuery.Filter.OfCategory)?.category,
     formId = (query.filter as? PackageQuery.Filter.OfForm)?.formId,
-    sort = query.sort.name,
-    includeArchived = query.includeArchived
+    sort = query.sort.name
 )

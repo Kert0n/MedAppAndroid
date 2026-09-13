@@ -4,8 +4,6 @@ import com.kert0n.medapp.domain.course.CourseDraft
 import com.kert0n.medapp.domain.course.CourseRecord
 import com.kert0n.medapp.domain.intake.IntakeStatus
 import com.kert0n.medapp.domain.intake.UnplannedIntake
-import com.kert0n.medapp.domain.pack.Package
-import com.kert0n.medapp.domain.stock.StockMovement
 import com.kert0n.medapp.fixture.COURSE
 import com.kert0n.medapp.fixture.HOME_KIT
 import com.kert0n.medapp.fixture.INTAKE
@@ -17,6 +15,7 @@ import com.kert0n.medapp.fixture.TABLET_FORM
 import com.kert0n.medapp.fixture.SHARED_KIT
 import com.kert0n.medapp.fixture.activeCourse
 import com.kert0n.medapp.fixture.course
+import com.kert0n.medapp.fixture.closing
 import com.kert0n.medapp.fixture.courseRecord
 import com.kert0n.medapp.fixture.dose
 import com.kert0n.medapp.fixture.inMemoryDatabase
@@ -52,6 +51,7 @@ import kotlin.uuid.Uuid
 import kotlinx.coroutines.test.runTest
 import org.junit.After
 import org.junit.Assert.assertEquals
+import com.kert0n.medapp.domain.course.Revision
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNotNull
 import org.junit.Assert.assertNull
@@ -77,8 +77,6 @@ class TransactionBoundariesTest {
     private lateinit var queue: QueueService
 
     private val operation: Uuid = Uuid.parse("00000000-0000-4000-8000-000000000091")
-    private val movementId: Uuid = Uuid.parse("00000000-0000-4000-8000-000000000081")
-    private val otherMovementId: Uuid = Uuid.parse("00000000-0000-4000-8000-000000000082")
     private val at: Instant = Instant.parse("2026-09-10T12:00:00Z")
 
     private val paracetamol = pack(quantity = tablets("20"))
@@ -148,7 +146,7 @@ class TransactionBoundariesTest {
         val ibuprofen = pack(id = OTHER_PACK, quantity = tablets("10"), form = TABLET_FORM)
         packages.add(ibuprofen)
 
-        val extended = activation.course.attach(ibuprofen.ref, 3.doses, LATER).getOrThrow()
+        val extended = activation.course.attach(ibuprofen, 3.doses, LATER).getOrThrow()
         assertTrue(courses.updateSources(extended, expected = activation.course.revision))
         assertEquals(COURSE, courses.courseHolding(PACK))
         assertEquals(COURSE, courses.courseHolding(OTHER_PACK))
@@ -160,6 +158,49 @@ class TransactionBoundariesTest {
         assertEquals(listOf(OTHER_PACK), requireNotNull(courses.findPlan(COURSE)).sources.map { it.pkg.id })
     }
 
+    /**
+     * Курс не воскрешает удалённое: состав, прочитанный до того, как коробку выбросили, называет
+     * коробку, которой нет, — и «писать некуда» вместо исключения ключа (PLAN D3, F5). Так же
+     * отвечает состав из прежней редакции — курс её уже потерял и редакцию поднял.
+     */
+    @Test
+    fun sourcesReadBeforeThePackageWasThrownOutAreNotWrittenBack() = runTest {
+        val activation = draft()
+        courses.activate(activation, planned = listOf(plannedIntake()))
+        val ibuprofen = pack(id = OTHER_PACK, quantity = tablets("10"), form = TABLET_FORM)
+        packages.add(ibuprofen)
+        val extended = activation.course.attach(ibuprofen, 3.doses, LATER).getOrThrow()
+
+        assertTrue(packages.end(ibuprofen.ended(), LATER))
+        assertFalse(courses.updateSources(extended, expected = activation.course.revision))
+        assertEquals(listOf(PACK), requireNotNull(courses.findPlan(COURSE)).sources.map { it.pkg.id })
+
+        // Коробку выбросили, и курс потерял её доменным переходом: редакция ушла вперёд.
+        val current = requireNotNull(courses.findPlan(COURSE))
+        val stale = current.detach(paracetamol.ref, LATER)
+        assertFalse(courses.updateSources(stale, expected = Revision(current.revision.number - 1)))
+        assertEquals(current.revision, requireNotNull(courses.findPlan(COURSE)).revision)
+    }
+
+    /**
+     * Черновик теряет коробку так же, как начатое лечение, — доменным переходом. Пачку он не
+     * занимает, назначения у него нет, и по назначениям его не найти; каскад вырезал бы источник
+     * молча, и человек, вернувшись к недоделанному курсу, не нашёл бы пачки и не узнал бы, куда
+     * она делась (PLAN D5, F2).
+     */
+    @Test
+    fun aDraftLosesTheBoxItHeldWhenTheBoxEnds() = runTest {
+        val ibuprofen = pack(id = OTHER_PACK, quantity = tablets("10"), form = TABLET_FORM)
+        packages.add(ibuprofen)
+        assertTrue(courses.saveDraft(course(dose = dose("2"), form = TABLET_FORM, sources = listOf(source(ibuprofen, 3))), expected = null))
+        assertEquals(listOf(OTHER_PACK), database.courses().sourcePackagesOf(COURSE))
+
+        assertTrue(packages.end(ibuprofen.ended(), LATER))
+
+        assertEquals(emptyList<Uuid>(), database.courses().sourcePackagesOf(COURSE))
+        assertNotNull(courses.findDraft(COURSE))
+    }
+
     /** Пересчёт обеспечения состав не меняет: иначе назначения пачек разошлись бы с источниками. */
     @Test
     fun reallocationWithAnotherCompositionIsRefused() = runTest {
@@ -167,7 +208,7 @@ class TransactionBoundariesTest {
         courses.activate(activation, planned = listOf(plannedIntake()))
         val ibuprofen = pack(id = OTHER_PACK, quantity = tablets("10"), form = TABLET_FORM)
         packages.add(ibuprofen)
-        val extended = activation.course.attach(ibuprofen.ref, 3.doses, LATER).getOrThrow()
+        val extended = activation.course.attach(ibuprofen, 3.doses, LATER).getOrThrow()
 
         val failure = runCatching {
             courses.reallocate(CourseReallocation(extended, activation.course.revision))
@@ -183,10 +224,7 @@ class TransactionBoundariesTest {
         courses.activate(activation, planned = listOf(plannedIntake()))
 
         val closed = activation.record.close(CourseRecord.Outcome.CANCELLED, LATER)
-        courses.close(
-            record = closed,
-            cancelled = listOf(plannedIntake().cancel(LATER))
-        )
+        courses.close(closing(record = closed, cancelled = listOf(plannedIntake().cancel(LATER))))
 
         assertNull(courses.findPlan(COURSE))
         val record = requireNotNull(courses.findRecord(COURSE))
@@ -206,6 +244,7 @@ class TransactionBoundariesTest {
                 intake = plannedIntake().confirm(paracetamol.take(dose("2"), LATER).getOrThrow()),
                 expected = setOf(IntakeStatus.PLANNED, IntakeStatus.MISSED),
                 sync = IntakeSyncState(INTAKE, IntakeAccounting.LOCAL_APPLIED),
+                recordedAt = LATER
             )
         )
 
@@ -226,7 +265,8 @@ class TransactionBoundariesTest {
             IntakeOutcome(
                 intake = plannedIntake().confirm(paracetamol.take(dose("2"), LATER).getOrThrow()),
                 expected = setOf(IntakeStatus.PLANNED),
-                sync = IntakeSyncState(INTAKE, IntakeAccounting.LOCAL_APPLIED)
+                sync = IntakeSyncState(INTAKE, IntakeAccounting.LOCAL_APPLIED),
+                recordedAt = LATER
             )
         }
         assertTrue(intakes.record(outcome()))
@@ -251,7 +291,8 @@ class TransactionBoundariesTest {
                     IntakeOutcome(
                         intake = plannedIntake().confirm(paracetamol.take(dose("2"), LATER).getOrThrow()),
                         expected = setOf(IntakeStatus.PLANNED),
-                        sync = IntakeSyncState(INTAKE, IntakeAccounting.PENDING, operationId = operation)
+                        sync = IntakeSyncState(INTAKE, IntakeAccounting.PENDING, operationId = operation),
+                        recordedAt = LATER
                     )
                 )
             }
@@ -260,7 +301,6 @@ class TransactionBoundariesTest {
         assertNotNull(failure)
         assertEquals(IntakeStatus.PLANNED, requireNotNull(intakes.find(INTAKE)).status)
         assertEquals(tablets("20"), requireNotNull(packages.find(PACK)).quantity)
-        assertEquals(emptyList<StockMovement>(), database.stockMovements().ofPackage(PACK).map { it.toDomain(VOCABULARY) })
         assertEquals(1, database.syncOperations().all().size)
     }
 
@@ -292,10 +332,7 @@ class TransactionBoundariesTest {
         courses.activate(activation, planned = listOf(plannedIntake()))
         assertTrue(intakes.record(confirmedOutcome()))
 
-        courses.close(
-            record = activation.record.close(CourseRecord.Outcome.CANCELLED, LATER),
-            cancelled = listOf(plannedIntake().cancel(LATER))
-        )
+        courses.close(closing(record = activation.record.close(CourseRecord.Outcome.CANCELLED, LATER), cancelled = listOf(plannedIntake().cancel(LATER))))
 
         assertEquals(IntakeStatus.TAKEN, requireNotNull(intakes.find(INTAKE)).status)
         assertEquals(
@@ -337,7 +374,8 @@ class TransactionBoundariesTest {
                     IntakeOutcome(
                         intake = plannedIntake().confirm(paracetamol.take(dose("2"), LATER).getOrThrow()),
                         expected = setOf(IntakeStatus.PLANNED),
-                        sync = IntakeSyncState(INTAKE, IntakeAccounting.PENDING, operationId = operation)
+                        sync = IntakeSyncState(INTAKE, IntakeAccounting.PENDING, operationId = operation),
+                        recordedAt = LATER
                     )
                 )
             }
@@ -351,11 +389,11 @@ class TransactionBoundariesTest {
     @Test
     fun localKitGetsNoCommandsEvenWhenTheChangeGoesThrough() = runTest {
         val local = medKit(publication = MedKit.Publication.LOCAL)
-        val recount = QueuedCommand(operation, PackageSyncCommand.CorrectStock(PACK, tablets("17")))
+        val recount = QueuedCommand(operation, PackageSyncCommand.CorrectStock(PACK, tablets("20"), tablets("17")))
 
         assertTrue(
             queue.change(local.ref, listOf(recount), at) {
-                packages.adjust(PackageAdjustment.Recount(PACK, tablets("17"), movementId), at = LATER)
+                packages.adjust(PackageAdjustment.Recount(PACK, tablets("17")), at = LATER)
             }
         )
 
@@ -367,11 +405,11 @@ class TransactionBoundariesTest {
     @Test
     fun aChangeWithNowhereToLandQueuesNothing() = runTest {
         val gone = Uuid.parse("00000000-0000-4000-8000-0000000000ee")
-        val recount = QueuedCommand(operation, PackageSyncCommand.CorrectStock(gone, tablets("17")))
+        val recount = QueuedCommand(operation, PackageSyncCommand.CorrectStock(gone, tablets("20"), tablets("17")))
 
         assertFalse(
             queue.change(published.ref, listOf(recount), at) {
-                packages.adjust(PackageAdjustment.Recount(gone, tablets("17"), movementId), at = LATER)
+                packages.adjust(PackageAdjustment.Recount(gone, tablets("17")), at = LATER)
             }
         )
         assertEquals(0, database.syncOperations().all().size)
@@ -383,7 +421,8 @@ class TransactionBoundariesTest {
         val outcome = IntakeOutcome(
             intake = unplannedIntake(taken = pack(id = OTHER_PACK), takenAmount = dose("2")),
             expected = emptySet(),
-            sync = IntakeSyncState(INTAKE, IntakeAccounting.LOCAL_APPLIED)
+            sync = IntakeSyncState(INTAKE, IntakeAccounting.LOCAL_APPLIED),
+            recordedAt = LATER
         )
 
         assertFalse(intakes.record(outcome))
@@ -395,12 +434,10 @@ class TransactionBoundariesTest {
     fun adjustmentDoesNotResurrectAClosedPlan() = runTest {
         val activation = draft()
         courses.activate(activation)
-        courses.close(
-            record = activation.record.close(CourseRecord.Outcome.CANCELLED, LATER)
-        )
+        courses.close(closing(activation.record.close(CourseRecord.Outcome.CANCELLED, LATER)))
 
         packages.adjust(
-            PackageAdjustment.Recount(PACK, tablets("17"), movementId),
+            PackageAdjustment.Recount(PACK, tablets("17")),
             reallocation = CourseReallocation(activation.course, activation.course.revision),
             at = LATER
         )
@@ -419,7 +456,7 @@ class TransactionBoundariesTest {
         val stale = course(title = "Старый черновик")
         courses.activate(activation)
 
-        assertFalse(courses.saveDraft(stale))
+        assertFalse(courses.saveDraft(stale, expected = stale.revision))
         assertNull(courses.findDraft(COURSE))
         assertNotNull(courses.findPlan(COURSE))
     }
@@ -432,9 +469,9 @@ class TransactionBoundariesTest {
     fun aDraftDoesNotResurrectAFinishedEpisode() = runTest {
         val activation = draft()
         courses.activate(activation)
-        courses.close(activation.record.close(CourseRecord.Outcome.COMPLETED, LATER))
+        courses.close(closing(activation.record.close(CourseRecord.Outcome.COMPLETED, LATER)))
 
-        assertFalse(courses.saveDraft(course(title = "Старый черновик")))
+        assertFalse(courses.saveDraft(course(title = "Старый черновик"), expected = null))
         assertNull(courses.findDraft(COURSE))
         assertEquals(
             CourseRecord.Outcome.COMPLETED,
@@ -466,7 +503,7 @@ class TransactionBoundariesTest {
 
         val failure = runCatching {
             packages.adjust(
-                PackageAdjustment.Recount(PACK, tablets("17"), movementId),
+                PackageAdjustment.Recount(PACK, tablets("17")),
                 reallocation = stale,
                 at = LATER
             )
@@ -474,25 +511,14 @@ class TransactionBoundariesTest {
 
         assertNotNull(failure)
         assertEquals(tablets("20"), requireNotNull(packages.find(PACK)).quantity)
-        assertEquals(emptyList<StockMovement>(), database.stockMovements().ofPackage(PACK).map { it.toDomain(VOCABULARY) })
     }
 
-    /** В минус пачка не уходит, и в историю попадает то, что действительно ушло. */
+    /** В минус пачка не уходит: выбросили больше, чем было, — коробка кончилась. */
     @Test
-    fun disposingMoreThanThereIsRecordsWhatActuallyLeft() = runTest {
-        packages.adjust(
-            PackageAdjustment.Disposal(
-                PACK,
-                tablets("50"),
-                StockMovement.Disposal.Reason.DAMAGED,
-                movementId
-            ),
-            at = LATER
-        )
+    fun disposingMoreThanThereIsEndsThePack() = runTest {
+        packages.adjust(PackageAdjustment.Disposal(PACK, tablets("50")), at = LATER)
 
-        val disposal = database.stockMovements().ofPackage(PACK).single().toDomain(VOCABULARY)
-        assertEquals(tablets("20"), (disposal as StockMovement.Disposal).amount)
-        assertEquals(Package.Lifecycle.ARCHIVED, requireNotNull(packages.find(PACK)).lifecycle)
+        assertNull(packages.find(PACK))
     }
 
     /**
@@ -503,7 +529,7 @@ class TransactionBoundariesTest {
     fun renamingDoesNotReopenAClosedRecord() = runTest {
         val activation = draft()
         courses.activate(activation)
-        courses.close(activation.record.close(CourseRecord.Outcome.COMPLETED, LATER))
+        courses.close(closing(activation.record.close(CourseRecord.Outcome.COMPLETED, LATER)))
 
         assertTrue(courses.rename(COURSE, "Другое название", note = null))
 
@@ -528,86 +554,70 @@ class TransactionBoundariesTest {
     private fun confirmedOutcome() = IntakeOutcome(
         intake = plannedIntake().confirm(paracetamol.take(dose("2"), LATER).getOrThrow()),
         expected = setOf(IntakeStatus.PLANNED),
-        sync = IntakeSyncState(INTAKE, IntakeAccounting.LOCAL_APPLIED)
+        sync = IntakeSyncState(INTAKE, IntakeAccounting.LOCAL_APPLIED),
+        recordedAt = LATER
     )
 
     private fun unplannedOutcome() = IntakeOutcome(
         intake = unplannedIntake(takenAmount = dose("2")),
         expected = emptySet(),
-        sync = IntakeSyncState(INTAKE, IntakeAccounting.LOCAL_APPLIED)
+        sync = IntakeSyncState(INTAKE, IntakeAccounting.LOCAL_APPLIED),
+        recordedAt = LATER
     )
 
     @Test
-    fun recountWritesMovementAndStockTogether() = runTest {
-        packages.adjust(PackageAdjustment.Recount(PACK, tablets("17"), movementId), at = LATER)
+    fun recountReplacesTheStock() = runTest {
+        packages.adjust(PackageAdjustment.Recount(PACK, tablets("17")), at = LATER)
 
         assertEquals(tablets("17"), requireNotNull(packages.find(PACK)).quantity)
-        val recount = database.stockMovements().ofPackage(PACK).single().toDomain(VOCABULARY)
-        assertEquals(tablets("20"), (recount as StockMovement.Recount).before)
-        assertEquals(tablets("17"), recount.after)
     }
 
     /**
-     * След пересчёта берёт «было» из базы, а не из снимка, с которым пришёл вызывающий: экран мог
-     * прочитать пачку до чужой записи, и тогда история назвала бы неверное число.
+     * Переход берёт «было» из базы, а не из снимка, с которым пришёл вызывающий: экран мог
+     * прочитать пачку до чужой записи, и тогда утилизация списала бы от неверного числа.
      */
     @Test
-    fun recountRecordsTheAmountThatWasActuallyThere() = runTest {
-        packages.adjust(PackageAdjustment.Recount(PACK, tablets("18"), movementId), at = LATER)
+    fun disposalAppliesToTheStockThatIsActuallyThere() = runTest {
+        packages.adjust(PackageAdjustment.Recount(PACK, tablets("18")), at = LATER)
 
-        packages.adjust(PackageAdjustment.Recount(PACK, tablets("15"), otherMovementId), at = LATER)
+        packages.adjust(PackageAdjustment.Disposal(PACK, tablets("3")), at = LATER)
 
-        val second = database.stockMovements().ofPackage(PACK)
-            .map { it.toDomain(VOCABULARY) }
-            .filterIsInstance<StockMovement.Recount>()
-            .single { it.id == otherMovementId }
-        assertEquals(tablets("18"), second.before)
         assertEquals(tablets("15"), requireNotNull(packages.find(PACK)).quantity)
     }
 
+    /** Кончившаяся коробка строки не оставляет (D3). */
     @Test
-    fun disposalToZeroArchivesAndKeepsTheTrace() = runTest {
-        packages.adjust(
-            PackageAdjustment.Disposal(
-                PACK,
-                tablets("20"),
-                StockMovement.Disposal.Reason.EXPIRED,
-                movementId
-            ),
-            at = LATER
-        )
+    fun disposalToZeroEndsThePack() = runTest {
+        packages.adjust(PackageAdjustment.Disposal(PACK, tablets("20")), at = LATER)
 
-        val archived = requireNotNull(packages.find(PACK))
-        assertEquals(Package.Lifecycle.ARCHIVED, archived.lifecycle)
-        assertEquals(1, database.stockMovements().ofPackage(PACK).size)
+        assertNull(packages.find(PACK))
     }
 
+    /** Перенос меняет место и только его: остаток он не трогает. */
     @Test
-    fun transferMovesThePackageAndRecordsBothEnds() = runTest {
+    fun transferMovesThePackageOnly() = runTest {
         packages.adjust(
-            PackageAdjustment.Transfer(PACK, medKit(id = SHARED_KIT, name = "Дача").ref, movementId),
+            PackageAdjustment.Transfer(PACK, medKit(id = SHARED_KIT, name = "Дача").ref),
             at = LATER
         )
 
         assertEquals(SHARED_KIT, requireNotNull(packages.find(PACK)).medKit.id)
-        val transfer = database.stockMovements().ofPackage(PACK).single().toDomain(VOCABULARY)
-        assertEquals(StockMovement.Transfer::class, transfer::class)
+        assertEquals(tablets("20"), requireNotNull(packages.find(PACK)).quantity)
     }
 
-    /** Упавшая команда очереди откатывает и остаток, и движение: половины пересчёта не бывает. */
+    /** Упавшая команда очереди откатывает остаток: половины пересчёта не бывает. */
     @Test
-    fun failedAdjustmentLeavesNeitherStockNorMovement() = runTest {
+    fun failedAdjustmentLeavesTheStock() = runTest {
         database.syncOperations().enqueue(operation, PackageSyncCommand.Delete(PACK), at)
-        val recount = QueuedCommand(operation, PackageSyncCommand.CorrectStock(PACK, tablets("4")))
+        val recount = QueuedCommand(operation, PackageSyncCommand.CorrectStock(PACK, tablets("20"), tablets("4")))
 
         val failure = runCatching {
             queue.change(published.ref, listOf(recount), at) {
-                packages.adjust(PackageAdjustment.Recount(PACK, tablets("4"), movementId), at = LATER)
+                packages.adjust(PackageAdjustment.Recount(PACK, tablets("4")), at = LATER)
             }
         }.exceptionOrNull()
 
         assertNotNull(failure)
         assertEquals(tablets("20"), requireNotNull(packages.find(PACK)).quantity)
-        assertEquals(emptyList<StockMovement>(), database.stockMovements().ofPackage(PACK).map { it.toDomain(VOCABULARY) })
     }
 }

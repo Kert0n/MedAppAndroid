@@ -1,6 +1,7 @@
 package com.kert0n.medapp.domain.course
 
 import com.kert0n.medapp.domain.pack.Availability
+import com.kert0n.medapp.domain.pack.Package
 import com.kert0n.medapp.domain.pack.PackageRef
 import com.kert0n.medapp.domain.value.DosageForm
 import com.kert0n.medapp.domain.value.Dose
@@ -98,6 +99,15 @@ class Course(
     fun remainingOccurrences(progress: CourseProgress): List<ScheduledOccurrence> =
         schedule.next(schedule.beginning, remainingDoses(progress).count, progress.answered)
 
+    /**
+     * Сколько доз придётся на [from, until), если все приёмы состоятся (ТЗ 4.1.1.10.1): оставшиеся
+     * дозы раскладываются по неотвеченным пунктам начиная с [from], и считаются те, что легли до
+     * [until]. Неотвеченный пункт раньше [from] в счёт не идёт: его место пропущено, и доза уехала
+     * вперёд, как уезжает у неответа (PLAN D6).
+     */
+    fun dosesDue(progress: CourseProgress, from: Instant, until: Instant): Doses =
+        Doses(schedule.next(from, remainingDoses(progress).count, progress.answered).count { it.at.isBefore(until) })
+
     /** Ожидаемый конец — последняя из оставшихся доз; `null` — принято всё. */
     fun expectedEnd(progress: CourseProgress): ScheduledOccurrence? =
         remainingOccurrences(progress).lastOrNull()
@@ -105,13 +115,48 @@ class Course(
     /**
      * Число доз правится и после начала: пропуски растянули лечение, или врач сократил его.
      * Редакция растёт — меняется состав будущих пунктов; снимок назначения в записи эпизода
-     * переписывает та же транзакция (PLAN F5).
+     * переписывает та же транзакция (PLAN F5). Ноль доз — не лечение: отказ, а не исключение.
      */
-    fun setTotalDoses(totalDoses: Doses, at: Instant): Course = changed(
-        prescription = prescription.withTotalDoses(totalDoses),
-        revision = revision.next(),
-        updatedAt = at
-    )
+    fun setTotalDoses(totalDoses: Doses, at: Instant): Result<Course> {
+        if (totalDoses.isNone) return rejected(CourseRejected.Reason.TOTAL_DOSES_MISSING)
+        if (totalDoses == this.totalDoses) return Result.success(this)
+        return Result.success(
+            changed(prescription = prescription.withTotalDoses(totalDoses), revision = revision.next(), updatedAt = at)
+        )
+    }
+
+    /**
+     * Врач сменил дозу — это то же лечение (PLAN C1, D5): отвеченные пункты помнят прежнюю дозу, а
+     * будущие перестраиваются. Единица дозы — единица лечения, и подключённые пачки другой единицы
+     * под неё не годятся: сначала отвязать.
+     */
+    fun changeDose(dose: Dose, at: Instant): Result<Course> {
+        if (dose == this.dose) return Result.success(this)
+        if (!medicine.isEmpty && dose.unit != unit) return rejected(CourseRejected.Reason.UNIT_MISMATCH)
+        return Result.success(changed(prescription = prescription.copy(dose = dose), revision = revision.next(), updatedAt = at))
+    }
+
+    /** Другая форма под подключёнными пачками — другой препарат: сначала отвязать (PLAN D5). */
+    fun changeForm(form: DosageForm, at: Instant): Result<Course> {
+        if (form == this.form) return Result.success(this)
+        if (!medicine.isEmpty) return rejected(CourseRejected.Reason.FORM_MISMATCH)
+        return Result.success(changed(prescription = prescription.copy(form = form), revision = revision.next(), updatedAt = at))
+    }
+
+    /**
+     * Другое расписание — в том числе другая зона — то же лечение, и будущие пункты перестраиваются
+     * по нему. Прошлое уже случилось: новое расписание не начинается раньше сегодняшнего дня своей
+     * зоны, иначе в нём завелись бы пункты, на которые отвечать поздно (PLAN D5).
+     */
+    fun changeSchedule(schedule: CourseSchedule, at: Instant): Result<Course> {
+        if (schedule == this.schedule) return Result.success(this)
+        if (schedule.start.isBefore(at.atZone(schedule.zone).toLocalDate())) {
+            return rejected(CourseRejected.Reason.SCHEDULE_IN_PAST)
+        }
+        return Result.success(changed(prescription = prescription.copy(schedule = schedule), revision = revision.next(), updatedAt = at))
+    }
+
+    private fun <T> rejected(reason: CourseRejected.Reason): Result<T> = Result.failure(CourseRejected(reason))
 
     val allocatedDosesTotal: Doses get() = medicine.allocatedTotal
 
@@ -131,9 +176,10 @@ class Course(
 
     /**
      * Пачки действующего курса менять можно: это не изменение дозы или календаря (PLAN D5).
-     * Годится ли пачка, решает назначение: та же форма, та же единица.
+     * Годится ли пачка, решает назначение: та же форма, та же единица. Подключается живая
+     * коробка — та, что у человека на руках в этой транзакции.
      */
-    fun attach(pkg: PackageRef, doses: Doses, at: Instant): Result<Course> =
+    fun attach(pkg: Package, doses: Doses, at: Instant): Result<Course> =
         medicine.attach(pkg, doses, dose, form)
             .map { changed(medicine = it, revision = revision.next(), updatedAt = at) }
 

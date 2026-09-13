@@ -12,7 +12,7 @@ import com.kert0n.medapp.domain.intake.UnplannedIntake
 import com.kert0n.medapp.queue.intake.IntakeAccounting
 import com.kert0n.medapp.queue.intake.IntakeSyncState
 import com.kert0n.medapp.storage.course.CourseRecordStorageEntity
-import com.kert0n.medapp.storage.pack.PackageStorageEntity
+import com.kert0n.medapp.storage.pack.PackageRecordStorageEntity
 import com.kert0n.medapp.storage.value.toStorageAmount
 import java.time.Instant
 import java.time.LocalDate
@@ -31,7 +31,8 @@ import kotlin.uuid.Uuid
  * `accounting` и `operation_id` живут в той же строке, но доменная модель их не носит: это
  * `IntakeSyncState` сетевого слоя, и правила о приёме его не читают (PLAN D6).
  *
- * Ключи на пачки и на запись эпизода — `RESTRICT`: история не удаляется каскадом.
+ * Ключи на записи — о коробке и об эпизоде — `RESTRICT`: приём держится за то, что остаётся
+ * навсегда, и история не удаляется ни каскадом, ни вслед за коробкой (PLAN D3, F2).
  */
 @Entity(
     tableName = "intakes",
@@ -43,13 +44,13 @@ import kotlin.uuid.Uuid
             onDelete = ForeignKey.RESTRICT
         ),
         ForeignKey(
-            entity = PackageStorageEntity::class,
+            entity = PackageRecordStorageEntity::class,
             parentColumns = ["id"],
             childColumns = ["planned_package_id"],
             onDelete = ForeignKey.RESTRICT
         ),
         ForeignKey(
-            entity = PackageStorageEntity::class,
+            entity = PackageRecordStorageEntity::class,
             parentColumns = ["id"],
             childColumns = ["taken_package_id"],
             onDelete = ForeignKey.RESTRICT
@@ -59,7 +60,8 @@ import kotlin.uuid.Uuid
         Index(value = ["course_id", "scheduled_on", "scheduled_time"], unique = true),
         Index("planned_package_id"),
         Index("taken_package_id"),
-        Index("operation_id")
+        Index("operation_id"),
+        Index("answered_at")
     ]
 )
 class IntakeStorageEntity(

@@ -20,6 +20,7 @@ class QueueServiceTest {
 
     private class Storage : QueueStorage {
         val enqueued = mutableListOf<QueuedCommand>()
+        val shelves = mutableListOf<kotlin.uuid.Uuid>()
         override fun changes(): kotlinx.coroutines.flow.Flow<Unit> = kotlinx.coroutines.flow.emptyFlow()
         override suspend fun nextDueAt(now: Instant): Instant? = null
         override suspend fun ready(now: Instant): List<StoredSyncOperation> = emptyList()
@@ -28,8 +29,9 @@ class QueueServiceTest {
         override suspend fun answered(id: Uuid, answer: com.kert0n.medapp.network.server.RawResponse, at: Instant) = Unit
         override suspend fun defer(id: Uuid, reason: String, at: Instant, notBefore: Instant) = Unit
         override suspend fun settle(id: Uuid, settlement: Settlement, at: Instant) = Unit
-        override suspend fun enqueue(queued: QueuedCommand, at: Instant): SyncOperation {
+        override suspend fun enqueue(queued: QueuedCommand, shelf: kotlin.uuid.Uuid, at: Instant): SyncOperation {
             enqueued += queued
+            shelves += shelf
             return SyncOperation(queued.id, queued.command, enqueued.size.toLong(), at, 1)
         }
     }
@@ -59,6 +61,8 @@ class QueueServiceTest {
         assertTrue(applied)
         assertTrue(changed)
         assertEquals(listOf(consume), storage.enqueued)
+        // Команда ставится на полку изменения: по ней очередь держит порядок полки (PLAN E3).
+        assertEquals(listOf(published.id), storage.shelves)
         assertEquals(1, transactions.opened)
     }
 

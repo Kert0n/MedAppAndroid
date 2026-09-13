@@ -7,31 +7,35 @@ import com.kert0n.medapp.queue.QueueService
 import com.kert0n.medapp.queue.QueuedCommand
 import com.kert0n.medapp.queue.pack.PackageSyncCommand
 import com.kert0n.medapp.storage.course.CourseStorageRepository
+import com.kert0n.medapp.storage.pack.PackageStorageRepository
 import java.time.Instant
 import javax.inject.Inject
 import kotlin.uuid.Uuid
 
 /**
  * Конец эпизода в базе: запись закрывается вместе с удалением плана, брони снимаются со всех
- * источников (PLAN D5, F5). Зовётся внутри транзакции сценария, который двинул прогресс до
- * конца, — подтверждение приёма сегодня, доза мимо плана и правка числа доз потом; что конец
- * наступил, решает [CourseCompletion], здесь только запись.
+ * источников (PLAN D5, F5). Зовётся внутри транзакции сценария, который лечение закончил: двинул
+ * прогресс до конца — подтверждение приёма, изменение лечения, — или отменил его. Что конец
+ * наступил и каким исходом, решают [CourseCompletion] и отмена, здесь только запись.
  */
 class CourseClosing @Inject constructor(
     private val courses: CourseStorageRepository,
+    private val packages: PackageStorageRepository,
     private val queue: QueueService
 ) {
 
     /**
      * [except] — пачка, чьё снятие брони уже уехало зависимым от расхода: второй раз его не
-     * ставят.
+     * ставят. Кому отвечает пачка, знает она сама, а не ссылка из курса: живая пачка читается
+     * той же транзакцией; коробки уже нет — снимать бронь не с чего.
      */
     suspend fun close(course: Course, closing: CourseCompletion.Closing, at: Instant, except: PackageRef? = null) {
-        courses.close(closing.record, closing.cancelled)
+        courses.close(closing)
         for (source in course.sources) {
             if (source.pkg == except) continue
-            val released = QueuedCommand(Uuid.random(), PackageSyncCommand.ReleaseClaim(source.pkg.id))
-            queue.change(source.pkg.medKit, listOf(released), at) { true }
+            val pkg = packages.find(source.pkg.id) ?: continue
+            val released = QueuedCommand(Uuid.random(), PackageSyncCommand.ReleaseClaim(pkg.id))
+            queue.change(pkg.medKit, listOf(released), at) { true }
         }
     }
 }

@@ -3,6 +3,7 @@ package com.kert0n.medapp.storage.pack
 import com.kert0n.medapp.domain.pack.Claims
 import com.kert0n.medapp.fixture.PACK
 import com.kert0n.medapp.fixture.inMemoryDatabase
+import com.kert0n.medapp.fixture.save
 import com.kert0n.medapp.fixture.pack
 import com.kert0n.medapp.fixture.tablets
 import com.kert0n.medapp.network.pack.PackageSyncState
@@ -32,7 +33,7 @@ class ClaimsDaoTest {
     @Before
     fun openDatabase() = runTest {
         database = inMemoryDatabase()
-        packages.save(shared.toStorageEntity(), shared.toDetailsStorageEntity())
+        packages.save(shared)
     }
 
     @After
@@ -77,14 +78,11 @@ class ClaimsDaoTest {
     }
 
     @Test
-    fun losingAccessLeavesNoClaimsAtAll() = runTest {
+    fun droppedClaimsLeaveNoPictureAtAll() = runTest {
         packages.upsertClaims(Claims(total = BigDecimal("3")).toStorageEntity(PACK))
-        val lost = shared.loseAccess()
-        packages.upsertServerPart(lost.toStorageEntity())
         packages.deleteClaims(PACK)
 
         val restored = requireNotNull(packages.find(PACK)).toDomain(VOCABULARY)
         assertNull(restored.claims)
-        assertEquals(lost.access, restored.access)
     }
 }

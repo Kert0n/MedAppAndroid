@@ -41,12 +41,11 @@ fun PackageProjection.toPresentationDTO(syncedAt: Instant? = null): PackagePrese
                 mine = it.mine?.stripTrailingZeros()?.toPlainString()
             )
         },
-        lifecycle = lifecycle,
-        access = access,
         effective = availability.effective.toPresentationDTO(),
         availableToMe = availability.availableToMe.toPresentationDTO(),
         freeForAnyone = availability.freeForAnyone.toPresentationDTO(),
         hasUnconfirmedChanges = hasUnconfirmedChanges,
+        status = status,
         syncedAt = syncedAt
     )
 

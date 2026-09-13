@@ -1,6 +1,7 @@
 package com.kert0n.medapp.queue.pack
 
 import com.kert0n.medapp.domain.pack.Package
+import com.kert0n.medapp.domain.pack.PackageSharedFacts
 import com.kert0n.medapp.domain.value.Quantity
 import com.kert0n.medapp.network.pack.ClaimPatchNetworkDTO
 import com.kert0n.medapp.network.pack.ClaimPostNetworkDTO
@@ -24,7 +25,13 @@ import kotlin.uuid.Uuid
  * чтения, и решает — уходит запрос, закрывается отказ или желаемое уже так (PLAN E2, E3).
  * Число в единице, которой пачку больше не считают, на провод не идёт — ни расход, ни бронь, ни
  * пересчёт ([PackageSyncCommand.measuredIn]). Бронь, равная желаемой, и снятие отсутствующей
- * брони — уже так. Всё остальное становится запросом по [toPreparedRequest].
+ * брони — уже так.
+ *
+ * Здесь же действие человека сводится с тем, что сделали соседи (C1 «Действие над общей пачкой —
+ * разница»): пересчёт кладёт разницу поверх прочитанного числа, правка сведений — только свои
+ * поля поверх прочитанных. Соотнести нельзя — итог ниже нуля, то же поле изменено соседом иначе —
+ * отказ `CONFLICT`; сведения уже такие — уже так. Всё остальное становится запросом по
+ * [toPreparedRequest].
  */
 fun PackageSyncCommand.prepare(operationId: Uuid, pkg: Package, sync: PackageSyncState, at: Instant): Preparation {
     val mine = pkg.claims?.mine?.let { Quantity(it, pkg.quantity.unit) }
@@ -33,6 +40,14 @@ fun PackageSyncCommand.prepare(operationId: Uuid, pkg: Package, sync: PackageSyn
         unit != null && unit != pkg.quantity.unit -> Preparation.Refuse(RefusalReason.UNIT_CHANGED)
         this is PackageSyncCommand.SetClaim && mine == amount -> Preparation.AlreadyApplied
         this is PackageSyncCommand.ReleaseClaim && mine == null && sync.claimsVersion != null -> Preparation.AlreadyApplied
+        this is PackageSyncCommand.CorrectStock && conflictsWith(pkg.quantity) -> Preparation.Refuse(RefusalReason.CONFLICT)
+        this is PackageSyncCommand.Describe -> when (val merged = onto(pkg.facts.shared)) {
+            null -> Preparation.Refuse(RefusalReason.CONFLICT)
+            pkg.facts.shared -> Preparation.AlreadyApplied
+            else -> Preparation.Request(
+                toPreparedRequest(operationId, sync, confirmed = pkg.quantity, mine = mine, at = at, known = pkg.facts.shared)
+            )
+        }
         else -> Preparation.Request(toPreparedRequest(operationId, sync, confirmed = pkg.quantity, mine = mine, at = at))
     }
 }
@@ -45,14 +60,16 @@ fun PackageSyncCommand.prepare(operationId: Uuid, pkg: Package, sync: PackageSyn
  *
  * Расход — всегда `sync` под [operationId]: у него есть номер, и повтор под ним сервер применит
  * один раз; внеплановый расход — тот же `sync` без блока брони (решение владельца, B4).
- * Ноль пересчёта — `DELETE`: это форма провода, а не смысл команды.
+ * Пересчёт везёт [confirmed] с разницей человека; итог ноль — `DELETE`: это форма провода, а не
+ * смысл команды. Правка сведений везёт свои поля поверх [known] — того, что у сервера сейчас.
  */
 fun PackageSyncCommand.toPreparedRequest(
     operationId: Uuid,
     sync: PackageSyncState,
     confirmed: Quantity?,
     mine: Quantity?,
-    at: Instant
+    at: Instant,
+    known: PackageSharedFacts? = null
 ): PreparedRequest {
     val version = sync.version
     val claimsVersion = sync.claimsVersion
@@ -76,17 +93,21 @@ fun PackageSyncCommand.toPreparedRequest(
             ),
             sync = sync, confirmed = confirmed, mine = mine, at = at
         )
-        is PackageSyncCommand.Describe -> prepared(
-            method = "PATCH",
-            path = MedAppRoutes.pack(packageId),
-            body = medAppJson.encodeToString(
-                PackagePatchNetworkDTO.serializer(),
-                after.toPatchNetworkDTO(before, version)
-            ),
-            sync = sync, confirmed = confirmed, mine = mine, at = at
-        )
-        is PackageSyncCommand.CorrectStock ->
-            if (actual.isZero) prepared(
+        is PackageSyncCommand.Describe -> {
+            val theirs = requireNotNull(known) { "правка сведений готовится по прочитанным сведениям" }
+            prepared(
+                method = "PATCH",
+                path = MedAppRoutes.pack(packageId),
+                body = medAppJson.encodeToString(
+                    PackagePatchNetworkDTO.serializer(),
+                    requireNotNull(onto(theirs)) { "несводимую правку отвергает подготовка" }.toPatchNetworkDTO(theirs, version)
+                ),
+                sync = sync, confirmed = confirmed, mine = mine, at = at
+            )
+        }
+        is PackageSyncCommand.CorrectStock -> {
+            val target = onto(requireNotNull(confirmed) { "пересчёт готовится по прочитанному остатку" })
+            if (target.isZero) prepared(
                 method = "DELETE",
                 path = MedAppRoutes.pack(packageId),
                 query = versionQuery(version),
@@ -96,17 +117,19 @@ fun PackageSyncCommand.toPreparedRequest(
                 path = MedAppRoutes.pack(packageId),
                 body = medAppJson.encodeToString(
                     PackagePatchNetworkDTO.serializer(),
-                    PackagePatchNetworkDTO(amount = actual.toNetworkAmount(), version = version)
+                    PackagePatchNetworkDTO(amount = target.toNetworkAmount(), version = version)
                 ),
                 sync = sync, confirmed = confirmed, mine = mine, at = at
             )
+        }
         is PackageSyncCommand.Move -> prepared(
             method = "PUT",
             path = MedAppRoutes.packageIn(targetMedKitId, packageId),
             query = versionQuery(version),
             sync = sync, confirmed = confirmed, mine = mine, at = at
         )
-        is PackageSyncCommand.Delete -> prepared(
+        // Унести домой и выбросить на проводе одно и то же: сервер снимает коробку по версии.
+        is PackageSyncCommand.Delete, is PackageSyncCommand.Withdraw -> prepared(
             method = "DELETE",
             path = MedAppRoutes.pack(packageId),
             query = versionQuery(version),

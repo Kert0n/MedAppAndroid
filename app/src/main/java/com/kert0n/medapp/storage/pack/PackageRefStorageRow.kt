@@ -1,29 +1,17 @@
 package com.kert0n.medapp.storage.pack
 
 import androidx.room.Embedded
-import androidx.room.Relation
 import com.kert0n.medapp.domain.pack.PackageRef
 import com.kert0n.medapp.domain.value.Vocabulary
-import com.kert0n.medapp.storage.medkit.MedKitStorageEntity
-import com.kert0n.medapp.storage.value.storedUnit
 
 /**
- * Пачка глазами чужого агрегата — источника курса, приёма, движения: серверная строка и её
- * аптечка, без личных сведений и броней. Room читает её связью той же транзакцией, что и
- * владельца, одним запросом на всю выборку; в домен уходит [PackageRef], а не вся пачка.
+ * Пачка глазами чужого агрегата — источника курса, приёма: запись о коробке, а не живая
+ * строка, поэтому история читается и после того, как коробки не стало (PLAN D6). Room
+ * читает её связью той же транзакцией, что и владельца, одним запросом на всю выборку; в домен
+ * уходит [PackageRef].
  */
 class PackageRefStorageRow(
-    @Embedded val pack: PackageStorageEntity,
-    @Relation(parentColumn = "med_kit_id", entityColumn = "id")
-    val medKit: MedKitStorageEntity? = null
+    @Embedded val record: PackageRecordStorageEntity
 ) {
-    fun toRef(vocabulary: Vocabulary): PackageRef = PackageRef(
-        id = pack.id,
-        name = pack.name,
-        unit = vocabulary.storedUnit(pack.quantityUnitId),
-        form = pack.sharedFacts(vocabulary).form,
-        lifecycle = pack.lifecycle,
-        access = pack.access,
-        medKit = pack.medKitRow(medKit).toRef()
-    )
+    fun toRef(vocabulary: Vocabulary): PackageRef = record.toRef(vocabulary)
 }

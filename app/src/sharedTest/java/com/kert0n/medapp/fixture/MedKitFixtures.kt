@@ -1,6 +1,7 @@
 package com.kert0n.medapp.fixture
 
 import com.kert0n.medapp.domain.medkit.MedKit
+import com.kert0n.medapp.domain.medkit.MedKitStatus
 import java.time.Instant
 import kotlin.uuid.Uuid
 
@@ -17,12 +18,14 @@ fun medKit(
     location: String? = null,
     publication: MedKit.Publication = MedKit.Publication.LOCAL,
     participantCount: Long = 1,
-    createdAt: Instant = Instant.EPOCH
+    createdAt: Instant = Instant.EPOCH,
+    status: MedKitStatus = MedKitStatus.ACTIVE
 ) = MedKit(
     id = id,
     name = name,
     location = location,
     publication = publication,
     participantCount = participantCount,
-    createdAt = createdAt
+    createdAt = createdAt,
+    status = status
 )

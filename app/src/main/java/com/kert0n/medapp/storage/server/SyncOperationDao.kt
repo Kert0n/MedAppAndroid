@@ -18,6 +18,10 @@ interface SyncOperationDao {
      * Номер выдаёт база: он монотонен и уникален, а `UNIQUE` ловит гонку двух постановок.
      * Команда своего номера не знает — он принадлежит очереди, а не тому, что предстоит
      * доставить (PLAN E2).
+     *
+     * [medKitId] — полка, **на которой команда действует**: там лежит коробка, когда её трогают, или
+     * это сама полка. Её называет тот, кто ставит команду, — ему это известно, а команде не всегда.
+     * По ней очередь держит порядок полки ([ready]).
      */
     @Transaction
     suspend fun enqueue(
@@ -25,7 +29,8 @@ interface SyncOperationDao {
         command: SyncCommand,
         createdAt: Instant,
         groupId: Uuid? = null,
-        dependsOn: Set<Uuid> = emptySet()
+        dependsOn: Set<Uuid> = emptySet(),
+        medKitId: Uuid? = SyncCommandStorageConverter.medKitIdOf(command)
     ): SyncOperation {
         val operation = SyncOperation(
             id = id,
@@ -36,7 +41,7 @@ interface SyncOperationDao {
             groupId = groupId,
             dependsOn = dependsOn
         )
-        insert(operation.toStorageEntity())
+        insert(operation.toStorageEntity(medKitId))
         insertDependencies(
             dependsOn.map { SyncOperationDependencyStorageEntity(id, it) }
         )
@@ -84,6 +89,38 @@ interface SyncOperationDao {
     )
     suspend fun unclosedOfPackages(packageIds: List<Uuid>): List<SyncOperationStorageRow>
 
+    /**
+     * Коробки, у которых запрос уже заморожен и не закрыт: он уходил или уйдёт тем же, и сервер
+     * мог его уже применить, а ответ ещё не лёг. Полный снимок таких не кладёт: он поставил бы
+     * серверное число под проекцию той же команды, и расход вычелся бы дважды. Истину по ним
+     * принесёт ответ на ту же команду (PLAN E1). Неотправленная команда сюда не входит: её сервер не видел.
+     */
+    @Query(
+        "SELECT DISTINCT package_id FROM sync_operations WHERE package_id IS NOT NULL " +
+            "AND status NOT IN ('APPLIED', 'REFUSED', 'ACCESS_LOST') AND prepared_method IS NOT NULL"
+    )
+    suspend fun packagesInFlight(): List<Uuid>
+
+    /**
+     * Сколько у полки незакрытых **своих** команд — о ней самой, а не о её коробках: пометка полки
+     * держится на них, а коробки следят за собой сами (PLAN E1).
+     */
+    @Query(
+        "SELECT COUNT(*) FROM sync_operations WHERE med_kit_id = :medKitId AND package_id IS NULL " +
+            "AND status NOT IN ('APPLIED', 'REFUSED', 'ACCESS_LOST')"
+    )
+    suspend fun unclosedOwnOfMedKit(medKitId: Uuid): Int
+
+    /**
+     * Сколько у полки незакрытых команд вообще — её собственных и по её коробкам. Столько ждёт
+     * публикация: полка становится общей вместе с содержимым, и половины не бывает (PLAN D2, E5).
+     */
+    @Query(
+        "SELECT COUNT(*) FROM sync_operations WHERE med_kit_id = :medKitId " +
+            "AND status NOT IN ('APPLIED', 'REFUSED', 'ACCESS_LOST')"
+    )
+    suspend fun unclosedOfMedKit(medKitId: Uuid): Int
+
     @Transaction
     @Query("SELECT * FROM sync_operations WHERE status = :status ORDER BY sequence")
     suspend fun withStatus(status: SyncOperationStatus): List<SyncOperationStorageRow>
@@ -92,6 +129,15 @@ interface SyncOperationDao {
      * Готовые к работе: ожидающие, отправлявшиеся в момент смерти процесса и получившие ответ,
      * который ещё не применён, — у которых каждая зависимость **применена** — зависимость значит «нужен эффект», и закрытая отказом её не
      * даёт. Порядок — номер очереди; кто ещё не готов, ждёт своей зависимости.
+     *
+     * **Полка ждёт свои коробки, коробки ждут полку** (PLAN E3): команда о полке ждёт любую более
+     * раннюю незакрытую по этой полке, а команда о коробке — более ранние по этой коробке и более
+     * ранние команды самой полки. Поэтому уборка ждёт расход, поставленный на её коробку раньше, а
+     * расход, поставленный позже, ждёт уборку — и ответ одной не подвешивает другую.
+     *
+     * Команды **двух разных коробок** одной полки друг друга не ждут: сервер их не связывает.
+     * Иначе коробка на откате держала бы всю полку до своего срока, а публикация полки с пятью
+     * коробками растянулась бы на пять проходов вместо одного (PLAN E1).
      */
     @Transaction
     @Query(
@@ -101,8 +147,10 @@ interface SyncOperationDao {
             "  SELECT 1 FROM sync_operation_dependencies d JOIN sync_operations p ON p.id = d.depends_on_id " +
             "  WHERE d.operation_id = o.id AND p.status != 'APPLIED'" +
             ") AND NOT EXISTS (" +
-            "  SELECT 1 FROM sync_operations e WHERE e.package_id = o.package_id AND e.sequence < o.sequence " +
-            "  AND e.status IN ('PENDING', 'SENDING', 'ANSWERED')" +
+            "  SELECT 1 FROM sync_operations e WHERE e.sequence < o.sequence " +
+            "  AND e.status IN ('PENDING', 'SENDING', 'ANSWERED') " +
+            "  AND (e.package_id = o.package_id " +
+            "    OR (e.med_kit_id = o.med_kit_id AND (o.package_id IS NULL OR e.package_id IS NULL)))" +
             ") ORDER BY sequence"
     )
     suspend fun ready(now: Instant): List<SyncOperationStorageRow>
@@ -116,6 +164,16 @@ interface SyncOperationDao {
             "AND not_before > :now"
     )
     suspend fun nextDueAt(now: Instant): Instant?
+
+    /**
+     * Ближайший срок среди **всех** незакрытых операций, прошедший в том числе: ждущая связи срока
+     * не имеет и отвечает началом эпохи. `null` — незакрытых нет. В отличие от [nextDueAt], вопрос
+     * здесь не «когда проснуться процессу», а «надо ли будить процесс вовсе» (PLAN E4).
+     */
+    @Query(
+        "SELECT MIN(COALESCE(not_before, 0)) FROM sync_operations WHERE status IN ('PENDING', 'SENDING', 'ANSWERED')"
+    )
+    suspend fun earliestDueOfUnclosed(): Instant?
 
     /** Замораживает запрос и берёт в отправку — только если операция ещё не закрыта. */
     @Query(

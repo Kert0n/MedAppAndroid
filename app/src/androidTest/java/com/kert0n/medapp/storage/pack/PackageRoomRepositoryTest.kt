@@ -9,9 +9,11 @@ import com.kert0n.medapp.fixture.OTHER_PACK
 import com.kert0n.medapp.fixture.PACK
 import com.kert0n.medapp.fixture.activeCourse
 import com.kert0n.medapp.fixture.dose
+import com.kert0n.medapp.domain.medkit.MedKit
 import com.kert0n.medapp.fixture.inMemoryDatabase
 import com.kert0n.medapp.fixture.medKit
 import com.kert0n.medapp.fixture.millilitres
+import com.kert0n.medapp.fixture.left
 import com.kert0n.medapp.fixture.pack
 import com.kert0n.medapp.fixture.projected
 import com.kert0n.medapp.fixture.packageRepository
@@ -73,7 +75,8 @@ class PackageRoomRepositoryTest {
         database = inMemoryDatabase { sql -> synchronized(counted) { counted += sql } }
         repository = database.packageRepository()
         queue = database.queueRepository()
-        database.medKits().upsert(medKit().toMedKitStorageEntity())
+        // Снимок сервера описывает коробку общей полки: местная серверу не принадлежит (PLAN E6).
+        database.medKits().upsert(medKit(publication = MedKit.Publication.PUBLISHED).toMedKitStorageEntity())
         repository.add(paracetamol)
     }
 
@@ -204,11 +207,12 @@ class PackageRoomRepositoryTest {
         assertNull(repository.observeSyncState(OTHER_PACK).first())
     }
 
-    /** Пересчёт заменяет число, а более новый расход ложится поверх него (PLAN E1). */
+    /** Пересчёт кладёт разницу поверх увиденного, а более новый расход — поверх него (PLAN E1, C1). */
     @Test
-    fun pendingRecountReplacesTheNumberAndLaterCommandsApplyOnTop() = runTest {
+    fun pendingRecountLaysItsDifferenceAndLaterCommandsApplyOnTop() = runTest {
         queue.enqueue(operation, PackageSyncCommand.Consume(PACK, dose("3"), INTAKE), at)
-        queue.enqueue(recount, PackageSyncCommand.CorrectStock(PACK, tablets("10")), at)
+        // Человек видел 17 (20 без трёх в пути) и насчитал 10.
+        queue.enqueue(recount, PackageSyncCommand.CorrectStock(PACK, tablets("17"), tablets("10")), at)
         queue.enqueue(later, PackageSyncCommand.Consume(PACK, dose("2"), OTHER_INTAKE), at)
 
         val availability = requireNotNull(repository.observe(PACK).first()).availability
@@ -256,33 +260,13 @@ class PackageRoomRepositoryTest {
     }
 
     /**
-     * Пачка, к которой утрачен доступ, свободной не считается — хотя её количество осталось
-     * известным, а брони с неё сняты вместе с доступом.
-     */
-    @Test
-    fun packageOutOfReachIsNotCountedAsFree() = runTest {
-        repository.saveClaims(PACK, Claims(total = BigDecimal("8")))
-
-        assertTrue(repository.loseAccess(PACK))
-
-        val availability = requireNotNull(repository.observe(PACK).first()).availability
-        assertEquals(tablets("0"), availability.freeForAnyone)
-        // Брони снимаются вместе с доступом: их больше не существует, а не «их не видно».
-        assertNull(requireNotNull(repository.observe(PACK).first()).claims)
-        assertEquals(
-            emptyList<String>(),
-            repository.list(PackageQuery(filter = PackageQuery.Filter.HasFree), today).first().map { it.name }
-        )
-    }
-
-    /**
      * Переименование правит описание и только его: остаток, обвязка синхронизации и брони
      * остаются нынешними, хотя экран загрузил пачку до чужой записи.
      */
     @Test
     fun describingDoesNotWriteBackAStaleAmount() = runTest {
         val sync = PackageSyncState(PACK, version = ResourceVersion(5), syncedAt = at)
-        repository.applySnapshot(PackageSnapshot(paracetamol.correctTo(tablets("11")), sync), at)
+        repository.applySnapshot(PackageSnapshot(paracetamol.correctTo(tablets("11")).left(), sync), at)
 
         val renamed = paracetamol.facts.let { it.copy(shared = it.shared.copy(name = "Панадол")) }
 

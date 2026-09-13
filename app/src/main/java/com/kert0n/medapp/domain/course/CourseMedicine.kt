@@ -1,6 +1,7 @@
 package com.kert0n.medapp.domain.course
 
 import com.kert0n.medapp.domain.pack.Availability
+import com.kert0n.medapp.domain.pack.Package
 import com.kert0n.medapp.domain.pack.PackageRef
 import com.kert0n.medapp.domain.value.DosageForm
 import com.kert0n.medapp.domain.value.Dose
@@ -48,26 +49,29 @@ class CourseMedicine(sources: List<CourseSource> = emptyList()) {
 
     /**
      * Подключает пачку последней в расходе, если она годится под назначенное: та же форма и та
-     * же единица, что у [dose]. Отказ называет причину, ведущую к действию.
+     * же единица, что у [dose]. Требует живую [Package], а не ссылку: источником бывает только
+     * коробка, которая у человека есть, — а есть она или нет, знает лишь тот, кто её прочитал
+     * (PLAN D3, D5). Отказ называет причину, ведущую к действию.
      */
     internal fun attach(
-        pkg: PackageRef,
+        pkg: Package,
         doses: Doses,
         dose: Dose,
         form: DosageForm
     ): Result<CourseMedicine> {
+        val ref = pkg.ref
         val rejection = when {
-            !pkg.suppliesStock -> CourseRejected.Reason.PACKAGE_UNUSABLE
-            holds(pkg) -> CourseRejected.Reason.ALREADY_ATTACHED
+            !pkg.status.allowsUse -> CourseRejected.Reason.PACKAGE_UNUSABLE
+            holds(ref) -> CourseRejected.Reason.ALREADY_ATTACHED
             // Пачка без формы не годится ни под какое назначение: сказать, тот ли это препарат,
             // нечем, и сначала форму надо заполнить.
-            pkg.form == null -> CourseRejected.Reason.FORM_UNKNOWN
-            pkg.form != form -> CourseRejected.Reason.FORM_MISMATCH
-            pkg.unit != dose.unit -> CourseRejected.Reason.UNIT_MISMATCH
+            ref.form == null -> CourseRejected.Reason.FORM_UNKNOWN
+            ref.form != form -> CourseRejected.Reason.FORM_MISMATCH
+            ref.unit != dose.unit -> CourseRejected.Reason.UNIT_MISMATCH
             else -> null
         }
         if (rejection != null) return Result.failure(CourseRejected(rejection))
-        return Result.success(withSources(sources + CourseSource(pkg, doses)))
+        return Result.success(withSources(sources + CourseSource(ref, doses)))
     }
 
     /** Убирает пачку; препарат без пачек — законное состояние, курс просто не обеспечен. */

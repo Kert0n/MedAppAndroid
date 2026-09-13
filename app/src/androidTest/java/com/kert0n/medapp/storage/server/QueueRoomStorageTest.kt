@@ -1,6 +1,7 @@
 package com.kert0n.medapp.storage.server
 
 import com.kert0n.medapp.domain.intake.IntakeStatus
+import com.kert0n.medapp.domain.pack.PackageStatus
 import com.kert0n.medapp.fixture.HOME_KIT
 import com.kert0n.medapp.fixture.INTAKE
 import com.kert0n.medapp.fixture.PACK
@@ -36,8 +37,16 @@ import com.kert0n.medapp.queue.Take
 import com.kert0n.medapp.storage.database.MedAppDatabase
 import com.kert0n.medapp.storage.intake.toStorageEntity as toIntakeStorageEntity
 import com.kert0n.medapp.storage.medkit.toStorageEntity as toMedKitStorageEntity
-import com.kert0n.medapp.storage.pack.toDetailsStorageEntity
 import com.kert0n.medapp.storage.pack.toStorageEntity
+import com.kert0n.medapp.fixture.COURSE
+import com.kert0n.medapp.fixture.activeCourse
+import com.kert0n.medapp.fixture.save
+import com.kert0n.medapp.fixture.source
+import com.kert0n.medapp.domain.course.Revision
+import com.kert0n.medapp.storage.course.ActivePackageAssignmentStorageEntity
+import com.kert0n.medapp.storage.course.toSourceStorageEntities
+import com.kert0n.medapp.storage.course.toStorageEntity as toCourseStorageEntity
+import com.kert0n.medapp.storage.course.toTimeStorageEntities
 import java.math.BigDecimal
 import java.time.Instant
 import kotlin.uuid.Uuid
@@ -95,12 +104,10 @@ class QueueRoomStorageTest {
     @Before
     fun openDatabase() = runTest {
         database = inMemoryDatabase()
-        database.medKits().upsert(medKit().toMedKitStorageEntity())
+        // Полка общая: снимок ложится на коробку только там, где у неё есть сервер (PLAN E6).
+        database.medKits().upsert(medKit(publication = MedKit.Publication.PUBLISHED).toMedKitStorageEntity())
         val paracetamol = pack(quantity = tablets("20"), form = TABLET_FORM)
-        database.packages().save(
-            paracetamol.toStorageEntity(PackageSyncState(PACK, ResourceVersion(3), ResourceVersion(1), at)),
-            paracetamol.toDetailsStorageEntity()
-        )
+        database.packages().save(paracetamol, PackageSyncState(PACK, ResourceVersion(3), ResourceVersion(1), at))
     }
 
     @After
@@ -196,29 +203,112 @@ class QueueRoomStorageTest {
         assertEquals(tablets("20"), requireNotNull(database.packages().find(PACK)).toDomain(VOCABULARY).quantity)
     }
 
+    /** На сервере пачки нет по нашей же причине: коробки нет, курс без источника (D3). */
     @Test
-    fun packageGoneFromTheServerIsArchivedLocally() = runTest {
+    fun packageGoneFromTheServerIsGoneLocally() = runTest {
+        holdByACourse()
         database.syncOperations().enqueue(operation, PackageSyncCommand.Consume(PACK, dose("20"), INTAKE), at)
         storage.take(operation, null, at)
 
         storage.settle(operation, Delivery.Applied(PackageState.Gone), at.plusSeconds(1))
 
-        val pkg = requireNotNull(database.packages().find(PACK)).toDomain(VOCABULARY)
-        assertEquals(tablets("0"), pkg.quantity)
-        assertEquals(false, pkg.suppliesStock)
+        assertNull(database.packages().find(PACK))
+        assertEquals(emptyList<Uuid>(), database.courses().sourcePackagesOf(COURSE))
+        assertEquals(Revision(2), requireNotNull(database.courses().findPlan(COURSE)).toPlan(VOCABULARY).revision)
     }
 
+    /** Доступ утрачен: коробки и источника нет. */
     @Test
-    fun accessLostMarksThePackageAndClosesTheOperation() = runTest {
+    fun accessLostRemovesThePackage() = runTest {
+        holdByACourse()
         database.syncOperations().enqueue(operation, PackageSyncCommand.Consume(PACK, dose("3"), INTAKE), at)
         storage.take(operation, null, at)
 
         storage.settle(operation, Delivery.AccessLost, at.plusSeconds(1))
 
-        val pkg = requireNotNull(database.packages().find(PACK)).toDomain(VOCABULARY)
-        assertEquals(com.kert0n.medapp.domain.pack.Package.Access.LOST, pkg.access)
-        assertNull(pkg.claims)
+        assertNull(database.packages().find(PACK))
+        assertEquals(emptyList<Uuid>(), database.courses().sourcePackagesOf(COURSE))
         assertTrue(storage.ready(at.plusSeconds(600)).isEmpty())
+    }
+
+    /**
+     * Снимок, пришедший, пока решение ждёт, пометку не снимает: статус — наше решение, а не
+     * сведения сервера, и снимает его только закрытие команды (PLAN E1).
+     */
+    @Test
+    fun aSnapshotDoesNotReleaseTheMark() = runTest {
+        database.packageRepository().mark(PACK, PackageStatus.REMOVING)
+
+        database.packageRepository().applySnapshot(snapshot, at)
+
+        val pkg = requireNotNull(database.packageRepository().find(PACK))
+        assertEquals(tablets("17"), pkg.quantity)
+        assertEquals(PackageStatus.REMOVING, pkg.status)
+    }
+
+    /**
+     * Коробку на местной полке снимок не переставляет и не пересчитывает, но обе её версии ведёт:
+     * команды, поставленные до уноса домой, ещё доставляются по ним (PLAN E3, E6).
+     *
+     * Красная проверка: без версии броней расход с бронью переподготавливается без конца — так проба
+     * на сервере и поймала этот случай.
+     */
+    @Test
+    fun aSnapshotOfABoxOnALocalShelfBringsOnlyItsVersions() = runTest {
+        database.medKits().upsert(medKit().toMedKitStorageEntity())
+
+        database.packageRepository().applySnapshot(snapshot, at)
+
+        val row = requireNotNull(database.packages().find(PACK))
+        assertEquals(tablets("20"), row.toDomain(VOCABULARY).quantity)
+        assertEquals(HOME_KIT, row.pack.medKitId)
+        assertEquals(ResourceVersion(4), row.pack.syncState().version)
+        assertEquals(ResourceVersion(2), row.pack.syncState().claimsVersion)
+    }
+
+    /**
+     * Унесённую домой коробку человек уже выбросил у себя, а сервер о ней ещё знает: она всё равно
+     * снимается — по версии свежего снимка, — и снимок её обратно не заводит (PLAN E6).
+     */
+    @Test
+    fun aBoxThrownAwayAtHomeIsStillTakenOffTheServer() = runTest {
+        database.syncOperations().enqueue(operation, PackageSyncCommand.Withdraw(PACK, HOME_KIT, tablets("20")), at)
+        database.packages().delete(PACK)
+
+        val taken = (storage.take(operation, snapshot, at) as Take.Sending).operation
+
+        assertEquals("DELETE", taken.prepared?.method)
+        assertEquals(ResourceVersion(4), taken.prepared?.drugVersion)
+        assertNull(database.packages().find(PACK))
+    }
+
+    /**
+     * Унесли при 20, дома выпили одну, а полка к снятию подтвердила 17. Когда сервер коробку забыл,
+     * у нас она местная и с 16: чужой расход и свой домашний учтены оба (PLAN E6).
+     */
+    @Test
+    fun carryingHomeCountsWhatTheShelfConfirmedAndWhatWasTakenAtHome() = runTest {
+        database.medKits().upsert(medKit().toMedKitStorageEntity())
+        database.packages().save(pack(quantity = tablets("19"), form = TABLET_FORM), PackageSyncState(PACK, ResourceVersion(3), null, at))
+        database.syncOperations().enqueue(operation, PackageSyncCommand.Withdraw(PACK, com.kert0n.medapp.fixture.SHARED_KIT, tablets("20")), at)
+
+        storage.take(operation, snapshot, at)
+        storage.settle(operation, Delivery.Applied(PackageState.Gone), at.plusSeconds(1))
+
+        val row = requireNotNull(database.packages().find(PACK))
+        assertEquals(tablets("16"), row.toDomain(VOCABULARY).quantity)
+        assertNull(row.pack.syncState().version)
+    }
+
+    /** Курс, держащий пачку: назначение и источник, как их пишет активация. */
+    private suspend fun holdByACourse() {
+        val plan = activeCourse(sources = listOf(source(PACK, 5)))
+        database.courses().saveCourse(
+            plan.toCourseStorageEntity(),
+            plan.schedule.toTimeStorageEntities(COURSE),
+            plan.medicine.toSourceStorageEntities(COURSE)
+        )
+        database.courses().assignPackage(ActivePackageAssignmentStorageEntity(PACK, COURSE))
     }
 
     @Test
@@ -420,7 +510,7 @@ class QueueRoomStorageTest {
         delay(300) // подписка на таблицу успела встать
 
         database.transactions().run {
-            storage.enqueue(QueuedCommand(operation, PackageSyncCommand.Consume(PACK, dose("3"), INTAKE)), at)
+            storage.enqueue(QueuedCommand(operation, PackageSyncCommand.Consume(PACK, dose("3"), INTAKE)), HOME_KIT, at)
             delay(300) // транзакция ещё открыта: сигнала быть не должно
             assertFalse(seen.isCompleted)
         }
@@ -440,7 +530,7 @@ class QueueRoomStorageTest {
 
         val stored = (requireNotNull(database.syncOperations().find(operation)).toDomain(VOCABULARY) as StoredSyncOperation.Readable).operation
         assertEquals(SyncOperationStatus.APPLIED, stored.status)
-        assertEquals(com.kert0n.medapp.domain.pack.Package.Access.AVAILABLE, requireNotNull(database.packages().find(PACK)).toDomain(VOCABULARY).access)
+        assertNotNull(database.packages().find(PACK))
         assertNull(storage.take(operation, null, at.plusSeconds(3)))
     }
 }

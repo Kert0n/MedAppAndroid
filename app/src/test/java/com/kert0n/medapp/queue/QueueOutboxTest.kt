@@ -86,7 +86,7 @@ class QueueOutboxTest {
             id, command, sequence, createdAt, payloadVersion, prepared, groupId, dependsOn,
             status, attempts, lastError, lastTriedAt, answer, notBefore, outcomeUnknown
         )
-        override suspend fun enqueue(queued: QueuedCommand, at: Instant): SyncOperation = error("не для этого теста")
+        override suspend fun enqueue(queued: QueuedCommand, shelf: kotlin.uuid.Uuid, at: Instant): SyncOperation = error("не для этого теста")
     }
 
     private class Transport(private val answer: () -> ApiResult<RawResponse>) : QueueTransport {
@@ -96,6 +96,9 @@ class QueueOutboxTest {
             return answer()
         }
         override suspend fun packageSnapshot(packageId: Uuid): ApiResult<PackageSnapshotNetworkDTO> =
+            ApiResult.Failure(ApiFailure.Unavailable)
+
+        override suspend fun medKitIsOurs(medKitId: Uuid): ApiResult<Boolean> =
             ApiResult.Failure(ApiFailure.Unavailable)
     }
 

@@ -46,7 +46,7 @@ class CourseSourceFormTest {
         val capsules = pack(id = OTHER_PACK, form = CAPSULE_FORM, quantity = tablets("10"))
         assertEquals(
             CourseRejected.Reason.FORM_MISMATCH,
-            prescribedDraft().attach(capsules.ref, doses = 1.doses, at = LATER).rejection()
+            prescribedDraft().attach(capsules, doses = 1.doses, at = LATER).rejection()
         )
     }
 
@@ -57,7 +57,7 @@ class CourseSourceFormTest {
         val unknownForm = pack(id = OTHER_PACK, form = null)
         assertEquals(
             CourseRejected.Reason.FORM_UNKNOWN,
-            prescribedDraft().attach(unknownForm.ref, doses = 1.doses, at = LATER).rejection()
+            prescribedDraft().attach(unknownForm, doses = 1.doses, at = LATER).rejection()
         )
     }
 
@@ -68,7 +68,7 @@ class CourseSourceFormTest {
         val syrup = pack(id = OTHER_PACK, form = TABLET_FORM, quantity = millilitres("100"))
         assertEquals(
             CourseRejected.Reason.UNIT_MISMATCH,
-            prescribedDraft().attach(syrup.ref, doses = 1.doses, at = LATER).rejection()
+            prescribedDraft().attach(syrup, doses = 1.doses, at = LATER).rejection()
         )
     }
 
@@ -77,11 +77,11 @@ class CourseSourceFormTest {
         // Сверять не с чем — и отказ говорит, чего не хватает.
         assertEquals(
             CourseRejected.Reason.DOSE_MISSING,
-            course().attach(tabletPack.ref, doses = 1.doses, at = LATER).rejection()
+            course().attach(tabletPack, doses = 1.doses, at = LATER).rejection()
         )
         assertEquals(
             CourseRejected.Reason.FORM_MISSING,
-            course(dose = dose("2")).attach(tabletPack.ref, doses = 1.doses, at = LATER).rejection()
+            course(dose = dose("2")).attach(tabletPack, doses = 1.doses, at = LATER).rejection()
         )
     }
 
@@ -92,20 +92,20 @@ class CourseSourceFormTest {
         // не допускает.
         val syrup = pack(id = OTHER_PACK, form = TABLET_FORM, quantity = millilitres("10"))
         val restarted = prescribedDraft()
-            .attach(tabletPack.ref, doses = 5.doses, at = LATER).getOrThrow()
+            .attach(tabletPack, doses = 5.doses, at = LATER).getOrThrow()
             .detach(tabletPack.ref, LATER)
         assertEquals(dose("2"), restarted.dose)
         assertEquals(TABLETS, restarted.unit)
         assertEquals(
             CourseRejected.Reason.UNIT_MISMATCH,
-            restarted.attach(syrup.ref, doses = 1.doses, at = LATER).rejection()
+            restarted.attach(syrup, doses = 1.doses, at = LATER).rejection()
         )
     }
 
     @Test
     fun changingTheDoseUnitUnderAttachedPacksIsRejected() {
         // Подключённые таблетки под миллилитры не годятся: сначала отвязать, потом менять.
-        val chosen = prescribedDraft().attach(tabletPack.ref, doses = 5.doses, at = LATER).getOrThrow()
+        val chosen = prescribedDraft().attach(tabletPack, doses = 5.doses, at = LATER).getOrThrow()
         assertEquals(
             CourseRejected.Reason.UNIT_MISMATCH,
             chosen.setDose(dose(millilitres("5")), LATER).rejection()
@@ -135,7 +135,7 @@ class CourseSourceFormTest {
         val unsupplied = activeCourse(sources = listOf(source(PACK, 5))).detach(tabletPack.ref, LATER)
         assertEquals(
             CourseRejected.Reason.FORM_MISMATCH,
-            unsupplied.attach(capsules.ref, doses = 1.doses, at = LATER).rejection()
+            unsupplied.attach(capsules, doses = 1.doses, at = LATER).rejection()
         )
     }
 

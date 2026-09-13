@@ -67,6 +67,9 @@ interface QueueStorage {
      */
     suspend fun settle(id: Uuid, settlement: Settlement, at: Instant)
 
-    /** Ставит команду; номер выдаёт хранилище. Только внутри [transaction] с её причиной. */
-    suspend fun enqueue(queued: QueuedCommand, at: Instant): SyncOperation
+    /**
+     * Ставит команду; номер выдаёт хранилище. Только внутри [transaction] с её причиной. [shelf] —
+     * полка, на которой команда действует: по ней очередь держит порядок полки.
+     */
+    suspend fun enqueue(queued: QueuedCommand, shelf: Uuid, at: Instant): SyncOperation
 }

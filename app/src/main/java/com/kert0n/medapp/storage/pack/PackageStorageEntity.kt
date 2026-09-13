@@ -7,6 +7,7 @@ import androidx.room.Index
 import androidx.room.PrimaryKey
 import com.kert0n.medapp.domain.pack.Package
 import com.kert0n.medapp.domain.pack.PackageSharedFacts
+import com.kert0n.medapp.domain.pack.PackageStatus
 import com.kert0n.medapp.domain.value.Vocabulary
 import com.kert0n.medapp.network.pack.PackageSyncState
 import com.kert0n.medapp.network.server.ResourceVersion
@@ -20,7 +21,9 @@ import java.time.Instant
 import kotlin.uuid.Uuid
 
 /**
- * Подтверждённая серверная часть упаковки: то, что снимок переписывает целиком. Личные сведения
+ * Живая коробка — подтверждённая серверная часть упаковки: то, что снимок переписывает целиком.
+ * Строка существует, пока коробка у нас есть; кончившаяся или выброшенная строки не оставляет
+ * (PLAN D3). Личные сведения
  * лежат отдельной строкой, иначе срок годности и цена стирались бы при каждом обновлении
  * (PLAN F1).
  *
@@ -33,13 +36,19 @@ import kotlin.uuid.Uuid
  * и `COLLATE NOCASE` в SQLite знают только латиницу, и по-русски поиск без учёта регистра иначе
  * не работает.
  *
- * Пачка не живёт без аптечки и без единицы, в которой её считают: ключи `RESTRICT` держат это в
- * схеме, а не в коде (PLAN F2). Аптечку с пачками база удалить не даст — сценарий сначала
- * решает, куда им деться; словарь только растёт, и удалять из него нечего.
+ * Пачка не живёт без записи о себе, без аптечки и без единицы, в которой её считают: ключи
+ * `RESTRICT` держат это в схеме, а не в коде (PLAN F2). Аптечку с пачками база удалить не даст —
+ * сценарий сначала решает, куда им деться; словарь только растёт, и удалять из него нечего.
  */
 @Entity(
     tableName = "packages",
     foreignKeys = [
+        ForeignKey(
+            entity = PackageRecordStorageEntity::class,
+            parentColumns = ["id"],
+            childColumns = ["id"],
+            onDelete = ForeignKey.RESTRICT
+        ),
         ForeignKey(
             entity = MedKitStorageEntity::class,
             parentColumns = ["id"],
@@ -76,9 +85,9 @@ class PackageStorageEntity(
     val description: String? = null,
     val version: Long? = null,
     @ColumnInfo(name = "claims_version") val claimsVersion: Long? = null,
-    val lifecycle: Package.Lifecycle = Package.Lifecycle.ACTIVE,
-    val access: Package.Access = Package.Access.AVAILABLE,
-    @ColumnInfo(name = "synced_at") val syncedAt: Instant? = null
+    @ColumnInfo(name = "synced_at") val syncedAt: Instant? = null,
+    /** Неподтверждённое решение о коробке; снимок сервера его не переписывает (PLAN E1). */
+    val status: PackageStatus = PackageStatus.ACTIVE
 ) {
     /** Аптечка пачки, прочитанная связью: её нет — строка пачки повреждена, ключ это держит (F2). */
     fun medKitRow(read: MedKitStorageEntity?): MedKitStorageEntity =
@@ -118,8 +127,7 @@ fun Package.toStorageEntity(sync: PackageSyncState = PackageSyncState(id)): Pack
         description = facts.description,
         version = sync.version?.number,
         claimsVersion = sync.claimsVersion?.number,
-        lifecycle = lifecycle,
-        access = access,
-        syncedAt = sync.syncedAt
+        syncedAt = sync.syncedAt,
+        status = status
     )
 }

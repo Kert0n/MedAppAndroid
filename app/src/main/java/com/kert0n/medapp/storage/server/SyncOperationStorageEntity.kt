@@ -55,7 +55,9 @@ class SyncOperationStorageEntity(
  * Номер в очереди выдаёт база, поэтому он приходит аргументом: команда его не знает и знать
  * не должна (PLAN E2).
  */
-fun SyncOperation.toStorageEntity(): SyncOperationStorageEntity = SyncOperationStorageEntity(
+fun SyncOperation.toStorageEntity(
+    medKitId: Uuid? = SyncCommandStorageConverter.medKitIdOf(command)
+): SyncOperationStorageEntity = SyncOperationStorageEntity(
     id = id,
     kind = SyncCommandStorageConverter.kindOf(command),
     payload = SyncCommandStorageConverter.payloadOf(command),
@@ -65,7 +67,7 @@ fun SyncOperation.toStorageEntity(): SyncOperationStorageEntity = SyncOperationS
     attempts = attempts,
     createdAt = createdAt,
     packageId = SyncCommandStorageConverter.packageIdOf(command),
-    medKitId = SyncCommandStorageConverter.medKitIdOf(command),
+    medKitId = medKitId,
     groupId = groupId,
     lastError = lastError,
     lastTriedAt = lastTriedAt,

@@ -8,15 +8,14 @@ import com.kert0n.medapp.domain.pack.ExpiryDate
 import com.kert0n.medapp.domain.pack.Package
 import com.kert0n.medapp.storage.value.toStorageAmount
 import com.kert0n.medapp.storage.value.toStorageCurrency
-import java.time.Instant
 import java.time.LocalDate
 import kotlin.uuid.Uuid
 
 /**
  * Сведения, которых сервер не знает: срок годности, доза-подсказка, заметка, цена и даты
  * покупки и вскрытия. **Строка заводится всегда**, включая пачки из чужой опубликованной
- * аптечки: тогда `added_at` — момент первого наблюдения, и обязательное поле домена никогда
- * не отсутствует (PLAN F1).
+ * аптечки — пустой (PLAN F1). Момент появления живёт в записи о коробке: он нужен истории и
+ * после того, как коробки не стало.
  */
 @Entity(
     tableName = "package_details",
@@ -25,13 +24,12 @@ import kotlin.uuid.Uuid
             entity = PackageStorageEntity::class,
             parentColumns = ["id"],
             childColumns = ["package_id"],
-            onDelete = ForeignKey.RESTRICT
+            onDelete = ForeignKey.CASCADE
         )
     ]
 )
 class PackageDetailsStorageEntity(
     @PrimaryKey @ColumnInfo(name = "package_id") val packageId: Uuid,
-    @ColumnInfo(name = "added_at") val addedAt: Instant,
     @ColumnInfo(name = "expires_on") val expiresOn: LocalDate? = null,
     @ColumnInfo(name = "default_intake_amount") val defaultIntakeAmount: String? = null,
     @ColumnInfo(name = "default_intake_unit_id") val defaultIntakeUnitId: Uuid? = null,
@@ -45,7 +43,6 @@ class PackageDetailsStorageEntity(
 
 fun Package.toDetailsStorageEntity(): PackageDetailsStorageEntity = PackageDetailsStorageEntity(
     packageId = id,
-    addedAt = addedAt,
     expiresOn = facts.expiresOn?.lastDay,
     defaultIntakeAmount = facts.defaultIntakeAmount?.quantity?.toStorageAmount(),
     defaultIntakeUnitId = facts.defaultIntakeAmount?.unit?.id,
@@ -56,9 +53,5 @@ fun Package.toDetailsStorageEntity(): PackageDetailsStorageEntity = PackageDetai
     openedOn = facts.openedOn,
     templateId = templateId
 )
-
-/** Момент первого наблюдения: у чужой пачки заводить детали больше нечем (PLAN F1). */
-fun observedPackageDetails(packageId: Uuid, at: Instant): PackageDetailsStorageEntity =
-    PackageDetailsStorageEntity(packageId = packageId, addedAt = at)
 
 internal fun PackageDetailsStorageEntity.expiry(): ExpiryDate? = expiresOn?.let(::ExpiryDate)

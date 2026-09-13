@@ -1,6 +1,8 @@
 package com.kert0n.medapp.fixture
 
 import com.kert0n.medapp.domain.course.Course
+import com.kert0n.medapp.domain.course.CourseCompletion
+import com.kert0n.medapp.domain.intake.CourseIntake
 import com.kert0n.medapp.domain.course.CourseDraft
 import com.kert0n.medapp.domain.course.CourseMedicine
 import com.kert0n.medapp.domain.course.CourseRecord
@@ -169,3 +171,10 @@ fun source(packageId: Uuid, doses: Int) = source(pack(id = packageId), doses)
 
 /** Препарат курса: пачки в порядке расходования, каждая со своим выделением. */
 fun medicine(vararg sources: CourseSource) = CourseMedicine(sources = sources.toList())
+
+/**
+ * Конец лечения для теста: закрытая запись и отменённые пункты — половины одного события, и
+ * собираются они вместе, как их и принимает хранение (PLAN D5, F5).
+ */
+fun closing(record: CourseRecord, cancelled: List<CourseIntake> = emptyList()): CourseCompletion.Closing =
+    CourseCompletion.Closing(record, cancelled)

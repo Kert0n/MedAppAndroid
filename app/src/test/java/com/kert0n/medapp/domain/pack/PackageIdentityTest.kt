@@ -10,6 +10,7 @@ import com.kert0n.medapp.fixture.TABLET_FORM
 import com.kert0n.medapp.fixture.medKit
 import com.kert0n.medapp.fixture.pack
 import com.kert0n.medapp.fixture.dose
+import com.kert0n.medapp.fixture.left
 import com.kert0n.medapp.fixture.tablets
 
 import java.time.Instant
@@ -28,7 +29,7 @@ class PackageIdentityTest {
     @Test
     fun packWithLessLeftIsTheSamePack() {
         val full = pack(quantity = tablets("20"))
-        val used = full.consume(dose("1"))
+        val used = full.consume(dose("1")).left()
         assertEquals(full, used)
         assertEquals(full.hashCode(), used.hashCode())
     }
@@ -50,24 +51,15 @@ class PackageIdentityTest {
             quantity = tablets("20"),
             addedAt = Instant.EPOCH
         )
-        assertEquals(Package.Lifecycle.ACTIVE, built.lifecycle)
-        assertEquals(Package.Access.AVAILABLE, built.access)
         assertEquals("Парацетамол", built.name)
         assertEquals(TABLET_FORM, built.facts.form)
     }
 
     @Test(expected = IllegalArgumentException::class)
-    fun activePackIsNeverEmpty() {
-        // Инвариант, верный всегда: и при заведении, и при чтении сохранённого состояния.
-        pack(quantity = Quantity.zero(TABLETS), lifecycle = Package.Lifecycle.ACTIVE)
-    }
-
-    @Test
-    fun archivedPackWithNothingLeftIsLegitimate() {
-        val archived =
-            pack(quantity = Quantity.zero(TABLETS), lifecycle = Package.Lifecycle.ARCHIVED)
-        assertTrue(archived.quantity.isZero)
-        assertEquals(Package.Lifecycle.ARCHIVED, archived.lifecycle)
+    fun packIsNeverEmpty() {
+        // Инвариант, верный всегда: и при заведении, и при чтении сохранённого состояния —
+        // кончившаяся коробка удаляется, а не хранится пустой (PLAN D3).
+        pack(quantity = Quantity.zero(TABLETS))
     }
 
     @Test

@@ -2,6 +2,7 @@ package com.kert0n.medapp.storage.course
 
 import androidx.room.withTransaction
 import com.kert0n.medapp.domain.course.Course
+import com.kert0n.medapp.domain.course.CourseCompletion
 import com.kert0n.medapp.domain.course.CourseDraft
 import com.kert0n.medapp.domain.course.CourseDraftProjection
 import com.kert0n.medapp.domain.course.CourseProjection
@@ -11,6 +12,7 @@ import com.kert0n.medapp.domain.course.Revision
 import com.kert0n.medapp.domain.intake.CourseIntake
 import com.kert0n.medapp.domain.intake.IntakeAnswer
 import com.kert0n.medapp.storage.database.MedAppDatabase
+import com.kert0n.medapp.storage.database.observing
 import com.kert0n.medapp.storage.intake.IntakeDao
 import com.kert0n.medapp.storage.intake.toStorageEntity as toIntakeStorageEntity
 import com.kert0n.medapp.storage.value.VocabularyDao
@@ -27,14 +29,14 @@ class CourseRoomRepository @Inject constructor(
 ) : CourseStorageRepository {
 
     override fun observeDrafts(): Flow<List<CourseDraftProjection>> =
-        courses.observeDrafts().map { rows ->
+        database.observing(*PLAN_TABLES) {
             val words = vocabulary.snapshot()
-            rows.map { it.toDraft(words).projection() }
+            courses.drafts().map { it.toDraft(words).projection() }
         }
 
     override fun observePlan(id: Uuid): Flow<CourseProjection?> =
-        courses.observePlan(id).map { row ->
-            row?.takeUnless { it.isDraft }?.toPlan(vocabulary.snapshot())?.projection()
+        database.observing(*PLAN_TABLES) {
+            courses.findPlan(id)?.takeUnless { it.isDraft }?.toPlan(vocabulary.snapshot())?.projection()
         }
 
     override suspend fun findDraft(id: Uuid): CourseDraft? =
@@ -43,12 +45,19 @@ class CourseRoomRepository @Inject constructor(
     override suspend fun findPlan(id: Uuid): Course? =
         courses.findPlan(id)?.takeUnless { it.isDraft }?.toPlan(vocabulary.snapshot())
 
-    override suspend fun saveDraft(draft: CourseDraft): Boolean = database.withTransaction {
+    override suspend fun planIds(): List<Uuid> = courses.planIds()
+
+    override suspend fun saveDraft(draft: CourseDraft, expected: Revision?): Boolean = database.withTransaction {
         val existing = courses.findPlan(draft.id)
         if (existing != null && !existing.isDraft) return@withTransaction false
         // Запись эпизода живёт вечно, а план после конца лечения удаляется: «плана нет» само по
         // себе не значит «черновик ещё можно сохранить».
         if (existing == null && courses.findRecord(draft.id) != null) return@withTransaction false
+        // Новый черновик не ложится поверх существующего, а правка — поверх чужой правки.
+        when (expected) {
+            null -> if (existing != null) return@withTransaction false
+            else -> if (existing == null || existing.course.revision != expected.number) return@withTransaction false
+        }
         courses.saveCourse(
             course = draft.toStorageEntity(),
             times = draft.schedule?.toTimeStorageEntities(draft.id).orEmpty(),
@@ -57,14 +66,23 @@ class CourseRoomRepository @Inject constructor(
         true
     }
 
+    override suspend fun discardDraft(id: Uuid): Boolean = database.withTransaction {
+        val existing = courses.findPlan(id) ?: return@withTransaction false
+        if (!existing.isDraft) return@withTransaction false
+        courses.deleteSourcesOf(id)
+        courses.deleteTimesOf(id)
+        courses.deletePlan(id)
+        true
+    }
+
     override fun observeRecords(): Flow<List<CourseRecordProjection>> =
-        courses.observeRecords().map { rows ->
+        database.observing(*RECORD_TABLES) {
             val words = vocabulary.snapshot()
-            rows.map { it.toDomain(words).projection() }
+            courses.records().map { it.toDomain(words).projection() }
         }
 
     override fun observeRecord(id: Uuid): Flow<CourseRecordProjection?> =
-        courses.observeRecord(id).map { it?.toDomain(vocabulary.snapshot())?.projection() }
+        database.observing(*RECORD_TABLES) { courses.findRecord(id)?.toDomain(vocabulary.snapshot())?.projection() }
 
     override suspend fun findRecord(id: Uuid): CourseRecord? =
         courses.findRecord(id)?.toDomain(vocabulary.snapshot())
@@ -96,6 +114,10 @@ class CourseRoomRepository @Inject constructor(
     }
 
     override suspend fun updateSources(course: Course, expected: Revision): Boolean = database.withTransaction {
+        // Состав правили из редакции, которой уже нет, — например, коробку из него выбросили, и
+        // курс её уже потерял: писать некуда, и исключением это не является (PLAN F5).
+        val stored = courses.findPlan(course.id) ?: return@withTransaction false
+        if (stored.course.revision != expected.number) return@withTransaction false
         val revised = courses.updateAllocations(
             course.toStorageEntity(),
             course.medicine.toSourceStorageEntities(course.id),
@@ -109,14 +131,22 @@ class CourseRoomRepository @Inject constructor(
         true
     }
 
-    override suspend fun setTotalDoses(course: Course, expected: Revision): Boolean =
-        courses.updateTotalDoses(
-            id = course.id,
-            totalDoses = course.totalDoses.count,
-            expected = expected,
-            revision = course.revision,
-            updatedAt = course.updatedAt
+    override suspend fun amend(course: Course, expected: Revision): Boolean = database.withTransaction {
+        val stored = courses.findPlan(course.id) ?: return@withTransaction false
+        if (stored.isDraft || stored.course.revision != expected.number) return@withTransaction false
+        check(courses.sourcePackagesOf(course.id).toSet() == course.sources.map { it.pkg.id }.toSet()) {
+            "изменение лечения не меняет состав пачек: смена состава — updateSources"
+        }
+        val record = checkNotNull(courses.findRecord(course.id)) { "у идущего лечения есть запись эпизода" }
+            .toDomain(vocabulary.snapshot())
+        courses.saveCourse(
+            course = course.toStorageEntity(),
+            times = course.schedule.toTimeStorageEntities(course.id),
+            sources = course.medicine.toSourceStorageEntities(course.id)
         )
+        courses.upsertRecord(record.withPrescription(course.prescription).toStorageEntity())
+        true
+    }
 
     override suspend fun activate(
         activation: CourseDraft.Activation,
@@ -136,13 +166,11 @@ class CourseRoomRepository @Inject constructor(
         Unit
     }
 
-    override suspend fun close(
-        record: CourseRecord,
-        cancelled: List<CourseIntake>
-    ) = database.withTransaction {
+    override suspend fun close(closing: CourseCompletion.Closing) = database.withTransaction {
+        val record = closing.record
         check(!record.isOpen) { "закрывается законченное лечение, а не идущее" }
         courses.upsertRecord(record.toStorageEntity())
-        for (intake in cancelled) {
+        for (intake in closing.cancelled) {
             val cancellation = requireNotNull(intake.answer as? IntakeAnswer.Cancelled) {
                 "конец лечения отменяет пункт, а не отвечает на него"
             }
@@ -151,5 +179,13 @@ class CourseRoomRepository @Inject constructor(
         courses.releaseAssignmentsOf(record.id)
         courses.deleteSourcesOf(record.id)
         courses.deletePlan(record.id)
+    }
+
+    private companion object {
+        /** План или черновик: строка, времена, источники со ссылками на записи о коробках. */
+        val PLAN_TABLES = arrayOf("courses", "course_times", "course_sources", "package_records")
+
+        /** Запись эпизода и времена её назначения. */
+        val RECORD_TABLES = arrayOf("course_records", "course_times")
     }
 }

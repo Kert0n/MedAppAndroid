@@ -12,9 +12,11 @@ import com.kert0n.medapp.storage.course.toSourceStorageEntities
 import com.kert0n.medapp.storage.course.toStorageEntity as toCourseStorageEntity
 import com.kert0n.medapp.storage.database.MedAppDatabase
 import com.kert0n.medapp.storage.database.chunkedForQuery
+import com.kert0n.medapp.storage.database.observing
+import com.kert0n.medapp.domain.pack.PackageAfter
 import com.kert0n.medapp.storage.pack.PackageDao
-import com.kert0n.medapp.storage.pack.toDetailsStorageEntity
-import com.kert0n.medapp.storage.pack.toStorageEntity as toPackageStorageEntity
+import com.kert0n.medapp.storage.pack.end
+import com.kert0n.medapp.storage.pack.save
 import com.kert0n.medapp.storage.value.VocabularyDao
 import com.kert0n.medapp.storage.value.toStorageAmount
 import java.time.Instant
@@ -32,14 +34,12 @@ class IntakeRoomRepository @Inject constructor(
 ) : IntakeStorageRepository {
 
     override fun observeOfCourse(courseId: Uuid): Flow<List<IntakeProjection>> =
-        intakes.observeOfCourse(courseId).map { rows ->
-            val words = vocabulary.snapshot()
-            rows.map { it.toDomain(words).projection() }
-        }
+        database.observing("intakes", "package_records") { ofCourse(courseId).map { it.projection() } }
 
-    override suspend fun ofCourse(courseId: Uuid): List<Intake> {
+    /** Строки и словарь — одной транзакцией: единица, записанная между ними, не потеряется. */
+    override suspend fun ofCourse(courseId: Uuid): List<Intake> = database.withTransaction {
         val words = vocabulary.snapshot()
-        return intakes.ofCourse(courseId).map { it.toDomain(words) }
+        intakes.ofCourse(courseId).map { it.toDomain(words) }
     }
 
     override suspend fun find(id: Uuid): Intake? = intakes.find(id)?.toDomain(vocabulary.snapshot())
@@ -73,7 +73,7 @@ class IntakeRoomRepository @Inject constructor(
         // Пачку читаем до ответа: списывать не из чего — значит и факта не записываем, иначе
         // приём разошёлся бы с остатком.
         val source = if (outcome.spendsLocally) {
-            val taken = requireNotNull(outcome.taken) { "локальный расход называет свою пачку" }
+            val taken = requireNotNull(outcome.taken) { "локальный расход есть только у принятого" }
             packages.find(taken.pkg.id) ?: return@withTransaction false
         } else {
             null
@@ -97,12 +97,15 @@ class IntakeRoomRepository @Inject constructor(
         if (!applied) return@withTransaction false
 
         source?.let {
-            // Расход не трогает обвязку доставки: версия и картина броней остаются прежними (E3).
-            val spent = it.toDomain(vocabulary.snapshot()).consume(requireNotNull(outcome.taken).amount)
-            packages.save(
-                spent.toPackageStorageEntity(it.pack.syncState()),
-                spent.toDetailsStorageEntity()
-            )
+            val words = vocabulary.snapshot()
+            when (val spent = it.toDomain(words).consume(requireNotNull(outcome.taken).amount)) {
+                // Коробка кончилась. Приём и есть учётная запись о расходе: держится он за вечную
+                // запись и конец переживает (PLAN D3, D6). Момент записи, а не ответа: редакцию
+                // курса двигает то, когда мы узнали (PLAN D5).
+                is PackageAfter.Ended -> packages.end(spent.ending, courses, words, outcome.recordedAt)
+                // Расход не трогает обвязку доставки: версия и картина броней остаются прежними (E3).
+                is PackageAfter.Left -> packages.save(spent.pkg, it.pack.syncState())
+            }
         }
         outcome.reallocation?.let { (course, expected) ->
             courses.updateAllocations(

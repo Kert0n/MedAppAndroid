@@ -5,7 +5,7 @@ import androidx.room.Relation
 import com.kert0n.medapp.domain.course.CourseSource
 import com.kert0n.medapp.domain.value.Doses
 import com.kert0n.medapp.domain.value.Vocabulary
-import com.kert0n.medapp.storage.pack.PackageStorageEntity
+import com.kert0n.medapp.storage.pack.PackageRecordStorageEntity
 import com.kert0n.medapp.storage.pack.PackageRefStorageRow
 
 /**
@@ -14,7 +14,7 @@ import com.kert0n.medapp.storage.pack.PackageRefStorageRow
  */
 class CourseSourceStorageRow(
     @Embedded val source: CourseSourceStorageEntity,
-    @Relation(entity = PackageStorageEntity::class, parentColumn = "package_id", entityColumn = "id")
+    @Relation(entity = PackageRecordStorageEntity::class, parentColumn = "package_id", entityColumn = "id")
     val pack: PackageRefStorageRow? = null
 ) {
     fun toDomain(vocabulary: Vocabulary): CourseSource = CourseSource(

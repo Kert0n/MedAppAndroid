@@ -6,14 +6,27 @@ import androidx.room.OnConflictStrategy
 import androidx.room.Query
 import androidx.room.Transaction
 import androidx.room.Upsert
+import com.kert0n.medapp.domain.pack.Package
+import com.kert0n.medapp.domain.pack.PackageEnding
+import com.kert0n.medapp.domain.value.Vocabulary
 import com.kert0n.medapp.network.pack.PackageSnapshot
+import com.kert0n.medapp.network.pack.PackageSyncState
+import com.kert0n.medapp.storage.course.CourseDao
+import com.kert0n.medapp.storage.course.releaseSource
 import java.time.Instant
 import java.time.LocalDate
+import com.kert0n.medapp.domain.pack.PackageStatus
 import kotlin.uuid.Uuid
 import kotlinx.coroutines.flow.Flow
 
 @Dao
 interface PackageDao {
+
+    /** Все живые коробки со сведениями — сводке, которой нужны все сразу (PLAN H6). */
+    @Transaction
+    @Query("SELECT * FROM packages")
+    suspend fun all(): List<PackageStorageRow>
+
 
     @Transaction
     @Query("SELECT * FROM packages WHERE id = :id")
@@ -28,12 +41,21 @@ interface PackageDao {
     suspend fun find(id: Uuid): PackageStorageRow?
 
     /**
-     * Пачка целиком: обе её строки пишутся одной транзакцией, потому что упаковка без личных
-     * сведений — не половина пачки, а несуществующее состояние (PLAN F1, F5).
+     * Пачка целиком: запись о коробке, серверная часть и личные сведения пишутся одной
+     * транзакцией, потому что упаковка без любой из них — не половина пачки, а несуществующее
+     * состояние (PLAN F1, F5). Запись первой: живая строка держится за неё ключом, и снимок
+     * имени, единицы и формы в ней идёт за пачкой.
      */
     @Transaction
-    suspend fun save(pack: PackageStorageEntity, details: PackageDetailsStorageEntity) {
-        require(pack.id == details.packageId) { "строки одной пачки называют один идентификатор" }
+    suspend fun save(
+        record: PackageRecordStorageEntity,
+        pack: PackageStorageEntity,
+        details: PackageDetailsStorageEntity
+    ) {
+        require(pack.id == details.packageId && pack.id == record.id) {
+            "строки одной пачки называют один идентификатор"
+        }
+        upsertRecord(record)
         upsertServerPart(pack)
         upsertDetails(details)
     }
@@ -52,6 +74,18 @@ interface PackageDao {
         observedAt: Instant
     ): SnapshotApplied {
         val known = versionsOf(pack.id)
+        // Местная полка серверу не принадлежит: коробка оказывается на ней, только если её унесли
+        // домой, а сервер ещё не согласился. Переставить или пересчитать её снимок не может. Но у
+        // сервера она пока есть, и команды, поставленные до уноса, ещё доставляются по её версиям:
+        // снимок несёт ей **обе** версии — каждую, если она не старее (PLAN E3, E6). Иначе расход
+        // с бронью переподготавливался бы по устаревшей версии броней без конца.
+        if (liesOnLocalShelf(pack.id)) {
+            if (pack.version.laysOver(known?.version)) setVersion(pack.id, pack.version)
+            if (pack.claimsVersion != null && pack.claimsVersion.laysOver(known?.claimsVersion)) {
+                setClaimsVersion(pack.id, pack.claimsVersion)
+            }
+            return SnapshotApplied(pack = false, claims = false)
+        }
         val packLaysDown = pack.version.laysOver(known?.version)
         val claimsLayDown = pack.claimsVersion != null && pack.claimsVersion.laysOver(known?.claimsVersion)
         if (packLaysDown) writeServerPart(pack, observedAt)
@@ -63,14 +97,48 @@ interface PackageDao {
     }
 
     /**
-     * Недостающая строка деталей создаётся моментом первого наблюдения — обязательное `addedAt`
-     * домена не бывает пустым (PLAN F1).
+     * Серверная часть снимка. Запись о коробке идёт за ней: недостающая — чужая пачка, увиденная
+     * впервые, — заводится моментом наблюдения, а имя, единица и форма переписываются всегда;
+     * личные сведения только создаются пустыми и не трогаются (PLAN E4, F1).
      */
     @Transaction
     suspend fun writeServerPart(pack: PackageStorageEntity, observedAt: Instant) {
+        insertRecordIfMissing(
+            PackageRecordStorageEntity(pack.id, pack.name, pack.quantityUnitId, pack.formId, observedAt)
+        )
+        describeRecord(pack.id, pack.name, pack.quantityUnitId, pack.formId)
+        // Статус — наше неподтверждённое решение, а не сведения сервера: снимок, пришедший, пока
+        // решение ждёт, его не снимает. Снимает его закрытие команды (PLAN E1).
+        val decided = statusOf(pack.id)
         upsertServerPart(pack)
-        insertDetailsIfMissing(observedPackageDetails(pack.id, observedAt))
+        decided?.let { setStatus(pack.id, it) }
+        insertDetailsIfMissing(PackageDetailsStorageEntity(packageId = pack.id))
     }
+
+    @Upsert
+    suspend fun upsertRecord(record: PackageRecordStorageEntity)
+
+    @Insert(onConflict = OnConflictStrategy.IGNORE)
+    suspend fun insertRecordIfMissing(record: PackageRecordStorageEntity)
+
+    /** Снимок в записи идёт за живой пачкой; момент появления остаётся прежним. */
+    @Query("UPDATE package_records SET name = :name, unit_id = :unitId, form_id = :formId WHERE id = :id")
+    suspend fun describeRecord(id: Uuid, name: String, unitId: Uuid, formId: Uuid?)
+
+    @Query(
+        "SELECT EXISTS(SELECT 1 FROM packages p JOIN med_kits k ON k.id = p.med_kit_id " +
+            "WHERE p.id = :id AND k.publication = 'LOCAL')"
+    )
+    suspend fun liesOnLocalShelf(id: Uuid): Boolean
+
+    @Query("UPDATE packages SET version = :version WHERE id = :id")
+    suspend fun setVersion(id: Uuid, version: Long?)
+
+    @Query("SELECT status FROM packages WHERE id = :id")
+    suspend fun statusOf(id: Uuid): PackageStatus?
+
+    @Query("UPDATE packages SET status = :status WHERE id = :id")
+    suspend fun setStatus(id: Uuid, status: PackageStatus)
 
     @Query("SELECT version, claims_version FROM packages WHERE id = :id")
     suspend fun versionsOf(id: Uuid): PackageVersionsStorageRow?
@@ -94,10 +162,10 @@ interface PackageDao {
     @Query(
         """
         SELECT p.* FROM packages p
+        JOIN package_records r ON r.id = p.id
         JOIN package_details d ON d.package_id = p.id
         LEFT JOIN active_package_assignments a ON a.package_id = p.id
-        WHERE (:includeArchived OR p.lifecycle = 'ACTIVE')
-          AND (:medKitId IS NULL OR p.med_kit_id = :medKitId)
+        WHERE (:medKitId IS NULL OR p.med_kit_id = :medKitId)
           AND (:text = '' OR p.name_search LIKE '%' || :text || '%')
           AND (
             :filter = 'NONE'
@@ -116,7 +184,7 @@ interface PackageDao {
           CASE WHEN d.expires_on IS NOT NULL AND d.expires_on < :today THEN 0 ELSE 1 END,
           CASE WHEN :sort = 'EXPIRY' THEN (d.expires_on IS NULL) END,
           CASE WHEN :sort = 'EXPIRY' THEN d.expires_on END,
-          CASE WHEN :sort = 'ADDED_AT' THEN -d.added_at END,
+          CASE WHEN :sort = 'ADDED_AT' THEN -r.added_at END,
           CASE WHEN :sort = 'QUANTITY' THEN p.quantity_unit_id END,
           CASE WHEN :sort = 'QUANTITY' THEN p.quantity_sort END,
           p.name_search
@@ -130,8 +198,7 @@ interface PackageDao {
         until: LocalDate?,
         category: String?,
         formId: Uuid?,
-        sort: String,
-        includeArchived: Boolean
+        sort: String
     ): List<PackageStorageRow>
 
     @Upsert
@@ -168,14 +235,45 @@ interface PackageDao {
     )
     suspend fun allocationsOf(packageIds: List<Uuid>): List<PackageAllocationRow>
 
+    /**
+     * Живая строка уходит и уносит свои части каскадом — сведения и брони (PLAN F2). Запись о
+     * коробке и всё, что за неё держится, остаются. Ноль строк значит «пачки и так нет».
+     *
+     * **Зовётся только из [end].** Сама по себе строка — половина конца: без следа остаток
+     * пропадает без объяснения, а без доменного перехода лечение теряет источник мимо своей же
+     * редакции.
+     */
     @Query("DELETE FROM packages WHERE id = :id")
-    suspend fun delete(id: Uuid)
+    suspend fun delete(id: Uuid): Int
+
+    /**
+     * Коробки, о которых сервер знает и по которым нечего ждать: без серверной версии он о коробке
+     * ещё не слышал, а помеченная ждёт ответа на своё решение — её отсутствие в снимке объяснит
+     * он, а не снимок (PLAN E4).
+     */
+    @Query(
+        "SELECT p.id FROM packages p JOIN med_kits k ON k.id = p.med_kit_id " +
+            "WHERE k.publication = 'PUBLISHED' AND p.version IS NOT NULL AND p.status = 'ACTIVE'"
+    )
+    suspend fun knownToServer(): List<Uuid>
+
+    /** Все живые коробки — чтобы снимок не вернул убранную, пока он летел (PLAN C0, E4). */
+    @Query("SELECT id FROM packages")
+    suspend fun held(): List<Uuid>
+
+    @Transaction
+    @Query("SELECT * FROM packages WHERE med_kit_id = :medKitId ORDER BY name")
+    suspend fun ofMedKit(medKitId: Uuid): List<PackageStorageRow>
 }
 
 /**
  * Снимок пачки, разрешённый в домен, — в базу. Единственная дверь: половины расходятся только
  * тут, и только по своим версиям, поэтому версия картины броней всегда описывает ту картину,
- * что лежит рядом (PLAN B3, E1).
+ * что лежит рядом (PLAN B3, E1). Серверное число ложится только через неё — полным снимком,
+ * чтением перед отправкой или ответом на команду; чужое изменение просто становится нашим
+ * числом, истории у коробки нет (D7).
+ *
+ * Зовётся внутри уже открытой транзакции того, кто снимок кладёт.
  */
 suspend fun PackageDao.applySnapshot(snapshot: PackageSnapshot, observedAt: Instant): SnapshotApplied =
     applySnapshot(
@@ -183,6 +281,28 @@ suspend fun PackageDao.applySnapshot(snapshot: PackageSnapshot, observedAt: Inst
         snapshot.pack.claims?.toStorageEntity(snapshot.pack.id),
         observedAt
     )
+
+/**
+ * Пачка целиком: запись о коробке, живая строка и личные сведения собираются из одной сущности.
+ * Порознь их не бывает, и раскладывать пачку на три строки каждому вызывающему незачем (PLAN F1).
+ */
+suspend fun PackageDao.save(pkg: Package, sync: PackageSyncState = PackageSyncState(pkg.id)) =
+    save(pkg.record.toStorageEntity(), pkg.toStorageEntity(sync), pkg.toDetailsStorageEntity())
+
+/**
+ * Конец коробки — **одно место на всё приложение**: расход, утилизация, пересчёт в ноль,
+ * выбрасывание, утрата доступа и «на сервере её нет» приходят сюда одним значением [PackageEnding].
+ *
+ * Источник снимается доменным переходом каждого лечения, которое коробку держало, — с ростом
+ * редакции, — потому что состав курса не меняется мимо самого курса (PLAN D5, F5); строка уходит
+ * последней, а запись о коробке остаётся: за неё держатся приёмы (D3).
+ *
+ * Зовётся внутри уже открытой транзакции того сценария, который коробку и кончает.
+ */
+suspend fun PackageDao.end(ending: PackageEnding, courses: CourseDao, vocabulary: Vocabulary, at: Instant) {
+    courses.releaseSource(ending.pkg.ref, vocabulary, at)
+    delete(ending.record.id)
+}
 
 /**
  * Ложится ли пришедшая версия поверх известной: запоздалый снимок свежий не перекрывает

@@ -1,9 +1,7 @@
 package com.kert0n.medapp.domain.pack
 
 import com.kert0n.medapp.domain.value.Quantity
-import java.time.Instant
 import java.time.LocalDate
-import java.time.ZoneId
 import kotlin.uuid.Uuid
 
 /**
@@ -15,18 +13,13 @@ import kotlin.uuid.Uuid
  * [effective] — число, которое считает очередь: подтверждённый остаток с незакрытыми командами
  * поверх (E1). Число есть всегда: истина по количеству — сервер, а до ответа устройство знает
  * то, что само отправило.
- *
- * Допуск пачки к обеспечению [suppliesStock] едет сюда вместе с ней: последнее известное
- * количество утраченной или выброшенной пачки остаётся видимым, но доступным запасом она быть
- * перестаёт. Иначе снятие броней вместе с доступом делало бы «свободно» даже больше.
  */
 data class PackageAvailability(
     val packageId: Uuid,
     val expiresOn: ExpiryDate?,
     val effective: Quantity,
     val reservedByOthers: Quantity,
-    val myAllocation: Quantity,
-    val suppliesStock: Boolean = true
+    val myAllocation: Quantity
 ) {
 
     constructor(
@@ -39,8 +32,7 @@ data class PackageAvailability(
         effective = effective,
         reservedByOthers = pkg.claims?.let { Quantity(it.reservedByOthers, pkg.quantity.unit) }
             ?: Quantity.zero(pkg.quantity.unit),
-        myAllocation = myAllocation,
-        suppliesStock = pkg.suppliesStock
+        myAllocation = myAllocation
     )
 
     init {
@@ -49,52 +41,14 @@ data class PackageAvailability(
         require(myAllocation.unit == unit) { "выделение измеряется единицей пачки" }
     }
 
-    /**
-     * Сколько могу взять я: вычитается только чужое, свою бронь я заявил сам. Из пачки, которая
-     * запаса не обеспечивает, взять нельзя нисколько.
-     */
-    val availableToMe: Quantity
-        get() =
-            if (suppliesStock) effective.minusOrZero(reservedByOthers)
-            else Quantity.zero(effective.unit)
+    /** Сколько могу взять я: вычитается только чужое, свою бронь я заявил сам. */
+    val availableToMe: Quantity get() = effective.minusOrZero(reservedByOthers)
 
     /**
      * Свободно любому: доступное мне без моего выделения. Считается не от суммы броней: моя
      * серверная бронь отстаёт от локального выделения на то, что ещё не уехало (D4).
      */
     val freeForAnyone: Quantity get() = availableToMe.minusOrZero(myAllocation)
-
-    /**
-     * Что останется к концу [date] в зоне отчёта, если до этого момента из пачки уйдёт [spent].
-     *
-     * Сколько уйдёт — считают курсы: сколько приёмов впереди и чем они обеспечены, знают они, а
-     * пачке остаётся вычесть названное число. Дата **включительна**: момент прогноза — начало
-     * следующих суток в зоне отчёта, и приёмы этого дня уже вычтены.
-     *
-     * Горизонт — не дальше трёх календарных месяцев (ТЗ 4.1.1.10): дальше расписание и остатки
-     * значат слишком мало, чтобы обещать число.
-     */
-    fun forecastOn(
-        date: LocalDate,
-        reportZone: ZoneId,
-        now: Instant,
-        spent: Quantity = Quantity.zero(effective.unit)
-    ): PackageForecast {
-        // `atZone().toLocalDate()`: `LocalDate.ofInstant` требует API 34 при нижней границе 29.
-        val todayThere = now.atZone(reportZone).toLocalDate()
-        require(!date.isBefore(todayThere)) { "прогноз считается вперёд, а не назад: $date" }
-        require(!date.isAfter(todayThere.plusMonths(PackageForecast.MAX_MONTHS))) {
-            "горизонт прогноза — ${PackageForecast.MAX_MONTHS} календарных месяца, запрошено $date"
-        }
-        return PackageForecast(
-            packageId = packageId,
-            at = date.plusDays(1).atStartOfDay(reportZone).toInstant(),
-            remaining = effective.minusOrZero(spent),
-            reservedByOthers = reservedByOthers,
-            // Просрочка помечается на дату отчёта: к третьему месяцу годной пачка быть перестанет.
-            expired = isExpiredOn(date)
-        )
-    }
 
     /** Просрочка только помечает: количество не списывается, пачка остаётся источником. */
     fun isExpiredOn(date: LocalDate): Boolean = expiresOn?.isExpiredOn(date) == true

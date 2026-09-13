@@ -27,7 +27,8 @@ class IntakeOutcomeTest {
     private fun outcome(sync: IntakeSyncState) = IntakeOutcome(
         intake = confirmed(),
         expected = setOf(IntakeStatus.PLANNED),
-        sync = sync
+        sync = sync,
+        recordedAt = LATER
     )
 
     /** Уехавший командой расход локальный остаток не трогает; локальный — трогает. */
@@ -41,10 +42,10 @@ class IntakeOutcomeTest {
     @Test
     fun theTransitionNamesItsOriginAndIsNotATransitionToItself() {
         assertThrows(IllegalArgumentException::class.java) {
-            IntakeOutcome(confirmed(), expected = emptySet(), sync = IntakeSyncState(INTAKE, IntakeAccounting.LOCAL_APPLIED))
+            IntakeOutcome(confirmed(), expected = emptySet(), sync = IntakeSyncState(INTAKE, IntakeAccounting.LOCAL_APPLIED), recordedAt = LATER)
         }
         assertThrows(IllegalArgumentException::class.java) {
-            IntakeOutcome(confirmed(), expected = setOf(IntakeStatus.TAKEN), sync = IntakeSyncState(INTAKE, IntakeAccounting.LOCAL_APPLIED))
+            IntakeOutcome(confirmed(), expected = setOf(IntakeStatus.TAKEN), sync = IntakeSyncState(INTAKE, IntakeAccounting.LOCAL_APPLIED), recordedAt = LATER)
         }
     }
 

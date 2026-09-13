@@ -2,11 +2,9 @@ package com.kert0n.medapp.network.pack
 
 import com.kert0n.medapp.network.server.ResourceVersion
 import com.kert0n.medapp.domain.pack.PackageSharedFacts
-import com.kert0n.medapp.domain.value.Quantity
 
 
 import com.kert0n.medapp.fixture.PACK
-import com.kert0n.medapp.fixture.TABLETS
 import com.kert0n.medapp.fixture.TABLET_FORM
 import com.kert0n.medapp.fixture.pack
 
@@ -50,11 +48,6 @@ class PackagePostNetworkMapperTest {
     @Test
     fun postAcceptsTheSmallestPositiveAmount() {
         assertEquals("0.000001", onServer.toPostNetworkDTO().copy(amount = "0.000001").amount)
-    }
-
-    @Test(expected = IllegalArgumentException::class)
-    fun exhaustedPackCannotBecomeACreationRequest() {
-        onServer.correctTo(Quantity.zero(TABLETS)).toPostNetworkDTO()
     }
 
     @Test

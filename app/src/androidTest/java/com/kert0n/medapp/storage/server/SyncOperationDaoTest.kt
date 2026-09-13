@@ -117,8 +117,8 @@ class SyncOperationDaoTest {
     /** Порядок по одной упаковке строится запросом: команды аптечки в него не попадают. */
     @Test
     fun orderOfOnePackageIsAQueryAndNotADomainFunction() = runTest {
-        queue.enqueue(first, PackageSyncCommand.CorrectStock(PACK, tablets("10")), createdAt)
-        queue.enqueue(second, MedKitSyncCommand.Create(HOME_KIT), createdAt)
+        queue.enqueue(first, PackageSyncCommand.CorrectStock(PACK, tablets("20"), tablets("10")), createdAt)
+        queue.enqueue(second, MedKitSyncCommand.Publish(HOME_KIT), createdAt)
         queue.enqueue(third, PackageSyncCommand.ReleaseClaim(PACK), createdAt)
 
         val ofPack = queue.ofPackage(PACK).map { it.operation.id }
@@ -126,9 +126,50 @@ class SyncOperationDaoTest {
         assertNull(queue.find(second)!!.operation.packageId)
     }
 
+    /**
+     * Полка ждёт свои коробки, коробки ждут полку: уборка ждёт расход, поставленный на её коробку
+     * раньше, а расход другой коробки той же полки, поставленный позже, ждёт уборку. Чужая полка не
+     * ждёт никого (PLAN E3).
+     *
+     * Красная проверка: порядок только по пачке пропускает полку раньше расхода.
+     */
+    @Test
+    fun theShelfWaitsForItsBoxesAndTheBoxesWaitForTheShelf() = runTest {
+        val elsewhere = Uuid.random()
+        queue.enqueue(first, PackageSyncCommand.Consume(PACK, dose("2"), INTAKE), createdAt, medKitId = SHARED_KIT)
+        queue.enqueue(second, MedKitSyncCommand.Delete(SHARED_KIT), createdAt)
+        queue.enqueue(third, PackageSyncCommand.Consume(OTHER_PACK, dose("1"), INTAKE), createdAt, medKitId = SHARED_KIT)
+        queue.enqueue(elsewhere, PackageSyncCommand.CorrectStock(Uuid.random(), tablets("20"), tablets("3")), createdAt, medKitId = HOME_KIT)
+
+        assertEquals(listOf(first, elsewhere), queue.ready(createdAt.plusSeconds(60)).map { it.operation.id })
+        queue.settle(first, SyncOperationStatus.APPLIED, null, createdAt, attempted = 0)
+        assertEquals(listOf(second, elsewhere), queue.ready(createdAt.plusSeconds(60)).map { it.operation.id })
+        queue.settle(second, SyncOperationStatus.APPLIED, null, createdAt, attempted = 0)
+        assertEquals(listOf(third, elsewhere), queue.ready(createdAt.plusSeconds(60)).map { it.operation.id })
+    }
+
+    /**
+     * Команды **двух разных коробок** одной полки друг друга не ждут: сервер их не связывает, и
+     * при связи они уезжают одним проходом (PLAN E1, E3). Коробка, отложенная до своего срока,
+     * соседнюю тоже не держит.
+     *
+     * Красная проверка: порядок по всей полке отдаёт одну команду вместо двух.
+     */
+    @Test
+    fun twoBoxesOfOneShelfDoNotWaitForEachOther() = runTest {
+        queue.enqueue(first, PackageSyncCommand.Consume(PACK, dose("2"), INTAKE), createdAt, medKitId = SHARED_KIT)
+        queue.enqueue(second, PackageSyncCommand.Consume(OTHER_PACK, dose("1"), INTAKE), createdAt, medKitId = SHARED_KIT)
+
+        assertEquals(listOf(first, second), queue.ready(createdAt.plusSeconds(60)).map { it.operation.id })
+
+        queue.settle(first, SyncOperationStatus.PENDING, "обрыв", createdAt, attempted = 1, notBefore = createdAt.plusSeconds(300))
+
+        assertEquals(listOf(second), queue.ready(createdAt.plusSeconds(60)).map { it.operation.id })
+    }
+
     @Test
     fun dependenciesTravelInTheirOwnTable() = runTest {
-        queue.enqueue(first, MedKitSyncCommand.Create(HOME_KIT), createdAt)
+        queue.enqueue(first, MedKitSyncCommand.Publish(HOME_KIT), createdAt)
         queue.enqueue(
             second,
             PackageSyncCommand.Create(PACK, HOME_KIT, tablets("20"), pack().facts.shared),
@@ -150,7 +191,7 @@ class SyncOperationDaoTest {
 
     @Test
     fun preparedRequestIsStoredWholeIncludingPreconditions() = runTest {
-        queue.enqueue(first, PackageSyncCommand.CorrectStock(PACK, tablets("10")), createdAt)
+        queue.enqueue(first, PackageSyncCommand.CorrectStock(PACK, tablets("20"), tablets("10")), createdAt)
         val prepared = PreparedRequest(
             method = "PATCH",
             path = "/drugs/$PACK",
@@ -242,7 +283,7 @@ class SyncOperationDaoTest {
     @Test
     fun nextDueAtSeesOnlyUnclosedOperationsWithATermStillAhead() = runTest {
         queue.enqueue(first, PackageSyncCommand.Delete(PACK), createdAt)
-        queue.enqueue(second, PackageSyncCommand.CorrectStock(PACK, tablets("10")), createdAt)
+        queue.enqueue(second, PackageSyncCommand.CorrectStock(PACK, tablets("20"), tablets("10")), createdAt)
         queue.enqueue(third, MedKitSyncCommand.Leave(SHARED_KIT), createdAt)
         queue.settle(first, SyncOperationStatus.PENDING, "429", createdAt, attempted = 1, notBefore = createdAt.plusSeconds(30))
         queue.settle(second, SyncOperationStatus.PENDING, "обрыв", createdAt, attempted = 1, notBefore = createdAt.plusSeconds(10))
@@ -256,7 +297,7 @@ class SyncOperationDaoTest {
     /** Незакрытые — те, чей исход ещё не установлен: свёртка остатка берёт именно их (PLAN E1). */
     @Test
     fun unclosedOperationsExcludeTheSettledOnes() = runTest {
-        queue.enqueue(first, PackageSyncCommand.CorrectStock(PACK, tablets("10")), createdAt)
+        queue.enqueue(first, PackageSyncCommand.CorrectStock(PACK, tablets("20"), tablets("10")), createdAt)
         queue.enqueue(second, PackageSyncCommand.Consume(PACK, dose("1"), INTAKE), createdAt)
         queue.settle(first, SyncOperationStatus.APPLIED)
 

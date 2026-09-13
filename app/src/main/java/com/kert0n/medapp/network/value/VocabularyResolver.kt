@@ -38,20 +38,41 @@ class VocabularyResolver @Inject constructor(
      * Второй промах после свежего словаря — не задержка, а запись, называющая то, чего сервер не
      * знает; она отдаётся как [Resolution.Unresolved] с той же причиной.
      */
-    suspend fun <T> resolve(read: (Vocabulary) -> T): Resolution<T> {
-        val miss = try {
-            return Resolution.Resolved(read(store.snapshot()))
-        } catch (missed: VocabularyMiss) {
-            missed
+    suspend fun <T> resolve(read: (Vocabulary) -> T): Resolution<T> = session().resolve(read)
+
+    /** Заход разбора многих записей — снимка, прохода очереди, — в котором словарь дочитывается один раз. */
+    fun session(): Session = Session()
+
+    /**
+     * Один заход разбора. Сколько бы записей в нём ни промахнулось, словарь дочитывается **не
+     * больше раза**: промах второй записи после дочитанного словаря — уже не «снимок устарел», а
+     * повторять чтение, не удавшееся без связи, в том же заходе незачем.
+     */
+    inner class Session internal constructor() {
+
+        private var refreshed: ApiResult<Vocabulary>? = null
+
+        /** Дочитать словарь, если в этом заходе ещё не дочитывали; `true` — дочитан сейчас и успешно. */
+        suspend fun refreshOnce(): Boolean {
+            if (refreshed != null) return false
+            return refresh().also { refreshed = it } is ApiResult.Success
         }
-        val fresh = when (val refreshed = refresh()) {
-            is ApiResult.Failure -> return Resolution.Unresolved(miss, refreshed.failure)
-            is ApiResult.Success -> refreshed.value
-        }
-        return try {
-            Resolution.Resolved(read(fresh))
-        } catch (missed: VocabularyMiss) {
-            Resolution.Unresolved(missed, failure = null)
+
+        suspend fun <T> resolve(read: (Vocabulary) -> T): Resolution<T> {
+            val miss = try {
+                return Resolution.Resolved(read(store.snapshot()))
+            } catch (missed: VocabularyMiss) {
+                missed
+            }
+            refreshOnce()
+            return when (val result = checkNotNull(refreshed)) {
+                is ApiResult.Failure -> Resolution.Unresolved(miss, result.failure)
+                is ApiResult.Success -> try {
+                    Resolution.Resolved(read(store.snapshot()))
+                } catch (missed: VocabularyMiss) {
+                    Resolution.Unresolved(missed, failure = null)
+                }
+            }
         }
     }
 

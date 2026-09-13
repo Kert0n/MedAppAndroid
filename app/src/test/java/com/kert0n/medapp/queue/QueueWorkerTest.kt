@@ -24,6 +24,8 @@ import com.kert0n.medapp.fixture.TABLET_FORM
 import com.kert0n.medapp.fixture.dose
 import com.kert0n.medapp.fixture.tablets
 import com.kert0n.medapp.network.pack.PackageSnapshotNetworkDTO
+import com.kert0n.medapp.queue.medkit.MedKitSyncCommand
+import com.kert0n.medapp.queue.medkit.toPreparedRequest
 import com.kert0n.medapp.queue.pack.PackageSyncCommand
 import com.kert0n.medapp.network.pack.PackageSyncState
 import com.kert0n.medapp.queue.pack.toPreparedRequest
@@ -137,10 +139,15 @@ class QueueWorkerTest {
             fresh?.let(::learn)
             val prepared = operation.prepared ?: run {
                 frozen++
-                when (val prepared = (operation.command as PackageSyncCommand).prepare(operation.id, knownPack, known, at)) {
-                    is Preparation.Request -> prepared.request
-                    is Preparation.Refuse -> return Take.Closed(Delivery.Refused(prepared.reason, PackageState.None)).also { settle(id, it.delivery.settlement(operation.command), at) }
-                    Preparation.AlreadyApplied -> return Take.Closed(Delivery.Applied(PackageState.None)).also { settle(id, it.delivery.settlement(operation.command), at) }
+                when (val command = operation.command) {
+                    // У аптечки предусловий нет: замораживать нечего, кроме самого пути.
+                    is MedKitSyncCommand -> command.toPreparedRequest(at)
+                    is PackageSyncCommand -> when (val prepared = command.prepare(operation.id, knownPack, known, at)) {
+                        is Preparation.Request -> prepared.request
+                        is Preparation.Refuse -> return Take.Closed(Delivery.Refused(prepared.reason, PackageState.None)).also { settle(id, it.delivery.settlement(operation.command), at) }
+                        Preparation.AlreadyApplied -> return Take.Closed(Delivery.Applied(PackageState.None)).also { settle(id, it.delivery.settlement(operation.command), at) }
+                    }
+                    else -> command.unknownRoot()
                 }
             }
             // Операция, найденная в отправке, — прошлый полёт умер вместе с процессом: исход неизвестен.
@@ -166,7 +173,7 @@ class QueueWorkerTest {
         }
 
 
-        override suspend fun enqueue(queued: QueuedCommand, at: Instant): SyncOperation =
+        override suspend fun enqueue(queued: QueuedCommand, shelf: kotlin.uuid.Uuid, at: Instant): SyncOperation =
             error("работник команд не ставит")
 
         override suspend fun settle(id: Uuid, settlement: Settlement, at: Instant) {
@@ -200,7 +207,8 @@ class QueueWorkerTest {
             val state = effects.firstNotNullOfOrNull {
                 when (it) {
                     is Settlement.Effect.LayDown -> PackageState.Present(it.snapshot)
-                    is Settlement.Effect.PackageGone -> PackageState.Gone
+                    // «Ушла туда, где нас нет» и «её нет» для базы одно и то же: коробка кончается.
+                    is Settlement.Effect.PackageEnded -> PackageState.Gone
                     else -> null
                 }
             } ?: PackageState.None
@@ -252,6 +260,15 @@ class QueueWorkerTest {
             snapshots++
             val answer = if (snapshots == 1) fresh ?: snapshotAnswer else snapshotAnswer ?: fresh
             return requireNotNull(answer) { "снимок в этом тесте не ожидался" }
+        }
+
+        /** Чем кончится проверка занятого номера аптечки; счётчик — чтобы видеть, что её сделали. */
+        var medKitIsOurs: ApiResult<Boolean> = ApiResult.Success(true)
+        var medKitReads = 0
+
+        override suspend fun medKitIsOurs(medKitId: Uuid): ApiResult<Boolean> {
+            medKitReads++
+            return medKitIsOurs
         }
     }
 
@@ -568,22 +585,113 @@ class QueueWorkerTest {
         assertEquals(SyncOperationStatus.REFUSED, storage.operations.getValue(INTAKE).status)
     }
 
-    /** Чужая правка перекрыла описание: отказ с названной причиной, истина прочитана, человек смотрит заново. */
+    /**
+     * 412 у правки сведений — гонка: сосед выпил таблетку между чтением и отправкой. Истина
+     * читается, правка готовится заново своими полями поверх неё и уходит тем же проходом — чужой
+     * приём решение человека не сбрасывает (C1 «Действие над общей пачкой — разница»).
+     */
     @Test
-    fun staleDescriptionIsRefusedWithTheReasonNamedAndTheTruthRead() = runTest {
+    fun staleDescriptionIsRepreparedOverTheFreshTruth() = runTest {
         val describe = PackageSyncCommand.Describe(
             PACK,
             com.kert0n.medapp.domain.pack.PackageSharedFacts("Парацетамол", TABLET_FORM),
             com.kert0n.medapp.domain.pack.PackageSharedFacts("Парацетамол 500", TABLET_FORM)
         )
         val storage = Storage(listOf(operation(describe)))
-        val transport = transport { ApiResult.Failure(ApiFailure.PreconditionFailed) }
-        transport.snapshotAnswer = ApiResult.Success(snapshot)
+        var attempts = 0
+        val transport = transport(fresh = snapshotWithVersion(3)) {
+            attempts++
+            if (attempts == 1) ApiResult.Failure(ApiFailure.PreconditionFailed) else ApiResult.Success(RawResponse(200, snapshotJson.replace("\"version\":4", "\"version\":8")))
+        }
+        transport.snapshotAnswer = ApiResult.Success(snapshotWithVersion(7))
 
         worker(storage, transport).drain()
 
-        assertEquals(Delivery.Refused(RefusalReason.STALE, PackageState.Present(resolved(snapshot))), storage.settled.single().second)
+        assertEquals(Delivery.Stale(resolved(snapshotWithVersion(7))), storage.settled[0].second)
+        assertEquals(Delivery.Applied(PackageState.Present(resolved(snapshotWithVersion(8)))), storage.settled[1].second)
+        assertEquals(listOf(ResourceVersion(3), ResourceVersion(7)), transport.sent.map { it.drugVersion })
+        assertTrue(transport.sent.all { it.body!!.contains("Парацетамол 500") })
+        assertEquals(SyncOperationStatus.APPLIED, storage.operations.getValue(INTAKE).status)
+    }
+
+    /**
+     * Сосед переименовал коробку иначе: то же поле изменено иначе, соотнести нельзя — подготовка
+     * закрывает операцию отказом `CONFLICT`, и человек описывает ситуацию заново (C1).
+     */
+    @Test
+    fun aDescriptionTheNeighbourChangedDifferentlyIsAConflictAtPreparation() = runTest {
+        val describe = PackageSyncCommand.Describe(
+            PACK,
+            com.kert0n.medapp.domain.pack.PackageSharedFacts("Парацетамол", TABLET_FORM),
+            com.kert0n.medapp.domain.pack.PackageSharedFacts("Парацетамол 500", TABLET_FORM)
+        )
+        val storage = Storage(listOf(operation(describe)))
+        val renamed = medAppJson.decodeFromString(
+            PackageSnapshotNetworkDTO.serializer(),
+            snapshotJson.replace("Парацетамол", "Панадол")
+        )
+        val transport = transport(fresh = renamed) { error("несводимая правка на провод не идёт") }
+
+        worker(storage, transport).drain()
+
+        assertTrue(transport.sent.isEmpty())
+        assertEquals(Delivery.Refused(RefusalReason.CONFLICT, PackageState.None), storage.settled.single().second)
         assertEquals(SyncOperationStatus.REFUSED, storage.operations.getValue(INTAKE).status)
+    }
+
+    /**
+     * Пересчёт — разница поверх свежего числа: видел 20, назвал 17, а свежее чтение принесло 17 —
+     * уходит 14. Ниже нуля свести нельзя: видел 20, назвал 2, а прочитано 17 — отказ подготовки.
+     */
+    @Test
+    fun aRecountLaysItsDifferenceOverTheFreshNumberOrConflicts() = runTest {
+        val recount = PackageSyncCommand.CorrectStock(PACK, seen = tablets("20"), actual = tablets("17"))
+        val storage = Storage(listOf(operation(recount)))
+        val transport = transport(fresh = snapshotWithVersion(3)) {
+            ApiResult.Success(RawResponse(200, snapshotJson.replace("17.000000", "14.000000")))
+        }
+
+        worker(storage, transport).drain()
+
+        assertTrue(transport.sent.single().body!!.contains("\"quantity\":\"14"))
+        assertEquals(SyncOperationStatus.APPLIED, storage.operations.getValue(INTAKE).status)
+
+        val tooMuch = PackageSyncCommand.CorrectStock(PACK, seen = tablets("20"), actual = tablets("2"))
+        val refusing = Storage(listOf(operation(tooMuch)))
+        val silent = transport(fresh = snapshotWithVersion(3)) { error("несводимый пересчёт на провод не идёт") }
+
+        worker(refusing, silent).drain()
+
+        assertTrue(silent.sent.isEmpty())
+        assertEquals(Delivery.Refused(RefusalReason.CONFLICT, PackageState.None), refusing.settled.single().second)
+    }
+
+    /**
+     * Пересчёт 20 → 17 уехал, ответ потерян, повтор получил 412: у сервера 17 — ровно то, к чему вёл
+     * запрос. Это применение, а не гонка: переподготовленная разница легла бы поверх себя, 17 → 14.
+     * Если же число не то — гонка, и разница кладётся заново.
+     */
+    @Test
+    fun aRecountWithALostAnswerThatAlreadyLandedIsNotAppliedTwice() = runTest {
+        val recount = PackageSyncCommand.CorrectStock(PACK, seen = tablets("20"), actual = tablets("17"))
+        val frozen = recount.toPreparedRequest(INTAKE, PackageSyncState(PACK, ResourceVersion(3)), tablets("20"), null, EARLIER)
+        val lost = Storage(listOf(operation(recount, status = SyncOperationStatus.SENDING, attempts = 1, prepared = frozen, outcomeUnknown = true)))
+        val refusing = Transport { ApiResult.Failure(ApiFailure.PreconditionFailed) }
+        refusing.snapshotAnswer = ApiResult.Success(snapshot) // у сервера 17
+
+        worker(lost, refusing).drain()
+
+        assertEquals(1, refusing.sent.size)
+        assertEquals(Delivery.Applied(PackageState.Present(resolved(snapshot))), lost.settled.single().second)
+
+        // Первая отправка по свежим 17 ведёт к 14, и 412 застаёт те же 17: запрос не применялся.
+        val raced = Storage(listOf(operation(recount)))
+        val again = transport(fresh = snapshot) { ApiResult.Failure(ApiFailure.PreconditionFailed) }
+        again.snapshotAnswer = ApiResult.Success(snapshot)
+
+        worker(raced, again).drain()
+
+        assertEquals(Delivery.Stale(resolved(snapshot)), raced.settled.first().second)
     }
 
     @Test
@@ -781,6 +889,73 @@ class QueueWorkerTest {
         assertEquals(SyncOperationStatus.APPLIED, storage.operations.getValue(INTAKE).status)
     }
 
+    /**
+     * 404 на создании — не стало **полки**, куда коробку кладут: сосед удалил её, пока команда
+     * ждала связи. Сама коробка при этом лежит у человека дома, поэтому это отказ, а не утрата
+     * доступа, и коробка возвращается на ту полку, с которой её принесли (PLAN E6).
+     */
+    @Test
+    fun aBoxWhoseTargetShelfIsGoneComesBackInsteadOfEnding() = runTest {
+        val create = PackageSyncCommand.Create(
+            PACK, SHARED_KIT, tablets("20"),
+            com.kert0n.medapp.domain.pack.PackageSharedFacts("Парацетамол", TABLET_FORM),
+            fromMedKitId = HOME_KIT
+        )
+        val storage = Storage(listOf(operation(create)))
+        val transport = Transport { ApiResult.Failure(ApiFailure.NotFound) }
+
+        worker(storage, transport).drain()
+
+        val settlement = storage.settled.single().second.settlement(create)
+        assertEquals(Delivery.Refused(RefusalReason.STALE, PackageState.None), storage.settled.single().second)
+        assertTrue(
+            "коробка не возвращена: ${settlement.effects}",
+            Settlement.Effect.Returned(PACK, HOME_KIT) in settlement.effects
+        )
+    }
+
+    /**
+     * 409 на команде аптечки — номер занят, и сам по себе он не значит «наше»: аптечка читается, и
+     * только увиденная своя делает желаемое сбывшимся (PLAN C0, E3).
+     */
+    @Test
+    fun aTakenMedKitIdentifierIsExplainedByReadingIt() = runTest {
+        val storage = Storage(listOf(operation(MedKitSyncCommand.Publish(HOME_KIT))))
+        val transport = Transport { ApiResult.Failure(ApiFailure.Conflict) }
+
+        worker(storage, transport).drain()
+
+        assertEquals(1, transport.medKitReads)
+        assertEquals(Delivery.Applied(PackageState.None), storage.settled.single().second)
+    }
+
+    /**
+     * Номер занят чужой полкой. Объявить это успешной публикацией нельзя: мы начали бы класть
+     * коробки в полку, которой не видим (PLAN C0).
+     */
+    @Test
+    fun aMedKitIdentifierTakenBySomebodyElseIsRefused() = runTest {
+        val storage = Storage(listOf(operation(MedKitSyncCommand.Publish(HOME_KIT))))
+        val transport = Transport { ApiResult.Failure(ApiFailure.Conflict) }
+        transport.medKitIsOurs = ApiResult.Success(false)
+
+        worker(storage, transport).drain()
+
+        assertEquals(Delivery.Refused(RefusalReason.INVALID, PackageState.None), storage.settled.single().second)
+    }
+
+    /** Проверку не дочитали — повтор тем же запросом: он снова даст 409, и вопрос зададут заново. */
+    @Test
+    fun aTakenMedKitIdentifierThatCouldNotBeCheckedWaitsForARetry() = runTest {
+        val storage = Storage(listOf(operation(MedKitSyncCommand.Publish(HOME_KIT))))
+        val transport = Transport { ApiResult.Failure(ApiFailure.Conflict) }
+        transport.medKitIsOurs = ApiResult.Failure(ApiFailure.Unavailable)
+
+        worker(storage, transport).drain()
+
+        assertEquals(SyncOperationStatus.PENDING, storage.operations.getValue(INTAKE).status)
+    }
+
     /** Расход больше остатка — отказ по количеству, пачка остаётся какой её знает сервер: удалять её нечем. */
     @Test
     fun consumeBeyondTheStockIsRefusedAsInsufficientAndThePackageStays() = runTest {
@@ -845,12 +1020,12 @@ class QueueWorkerTest {
     }
 
     /**
-     * Сосед перенёс пачку в аптечку, которой у нас локально нет: снимок в ответе положить некуда.
-     * Это тот же вопрос, что и промах словаря, и исход тот же — операция ждёт с ответом в руках и
-     * названной причиной, а проход жив и следующая операция обрабатывается (PLAN E3, E4).
+     * Сосед перенёс пачку в аптечку, которой у нас нет. Это не промах словаря: ждать нечего, коробка
+     * ушла туда, где нас нет. Команда применена, а коробка у нас кончается утратой доступа —
+     * операция закрыта, а не отложена навсегда, и проход идёт дальше (PLAN E3, E6).
      */
     @Test
-    fun aSnapshotNamingAnUnknownMedKitIsDeferredAndThePassGoesOn() = runTest {
+    fun aSnapshotNamingAnUnknownMedKitClosesTheOperationAndThePassGoesOn() = runTest {
         val storage = Storage(listOf(operation(sequence = 0), operation(id = OTHER_PACK, sequence = 1, command = PackageSyncCommand.Consume(OTHER_PACK, dose("1"), OTHER_PACK))))
         val elsewhere = snapshotJson.replace(HOME_KIT.toString(), SHARED_KIT.toString())
         val transport = transport { request ->
@@ -860,9 +1035,10 @@ class QueueWorkerTest {
 
         val report = worker(storage, transport).drain()
 
-        assertEquals(1, report.settled)
-        assertEquals(SyncOperationStatus.ANSWERED, storage.operations.getValue(INTAKE).status)
-        assertEquals("аптечка $SHARED_KIT неизвестна", storage.deferred.single().second)
+        assertEquals(2, report.settled)
+        assertEquals(SyncOperationStatus.APPLIED, storage.operations.getValue(INTAKE).status)
+        assertEquals(Delivery.Applied(PackageState.Gone), storage.settled.first { it.first == INTAKE }.second)
+        assertTrue(storage.deferred.isEmpty())
         assertEquals(SyncOperationStatus.APPLIED, storage.operations.getValue(OTHER_PACK).status)
         assertEquals(0, store.refreshed)
     }
@@ -989,6 +1165,7 @@ class QueueWorkerTest {
                 return ApiResult.Success(RawResponse(200, snapshotJson))
             }
             override suspend fun packageSnapshot(packageId: Uuid): ApiResult<PackageSnapshotNetworkDTO> = ApiResult.Success(snapshot)
+            override suspend fun medKitIsOurs(medKitId: Uuid): ApiResult<Boolean> = ApiResult.Success(true)
         }
         val worker = worker(storage, transport)
 

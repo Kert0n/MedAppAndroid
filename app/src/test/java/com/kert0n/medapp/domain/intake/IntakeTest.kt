@@ -55,9 +55,8 @@ class IntakeTest {
         assertEquals(FIRST_SCHEDULED_TIME, taken.slot.localTime)
         assertEquals(dose("2"), taken.plannedAmount)
         assertEquals(PACK, taken.plannedPackage?.id)
-        // А фактические пачка — с её аптечкой — и количество те, что назвал человек.
+        // А фактические пачка и количество те, что назвал человек.
         assertEquals(OTHER_PACK, taken.taken?.pkg?.id)
-        assertEquals(SHARED_KIT, taken.taken?.pkg?.medKit?.id)
         assertEquals(dose("1"), taken.taken?.amount)
     }
 
@@ -137,7 +136,7 @@ class IntakeTest {
         // У внепланового факта по типу нет полей курса и расписания; единственный статус — TAKEN.
         val fact = unplannedIntake()
         assertEquals(IntakeStatus.TAKEN, fact.status)
-        assertEquals(PACK, fact.taken.pkg.id)
+        assertEquals(PACK, fact.taken.pkg?.id)
         assertEquals(dose("1"), fact.taken.amount)
     }
 
@@ -167,22 +166,18 @@ class IntakeTest {
     @Test
     fun takingIsCheckedAgainstThePackAsItIsNow() {
         // Акт «беру из этой пачки» проверяется в момент записи по пачке, какой её знает
-        // устройство: две таблетки из флакона, который меряют миллилитрами, не берутся; из
-        // архивной пачки — тоже. Причина — значение, текст возьмёт экран.
+        // устройство: две таблетки из флакона, который меряют миллилитрами, не берутся.
+        // Причина — значение, текст возьмёт экран.
         val syrup = pack(quantity = millilitres("100"))
         assertEquals(
             IntakeRejected.Reason.UNIT_MISMATCH,
             (syrup.take(dose("2"), LATER).exceptionOrNull() as IntakeRejected).reason
         )
-        assertEquals(
-            IntakeRejected.Reason.PACKAGE_UNUSABLE,
-            (pack().archive().take(dose("2"), LATER).exceptionOrNull() as IntakeRejected).reason
-        )
         // Годная пачка отдаёт факт с теми обстоятельствами, что назвали, и остаток не меняет.
         val taken = pack(quantity = tablets("10")).take(dose("2"), LATER).getOrThrow()
         assertEquals(dose("2"), taken.amount)
         assertEquals(LATER, taken.at)
-        assertEquals(PACK, taken.pkg.id)
+        assertEquals(PACK, taken.pkg?.id)
     }
 
     @Test
@@ -191,7 +186,7 @@ class IntakeTest {
         // пачки — ссылка, и её смена историю не переписывает и не делает нечитаемой.
         val recorded = TakenDose(pack(quantity = millilitres("100")).ref, dose("2"), LATER)
         assertEquals(TABLETS, recorded.amount.unit)
-        assertEquals(MILLILITRES, recorded.pkg.unit)
+        assertEquals(MILLILITRES, recorded.pkg?.unit)
     }
 
     @Test
@@ -200,4 +195,5 @@ class IntakeTest {
         // уже не доходит.
         assertThrows(IllegalArgumentException::class.java) { dose("0") }
     }
+
 }

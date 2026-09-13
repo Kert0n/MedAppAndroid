@@ -9,7 +9,7 @@ class CourseRejected(val reason: Reason) : IllegalStateException(reason.name) {
     /** Причины различаются, потому что ведут человека к разным действиям. */
     enum class Reason {
 
-        /** Пачка израсходована, утилизирована или доступ к ней утрачен. */
+        /** Коробка помечена — её выбрасывают или из её полки ушли: источником она не бывает. */
         PACKAGE_UNUSABLE,
 
         /** Пачка уже в препарате курса. */
@@ -34,6 +34,9 @@ class CourseRejected(val reason: Reason) : IllegalStateException(reason.name) {
         FORM_MISSING,
 
         /** Активировать нельзя: не названо, сколько всего доз, — или названо ноль. */
-        TOTAL_DOSES_MISSING
+        TOTAL_DOSES_MISSING,
+
+        /** Новое расписание начинается раньше сегодняшнего дня: пункты в прошлом не заводят. */
+        SCHEDULE_IN_PAST
     }
 }

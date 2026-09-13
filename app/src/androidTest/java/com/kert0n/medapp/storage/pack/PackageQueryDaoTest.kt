@@ -1,6 +1,5 @@
 package com.kert0n.medapp.storage.pack
 
-import com.kert0n.medapp.domain.pack.Package
 import com.kert0n.medapp.fixture.COURSE
 import com.kert0n.medapp.fixture.HOME_KIT
 import com.kert0n.medapp.fixture.MILLILITRES
@@ -9,6 +8,7 @@ import com.kert0n.medapp.fixture.TABLET_FORM
 import com.kert0n.medapp.fixture.activeCourse
 import com.kert0n.medapp.fixture.expiry
 import com.kert0n.medapp.fixture.inMemoryDatabase
+import com.kert0n.medapp.fixture.save
 import com.kert0n.medapp.fixture.medKit
 import com.kert0n.medapp.fixture.millilitres
 import com.kert0n.medapp.fixture.pack
@@ -72,14 +72,11 @@ class PackageQueryDaoTest {
         all.forEachIndexed { index, pkg ->
             val added = Instant.EPOCH.plusSeconds(index.toLong() * 3600)
             packages.save(
-                pkg.toStorageEntity(),
-                pkg.toDetailsStorageEntity().let {
-                    PackageDetailsStorageEntity(
-                        packageId = it.packageId,
-                        addedAt = added,
-                        expiresOn = it.expiresOn
-                    )
-                }
+                pack(
+                    id = pkg.id, medKit = pkg.medKit, name = pkg.name, quantity = pkg.quantity,
+                    form = pkg.facts.form, category = pkg.facts.category,
+                    expiresOn = pkg.facts.expiresOn, addedAt = added
+                )
             )
         }
     }
@@ -186,7 +183,7 @@ class PackageQueryDaoTest {
         val ten = pack(id = id(5), name = "Десять", quantity = tablets("10"))
         val two = pack(id = id(6), name = "Два", quantity = tablets("2"))
         for (pkg in listOf(ten, two)) {
-            packages.save(pkg.toStorageEntity(), pkg.toDetailsStorageEntity())
+            packages.save(pkg)
         }
 
         val ordered = names(PackageQuery(medKitId = HOME_KIT, sort = PackageQuery.Sort.QUANTITY))
@@ -203,16 +200,6 @@ class PackageQueryDaoTest {
             today
         ).drop(1).map { it.pack.quantityUnitId }
         assertEquals(1, ordered.count { it == MILLILITRES.id })
-    }
-
-    @Test
-    fun archivedStayOutOfTheListUntilAskedFor() = runTest {
-        val gone = pack(id = id(7), name = "Кончилась", quantity = tablets("0"),
-            lifecycle = Package.Lifecycle.ARCHIVED)
-        packages.save(gone.toStorageEntity(), gone.toDetailsStorageEntity())
-
-        assertEquals(false, names(PackageQuery()).contains("Кончилась"))
-        assertEquals(true, names(PackageQuery(includeArchived = true)).contains("Кончилась"))
     }
 
     @Test

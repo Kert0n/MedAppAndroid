@@ -60,7 +60,7 @@ class CourseReplacementTest {
             updatedAt = LATER
         )
             .setSchedule(schedule(times = listOf(LocalTime.of(9, 0), LocalTime.of(21, 0))), LATER)
-            .attach(pack(id = PACK, form = TABLET_FORM, quantity = tablets("20")).ref, 5.doses, LATER)
+            .attach(pack(id = PACK, form = TABLET_FORM, quantity = tablets("20")), 5.doses, LATER)
             .getOrThrow()
             .activate(LATER)
             .getOrThrow()

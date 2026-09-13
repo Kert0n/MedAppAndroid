@@ -40,20 +40,104 @@ class SettlementTest {
     fun appliedWithASnapshotClosesLaysItDownAndAccountsTheIntake() {
         val settlement = Delivery.Applied(PackageState.Present(snapshot)).settlement(consume)
         assertEquals(Transition.Close(SyncOperationStatus.APPLIED), settlement.transition)
-        assertEquals(listOf(Effect.Account(IntakeAccounting.REMOTE_APPLIED), Effect.LayDown(snapshot)), settlement.effects)
+        assertEquals(
+            listOf(Effect.Account(IntakeAccounting.REMOTE_APPLIED), Effect.LayDown(snapshot), Effect.Settled),
+            settlement.effects
+        )
     }
 
     @Test
-    fun appliedWithThePackageGoneArchivesIt() {
+    fun appliedWithThePackageGoneEndsIt() {
         val settlement = Delivery.Applied(PackageState.Gone).settlement(consume)
-        assertEquals(listOf(Effect.Account(IntakeAccounting.REMOTE_APPLIED), Effect.PackageGone(PACK)), settlement.effects)
+        assertEquals(listOf(Effect.Account(IntakeAccounting.REMOTE_APPLIED), Effect.PackageEnded(PACK), Effect.Settled), settlement.effects)
     }
 
     @Test
-    fun appliedWithNoPackageStateTouchesOnlyTheAccounting() {
+    fun appliedLeaveTakesTheShelfAndNotAPackage() {
+        // Выход касается полки целиком, а не какой-то её коробки: состояния пачки у него нет
+        // вовсе, а следствие — то, что до согласия сервера не трогали (PLAN E6).
         val settlement = Delivery.Applied(PackageState.None).settlement(leave)
         assertEquals(Transition.Close(SyncOperationStatus.APPLIED), settlement.transition)
-        assertEquals(listOf<Effect>(Effect.Account(IntakeAccounting.REMOTE_APPLIED)), settlement.effects)
+        assertEquals(
+            listOf(Effect.Account(IntakeAccounting.REMOTE_APPLIED), Effect.MedKitLeft(SHARED_KIT), Effect.Settled),
+            settlement.effects
+        )
+    }
+
+    /** Разбор полки приходит тем же путём и несёт, куда девать её содержимое (PLAN E6). */
+    @Test
+    fun appliedDismantleCarriesWhereTheContentsGo() {
+        val settlement = Delivery.Applied(PackageState.None)
+            .settlement(MedKitSyncCommand.Delete(SHARED_KIT, transferTo = HOME_KIT))
+        assertEquals(
+            listOf<Effect>(
+                Effect.Account(IntakeAccounting.REMOTE_APPLIED),
+                Effect.MedKitDismantled(SHARED_KIT, transferTo = HOME_KIT),
+                Effect.Settled
+            ),
+            settlement.effects
+        )
+    }
+
+    /** «Пачки нет» после нашего же `Delete` — конец коробки; чем вызван, база не различает (D7). */
+    @Test
+    fun theBoxGoneAfterOurDeleteEnds() {
+        assertEquals(
+            listOf<Effect>(
+                Effect.Account(IntakeAccounting.REMOTE_APPLIED),
+                Effect.PackageEnded(PACK),
+                Effect.Settled
+            ),
+            Delivery.Applied(PackageState.Gone).settlement(PackageSyncCommand.Delete(PACK)).effects
+        )
+    }
+
+    /**
+     * Унесённую домой коробку сервер забыл — это не конец коробки: она у человека (PLAN E6). Отказ
+     * возвращает её на прежнюю полку раньше, чем ляжет ответ.
+     */
+    @Test
+    fun aWithdrawnBoxStaysLocalOrReturnsToItsShelf() {
+        val withdraw = PackageSyncCommand.Withdraw(PACK, SHARED_KIT, tablets("20"))
+        assertEquals(
+            listOf(Effect.Account(IntakeAccounting.REMOTE_APPLIED), Effect.Withdrawn(PACK), Effect.Settled),
+            Delivery.Applied(PackageState.Gone).settlement(withdraw).effects
+        )
+        assertEquals(
+            listOf(
+                Effect.Account(IntakeAccounting.REMOTE_REFUSED),
+                Effect.Withdrawn(PACK),
+                Effect.Cascade(SyncOperationStatus.ACCESS_LOST, IntakeAccounting.REMOTE_REFUSED),
+                Effect.Settled
+            ),
+            Delivery.AccessLost.settlement(withdraw).effects
+        )
+        assertEquals(
+            listOf(
+                Effect.Account(IntakeAccounting.REMOTE_REFUSED),
+                Effect.Returned(PACK, SHARED_KIT),
+                Effect.LayDown(snapshot),
+                Effect.Cascade(SyncOperationStatus.REFUSED, IntakeAccounting.REMOTE_REFUSED),
+                Effect.Settled
+            ),
+            Delivery.Refused(RefusalReason.STALE, PackageState.Present(snapshot)).settlement(withdraw).effects
+        )
+    }
+
+    /**
+     * Расход применён, а коробка уже на полке, где нас нет: учёт — применён, коробка у нас кончается
+     * утратой доступа (PLAN E3, E6).
+     */
+    @Test
+    fun appliedButElsewhereKeepsTheAccountingAndLosesTheBox() {
+        assertEquals(
+            listOf(
+                Effect.Account(IntakeAccounting.REMOTE_APPLIED),
+                Effect.PackageEnded(PACK),
+                Effect.Settled
+            ),
+            Delivery.Applied(PackageState.Elsewhere).settlement(consume).effects
+        )
     }
 
     @Test
@@ -71,7 +155,8 @@ class SettlementTest {
             listOf(
                 Effect.Account(IntakeAccounting.REMOTE_REFUSED),
                 Effect.LayDown(snapshot),
-                Effect.Cascade(SyncOperationStatus.REFUSED, IntakeAccounting.REMOTE_REFUSED)
+                Effect.Cascade(SyncOperationStatus.REFUSED, IntakeAccounting.REMOTE_REFUSED),
+                Effect.Settled
             ),
             settlement.effects
         )
@@ -91,8 +176,9 @@ class SettlementTest {
         assertEquals(
             listOf(
                 Effect.Account(IntakeAccounting.REMOTE_REFUSED),
-                Effect.PackageLost(PACK),
-                Effect.Cascade(SyncOperationStatus.ACCESS_LOST, IntakeAccounting.REMOTE_REFUSED)
+                Effect.PackageEnded(PACK),
+                Effect.Cascade(SyncOperationStatus.ACCESS_LOST, IntakeAccounting.REMOTE_REFUSED),
+                Effect.Settled
             ),
             settlement.effects
         )
@@ -104,10 +190,26 @@ class SettlementTest {
         assertEquals(
             listOf(
                 Effect.Account(IntakeAccounting.REMOTE_REFUSED),
-                Effect.Cascade(SyncOperationStatus.ACCESS_LOST, IntakeAccounting.REMOTE_REFUSED)
+                Effect.Cascade(SyncOperationStatus.ACCESS_LOST, IntakeAccounting.REMOTE_REFUSED),
+                Effect.Settled
             ),
             settlement.effects
         )
+    }
+
+    /**
+     * Пометку снимает только закрытие: отказ возвращает вещь в оборот, применение отпускает её, а
+     * «устарело» и повтор — ещё не ответ, и решение продолжает ждать (PLAN E1).
+     */
+    @Test
+    fun onlyAClosedCommandReleasesTheMark() {
+        val delete = PackageSyncCommand.Delete(PACK)
+        for (closing in listOf(Delivery.Applied(PackageState.None), Delivery.Refused(RefusalReason.STALE, PackageState.None), Delivery.AccessLost)) {
+            assertEquals(Effect.Settled, closing.settlement(delete).effects.last())
+        }
+        for (waiting in listOf(Delivery.Stale(snapshot), Delivery.Retry("обрыв"))) {
+            assertEquals(false, Effect.Settled in waiting.settlement(delete).effects)
+        }
     }
 
     @Test

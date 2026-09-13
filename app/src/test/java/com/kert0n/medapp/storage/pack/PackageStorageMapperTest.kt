@@ -59,8 +59,6 @@ class PackageStorageMapperTest {
         assertEquals(full.quantity, restored.quantity)
         assertEquals(full.addedAt, restored.addedAt)
         assertEquals(full.templateId, restored.templateId)
-        assertEquals(full.lifecycle, restored.lifecycle)
-        assertEquals(full.access, restored.access)
         assertEquals(full.facts, restored.facts)
     }
 
@@ -84,6 +82,7 @@ class PackageStorageMapperTest {
         val row = rowOf(full)
         val relabelled = PackageStorageRow(
             pack = pack(quantity = millilitres("100")).toStorageEntity(PackageSyncState(PACK)),
+            record = row.record,
             details = row.details,
             claims = row.claims,
             medKit = row.medKit
@@ -94,13 +93,6 @@ class PackageStorageMapperTest {
         assertEquals(millilitres("100"), restored.quantity)
         assertNull(restored.facts.defaultIntakeAmount)
         assertEquals(full.facts.note, restored.facts.note)
-    }
-
-    @Test
-    fun archivedEmptyPackageIsRestorable() {
-        val archived = pack(quantity = tablets("0"), lifecycle = Package.Lifecycle.ARCHIVED)
-        assertEquals(archived.quantity, rowOf(archived).toDomain(VOCABULARY).quantity)
-        assertEquals(Package.Lifecycle.ARCHIVED, rowOf(archived).toDomain(VOCABULARY).lifecycle)
     }
 
     /** Обвязка доставки едет в колонках, а не в пачке: домен её обратно не получает. */
@@ -116,8 +108,12 @@ class PackageStorageMapperTest {
         assertEquals(sync, stored.syncState())
         assertEquals(
             full.facts,
-            PackageStorageRow(stored, full.toDetailsStorageEntity(), medKit = medKit().toMedKitStorageEntity())
-                .toDomain(VOCABULARY).facts
+            PackageStorageRow(
+                stored,
+                full.record.toStorageEntity(),
+                full.toDetailsStorageEntity(),
+                medKit = medKit().toMedKitStorageEntity()
+            ).toDomain(VOCABULARY).facts
         )
     }
 
@@ -133,14 +129,15 @@ class PackageStorageMapperTest {
         assertEquals(IllegalArgumentException::class, failure!!::class)
     }
 
-    /** Момент первого наблюдения — единственное, что известно о чужой пачке из снимка. */
+    /** Запись о коробке — снимок того, что о ней нужно знать истории, и момент появления. */
     @Test
-    fun observedDetailsCarryOnlyTheMomentOfFirstSighting() {
-        val at = Instant.parse("2026-09-10T12:00:00Z")
-        val details = observedPackageDetails(PACK, at)
-        assertEquals(at, details.addedAt)
-        assertNull(details.expiresOn)
-        assertNull(details.note)
-        assertNull(details.price)
+    fun recordCarriesTheSnapshotAndTheMomentOfAppearance() {
+        val record = full.record.toStorageEntity()
+        assertEquals(full.id, record.id)
+        assertEquals(full.name, record.name)
+        assertEquals(full.quantity.unit.id, record.unitId)
+        assertEquals(full.facts.form?.id, record.formId)
+        assertEquals(full.addedAt, record.addedAt)
+        assertEquals(full.ref, record.toRef(VOCABULARY))
     }
 }
