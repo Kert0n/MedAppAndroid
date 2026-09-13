@@ -2,7 +2,7 @@
   "formatVersion": 1,
   "database": {
     "version": 3,
-    "identityHash": "dfd8c0e90b04ef447f64845018849098",
+    "identityHash": "72777cc7acdd140dff95167986f42307",
     "entities": [
       {
         "tableName": "quantity_units",
@@ -1158,7 +1158,7 @@
       },
       {
         "tableName": "sync_operations",
-        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`id` TEXT NOT NULL, `kind` TEXT NOT NULL, `payload` TEXT NOT NULL, `payload_version` INTEGER NOT NULL, `sequence` INTEGER NOT NULL, `status` TEXT NOT NULL, `attempts` INTEGER NOT NULL, `created_at` INTEGER NOT NULL, `package_id` TEXT, `med_kit_id` TEXT, `group_id` TEXT, `last_error` TEXT, `last_tried_at` INTEGER, `answer_status` INTEGER, `answer_body` TEXT, `not_before` INTEGER, `outcome_unknown` INTEGER NOT NULL DEFAULT 0, `prepared_method` TEXT, `prepared_path` TEXT, `prepared_query` TEXT, `prepared_body` TEXT, `prepared_drug_version` INTEGER, `prepared_claims_version` INTEGER, `prepared_quantity_before` TEXT, `prepared_mine_before` TEXT, `prepared_unit_id` TEXT, `prepared_at` INTEGER, PRIMARY KEY(`id`))",
+        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`id` TEXT NOT NULL, `kind` TEXT NOT NULL, `payload` TEXT NOT NULL, `payload_version` INTEGER NOT NULL, `sequence` INTEGER NOT NULL, `status` TEXT NOT NULL, `attempts` INTEGER NOT NULL, `created_at` INTEGER NOT NULL, `package_id` TEXT, `med_kit_id` TEXT, `group_id` TEXT, `last_error` TEXT, `last_tried_at` INTEGER, `answer_status` INTEGER, `answer_body` TEXT, `not_before` INTEGER, `outcome_unknown` INTEGER NOT NULL DEFAULT 0, `refusal_reason` TEXT, `prepared_method` TEXT, `prepared_path` TEXT, `prepared_query` TEXT, `prepared_body` TEXT, `prepared_drug_version` INTEGER, `prepared_claims_version` INTEGER, `prepared_quantity_before` TEXT, `prepared_mine_before` TEXT, `prepared_unit_id` TEXT, `prepared_at` INTEGER, PRIMARY KEY(`id`))",
         "fields": [
           {
             "fieldPath": "id",
@@ -1254,6 +1254,11 @@
             "affinity": "INTEGER",
             "notNull": true,
             "defaultValue": "0"
+          },
+          {
+            "fieldPath": "refusalReason",
+            "columnName": "refusal_reason",
+            "affinity": "TEXT"
           },
           {
             "fieldPath": "prepared.method",
@@ -1463,7 +1468,7 @@
     ],
     "setupQueries": [
       "CREATE TABLE IF NOT EXISTS room_master_table (id INTEGER PRIMARY KEY,identity_hash TEXT)",
-      "INSERT OR REPLACE INTO room_master_table (id,identity_hash) VALUES(42, 'dfd8c0e90b04ef447f64845018849098')"
+      "INSERT OR REPLACE INTO room_master_table (id,identity_hash) VALUES(42, '72777cc7acdd140dff95167986f42307')"
     ]
   }
 }

@@ -21,10 +21,25 @@ class Settlement(val transition: Transition, effects: List<Effect> = emptyList()
     /** Что становится со строкой операции. */
     sealed interface Transition {
 
-        /** Операция закрыта — применена, отказана или потеряла доступ; [lastError] — причина отказа. */
-        data class Close(val status: SyncOperationStatus, val lastError: String? = null) : Transition {
-            init {
-                require(status.isClosed) { "закрытие ведёт в закрытое состояние, а не в $status" }
+        /**
+         * Операция закрыта — ровно три случая, как и закрытых статусов: применена, отказана —
+         * и только у отказа есть причина, почему сервер делать не будет (PLAN E2), — или потеряла
+         * доступ. Закрытие в незакрытый статус и отказ без причины не выражаются.
+         */
+        sealed interface Close : Transition {
+            val status: SyncOperationStatus
+            val refusalReason: RefusalReason? get() = null
+
+            data object Applied : Close {
+                override val status: SyncOperationStatus get() = SyncOperationStatus.APPLIED
+            }
+
+            data class Refused(override val refusalReason: RefusalReason) : Close {
+                override val status: SyncOperationStatus get() = SyncOperationStatus.REFUSED
+            }
+
+            data object AccessLost : Close {
+                override val status: SyncOperationStatus get() = SyncOperationStatus.ACCESS_LOST
             }
         }
 
@@ -104,7 +119,7 @@ class Settlement(val transition: Transition, effects: List<Effect> = emptyList()
  */
 fun Delivery.settlement(command: SyncCommand): Settlement = when (this) {
     is Delivery.Applied -> Settlement(
-        Settlement.Transition.Close(SyncOperationStatus.APPLIED),
+        Settlement.Transition.Close.Applied,
         listOf(Settlement.Effect.Account(IntakeAccounting.REMOTE_APPLIED)) + state.effects(command) +
             command.appliedToTheShelf() + Settlement.Effect.Settled
     )
@@ -113,7 +128,7 @@ fun Delivery.settlement(command: SyncCommand): Settlement = when (this) {
         listOf(Settlement.Effect.LayDown(snapshot))
     )
     is Delivery.Refused -> Settlement(
-        Settlement.Transition.Close(SyncOperationStatus.REFUSED, reason.name),
+        Settlement.Transition.Close.Refused(reason),
         listOf(Settlement.Effect.Account(IntakeAccounting.REMOTE_REFUSED)) + command.returned() + state.effects(command) +
             Settlement.Effect.Cascade(SyncOperationStatus.REFUSED, IntakeAccounting.REMOTE_REFUSED) +
             Settlement.Effect.Settled
@@ -122,7 +137,7 @@ fun Delivery.settlement(command: SyncCommand): Settlement = when (this) {
         Settlement.Transition.Retry(error, attempted, outcomeUnknown, notBefore)
     )
     Delivery.AccessLost -> Settlement(
-        Settlement.Transition.Close(SyncOperationStatus.ACCESS_LOST),
+        Settlement.Transition.Close.AccessLost,
         listOf(Settlement.Effect.Account(IntakeAccounting.REMOTE_REFUSED)) +
             listOfNotNull((command as? PackageSyncCommand)?.gone()) +
             Settlement.Effect.Cascade(SyncOperationStatus.ACCESS_LOST, IntakeAccounting.REMOTE_REFUSED) +

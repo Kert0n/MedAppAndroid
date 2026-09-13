@@ -139,6 +139,14 @@ abstract class MedAppDatabase : RoomDatabase() {
                 connection.execSQL(
                     "ALTER TABLE `med_kits` ADD COLUMN `status` TEXT NOT NULL DEFAULT 'ACTIVE'"
                 )
+                // Причина отказа — значением у отказанной операции; прежде она лежала текстом
+                // журнала, и у уже отказанных переносится оттуда (PLAN E2).
+                connection.execSQL("ALTER TABLE `sync_operations` ADD COLUMN `refusal_reason` TEXT")
+                connection.execSQL(
+                    "UPDATE `sync_operations` SET `refusal_reason` = CASE WHEN `last_error` IN " +
+                        "('INVALID', 'INSUFFICIENT', 'UNIT_CHANGED', 'STALE', 'CONFLICT', 'SUPERSEDED') " +
+                        "THEN `last_error` ELSE 'INVALID' END WHERE `status` = 'REFUSED'"
+                )
                 connection.execSQL(
                     """
                     CREATE TABLE IF NOT EXISTS `package_records` (

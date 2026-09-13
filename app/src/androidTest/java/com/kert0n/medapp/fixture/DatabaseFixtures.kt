@@ -86,7 +86,7 @@ fun MedAppDatabase.medKitRepository() = com.kert0n.medapp.storage.medkit.MedKitR
 )
 
 fun MedAppDatabase.queueRepository() = com.kert0n.medapp.storage.server.SyncOperationRoomRepository(
-    syncOperations(), vocabulary()
+    this, syncOperations(), vocabulary()
 )
 
 /** Отчёты личного кабинета — одним снимком базы (PLAN H6). */

@@ -18,6 +18,7 @@ import com.kert0n.medapp.queue.QueuedCommand
 import com.kert0n.medapp.queue.Settlement
 import com.kert0n.medapp.queue.StoredSyncOperation
 import com.kert0n.medapp.queue.SyncOperation
+import com.kert0n.medapp.queue.RefusalReason
 import com.kert0n.medapp.queue.SyncOperationStatus
 import com.kert0n.medapp.queue.Take
 import com.kert0n.medapp.queue.medkit.MedKitSyncCommand
@@ -161,8 +162,10 @@ class QueueRoomStorage @Inject constructor(
         val changed = when (val transition = settlement.transition) {
             // Закрытая операция не повторяется, а счёт попыток — вход задержки и только он:
             // закрытию нечего им двигать (PLAN E2, E3).
-            is Settlement.Transition.Close ->
-                queue.settle(id, transition.status, transition.lastError, at, attempted = 0)
+            is Settlement.Transition.Close -> queue.settle(
+                id, transition.status, transition.refusalReason?.name, at, attempted = 0,
+                refusalReason = transition.refusalReason
+            )
             is Settlement.Transition.Reprepare ->
                 queue.reprepare(id, transition.lastError, at, transition.notBefore)
             is Settlement.Transition.Retry -> queue.settle(
@@ -379,7 +382,9 @@ class QueueRoomStorage @Inject constructor(
         val pending = ArrayDeque(listOf(id))
         while (pending.isNotEmpty()) {
             for (dependent in queue.unclosedDependentsOf(pending.removeFirst())) {
-                queue.settle(dependent, effect.status, com.kert0n.medapp.queue.RefusalReason.SUPERSEDED.name, at = null, attempted = 0)
+                // Зависимая закрывается тем же статусом; причина — значением, и только у отказа.
+                val superseded = RefusalReason.SUPERSEDED.takeIf { effect.status == SyncOperationStatus.REFUSED }
+                queue.settle(dependent, effect.status, RefusalReason.SUPERSEDED.name, at = null, attempted = 0, refusalReason = superseded)
                 intakes.setAccounting(dependent, effect.accounting)
                 settled(dependent)
                 pending += dependent

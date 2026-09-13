@@ -197,7 +197,8 @@ class QueueWorkerTest {
                 )
                 // Как Room: закрытие попытки не считает — закрытая операция не повторяется.
                 is Settlement.Transition.Close -> operation.with(
-                    status = transition.status, lastTriedAt = at, dropAnswer = true, dropNotBefore = true
+                    status = transition.status, lastTriedAt = at, dropAnswer = true, dropNotBefore = true,
+                    refusalReason = transition.refusalReason
                 )
             }
         }
@@ -218,7 +219,7 @@ class QueueWorkerTest {
                 is Settlement.Transition.Reprepare -> Delivery.Stale((state as PackageState.Present).snapshot, transition.notBefore)
                 is Settlement.Transition.Close -> when (transition.status) {
                     SyncOperationStatus.APPLIED -> Delivery.Applied(state)
-                    SyncOperationStatus.REFUSED -> Delivery.Refused(RefusalReason.valueOf(transition.lastError!!), state)
+                    SyncOperationStatus.REFUSED -> Delivery.Refused(requireNotNull(transition.refusalReason), state)
                     SyncOperationStatus.ACCESS_LOST -> Delivery.AccessLost
                     else -> error("закрытие ведёт в закрытое состояние")
                 }
@@ -235,11 +236,12 @@ class QueueWorkerTest {
             dropPrepared: Boolean = false,
             dropAnswer: Boolean = false,
             dropNotBefore: Boolean = false,
-            outcomeUnknown: Boolean = this.outcomeUnknown
+            outcomeUnknown: Boolean = this.outcomeUnknown,
+            refusalReason: RefusalReason? = this.refusalReason
         ) = SyncOperation(
             id, command, sequence, createdAt, payloadVersion, if (dropPrepared) null else prepared, groupId, dependsOn,
             status, attempts, lastError, lastTriedAt, if (dropAnswer) null else answer, if (dropNotBefore) null else notBefore,
-            outcomeUnknown = outcomeUnknown
+            outcomeUnknown = outcomeUnknown, refusalReason = refusalReason
         )
     }
 

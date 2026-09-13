@@ -1,13 +1,17 @@
 package com.kert0n.medapp.storage.server
 
 import com.kert0n.medapp.queue.StoredSyncOperation
+import com.kert0n.medapp.queue.RefusalReason
 import com.kert0n.medapp.queue.SyncCommand
 import com.kert0n.medapp.queue.SyncOperation
 import com.kert0n.medapp.queue.SyncOperationStatus
+import com.kert0n.medapp.storage.database.MedAppDatabase
+import com.kert0n.medapp.storage.database.observing
 import com.kert0n.medapp.storage.value.VocabularyDao
 import java.time.Instant
 import javax.inject.Inject
 import kotlin.uuid.Uuid
+import kotlinx.coroutines.flow.Flow
 
 /**
  * Строки очереди для тех, кто их ставит и читает: поставить, найти, по статусу, сменить статус,
@@ -15,6 +19,7 @@ import kotlin.uuid.Uuid
  * эффектами — живут в [QueueRoomStorage].
  */
 class SyncOperationRoomRepository @Inject constructor(
+    private val database: MedAppDatabase,
     private val queue: SyncOperationDao,
     private val vocabulary: VocabularyDao
 ) : SyncOperationStorageRepository {
@@ -42,10 +47,17 @@ class SyncOperationRoomRepository @Inject constructor(
         status: SyncOperationStatus,
         lastError: String?,
         at: Instant?,
-        attempted: Boolean
+        attempted: Boolean,
+        refusalReason: RefusalReason?
     ) {
-        queue.settle(id, status, lastError, at, if (attempted) 1 else 0)
+        queue.settle(id, status, lastError, at, if (attempted) 1 else 0, refusalReason = refusalReason)
     }
+
+    override fun observeOutstanding(): Flow<List<StoredSyncOperation>> =
+        database.observing("sync_operations", "sync_operation_dependencies") {
+            val words = vocabulary.snapshot()
+            queue.outstanding().map { it.toDomain(words) }
+        }
 
     override suspend fun unreadable(): List<StoredSyncOperation.Unreadable> =
         queue.all().let { rows ->

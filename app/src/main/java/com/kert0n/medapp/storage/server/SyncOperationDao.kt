@@ -7,6 +7,7 @@ import androidx.room.Transaction
 import androidx.room.Update
 import com.kert0n.medapp.queue.SyncCommand
 import com.kert0n.medapp.queue.SyncOperation
+import com.kert0n.medapp.queue.RefusalReason
 import com.kert0n.medapp.queue.SyncOperationStatus
 import java.time.Instant
 import kotlin.uuid.Uuid
@@ -121,6 +122,15 @@ interface SyncOperationDao {
     )
     suspend fun unclosedOfMedKit(medKitId: Uuid): Int
 
+    /**
+     * Что ещё касается человека: незакрытые — ждут, отправляются, ответ записан — и отказанные,
+     * которым нужно его решение. Применённые и утратившие доступ экрану не нужны (PLAN H3 №28).
+     * Чтение, а не поток: нечитаемые строки различает разбор, и поток строит репозиторий.
+     */
+    @Transaction
+    @Query("SELECT * FROM sync_operations WHERE status NOT IN ('APPLIED', 'ACCESS_LOST') ORDER BY sequence")
+    suspend fun outstanding(): List<SyncOperationStorageRow>
+
     @Transaction
     @Query("SELECT * FROM sync_operations WHERE status = :status ORDER BY sequence")
     suspend fun withStatus(status: SyncOperationStatus): List<SyncOperationStorageRow>
@@ -226,9 +236,10 @@ interface SyncOperationDao {
      * Закрытие или возврат в ожидание — только незакрытой: закрытая второй раз не закрывается.
      * Записанный ответ стирается: он либо применён, либо будет получен заново. Неизвестный исход
      * прилипает к запросу: раз неизвестный — неизвестный, пока запрос не переподготовлен.
+     * Причина отказа — значением и ровно у `REFUSED` (PLAN E2); держит это тип операции.
      */
     @Query(
-        "UPDATE sync_operations SET status = :status, last_error = :lastError, " +
+        "UPDATE sync_operations SET status = :status, last_error = :lastError, refusal_reason = :refusalReason, " +
             "last_tried_at = :at, attempts = attempts + :attempted, answer_status = NULL, answer_body = NULL, " +
             "not_before = :notBefore, outcome_unknown = MAX(outcome_unknown, :outcomeUnknown) " +
             "WHERE id = :id AND status IN ('PENDING', 'SENDING', 'ANSWERED')"
@@ -240,7 +251,8 @@ interface SyncOperationDao {
         at: Instant? = null,
         attempted: Int = 0,
         notBefore: Instant? = null,
-        outcomeUnknown: Int = 0
+        outcomeUnknown: Int = 0,
+        refusalReason: RefusalReason? = null
     ): Int
 
     /**
