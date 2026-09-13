@@ -29,7 +29,8 @@ class IntakeOutcome(
     val intake: Intake,
     expected: Set<IntakeStatus>,
     val sync: IntakeSyncState = IntakeSyncState(intake.id),
-    val reallocation: CourseReallocation? = null
+    val reallocation: CourseReallocation? = null,
+    val recordedAt: Instant
 ) {
     /**
      * Ожидаемые статусы условного перехода: повтор уже совершённого ничего не меняет (D6).
@@ -38,14 +39,23 @@ class IntakeOutcome(
     val expected: Set<IntakeStatus> = expected.toSet()
 
     /**
-     * Момент ответа. Часы приходят из домена вместе с ответом: хранение системного времени не
-     * читает, иначе записанное время зависело бы от того, когда дошла транзакция (PLAN H1).
+     * Момент ответа — когда человек принял дозу, и он же момент факта в истории. Часы приходят из
+     * домена вместе с ответом: хранение системного времени не читает, иначе записанное время
+     * зависело бы от того, когда дошла транзакция (PLAN H1).
+     *
+     * Он не годится в [recordedAt]: ответ бывает задним числом, а редакция курса назад не ходит.
      */
     val answeredAt: Instant = when (intake) {
         is UnplannedIntake -> intake.dose.at
         is CourseIntake -> requireNotNull(intake.answer) { "записывается ответ, а не его отсутствие" }.at
     }
 
+    /**
+     * Момент самой записи — «когда мы это узнали», в отличие от [answeredAt] «когда это случилось».
+     * Им двигаются редакции: кончившаяся расходом коробка снимается с лечения, и редакция курса
+     * растёт этим моментом. Ответ задним числом момента записи не меняет, иначе приём о вчерашнем
+     * дне двигал бы `courses.updated_at` назад и делал бы свежую правку курса старее себя (D5, F5).
+     */
     /** Что и откуда принято; у подтверждённого приёма это есть по построению. */
     val taken: TakenDose? get() = intake.taken
 

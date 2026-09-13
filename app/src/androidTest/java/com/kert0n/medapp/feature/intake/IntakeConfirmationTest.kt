@@ -107,7 +107,7 @@ class IntakeConfirmationTest {
         plannedIntake(id = id, plannedAt = slot.at, scheduledOn = slot.localDate, scheduledTime = slot.localTime)
 
     private suspend fun miss(intake: CourseIntake) =
-        assertTrue(intakes.record(IntakeOutcome(intake.miss(LATER), expected = setOf(IntakeStatus.PLANNED))))
+        assertTrue(intakes.record(IntakeOutcome(intake.miss(LATER), expected = setOf(IntakeStatus.PLANNED), recordedAt = LATER)))
 
     private suspend fun commands(): List<SyncCommand> = database.syncOperations().all()
         .map { (it.toDomain(VOCABULARY) as StoredSyncOperation.Readable).operation.command }
@@ -146,6 +146,27 @@ class IntakeConfirmationTest {
         assertEquals(Revision(2), plan.revision)
         assertEquals(PACK, requireNotNull(intakes.find(INTAKE)).taken?.pkg?.id)
         assertEquals(0, database.syncOperations().all().size)
+    }
+
+    /**
+     * Ответ бывает задним числом — «выпил вчера вечером», — а редакция курса назад не ходит: её
+     * двигает момент записи, а не момент ответа. Иначе приём о прошлом делал бы свежую правку курса
+     * старее самой себя (PLAN D5, F5). Сам факт и его место в истории при этом остаются в прошлом:
+     * они о том, что случилось, а не о том, когда мы это узнали.
+     *
+     * Красная проверка: конец коробки, записанный моментом ответа, ставит курсу вчерашний
+     * `updated_at`.
+     */
+    @Test
+    fun anAnswerAboutThePastDoesNotMoveTheCourseBackwards() = runTest {
+        activate()
+        packages.adjust(PackageAdjustment.Recount(PACK, tablets("2"), Uuid.random()), at = now)
+
+        confirmation.confirm(INTAKE, PACK, dose("2"), FIRST_PLANNED_AT).getOrThrow()
+
+        val plan = requireNotNull(courses.findPlan(COURSE))
+        assertEquals(now, plan.updatedAt)
+        assertEquals(FIRST_PLANNED_AT, requireNotNull(intakes.find(INTAKE)).taken?.at)
     }
 
     @Test

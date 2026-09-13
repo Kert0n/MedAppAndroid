@@ -109,7 +109,7 @@ class IntakeConfirmation @Inject constructor(
         } else {
             IntakeSyncState(intake.id, IntakeAccounting.PENDING, consume.id)
         }
-        val outcome = IntakeOutcome(confirmed, setOf(IntakeStatus.PLANNED, IntakeStatus.MISSED), sync, reallocation)
+        val outcome = IntakeOutcome(confirmed, setOf(IntakeStatus.PLANNED, IntakeStatus.MISSED), sync, reallocation, recordedAt = now)
         val recorded = queue.change(pkg.medKit, listOfNotNull(consume, release), now) { intakes.record(outcome) }
         check(recorded) { "пункт и пачка прочитаны этой же транзакцией" }
 

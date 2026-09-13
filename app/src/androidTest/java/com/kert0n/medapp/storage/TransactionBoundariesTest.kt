@@ -247,6 +247,7 @@ class TransactionBoundariesTest {
                 intake = plannedIntake().confirm(paracetamol.take(dose("2"), LATER).getOrThrow()),
                 expected = setOf(IntakeStatus.PLANNED, IntakeStatus.MISSED),
                 sync = IntakeSyncState(INTAKE, IntakeAccounting.LOCAL_APPLIED),
+                recordedAt = LATER
             )
         )
 
@@ -267,7 +268,8 @@ class TransactionBoundariesTest {
             IntakeOutcome(
                 intake = plannedIntake().confirm(paracetamol.take(dose("2"), LATER).getOrThrow()),
                 expected = setOf(IntakeStatus.PLANNED),
-                sync = IntakeSyncState(INTAKE, IntakeAccounting.LOCAL_APPLIED)
+                sync = IntakeSyncState(INTAKE, IntakeAccounting.LOCAL_APPLIED),
+                recordedAt = LATER
             )
         }
         assertTrue(intakes.record(outcome()))
@@ -292,7 +294,8 @@ class TransactionBoundariesTest {
                     IntakeOutcome(
                         intake = plannedIntake().confirm(paracetamol.take(dose("2"), LATER).getOrThrow()),
                         expected = setOf(IntakeStatus.PLANNED),
-                        sync = IntakeSyncState(INTAKE, IntakeAccounting.PENDING, operationId = operation)
+                        sync = IntakeSyncState(INTAKE, IntakeAccounting.PENDING, operationId = operation),
+                        recordedAt = LATER
                     )
                 )
             }
@@ -375,7 +378,8 @@ class TransactionBoundariesTest {
                     IntakeOutcome(
                         intake = plannedIntake().confirm(paracetamol.take(dose("2"), LATER).getOrThrow()),
                         expected = setOf(IntakeStatus.PLANNED),
-                        sync = IntakeSyncState(INTAKE, IntakeAccounting.PENDING, operationId = operation)
+                        sync = IntakeSyncState(INTAKE, IntakeAccounting.PENDING, operationId = operation),
+                        recordedAt = LATER
                     )
                 )
             }
@@ -421,7 +425,8 @@ class TransactionBoundariesTest {
         val outcome = IntakeOutcome(
             intake = unplannedIntake(taken = pack(id = OTHER_PACK), takenAmount = dose("2")),
             expected = emptySet(),
-            sync = IntakeSyncState(INTAKE, IntakeAccounting.LOCAL_APPLIED)
+            sync = IntakeSyncState(INTAKE, IntakeAccounting.LOCAL_APPLIED),
+            recordedAt = LATER
         )
 
         assertFalse(intakes.record(outcome))
@@ -564,13 +569,15 @@ class TransactionBoundariesTest {
     private fun confirmedOutcome() = IntakeOutcome(
         intake = plannedIntake().confirm(paracetamol.take(dose("2"), LATER).getOrThrow()),
         expected = setOf(IntakeStatus.PLANNED),
-        sync = IntakeSyncState(INTAKE, IntakeAccounting.LOCAL_APPLIED)
+        sync = IntakeSyncState(INTAKE, IntakeAccounting.LOCAL_APPLIED),
+        recordedAt = LATER
     )
 
     private fun unplannedOutcome() = IntakeOutcome(
         intake = unplannedIntake(takenAmount = dose("2")),
         expected = emptySet(),
-        sync = IntakeSyncState(INTAKE, IntakeAccounting.LOCAL_APPLIED)
+        sync = IntakeSyncState(INTAKE, IntakeAccounting.LOCAL_APPLIED),
+        recordedAt = LATER
     )
 
     @Test

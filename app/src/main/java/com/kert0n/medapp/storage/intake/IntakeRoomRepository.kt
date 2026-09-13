@@ -104,7 +104,9 @@ class IntakeRoomRepository @Inject constructor(
             when (val spent = it.toDomain(words).consume(requireNotNull(outcome.taken).amount)) {
                 // Коробка кончилась. Следа у расхода нет — приём и есть учётная запись о нём, — а
                 // держится он за вечную запись и конец переживает (PLAN D3, D6, H6).
-                is PackageAfter.Ended -> packages.end(spent.ending, courses, movements, words, outcome.answeredAt)
+                // Момент записи, а не ответа: след расхода держит свой момент внутри себя, а
+                // редакцию курса двигает то, когда мы узнали (PLAN D5, D7).
+                is PackageAfter.Ended -> packages.end(spent.ending, courses, movements, words, outcome.recordedAt)
                 // Расход не трогает обвязку доставки: версия и картина броней остаются прежними (E3).
                 is PackageAfter.Left -> packages.save(spent.pkg, it.pack.syncState())
             }
