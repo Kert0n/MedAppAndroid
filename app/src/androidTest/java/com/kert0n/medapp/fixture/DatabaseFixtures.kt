@@ -137,6 +137,7 @@ class Scenarios(database: MedAppDatabase, now: java.time.Instant) {
     val packageRelocation = com.kert0n.medapp.feature.packages.PackageRelocation(
         packages, medKits, courses, queue, transactions, clock
     )
+    val medKitKeeping = com.kert0n.medapp.feature.medkits.MedKitKeeping(medKits, transactions, clock)
     val medKitRemoval = com.kert0n.medapp.feature.medkits.MedKitRemoval(
         medKits, packages, packageRemoval, packageRelocation, queue, transactions, clock
     )

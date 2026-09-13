@@ -105,10 +105,8 @@ class WriteContractTest {
         "MedKitStorageRepository.delete" to (Shape.NAMED_FIELDS by "(Uuid): Boolean"),
         "MedKitStorageRepository.mark" to (Shape.NAMED_FIELDS by "(Uuid, MedKitStatus): Boolean"),
         "MedKitStorageRepository.applyServerParticipants" to (Shape.NAMED_FIELDS by "(Uuid, long, Instant): Unit"),
-        // Долг: заведение и правка местных сведений одним методом. Пока у него нет ни одного
-        // вызывающего в продукте; экран правки придёт в PR 7 и должен принести названные поля,
-        // как `rename` у записи эпизода, — иначе он затрёт то, что сделал сосед.
-        "MedKitStorageRepository.save" to (Shape.UNGUARDED by "(MedKit, Instant): Unit"),
+        "MedKitStorageRepository.add" to (Shape.CREATION by "(MedKit): Unit"),
+        "MedKitStorageRepository.describe" to (Shape.NAMED_FIELDS by "(Uuid, String, String): Boolean"),
         // Приём
         "IntakeStorageRepository.observeOfCourse" to (Shape.READ by "(Uuid): Flow<List<IntakeProjection>>"),
         "IntakeStorageRepository.ofCourse" to (Shape.READ by "(Uuid): List<? extends Intake>"),
@@ -122,12 +120,10 @@ class WriteContractTest {
     )
 
     /**
-     * Долг назван поимённо: список закрыт, и новый метод, принимающий прочитанный экземпляр без
-     * редакции, в него молча не попадёт — его придётся приписать сюда руками и объяснить.
+     * Долг назван поимённо, и сейчас он пуст: новый метод, принимающий прочитанный экземпляр без
+     * редакции, в список молча не попадёт — его придётся приписать сюда руками и объяснить.
      */
-    private val known: Set<String> = setOf(
-        "MedKitStorageRepository.save"
-    )
+    private val known: Set<String> = emptySet()
 
     private val ports = listOf(
         PackageStorageRepository::class.java,

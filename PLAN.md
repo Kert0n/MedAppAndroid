@@ -588,6 +588,14 @@ enum class MedKitStatus { ACTIVE, PUBLISHING, REMOVING }
 даты, число участников и состояние публикации сохраняются. Конструктор публичный; момент последней
 сверки с сервером в аптечку не входит — он в обвязке синхронизации слоя данных.
 
+**Полка заводится и правится целым действием — `feature/medkits/MedKitKeeping`.** Заведённая
+полка — местная, с одним участником, `ACTIVE`; правка — `describe` **к полке, прочитанной той же
+транзакцией**, названными полями, а не прочитанным экземпляром: экран, загрузивший полку до чужой
+пометки или до ответа сервера о публикации, переименованием их не переписывает (F5). Команд ни
+то ни другое не ставит: имя и место хранения серверу неизвестны (C0), и правка общей полки — такая
+же местная запись, как правка своей. Помеченную уборкой полку не правят (`allowsUse`); публикуемую
+— правят, решение о ней это не меняет.
+
 **Где полка существует и что о ней решено — разные вопросы.** `Publication` отвечает на первый, и
 состояний у него по-прежнему два: на сервере полка есть либо её там нет. Незавершённое решение
 третьим состоянием не становится — оно живёт пометкой `MedKitStatus`, потому что различает не место
@@ -2438,6 +2446,7 @@ sealed interface MedKitSyncCommand {
 | пересчёт / утилизация / перенос       | остаток/проекция, выделения, исходящие операции; коробка, дошедшая до нуля, удаляется той же транзакцией                              |
 | удаление коробки (`PackageRemoval`)   | курс теряет источник доменным `detach`; местная строка уходит, общая — команда `Delete`, строка до ответа                          |
 | перенос коробки (`PackageRelocation`) | `moveTo` к прочитанному состоянию; команды по границе публикации (`Move`, `Create` + `SetClaim`)                                       |
+| заведение и правка полки (`MedKitKeeping`) | новая строка — местная, `ACTIVE`; правка — `describe` к прочитанному состоянию, названными полями; команд нет: имя и место серверу неизвестны (C0, D2) |
 | уборка аптечки (`MedKitRemoval`)      | по каждой коробке — шаг её судьбы, затем строка аптечки; общая — пометки и команда аптечки, разбирает её ответ сервера; история остаётся |
 | публикация (`MedKitPublishing`)       | пометка полки и её коробок вместе с командами: полки — `Publish`, содержимого — `Create` (+`SetClaim`) зависимыми от неё                |
 
@@ -2597,7 +2606,7 @@ com.kert0n.medapp
 ├─ platform/   notifications/, scanner/, credentials/, connectivity/ (SyncTriggers), clipboard/,
 │              background/ (SyncWorker, WorkManagerSyncSchedule)
 └─ feature/    bootstrap/ (AppStart, AppStartState, AppStartViewModel, SetupScreen),
-               medkits/ (MedKitRemoval, MedKitPublishing, MedKitJoining, MedKitInvitation), packages/ (PackageRemoval, PackageRelocation),
+               medkits/ (MedKitKeeping, MedKitRemoval, MedKitPublishing, MedKitJoining, MedKitInvitation), packages/ (PackageRemoval, PackageRelocation),
                course/ (CourseClosing, CourseDrafting, CourseCalendar, CourseUpkeep, CourseActivation,
                CourseCancellation, CourseAmendment, SourceEditing), schedule/, intake/ (IntakeConfirmation), sharing/, analytics/,
                scanner/, settings/, syncstatus/
@@ -3130,7 +3139,7 @@ data class PackageQuery(
 | 1 | `Аналитика — это мои расходы, а расписание PR — нынешнее` | **сделан**: H6, часть I |
 | 2 | `PLAN: истории коробки нет, а действие над общей пачкой — разница` | **сделан**: C1, D7, E3, I2 |
 | 3 | `У коробки нет истории — есть запись и приёмы` | **сделан**: ушли `StockMovement`, `stock_adjustments` (версия 3 не выпущена — `3.json` и 2→3 правятся на месте), след у `PackageEnding`, `Package.changedElsewhere`, разница в `PackageDao.applySnapshot` и `LayDown.includes`, `StockMovementStorageRepository`; четыре конца коробки — один `Package.ended()`; D3, E1, E4, F1, F2, F4, F5, H1 |
-| 4 | `Полка заводится и переименовывается названными полями` | `feature/medkits/MedKitKeeping`; долг `MedKitStorageRepository.save` в `WriteContractTest` закрыт |
+| 4 | `Полка заводится и переименовывается названными полями` | **сделан**: `feature/medkits/MedKitKeeping` — `create`, `describe` названными полями к прочитанному; порт — `add` и `describe` вместо `save`, долг в `WriteContractTest` закрыт; D2, F5, H1 |
 | 5 | `Пачка заводится целиком` | `feature/packages/PackageAdding`: запись, живая строка, детали; на общей полке — `Create`, пометка `CHANGING`; `templateId` из справочника |
 | 6 | `Чужая правка не сбрасывает мою` | команды — разница: `CorrectStock(seen, actual)` и утилизация поверх свежего числа, `Describe` — своими полями, `Move`/`Delete` — переподготовка; `onStale` переподготовки, `CONFLICT` — где соотнести нельзя (E3) |
 | 7 | `Сведения пачки правятся, общее уезжает командой` | `feature/packages/PackageDescribing`: личное локально, общее — `Describe(before, after)` |
