@@ -5,6 +5,8 @@ import androidx.test.ext.junit.runners.AndroidJUnit4
 import com.kert0n.medapp.domain.course.CourseDraft
 import com.kert0n.medapp.domain.intake.CourseIntake
 import com.kert0n.medapp.domain.intake.TakenDose
+import com.kert0n.medapp.domain.intake.IntakeStatus
+import com.kert0n.medapp.domain.report.DayPlan
 import com.kert0n.medapp.domain.report.FutureSpending
 import com.kert0n.medapp.domain.report.Spending
 import com.kert0n.medapp.domain.report.SpendingHorizon
@@ -238,6 +240,52 @@ class ReportRoomRepositoryTest {
 
         database.packageRepository().mark(PACK, PackageStatus.REMOVING)
         assertEquals(0, summary.first().packages)
+    }
+
+    private suspend fun dayPlan(date: LocalDate): DayPlan = reports.observeDayPlan(date, MOSCOW).first()
+
+    /**
+     * 10 марта: пункт курса ждёт, разовый приём этого дня — рядом; после ответа пункт показан
+     * принятым. Последняя, пятая доза — 14 марта, 15-е пусто.
+     */
+    @Test
+    fun theDayPlanShowsWrittenItemsWithStatusAndOneOffs() = runTest {
+        val id = treated()
+        scenarios.unplannedIntakeRecording.record(OTHER_PACK, dose("1"), now)
+
+        val before = dayPlan(LocalDate.of(2027, 3, 10))
+        assertEquals(2, before.items.size)
+        val item = before.items.filterIsInstance<DayPlan.Item.Scheduled>().single()
+        assertEquals(IntakeStatus.PLANNED, item.intake.status)
+
+        scenarios.intakeConfirmation.confirm(item.intake.id, PACK, dose("2"), now).getOrThrow()
+
+        assertEquals(IntakeStatus.TAKEN, dayPlan(LocalDate.of(2027, 3, 10)).items.filterIsInstance<DayPlan.Item.Scheduled>().single().intake.status)
+        assertEquals(1, dayPlan(LocalDate.of(2027, 3, 14)).items.size)
+        assertTrue(dayPlan(LocalDate.of(2027, 3, 15)).isEmpty)
+    }
+
+    /** Лечение на сто доз: календарь записан на 60 дней, а 70-й день отвечается ожидаемым пунктом. */
+    @Test
+    fun aDayBeyondTheWindowIsAnsweredByTheSchedule() = runTest {
+        database.packageRepository().add(pack(id = PACK, quantity = tablets("20"), form = TABLET_FORM))
+        val created = scenarios.courseDrafting.create("Витамин D")
+        val draft = (scenarios.courseDrafting.edit(
+            created.id, created.revision,
+            listOf(
+                CourseDrafting.Edit.SetDose(dose("1")),
+                CourseDrafting.Edit.SetForm(TABLET_FORM),
+                CourseDrafting.Edit.SetSchedule(schedule(start = LocalDate.of(2027, 3, 10))),
+                CourseDrafting.Edit.SetTotalDoses(Doses(100))
+            )
+        ) as CourseDrafting.Outcome.Saved).draft
+        scenarios.courseActivation.activate(draft.id, draft.revision)
+        scenarios.courseUpkeep.keepUp()
+
+        val far = dayPlan(LocalDate.of(2027, 3, 10).plusDays(70)).items.single()
+
+        assertTrue("$far", far is DayPlan.Item.Expected)
+        assertEquals("Витамин D", (far as DayPlan.Item.Expected).title)
     }
 
     /** Пустая база — пустой отчёт и одно чтение приёмов, без чтения записей. */

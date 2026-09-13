@@ -28,13 +28,13 @@ class FutureSpendingTest {
 
     private fun horizon(today: Int, until: Int) = SpendingHorizon(LocalDate.of(2027, 3, today), LocalDate.of(2027, 3, until))
 
-    private fun spend(plan: FutureSpending.Plan, horizon: SpendingHorizon) =
+    private fun spend(plan: CourseInProgress, horizon: SpendingHorizon) =
         FutureSpending.of(listOf(plan), mapOf(COURSE to record), horizon)
 
     /** Приняты 1 и 2 марта: с 3 по 5 марта — три дозы, шесть таблеток. */
     @Test
     fun theDosesOfTheHorizonAreCountedInTheCourseUnit() {
-        val spending = spend(FutureSpending.Plan(course, course.progress(taken = 2)), horizon(3, 5))
+        val spending = spend(CourseInProgress(course, course.progress(taken = 2)), horizon(3, 5))
 
         assertEquals(listOf(FutureSpending.Episode(record, Doses(3), tablets("6"))), spending.episodes)
     }
@@ -46,7 +46,7 @@ class FutureSpendingTest {
      */
     @Test
     fun unansweredPastItemsMoveTheirDosesForward() {
-        val spending = spend(FutureSpending.Plan(course, course.progress()), horizon(3, 5))
+        val spending = spend(CourseInProgress(course, course.progress()), horizon(3, 5))
 
         assertEquals(Doses(3), spending.episodes.single().doses)
     }
@@ -54,14 +54,14 @@ class FutureSpendingTest {
     /** Горизонт длиннее лечения: считается оставшееся, а не дни горизонта. */
     @Test
     fun theHorizonDoesNotAddDosesBeyondTheCourse() {
-        val spending = spend(FutureSpending.Plan(course, course.progress(taken = 2)), horizon(3, 31))
+        val spending = spend(CourseInProgress(course, course.progress(taken = 2)), horizon(3, 31))
 
         assertEquals(tablets("10"), spending.episodes.single().total)
     }
 
     @Test
     fun aCourseWithNothingLeftGivesNoRow() {
-        assertTrue(spend(FutureSpending.Plan(course, course.progress(taken = 7)), horizon(10, 20)).isEmpty)
+        assertTrue(spend(CourseInProgress(course, course.progress(taken = 7)), horizon(10, 20)).isEmpty)
     }
 
     /** Сутки — в зоне курса: берлинский приём в 23:30 3 марта — это 4 марта по Москве, но 3-е в Берлине. */
@@ -69,7 +69,7 @@ class FutureSpendingTest {
     fun theDaysAreTheCourseDays() {
         val berlin = activeCourse(schedule = schedule(times = listOf(LocalTime.of(23, 30)), zone = BERLIN))
 
-        val spending = spend(FutureSpending.Plan(berlin, berlin.progress(taken = 2)), horizon(3, 3))
+        val spending = spend(CourseInProgress(berlin, berlin.progress(taken = 2)), horizon(3, 3))
 
         assertEquals(Doses(1), spending.episodes.single().doses)
     }
@@ -81,7 +81,7 @@ class FutureSpendingTest {
         val laterRecord = courseRecord(id = other, startedAt = LATER).projection()
 
         val spending = FutureSpending.of(
-            listOf(FutureSpending.Plan(course, course.progress()), FutureSpending.Plan(later, later.progress())),
+            listOf(CourseInProgress(course, course.progress()), CourseInProgress(later, later.progress())),
             mapOf(COURSE to record, other to laterRecord),
             horizon(3, 3)
         )

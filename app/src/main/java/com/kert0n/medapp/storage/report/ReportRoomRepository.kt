@@ -5,6 +5,9 @@ import com.kert0n.medapp.domain.intake.CourseIntake
 import com.kert0n.medapp.domain.intake.Intake
 import com.kert0n.medapp.domain.course.CourseProgress
 import com.kert0n.medapp.domain.course.CourseRecordProjection
+import com.kert0n.medapp.domain.report.CourseInProgress
+import com.kert0n.medapp.domain.intake.UnplannedIntake
+import com.kert0n.medapp.domain.report.DayPlan
 import com.kert0n.medapp.domain.report.FutureSpending
 import com.kert0n.medapp.domain.report.Spending
 import com.kert0n.medapp.domain.report.SpendingHorizon
@@ -17,6 +20,7 @@ import com.kert0n.medapp.storage.database.chunkedForQuery
 import com.kert0n.medapp.storage.intake.IntakeDao
 import com.kert0n.medapp.storage.pack.PackageDao
 import com.kert0n.medapp.storage.value.VocabularyDao
+import java.time.LocalDate
 import java.time.ZoneId
 import javax.inject.Inject
 import kotlin.uuid.Uuid
@@ -59,14 +63,27 @@ class ReportRoomRepository @Inject constructor(
             }
         }
 
+    override fun observeDayPlan(date: LocalDate, zone: ZoneId): Flow<DayPlan> =
+        database.invalidationTracker.createFlow(*PLAN_TABLES).map {
+            database.withTransaction {
+                val words = vocabulary.snapshot()
+                val scheduled = intakes.scheduledOn(date).map { it.toDomain(words) as CourseIntake }
+                val oneOffs = intakes.unplannedBetween(date.atStartOfDay(zone).toInstant(), date.plusDays(1).atStartOfDay(zone).toInstant())
+                    .map { it.toDomain(words) as UnplannedIntake }
+                val inProgress = plans(words)
+                val records = recordsOf(scheduled.map { it.courseId } + inProgress.map { it.course.id }, words)
+                DayPlan.of(date, scheduled, oneOffs, inProgress, records)
+            }
+        }
+
     /** Идущие лечения с их прогрессом: пункты всех курсов — порциями, а не по курсу. */
-    private suspend fun plans(words: Vocabulary): List<FutureSpending.Plan> {
+    private suspend fun plans(words: Vocabulary): List<CourseInProgress> {
         val courses = this.courses.plans().map { it.toPlan(words) }
         val intakesByCourse = courses.map { it.id }.chunkedForQuery()
             .flatMap { intakes.ofCourses(it) }
             .map { it.toDomain(words) as CourseIntake }
             .groupBy { it.courseId }
-        return courses.map { FutureSpending.Plan(it, CourseProgress.of(intakesByCourse[it.id].orEmpty())) }
+        return courses.map { CourseInProgress(it, CourseProgress.of(intakesByCourse[it.id].orEmpty())) }
     }
 
     private suspend fun recordsOf(ids: List<Uuid>, words: Vocabulary): Map<Uuid, CourseRecordProjection> =

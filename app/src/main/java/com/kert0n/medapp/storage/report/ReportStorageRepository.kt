@@ -1,10 +1,12 @@
 package com.kert0n.medapp.storage.report
 
+import com.kert0n.medapp.domain.report.DayPlan
 import com.kert0n.medapp.domain.report.FutureSpending
 import com.kert0n.medapp.domain.report.Spending
 import com.kert0n.medapp.domain.report.SpendingHorizon
 import com.kert0n.medapp.domain.report.StockSummary
 import com.kert0n.medapp.domain.report.SpendingPeriod
+import java.time.LocalDate
 import java.time.ZoneId
 import kotlinx.coroutines.flow.Flow
 
@@ -23,4 +25,7 @@ interface ReportStorageRepository {
 
     /** Что у меня есть сейчас: живые пачки всех доступных полок по категориям, формам и цене. */
     fun observeStockSummary(): Flow<StockSummary>
+
+    /** План на день [date]: пункты моих курсов и разовые приёмы дня, чей момент — в [zone]. */
+    fun observeDayPlan(date: LocalDate, zone: ZoneId): Flow<DayPlan>
 }
