@@ -1,9 +1,10 @@
-package com.kert0n.medapp.feature.bootstrap
+package com.kert0n.medapp.ui.bootstrap
 
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
 import com.kert0n.medapp.R
+import com.kert0n.medapp.presentation.bootstrap.AppStartState
 import com.kert0n.medapp.ui.ErrorMessage
 import com.kert0n.medapp.ui.LoadingState
 

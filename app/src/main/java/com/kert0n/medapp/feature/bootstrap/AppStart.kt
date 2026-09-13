@@ -20,10 +20,10 @@ class AppStart @Inject constructor(
     private val vocabulary: VocabularyLibrary
 ) {
 
-    suspend fun begin(): AppStartState = when (val readiness = account.ensure()) {
+    suspend fun begin(): Outcome = when (val readiness = account.ensure()) {
         AccountReadiness.Ready -> vocabularyKnown()
-        AccountReadiness.KeyLost -> AppStartState.KeyLost
-        is AccountReadiness.NotReady -> AppStartState.Setup(readiness.reason)
+        AccountReadiness.KeyLost -> Outcome.KeyLost
+        is AccountReadiness.NotReady -> Outcome.Setup(readiness.reason)
     }
 
     /**
@@ -31,11 +31,27 @@ class AppStart @Inject constructor(
      * Он только растёт, и уже настроенное приложение обязано открываться без связи (PLAN J3):
      * поэтому пополняется он, лишь когда не знаем ни одной единицы.
      */
-    private suspend fun vocabularyKnown(): AppStartState {
-        if (vocabulary.known().knowsUnits) return AppStartState.Ready
-        vocabulary.refresh()?.let { return AppStartState.Setup(it) }
+    private suspend fun vocabularyKnown(): Outcome {
+        if (vocabulary.known().knowsUnits) return Outcome.Ready
+        vocabulary.refresh()?.let { return Outcome.Setup(it) }
         // Пополнили, а единиц всё равно нет: сервер ответил, но считать по-прежнему нечем.
-        return if (vocabulary.known().knowsUnits) AppStartState.Ready
-        else AppStartState.Setup(Unavailability.SERVER_SILENT)
+        return if (vocabulary.known().knowsUnits) Outcome.Ready
+        else Outcome.Setup(Unavailability.SERVER_SILENT)
+    }
+
+    /**
+     * Чем кончилось начало. Случая три, и это исход **сценария**, а не состояние экрана: «идёт
+     * проверка» сценарий не отвечает никогда — она длится, пока он не ответил, и живёт там, где её
+     * видно, у состояния экрана (PLAN H1).
+     */
+    sealed interface Outcome {
+
+        data object Ready : Outcome
+
+        /** Сохранённое есть, но не открывается: заводить вторую учётку поверх нельзя (PLAN G2). */
+        data object KeyLost : Outcome
+
+        /** Настройка не прошла, и названо почему; повтор осмыслен по правилам самой причины. */
+        data class Setup(val reason: Unavailability) : Outcome
     }
 }

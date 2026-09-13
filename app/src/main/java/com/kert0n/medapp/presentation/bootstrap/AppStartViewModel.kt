@@ -1,4 +1,6 @@
-package com.kert0n.medapp.feature.bootstrap
+package com.kert0n.medapp.presentation.bootstrap
+
+import com.kert0n.medapp.feature.bootstrap.AppStart
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
@@ -38,7 +40,7 @@ class AppStartViewModel @Inject constructor(private val start: AppStart) : ViewM
         if (attempt?.isActive == true) return
         attempt = viewModelScope.launch {
             _state.value = AppStartState.Checking
-            _state.value = start.begin()
+            _state.value = start.begin().toAppStartState()
         }
     }
 }
