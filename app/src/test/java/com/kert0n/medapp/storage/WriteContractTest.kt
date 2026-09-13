@@ -80,6 +80,7 @@ class WriteContractTest {
         // Отчёты
         "ReportStorageRepository.observeSpending" to (Shape.READ by "(SpendingPeriod, ZoneId): Flow<Spending>"),
         "ReportStorageRepository.observeFutureSpending" to (Shape.READ by "(SpendingHorizon): Flow<FutureSpending>"),
+        "ReportStorageRepository.observeStockSummary" to (Shape.READ by "(): Flow<StockSummary>"),
         // Лечение
         "CourseStorageRepository.observeDrafts" to (Shape.READ by "(): Flow<List<CourseDraftProjection>>"),
         "CourseStorageRepository.observePlan" to (Shape.READ by "(Uuid): Flow<CourseProjection>"),

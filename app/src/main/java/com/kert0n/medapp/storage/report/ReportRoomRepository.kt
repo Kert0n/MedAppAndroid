@@ -8,12 +8,14 @@ import com.kert0n.medapp.domain.course.CourseRecordProjection
 import com.kert0n.medapp.domain.report.FutureSpending
 import com.kert0n.medapp.domain.report.Spending
 import com.kert0n.medapp.domain.report.SpendingHorizon
+import com.kert0n.medapp.domain.report.StockSummary
 import com.kert0n.medapp.domain.value.Vocabulary
 import com.kert0n.medapp.domain.report.SpendingPeriod
 import com.kert0n.medapp.storage.course.CourseDao
 import com.kert0n.medapp.storage.database.MedAppDatabase
 import com.kert0n.medapp.storage.database.chunkedForQuery
 import com.kert0n.medapp.storage.intake.IntakeDao
+import com.kert0n.medapp.storage.pack.PackageDao
 import com.kert0n.medapp.storage.value.VocabularyDao
 import java.time.ZoneId
 import javax.inject.Inject
@@ -24,6 +26,7 @@ import kotlinx.coroutines.flow.map
 class ReportRoomRepository @Inject constructor(
     private val database: MedAppDatabase,
     private val intakes: IntakeDao,
+    private val packages: PackageDao,
     private val courses: CourseDao,
     private val vocabulary: VocabularyDao
 ) : ReportStorageRepository {
@@ -48,6 +51,14 @@ class ReportRoomRepository @Inject constructor(
             }
         }
 
+    override fun observeStockSummary(): Flow<StockSummary> =
+        database.invalidationTracker.createFlow(*STOCK_TABLES).map {
+            database.withTransaction {
+                val words = vocabulary.snapshot()
+                StockSummary.of(packages.all().map { it.toDomain(words) })
+            }
+        }
+
     /** Идущие лечения с их прогрессом: пункты всех курсов — порциями, а не по курсу. */
     private suspend fun plans(words: Vocabulary): List<FutureSpending.Plan> {
         val courses = this.courses.plans().map { it.toPlan(words) }
@@ -68,6 +79,9 @@ class ReportRoomRepository @Inject constructor(
     private companion object {
         /** Из чего складывается истраченное: приёмы, записи эпизодов и записи о коробках. */
         val SPENDING_TABLES = arrayOf("intakes", "course_records", "course_times", "package_records")
+
+        /** Из чего складывается сводка: живые коробки, их сведения и записи. */
+        val STOCK_TABLES = arrayOf("packages", "package_details", "package_records", "claims", "med_kits")
 
         /** Из чего складывается расход идущих лечений: планы, их времена и пункты, записи эпизодов. */
         val PLAN_TABLES = arrayOf("courses", "course_times", "course_sources", "intakes", "course_records", "package_records")

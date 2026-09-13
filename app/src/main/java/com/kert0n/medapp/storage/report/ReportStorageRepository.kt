@@ -3,6 +3,7 @@ package com.kert0n.medapp.storage.report
 import com.kert0n.medapp.domain.report.FutureSpending
 import com.kert0n.medapp.domain.report.Spending
 import com.kert0n.medapp.domain.report.SpendingHorizon
+import com.kert0n.medapp.domain.report.StockSummary
 import com.kert0n.medapp.domain.report.SpendingPeriod
 import java.time.ZoneId
 import kotlinx.coroutines.flow.Flow
@@ -19,4 +20,7 @@ interface ReportStorageRepository {
 
     /** Сколько я израсходую по идущим лечениям на [horizon], если все приёмы состоятся. */
     fun observeFutureSpending(horizon: SpendingHorizon): Flow<FutureSpending>
+
+    /** Что у меня есть сейчас: живые пачки всех доступных полок по категориям, формам и цене. */
+    fun observeStockSummary(): Flow<StockSummary>
 }

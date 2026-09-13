@@ -22,6 +22,12 @@ import kotlinx.coroutines.flow.Flow
 @Dao
 interface PackageDao {
 
+    /** Все живые коробки со сведениями — сводке, которой нужны все сразу (PLAN H6). */
+    @Transaction
+    @Query("SELECT * FROM packages")
+    suspend fun all(): List<PackageStorageRow>
+
+
     @Transaction
     @Query("SELECT * FROM packages WHERE id = :id")
     fun observe(id: Uuid): Flow<PackageStorageRow?>

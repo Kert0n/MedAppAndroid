@@ -14,6 +14,9 @@ import com.kert0n.medapp.feature.course.CourseDrafting
 import com.kert0n.medapp.feature.intake.UnplannedIntakeRecording
 import com.kert0n.medapp.feature.packages.PackageAdjusting
 import com.kert0n.medapp.fixture.MOSCOW
+import com.kert0n.medapp.fixture.SHARED_KIT
+import com.kert0n.medapp.fixture.medKit
+import com.kert0n.medapp.domain.pack.PackageStatus
 import com.kert0n.medapp.fixture.OTHER_PACK
 import com.kert0n.medapp.fixture.PACK
 import com.kert0n.medapp.fixture.Scenarios
@@ -216,6 +219,25 @@ class ReportRoomRepositoryTest {
         scenarios.courseCancellation.cancel(id)
 
         assertTrue(future(31).isEmpty)
+    }
+
+    /**
+     * Сводка — живые пачки всех полок, включая общую; коробка, кончившаяся приёмом, и коробка, которую
+     * решили выбросить, в неё не входят, а новая приходит потоком.
+     */
+    @Test
+    fun theStockSummaryCountsLivingBoxesOfAllShelves() = runTest {
+        val summary = reports.observeStockSummary()
+        database.packageRepository().add(pack(id = PACK, category = "обезболивающее", price = com.kert0n.medapp.domain.value.Money(java.math.BigDecimal("150"))))
+        database.packageRepository().add(pack(id = OTHER_PACK, medKit = medKit(id = SHARED_KIT).ref, quantity = tablets("1")))
+        assertEquals(2, summary.first().packages)
+        assertEquals(1, summary.first().unpriced)
+
+        scenarios.unplannedIntakeRecording.record(OTHER_PACK, dose("1"), now)
+        assertEquals(1, summary.first().packages)
+
+        database.packageRepository().mark(PACK, PackageStatus.REMOVING)
+        assertEquals(0, summary.first().packages)
     }
 
     /** Пустая база — пустой отчёт и одно чтение приёмов, без чтения записей. */
