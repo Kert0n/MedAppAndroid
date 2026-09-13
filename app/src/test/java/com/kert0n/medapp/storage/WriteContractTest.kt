@@ -4,7 +4,6 @@ import com.kert0n.medapp.storage.course.CourseStorageRepository
 import com.kert0n.medapp.storage.intake.IntakeStorageRepository
 import com.kert0n.medapp.storage.medkit.MedKitStorageRepository
 import com.kert0n.medapp.storage.pack.PackageStorageRepository
-import com.kert0n.medapp.storage.stock.StockMovementStorageRepository
 import java.lang.reflect.Method
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
@@ -67,6 +66,7 @@ class WriteContractTest {
         // Упаковка
         "PackageStorageRepository.observe" to (Shape.READ by "(Uuid): Flow<PackageProjection>"),
         "PackageStorageRepository.find" to (Shape.READ by "(Uuid): Package"),
+        "PackageStorageRepository.projection" to (Shape.READ by "(Uuid): PackageProjection"),
         "PackageStorageRepository.list" to (Shape.READ by "(PackageQuery, LocalDate): Flow<List<PackageProjection>>"),
         "PackageStorageRepository.contentsOf" to (Shape.READ by "(Uuid): List<Package>"),
         "PackageStorageRepository.observeSyncState" to (Shape.READ by "(Uuid): Flow<PackageSyncState>"),
@@ -77,6 +77,11 @@ class WriteContractTest {
         "PackageStorageRepository.end" to (Shape.ACTION by "(PackageEnding, Instant): Boolean"),
         "PackageStorageRepository.adjust" to (Shape.ACTION by "(PackageAdjustment, CourseReallocation, Instant): Boolean"),
         "PackageStorageRepository.applySnapshot" to (Shape.SNAPSHOT by "(PackageSnapshot, Instant): SnapshotApplied"),
+        // Отчёты
+        "ReportStorageRepository.observeSpending" to (Shape.READ by "(SpendingPeriod, ZoneId): Flow<Spending>"),
+        "ReportStorageRepository.observeFutureSpending" to (Shape.READ by "(SpendingHorizon): Flow<FutureSpending>"),
+        "ReportStorageRepository.observeStockSummary" to (Shape.READ by "(): Flow<StockSummary>"),
+        "ReportStorageRepository.observeDayPlan" to (Shape.READ by "(LocalDate, ZoneId): Flow<DayPlan>"),
         // Лечение
         "CourseStorageRepository.observeDrafts" to (Shape.READ by "(): Flow<List<CourseDraftProjection>>"),
         "CourseStorageRepository.observePlan" to (Shape.READ by "(Uuid): Flow<CourseProjection>"),
@@ -84,18 +89,20 @@ class WriteContractTest {
         "CourseStorageRepository.observeRecord" to (Shape.READ by "(Uuid): Flow<CourseRecordProjection>"),
         "CourseStorageRepository.findDraft" to (Shape.READ by "(Uuid): CourseDraft"),
         "CourseStorageRepository.findPlan" to (Shape.READ by "(Uuid): Course"),
+        "CourseStorageRepository.planIds" to (Shape.READ by "(): List<Uuid>"),
         "CourseStorageRepository.findRecord" to (Shape.READ by "(Uuid): CourseRecord"),
         "CourseStorageRepository.courseHolding" to (Shape.READ by "(Uuid): Uuid"),
         "CourseStorageRepository.rename" to (Shape.NAMED_FIELDS by "(Uuid, String, String): Boolean"),
         // `long` — редакция: `value class Revision` на JVM разворачивается в своё число.
-        "CourseStorageRepository.setTotalDoses" to (Shape.GUARDED by "(Course, long): Boolean"),
+        "CourseStorageRepository.amend" to (Shape.GUARDED by "(Course, long): Boolean"),
         "CourseStorageRepository.updateSources" to (Shape.GUARDED by "(Course, long): Boolean"),
         "CourseStorageRepository.reallocate" to (Shape.ACTION by "(CourseReallocation): Boolean"),
         "CourseStorageRepository.activate" to (Shape.ACTION by "(CourseDraft\$Activation, List<CourseIntake>): Unit"),
         "CourseStorageRepository.close" to (Shape.ACTION by "(CourseCompletion\$Closing): Unit"),
-        // Черновик — сам себе правка: человек держит его на экране целиком, и записывается он
-        // целиком же, а начатое лечение поверх не затирается (проверка живёт в реализации).
-        "CourseStorageRepository.saveDraft" to (Shape.UNGUARDED by "(CourseDraft): Boolean"),
+        // Черновик записывается целиком, но условно по редакции, из которой его правили; новый —
+        // только туда, где под его номером ещё ничего нет (PLAN F5).
+        "CourseStorageRepository.saveDraft" to (Shape.GUARDED by "(CourseDraft, Revision): Boolean"),
+        "CourseStorageRepository.discardDraft" to (Shape.NAMED_FIELDS by "(Uuid): Boolean"),
         // Аптечка
         "MedKitStorageRepository.observeAll" to (Shape.READ by "(): Flow<List<MedKitProjection>>"),
         "MedKitStorageRepository.observe" to (Shape.READ by "(Uuid): Flow<MedKitProjection>"),
@@ -104,10 +111,8 @@ class WriteContractTest {
         "MedKitStorageRepository.delete" to (Shape.NAMED_FIELDS by "(Uuid): Boolean"),
         "MedKitStorageRepository.mark" to (Shape.NAMED_FIELDS by "(Uuid, MedKitStatus): Boolean"),
         "MedKitStorageRepository.applyServerParticipants" to (Shape.NAMED_FIELDS by "(Uuid, long, Instant): Unit"),
-        // Долг: заведение и правка местных сведений одним методом. Пока у него нет ни одного
-        // вызывающего в продукте; экран правки придёт в PR 7 и должен принести названные поля,
-        // как `rename` у записи эпизода, — иначе он затрёт то, что сделал сосед.
-        "MedKitStorageRepository.save" to (Shape.UNGUARDED by "(MedKit, Instant): Unit"),
+        "MedKitStorageRepository.add" to (Shape.CREATION by "(MedKit): Unit"),
+        "MedKitStorageRepository.describe" to (Shape.NAMED_FIELDS by "(Uuid, String, String): Boolean"),
         // Приём
         "IntakeStorageRepository.observeOfCourse" to (Shape.READ by "(Uuid): Flow<List<IntakeProjection>>"),
         "IntakeStorageRepository.ofCourse" to (Shape.READ by "(Uuid): List<? extends Intake>"),
@@ -117,29 +122,21 @@ class WriteContractTest {
         "IntakeStorageRepository.save" to (Shape.ACTION by "(RecordedIntake): Unit"),
         "IntakeStorageRepository.record" to (Shape.ACTION by "(IntakeOutcome): Boolean"),
         "IntakeStorageRepository.materialise" to (Shape.CREATION by "(List<CourseIntake>): Integer"),
-        "IntakeStorageRepository.prunePlanned" to (Shape.NAMED_FIELDS by "(Uuid, Set<ScheduledOccurrence>): Integer"),
-        // История остатка — только дописывается.
-        "StockMovementStorageRepository.observeOfPackage" to (Shape.READ by "(Uuid): Flow<List<StockMovement>>"),
-        "StockMovementStorageRepository.ofPackage" to (Shape.READ by "(Uuid): List<? extends StockMovement>"),
-        "StockMovementStorageRepository.observedBetween" to (Shape.READ by "(Instant, Instant): List<? extends StockMovement>"),
-        "StockMovementStorageRepository.record" to (Shape.CREATION by "(StockMovement): Unit")
+        "IntakeStorageRepository.prunePlanned" to (Shape.NAMED_FIELDS by "(Uuid, Set<ScheduledOccurrence>): Integer")
     )
 
     /**
-     * Долг назван поимённо: список закрыт, и новый метод, принимающий прочитанный экземпляр без
-     * редакции, в него молча не попадёт — его придётся приписать сюда руками и объяснить.
+     * Долг назван поимённо, и сейчас он пуст: новый метод, принимающий прочитанный экземпляр без
+     * редакции, в список молча не попадёт — его придётся приписать сюда руками и объяснить.
      */
-    private val known: Set<String> = setOf(
-        "CourseStorageRepository.saveDraft",
-        "MedKitStorageRepository.save"
-    )
+    private val known: Set<String> = emptySet()
 
     private val ports = listOf(
         PackageStorageRepository::class.java,
         CourseStorageRepository::class.java,
         MedKitStorageRepository::class.java,
         IntakeStorageRepository::class.java,
-        StockMovementStorageRepository::class.java
+        com.kert0n.medapp.storage.report.ReportStorageRepository::class.java
     )
 
     /**

@@ -72,8 +72,8 @@ class MedAppDatabaseMigrationTest {
     /**
      * Версия 3 — коробка стала живой пачкой и вечной записью (PLAN D3, F1, F2). База версии 2 с
      * данными во **всех** перестроенных таблицах переезжает целиком: живая пачка — со своими
-     * частями; кончившаяся — только записью, за которую держатся её приём и приход; переносы
-     * уходят — они говорили о местах (D7).
+     * частями; кончившаяся — только записью, за которую держится её приём; движения уходят
+     * целиком — истории у коробки нет (D7).
      */
     @Test
     fun aDatabaseOfVersionTwoMovesToVersionThreeWhole() {
@@ -161,14 +161,17 @@ class MedAppDatabaseMigrationTest {
         assertEquals(listOf(listOf(PACK.toString(), "5", "2")), rows("SELECT package_id, total, mine FROM claims"))
         assertEquals(listOf(listOf(COURSE.toString(), PACK.toString(), "0", "5")), rows("SELECT * FROM course_sources"))
         assertEquals(listOf(listOf(PACK.toString(), COURSE.toString())), rows("SELECT * FROM active_package_assignments"))
-        // История держится за запись: приём из кончившейся коробки и её приход на месте.
+        // История держится за запись: приём из кончившейся коробки на месте.
         assertEquals(
             listOf(listOf(INTAKE.toString(), OTHER_PACK.toString(), OTHER_PACK.toString(), "2", "LOCAL_APPLIED", operation)),
             rows("SELECT id, planned_package_id, taken_package_id, taken_amount, accounting, operation_id FROM intakes")
         )
+        // Движений версии 2 — прихода, переноса — после миграции нет вместе с таблицей.
+        assertEquals(emptyList<List<String?>>(), rows("SELECT name FROM sqlite_master WHERE type = 'table' AND name = 'stock_adjustments'"))
+        // Истраченное за год читается по моменту ответа, а не перебором (PLAN H6).
         assertEquals(
-            listOf(listOf(oldReceipt, OTHER_PACK.toString(), "RECEIPT"), listOf(receipt, PACK.toString(), "RECEIPT")),
-            rows("SELECT id, package_id, kind FROM stock_adjustments ORDER BY observed_at")
+            listOf(listOf("index_intakes_answered_at")),
+            rows("SELECT name FROM sqlite_master WHERE type = 'index' AND name = 'index_intakes_answered_at'")
         )
         v3.close()
     }

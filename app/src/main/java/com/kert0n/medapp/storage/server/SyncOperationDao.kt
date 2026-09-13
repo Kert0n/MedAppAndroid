@@ -90,6 +90,18 @@ interface SyncOperationDao {
     suspend fun unclosedOfPackages(packageIds: List<Uuid>): List<SyncOperationStorageRow>
 
     /**
+     * Коробки, у которых запрос уже заморожен и не закрыт: он уходил или уйдёт тем же, и сервер
+     * мог его уже применить, а ответ ещё не лёг. Полный снимок таких не кладёт: он поставил бы
+     * серверное число под проекцию той же команды, и расход вычелся бы дважды. Истину по ним
+     * принесёт ответ на ту же команду (PLAN E1). Неотправленная команда сюда не входит: её сервер не видел.
+     */
+    @Query(
+        "SELECT DISTINCT package_id FROM sync_operations WHERE package_id IS NOT NULL " +
+            "AND status NOT IN ('APPLIED', 'REFUSED', 'ACCESS_LOST') AND prepared_method IS NOT NULL"
+    )
+    suspend fun packagesInFlight(): List<Uuid>
+
+    /**
      * Сколько у полки незакрытых **своих** команд — о ней самой, а не о её коробках: пометка полки
      * держится на них, а коробки следят за собой сами (PLAN E1).
      */
@@ -152,6 +164,16 @@ interface SyncOperationDao {
             "AND not_before > :now"
     )
     suspend fun nextDueAt(now: Instant): Instant?
+
+    /**
+     * Ближайший срок среди **всех** незакрытых операций, прошедший в том числе: ждущая связи срока
+     * не имеет и отвечает началом эпохи. `null` — незакрытых нет. В отличие от [nextDueAt], вопрос
+     * здесь не «когда проснуться процессу», а «надо ли будить процесс вовсе» (PLAN E4).
+     */
+    @Query(
+        "SELECT MIN(COALESCE(not_before, 0)) FROM sync_operations WHERE status IN ('PENDING', 'SENDING', 'ANSWERED')"
+    )
+    suspend fun earliestDueOfUnclosed(): Instant?
 
     /** Замораживает запрос и берёт в отправку — только если операция ещё не закрыта. */
     @Query(

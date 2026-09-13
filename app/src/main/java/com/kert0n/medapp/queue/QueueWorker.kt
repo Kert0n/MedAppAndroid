@@ -59,6 +59,12 @@ class QueueWorker @Inject constructor(
     private val single = Mutex()
 
     /**
+     * Заход разбора текущего прохода: промах словаря дочитывается один раз на проход, а не на
+     * каждую операцию. Проход один — [single], — поэтому и заход у него один.
+     */
+    private var words: VocabularyResolver.Session = vocabulary.session()
+
+    /**
      * Проход: пока в базе есть готовая операция — берётся первая по номеру, и так до тех пор,
      * пока готовых не останется или связь не оборвётся. Готовность — одно определение, и живёт
      * оно в запросе ([QueueStorage.ready]): срок, зависимости, порядок по пачке. Поэтому
@@ -69,16 +75,13 @@ class QueueWorker @Inject constructor(
      */
     suspend fun drain(): Report = single.withLock {
         val drain = Drain()
-        var vocabularyRefreshable = true
+        words = vocabulary.session()
         while (true) {
             val entry = storage.ready(clock.instant()).firstOrNull { it.id !in drain.skippedIds } ?: break
             val operation = when (entry) {
                 is StoredSyncOperation.Readable -> entry.operation
                 is StoredSyncOperation.Unreadable -> {
-                    if (entry.reason is StoredSyncOperation.Reason.VocabularyStale && vocabularyRefreshable) {
-                        vocabularyRefreshable = false
-                        if (vocabulary.refresh() is ApiResult.Success) continue
-                    }
+                    if (entry.reason is StoredSyncOperation.Reason.VocabularyStale && words.refreshOnce()) continue
                     drain.skip(entry)
                     continue
                 }
@@ -134,7 +137,7 @@ class QueueWorker @Inject constructor(
             }
             is ApiResult.Failure -> when (val failure = result.failure) {
                 // Версия устарела — сервер отверг запрос до применения; 409 о версии не говорит.
-                ApiFailure.PreconditionFailed -> Step.Settled(stale(taken.command, request))
+                ApiFailure.PreconditionFailed -> Step.Settled(stale(taken, request))
                 ApiFailure.Conflict -> Step.Settled(conflict(taken.command))
                 ApiFailure.PreconditionRequired -> Step.Settled(refused(taken.command, RefusalReason.INVALID))
                 is ApiFailure.Invalid ->
@@ -175,9 +178,7 @@ class QueueWorker @Inject constructor(
                 is QueueAnswer.Snapshot -> known(read.snapshot) { Step.Settled(Delivery.Applied(PackageState.Present(it))) }
                 QueueAnswer.Gone -> Step.Settled(Delivery.Applied(PackageState.Gone))
                 is QueueAnswer.Claim, QueueAnswer.Nothing ->
-                    if (command is PackageSyncCommand.Delete || command is PackageSyncCommand.Withdraw ||
-                        (command is PackageSyncCommand.CorrectStock && command.actual.isZero)
-                    ) {
+                    if (command is PackageSyncCommand.Delete || command is PackageSyncCommand.Withdraw) {
                         Step.Settled(Delivery.Applied(PackageState.Gone))
                     } else {
                         when (val snapshot = snapshotRead(command.packageId)) {
@@ -196,7 +197,7 @@ class QueueWorker @Inject constructor(
 
     /** Снимок из ответа ложится в базу только разрешённым: неизвестное дочитывается или ждёт. */
     private suspend fun known(snapshot: PackageSnapshotNetworkDTO, then: (PackageSnapshot) -> Step): Step =
-        when (val resolution = snapshots.resolve(snapshot, clock.instant())) {
+        when (val resolution = snapshots.resolve(snapshot, clock.instant(), words = words)) {
             is PackageSnapshotResolver.Resolution.Resolved -> then(resolution.snapshot)
             // Команда применена, а коробка уже на полке, где нас нет: ответ окончательный (E6).
             is PackageSnapshotResolver.Resolution.Elsewhere -> Step.Settled(Delivery.Applied(PackageState.Elsewhere))
@@ -204,20 +205,21 @@ class QueueWorker @Inject constructor(
         }
 
     /**
-     * Версия устарела — сервер отверг запрос до применения, в журнал он не попал. Расход и бронь
-     * готовятся заново по свежему состоянию под тем же номером; описание, пересчёт, перенос и
-     * удаление перекрыты чужой правкой — отказ, человек смотрит заново (PLAN E3). У курсового
-     * расхода прежде смотрится бронь: потерянный ответ, за которым пришёл отказ по версии,
-     * оставляет след в `mine`, и тогда расход применён.
+     * Версия устарела — сервер отверг запрос до применения, в журнал он не попал: гонка длиной в
+     * секунды. Любая команда пачки готовится заново по свежему состоянию под тем же номером —
+     * разница человека ложится поверх чужого изменения, а сводима ли она, решает подготовка
+     * (PLAN E3, C1). Прежде смотрится, не применён ли запрос уже: у курсового расхода потерянный
+     * ответ оставляет след в `mine`; у пересчёта, чей исход неизвестен, — число, к которому он
+     * вёл. Разница, переподготовленная поверх себя же, применилась бы дважды.
      */
-    private suspend fun stale(command: SyncCommand, request: PreparedRequest): Delivery = when (command) {
+    private suspend fun stale(operation: SyncOperation, request: PreparedRequest): Delivery = when (val command = operation.command) {
         is PackageSyncCommand -> snapshotThen(command.packageId) { snapshot ->
-            when {
-                command is PackageSyncCommand.Consume && command.provenAppliedBy(snapshot, request) ->
-                    Delivery.Applied(PackageState.Present(snapshot))
-                command.onStale == StalePolicy.REPREPARE -> Delivery.Stale(snapshot)
-                else -> Delivery.Refused(RefusalReason.STALE, PackageState.Present(snapshot))
+            val applied = when (command) {
+                is PackageSyncCommand.Consume -> command.provenAppliedBy(snapshot, request)
+                is PackageSyncCommand.CorrectStock -> operation.outcomeUnknown && command.provenAppliedBy(snapshot, request)
+                else -> false
             }
+            if (applied) Delivery.Applied(PackageState.Present(snapshot)) else Delivery.Stale(snapshot)
         }
         is MedKitSyncCommand -> Delivery.Refused(RefusalReason.STALE, PackageState.None)
         else -> command.unknownRoot()
@@ -259,15 +261,15 @@ class QueueWorker @Inject constructor(
     }
 
     /**
-     * 404 значит разное для разных команд (PLAN B4): что именно — говорит команда. У расхода есть
-     * ещё один случай: повтор запроса, который уже уходил с неизвестным исходом и мог уничтожить
-     * пачку, дойдя до нуля, — тогда пачки нет по нашей же причине, и это применение, а не потеря
-     * доступа (PLAN E3). Известный исход — 429, обрыв до сервера — такого не значит.
+     * 404 значит разное для разных команд (PLAN B4): что именно — говорит команда. У расхода и
+     * пересчёта есть ещё один случай: повтор запроса, который уже уходил с неизвестным исходом и
+     * мог уничтожить пачку, дойдя до нуля, — тогда пачки нет по нашей же причине, и это применение,
+     * а не потеря доступа (PLAN E3). Известный исход — 429, обрыв до сервера — такого не значит.
      */
     private suspend fun notFound(operation: SyncOperation, request: PreparedRequest): Delivery = when (val command = operation.command) {
         is PackageSyncCommand -> when (command.onNotFound) {
             NotFoundPolicy.ACCESS_LOST ->
-                if (command is PackageSyncCommand.Consume && operation.outcomeUnknown && command.emptiedBy(request)) {
+                if (operation.outcomeUnknown && command.emptiedBy(request)) {
                     Delivery.Applied(PackageState.Gone)
                 } else {
                     Delivery.AccessLost
@@ -298,7 +300,7 @@ class QueueWorker @Inject constructor(
      * Пачки нет — доступа к ней нет; связи нет — проход останавливается; иначе — повтор позже.
      */
     private suspend fun snapshotRead(packageId: Uuid): Read = when (val read = transport.packageSnapshot(packageId)) {
-        is ApiResult.Success -> when (val resolution = snapshots.resolve(read.value, clock.instant())) {
+        is ApiResult.Success -> when (val resolution = snapshots.resolve(read.value, clock.instant(), words = words)) {
             is PackageSnapshotResolver.Resolution.Resolved -> Read.Snapshot(resolution.snapshot)
             // Коробка на полке, где нас нет: отправлять некуда — это утрата доступа, а не повтор (E6).
             is PackageSnapshotResolver.Resolution.Elsewhere -> Read.Failed(Delivery.AccessLost)

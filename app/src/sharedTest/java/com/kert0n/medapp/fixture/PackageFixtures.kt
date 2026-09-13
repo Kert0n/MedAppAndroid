@@ -84,7 +84,7 @@ fun Package.projected(hasUnconfirmedChanges: Boolean = false): PackageProjection
 fun PackageAfter.left(): Package =
     (this as? PackageAfter.Left)?.pkg ?: error("ожидалась оставшаяся коробка, а не $this")
 
-/** Конец коробки со своим следом — второй исход того же перехода. */
+/** Конец коробки — второй исход того же перехода. */
 fun PackageAfter.ended(): PackageEnding =
     (this as? PackageAfter.Ended)?.ending ?: error("ожидался конец коробки, а не $this")
 

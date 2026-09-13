@@ -8,15 +8,21 @@ import com.kert0n.medapp.storage.medkit.MedKitRoomRepository
 import com.kert0n.medapp.storage.medkit.MedKitStorageRepository
 import com.kert0n.medapp.storage.pack.PackageRoomRepository
 import com.kert0n.medapp.storage.pack.PackageStorageRepository
+import com.kert0n.medapp.storage.server.QueueBacklogRoomStorage
 import com.kert0n.medapp.storage.server.QueueRoomStorage
+import com.kert0n.medapp.storage.server.SnapshotRoomStorage
 import com.kert0n.medapp.storage.server.SyncOperationRoomRepository
 import com.kert0n.medapp.storage.server.SyncOperationStorageRepository
-import com.kert0n.medapp.storage.stock.StockMovementRoomRepository
-import com.kert0n.medapp.storage.stock.StockMovementStorageRepository
 import com.kert0n.medapp.network.value.VocabularyStore
+import com.kert0n.medapp.queue.QueueBacklog
 import com.kert0n.medapp.queue.QueueStorage
+import com.kert0n.medapp.queue.SnapshotStorage
 import com.kert0n.medapp.queue.Transactions
 import com.kert0n.medapp.storage.database.RoomTransactions
+import com.kert0n.medapp.storage.report.ReportRoomRepository
+import com.kert0n.medapp.storage.report.ReportStorageRepository
+import com.kert0n.medapp.storage.template.PackageTemplateRoomRepository
+import com.kert0n.medapp.storage.template.PackageTemplateStorageRepository
 import com.kert0n.medapp.storage.value.VocabularyRoomRepository
 import com.kert0n.medapp.storage.value.VocabularyStorageRepository
 import dagger.Binds
@@ -51,12 +57,6 @@ abstract class StorageModule {
 
     @Binds
     @Singleton
-    abstract fun stockMovements(
-        implementation: StockMovementRoomRepository
-    ): StockMovementStorageRepository
-
-    @Binds
-    @Singleton
     abstract fun syncOperations(
         implementation: SyncOperationRoomRepository
     ): SyncOperationStorageRepository
@@ -64,6 +64,14 @@ abstract class StorageModule {
     @Binds
     @Singleton
     abstract fun vocabulary(implementation: VocabularyRoomRepository): VocabularyStorageRepository
+
+    @Binds
+    @Singleton
+    abstract fun reports(implementation: ReportRoomRepository): ReportStorageRepository
+
+    @Binds
+    @Singleton
+    abstract fun templates(implementation: PackageTemplateRoomRepository): PackageTemplateStorageRepository
 
     /** «Одна транзакция» — узкий порт: сценарию незачем видеть порт работника очереди (PLAN F5). */
     @Binds
@@ -75,7 +83,15 @@ abstract class StorageModule {
     @Singleton
     abstract fun queueStorage(implementation: QueueRoomStorage): QueueStorage
 
-    /** Публикация читает аптечку и пишет переключение через свой порт (PLAN E5). */
+    /** Остаток очереди — планировщику заходов без живого процесса (PLAN E4). */
+    @Binds
+    @Singleton
+    abstract fun queueBacklog(implementation: QueueBacklogRoomStorage): QueueBacklog
+
+    /** Чтение полного снимка кладёт его через свой порт — одной транзакцией (PLAN E4). */
+    @Binds
+    @Singleton
+    abstract fun snapshotStorage(implementation: SnapshotRoomStorage): SnapshotStorage
 
     /** Резолвер словаря живёт в сети и получает снимок через свой интерфейс. */
     @Binds

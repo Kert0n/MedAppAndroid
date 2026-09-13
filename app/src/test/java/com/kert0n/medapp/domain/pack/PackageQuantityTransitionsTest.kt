@@ -1,9 +1,7 @@
 package com.kert0n.medapp.domain.pack
 
-import com.kert0n.medapp.domain.stock.StockMovement
 import com.kert0n.medapp.domain.value.Quantity
 
-import com.kert0n.medapp.fixture.LATER
 import com.kert0n.medapp.fixture.TABLETS
 import com.kert0n.medapp.fixture.millilitres
 import com.kert0n.medapp.fixture.pack
@@ -12,60 +10,49 @@ import com.kert0n.medapp.fixture.ended
 import com.kert0n.medapp.fixture.left
 import com.kert0n.medapp.fixture.tablets
 
-import kotlin.uuid.Uuid
 import org.junit.Assert.assertEquals
-import org.junit.Assert.assertNull
 import org.junit.Test
 
 /**
  * Переходы, меняющие остаток. Пустой коробки не бывает: кончившаяся перестаёт существовать так же,
- * как выброшенная, и переход отвечает на это концом (PLAN D3). Конец несёт свой след, и выбирает
- * его переход: у расхода следа нет — приём и есть учётная запись о нём, — а у всего остального
- * есть, иначе остаток пропал бы из учёта без объяснения (PLAN D7, H6).
+ * как выброшенная, и переход отвечает на это концом (PLAN D3). Истории у коробки нет: переход
+ * меняет число или кончает коробку и ничего не объясняет (D7).
  */
 class PackageQuantityTransitionsTest {
-
-    private val movementId: Uuid = Uuid.parse("00000000-0000-4000-8000-000000000091")
 
     @Test
     fun consumingToZeroEndsThePack() {
         val ending = pack(quantity = tablets("2")).consume(dose("2")).ended()
-        // Расход объясняет себя сам: движения у него нет, «истрачено» читается по приёмам (H6).
-        assertNull(ending.trace)
+        assertEquals(tablets("2"), ending.pkg.quantity)
     }
 
     @Test
     fun consumingPartOfThePackKeepsIt() {
         val after = pack(quantity = tablets("20")).consume(dose("0.5"))
         assertEquals(tablets("19.5"), after.left().quantity)
-        assertNull(after.trace)
     }
 
     @Test
     fun disposingMoreThanIsLeftDisposesOfEverything() {
-        // Выбросил «пачку» из трёх таблеток, назвав пять: в минус не уходит, ушло три, коробки
-        // нет. Правило — переход пачки, а не хранения, которое его записывает.
-        val ending = pack(quantity = tablets("3")).dispose(tablets("5"), movementId, LATER).ended()
-        assertEquals(tablets("3"), (ending.trace as StockMovement.Disposal).amount)
+        // Выбросил «пачку» из трёх таблеток, назвав пять: в минус не уходит, коробки нет.
+        // Правило — переход пачки, а не хранения, которое его записывает.
+        val ending = pack(quantity = tablets("3")).dispose(tablets("5")).ended()
+        assertEquals(tablets("3"), ending.pkg.quantity)
     }
 
     @Test
-    fun disposingPartOfThePackKeepsItAndSaysWhatWentAway() {
-        val after = pack(quantity = tablets("20")).dispose(tablets("2"), movementId, LATER)
+    fun disposingPartOfThePackKeepsIt() {
+        val after = pack(quantity = tablets("20")).dispose(tablets("2"))
         assertEquals(tablets("18"), after.left().quantity)
-        assertEquals(tablets("2"), (after.trace as StockMovement.Disposal).amount)
     }
 
-    /**
-     * Выброшенная целиком коробка — та же утилизация: без её следа «истрачено за период» не
-     * сошлось бы, а остаток исчез бы, никем не принятый и ничем не объяснённый (PLAN H6).
-     */
+    /** Выброшенная целиком коробка кончается, и её запись остаётся — за неё держатся приёмы. */
     @Test
-    fun throwingThePackOutExplainsWhereItsStockWent() {
-        val ending = pack(quantity = tablets("20")).thrownOut(movementId, LATER)
-        val disposal = ending.trace as StockMovement.Disposal
-        assertEquals(tablets("20"), disposal.amount)
-        assertEquals(movementId, disposal.id)
+    fun throwingThePackOutKeepsItsRecord() {
+        val box = pack(quantity = tablets("20"))
+        val ending = box.ended()
+        assertEquals(box.record, ending.record)
+        assertEquals(box, ending.pkg)
     }
 
     @Test(expected = IllegalArgumentException::class)
@@ -81,23 +68,20 @@ class PackageQuantityTransitionsTest {
 
     @Test
     fun recountToZeroEndsThePack() {
-        val ending = pack(quantity = tablets("20")).correctTo(Quantity.zero(TABLETS), movementId, LATER).ended()
-        val recount = ending.trace as StockMovement.Recount
-        assertEquals(tablets("20"), recount.before)
-        assertEquals(Quantity.zero(TABLETS), recount.after)
+        val ending = pack(quantity = tablets("20")).correctTo(Quantity.zero(TABLETS)).ended()
+        assertEquals(tablets("20"), ending.pkg.quantity)
     }
 
     @Test
     fun recountMayFindMoreThanWasKnown() {
         // Пересчёт — замена значения, а не дельта: пачку могли докупить или ошибиться в учёте.
-        val after = pack(quantity = tablets("3")).correctTo(tablets("12"), movementId, LATER)
+        val after = pack(quantity = tablets("3")).correctTo(tablets("12"))
         assertEquals(tablets("12"), after.left().quantity)
-        assertEquals(tablets("3"), (after.trace as StockMovement.Recount).before)
     }
 
     @Test(expected = IllegalArgumentException::class)
     fun recountDoesNotChangeTheUnit() {
-        pack(quantity = tablets("20")).correctTo(millilitres("20"), movementId, LATER)
+        pack(quantity = tablets("20")).correctTo(millilitres("20"))
     }
 
     @Test(expected = IllegalArgumentException::class)

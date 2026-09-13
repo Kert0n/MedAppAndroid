@@ -43,7 +43,6 @@ import com.kert0n.medapp.fixture.activeCourse
 import com.kert0n.medapp.fixture.save
 import com.kert0n.medapp.fixture.source
 import com.kert0n.medapp.domain.course.Revision
-import com.kert0n.medapp.domain.stock.StockMovement
 import com.kert0n.medapp.storage.course.ActivePackageAssignmentStorageEntity
 import com.kert0n.medapp.storage.course.toSourceStorageEntities
 import com.kert0n.medapp.storage.course.toStorageEntity as toCourseStorageEntity
@@ -204,7 +203,7 @@ class QueueRoomStorageTest {
         assertEquals(tablets("20"), requireNotNull(database.packages().find(PACK)).toDomain(VOCABULARY).quantity)
     }
 
-    /** На сервере пачки нет по нашей же причине: коробки нет, движения нет, курс без источника (D3, D7). */
+    /** На сервере пачки нет по нашей же причине: коробки нет, курс без источника (D3). */
     @Test
     fun packageGoneFromTheServerIsGoneLocally() = runTest {
         holdByACourse()
@@ -214,14 +213,13 @@ class QueueRoomStorageTest {
         storage.settle(operation, Delivery.Applied(PackageState.Gone), at.plusSeconds(1))
 
         assertNull(database.packages().find(PACK))
-        assertTrue(database.stockMovements().ofPackage(PACK).isEmpty())
         assertEquals(emptyList<Uuid>(), database.courses().sourcePackagesOf(COURSE))
         assertEquals(Revision(2), requireNotNull(database.courses().findPlan(COURSE)).toPlan(VOCABULARY).revision)
     }
 
-    /** Доступ утрачен: последний виденный остаток уходит в историю, коробки и источника нет. */
+    /** Доступ утрачен: коробки и источника нет. */
     @Test
-    fun accessLostRemovesThePackageAndWritesTheLossDown() = runTest {
+    fun accessLostRemovesThePackage() = runTest {
         holdByACourse()
         database.syncOperations().enqueue(operation, PackageSyncCommand.Consume(PACK, dose("3"), INTAKE), at)
         storage.take(operation, null, at)
@@ -229,9 +227,6 @@ class QueueRoomStorageTest {
         storage.settle(operation, Delivery.AccessLost, at.plusSeconds(1))
 
         assertNull(database.packages().find(PACK))
-        val loss = database.stockMovements().ofPackage(PACK).single().toDomain(VOCABULARY) as StockMovement.AccessLoss
-        assertEquals(tablets("20"), loss.amount)
-        assertEquals(at.plusSeconds(1), loss.observedAt)
         assertEquals(emptyList<Uuid>(), database.courses().sourcePackagesOf(COURSE))
         assertTrue(storage.ready(at.plusSeconds(600)).isEmpty())
     }

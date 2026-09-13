@@ -5,7 +5,6 @@ import com.kert0n.medapp.domain.course.CourseDraft
 import com.kert0n.medapp.domain.medkit.MedKit
 import com.kert0n.medapp.domain.medkit.MedKitStatus
 import com.kert0n.medapp.domain.pack.PackageStatus
-import com.kert0n.medapp.domain.stock.StockMovement
 import com.kert0n.medapp.fixture.COURSE
 import com.kert0n.medapp.fixture.HOME_KIT
 import com.kert0n.medapp.fixture.INTAKE
@@ -94,7 +93,6 @@ class MedKitLeaveToOthersTest {
         assertEquals(MedKitRemoval.Outcome.MARKED, outcome)
         assertNotNull(database.medKits().find(SHARED_KIT))
         assertNotNull(database.packageRepository().find(PACK))
-        assertEquals(emptyList<StockMovement>(), database.stockMovements().ofPackage(PACK).map { it.toDomain(VOCABULARY) })
         assertEquals(listOf(PACK, OTHER_PACK).sorted(), database.courses().sourcePackagesOf(COURSE).sorted())
         assertEquals(listOf(MedKitSyncCommand.Leave(SHARED_KIT)), commands())
         // Коробки полки видны, но уже не наши; коробка с другой полки не тронута.
@@ -105,9 +103,8 @@ class MedKitLeaveToOthersTest {
     }
 
     /**
-     * Сервер согласился: коробки целы, но не у нас — последний виденный остаток каждой уходит в
-     * историю утратой доступа, курс теряет источники **с этой полки и только их**, а лечение и его
-     * история остаются (PLAN D5, D7, E6).
+     * Сервер согласился: коробки целы, но не у нас — их строк больше нет, курс теряет источники
+     * **с этой полки и только их**, а лечение и его история остаются (PLAN D5, E6).
      */
     @Test
     fun theServerAgreeingLosesTheShelfsPackagesAndKeepsTheCourse() = runTest {
@@ -118,9 +115,6 @@ class MedKitLeaveToOthersTest {
         assertNull(database.medKits().find(SHARED_KIT))
         assertNull(database.packageRepository().find(PACK))
         assertNotNull(database.packageRepository().find(OTHER_PACK))
-        val loss = database.stockMovements().ofPackage(PACK).single().toDomain(VOCABULARY) as StockMovement.AccessLoss
-        assertEquals(tablets("7"), loss.amount)
-        assertEquals(LATER, loss.observedAt)
         assertEquals(listOf(OTHER_PACK), database.courses().sourcePackagesOf(COURSE))
         assertNotNull(database.courses().findRecord(COURSE))
         assertEquals("Парацетамол", requireNotNull(database.intakes().find(INTAKE)).toDomain(VOCABULARY).taken?.pkg?.name)

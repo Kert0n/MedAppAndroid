@@ -5,8 +5,12 @@ import com.kert0n.medapp.BuildConfig
 import com.kert0n.medapp.network.account.AccessTokens
 import io.ktor.client.plugins.logging.Logger
 import com.kert0n.medapp.domain.account.DeviceAccount
+import com.kert0n.medapp.domain.medkit.MedKitInvitations
+import com.kert0n.medapp.domain.template.PackageTemplates
 import com.kert0n.medapp.domain.value.VocabularyLibrary
 import com.kert0n.medapp.network.account.ServerDeviceAccount
+import com.kert0n.medapp.network.medkit.ServerMedKitInvitations
+import com.kert0n.medapp.network.template.ServerPackageTemplates
 import com.kert0n.medapp.network.server.MedAppApi
 import com.kert0n.medapp.network.value.ServerVocabularyLibrary
 import com.kert0n.medapp.queue.QueueHttpTransport
@@ -35,6 +39,14 @@ annotation class CrptHttp
 @Qualifier
 @Retention(AnnotationRetention.BINARY)
 annotation class RegistrationToken
+
+/**
+ * Сколько, по нашей оценке, действует ключ приглашения. Сервер срок не отдаёт (PLAN B6), а
+ * задаёт его своей настройкой `medkit.share.termInMinutes`; разошлись — правится параметр сборки.
+ */
+@Qualifier
+@Retention(AnnotationRetention.BINARY)
+annotation class InvitationTerm
 
 /**
  * Два клиента, а не один с настройками по месту вызова: строгость разбора и авторизация — свойство
@@ -98,4 +110,16 @@ object NetworkModule {
     @Provides
     @Singleton
     fun vocabularyLibrary(implementation: ServerVocabularyLibrary): VocabularyLibrary = implementation
+
+    @Provides
+    @Singleton
+    fun medKitInvitations(implementation: ServerMedKitInvitations): MedKitInvitations = implementation
+
+    @Provides
+    @Singleton
+    fun packageTemplates(implementation: ServerPackageTemplates): PackageTemplates = implementation
+
+    @Provides
+    @InvitationTerm
+    fun invitationTerm(): java.time.Duration = java.time.Duration.ofMinutes(BuildConfig.INVITATION_TERM_MINUTES)
 }

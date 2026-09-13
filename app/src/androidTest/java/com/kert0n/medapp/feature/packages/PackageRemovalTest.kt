@@ -5,7 +5,6 @@ import com.kert0n.medapp.domain.course.CourseDraft
 import com.kert0n.medapp.domain.course.Revision
 import com.kert0n.medapp.domain.medkit.MedKit
 import com.kert0n.medapp.domain.pack.PackageStatus
-import com.kert0n.medapp.domain.stock.StockMovement
 import com.kert0n.medapp.fixture.queueStorage
 import com.kert0n.medapp.queue.Delivery
 import com.kert0n.medapp.queue.PackageState
@@ -36,7 +35,6 @@ import com.kert0n.medapp.queue.pack.PackageSyncCommand
 import com.kert0n.medapp.storage.database.MedAppDatabase
 import com.kert0n.medapp.storage.intake.toStorageEntity as toIntakeStorageEntity
 import com.kert0n.medapp.storage.medkit.toStorageEntity as toMedKitStorageEntity
-import com.kert0n.medapp.storage.stock.toStorageEntity as toMovementStorageEntity
 import java.time.Instant
 import kotlin.uuid.Uuid
 import kotlinx.coroutines.flow.first
@@ -61,17 +59,12 @@ class PackageRemovalTest {
     private lateinit var database: MedAppDatabase
     private lateinit var removal: PackageRemoval
 
-    private val movementId: Uuid = Uuid.parse("00000000-0000-4000-8000-000000000081")
 
     @Before
     fun setUp() = runTest {
         database = inMemoryDatabase()
         removal = Scenarios(database, LATER).packageRemoval
         database.packageRepository().add(pack(id = PACK, quantity = tablets("20"), form = TABLET_FORM))
-        database.stockMovements().insert(
-            StockMovement.Receipt(movementId, pack(id = PACK).ref, tablets("20"), Instant.EPOCH, LATER)
-                .toMovementStorageEntity()
-        )
         val plan = activeCourse(sources = listOf(source(PACK, 5)))
         database.courseRepository().activate(CourseDraft.Activation(plan, courseRecord(prescription = plan.prescription)))
         database.intakes().upsert(
@@ -95,11 +88,6 @@ class PackageRemovalTest {
         assertTrue(plan.sources.isEmpty())
         assertEquals(Revision(2), plan.revision)
         assertNull(database.courses().courseHolding(PACK))
-        // Выброшенное объясняет себя: к приходу добавляется утилизация всего остатка. Без неё
-        // двадцать таблеток исчезли бы из учёта никем не принятыми, и «истрачено» не сошлось (H6).
-        val history = database.stockMovements().ofPackage(PACK).map { it.toDomain(VOCABULARY) }
-        assertEquals(2, history.size)
-        assertEquals(tablets("20"), history.filterIsInstance<StockMovement.Disposal>().single().amount)
         val intake = requireNotNull(database.intakes().find(INTAKE)).toDomain(VOCABULARY)
         assertEquals("Парацетамол", intake.taken?.pkg?.name)
         assertEquals(emptyList<SyncCommand>(), commands())
@@ -108,7 +96,7 @@ class PackageRemovalTest {
     /**
      * Общая коробка: решение и подтверждение — разные моменты (PLAN E1, E6). Серверу уходит
      * `Delete` со своим предусловием, а коробка до ответа **цела**: сосед мог отложить её себе, и
-     * выбросить её молча нельзя. Лечение держит её источником, следа ещё нет, а проекция уже
+     * выбросить её молча нельзя. Лечение держит её источником, а проекция уже
      * показывает ноль — человеку видно, что коробка помечена.
      */
     @Test
@@ -125,7 +113,6 @@ class PackageRemovalTest {
             listOf(PACK),
             requireNotNull(database.courseRepository().findPlan(COURSE)).sources.map { it.pkg.id }
         )
-        assertEquals(1, database.stockMovements().ofPackage(PACK).size)
         assertEquals(listOf(PackageSyncCommand.Delete(PACK)), commands())
         val projection = requireNotNull(database.packageRepository().observe(PACK).first())
         assertEquals(tablets("0"), projection.availability.effective)

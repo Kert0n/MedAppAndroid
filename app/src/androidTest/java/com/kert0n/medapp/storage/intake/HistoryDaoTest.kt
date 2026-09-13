@@ -2,7 +2,6 @@ package com.kert0n.medapp.storage.intake
 
 import android.database.sqlite.SQLiteConstraintException
 import com.kert0n.medapp.domain.intake.IntakeStatus
-import com.kert0n.medapp.domain.stock.StockMovement
 import com.kert0n.medapp.fixture.COURSE
 import com.kert0n.medapp.fixture.FIRST_PLANNED_AT
 import com.kert0n.medapp.fixture.HOME_KIT
@@ -24,7 +23,6 @@ import com.kert0n.medapp.storage.course.toStorageEntity as toRecordStorageEntity
 import com.kert0n.medapp.storage.database.MedAppDatabase
 import com.kert0n.medapp.fixture.save
 import com.kert0n.medapp.storage.pack.ClaimsStorageEntity
-import com.kert0n.medapp.storage.stock.toStorageEntity as toMovementStorageEntity
 import java.time.Instant
 import kotlin.uuid.Uuid
 import kotlinx.coroutines.test.runTest
@@ -42,19 +40,16 @@ import com.kert0n.medapp.fixture.intakeRepository
 import com.kert0n.medapp.fixture.FIRST_SCHEDULED_ON
 
 /**
- * Что переживает конец коробки, а что уходит вместе с ней (PLAN D3, D6, D7, F2).
+ * Что переживает конец коробки, а что уходит вместе с ней (PLAN D3, D6, F2).
  *
- * Приёмы и движения держатся за запись о коробке, а не за живую строку: коробки нет — история
- * читается по-прежнему, с именем и единицей из записи. Части живой коробки — сведения, брони,
+ * Приёмы держатся за запись о коробке, а не за живую строку: коробки нет — история читается
+ * по-прежнему, с именем и единицей из записи. Части живой коробки — сведения, брони,
  * связи с курсами — уходят вместе с ней.
  */
 class HistoryDaoTest {
 
     private lateinit var database: MedAppDatabase
     private val intakes get() = database.intakes()
-    private val movements get() = database.stockMovements()
-
-    private val movementId: Uuid = Uuid.parse("00000000-0000-4000-8000-000000000081")
 
     @Before
     fun openDatabase() = runTest {
@@ -171,21 +166,6 @@ class HistoryDaoTest {
         assertEquals(TABLETS, left.taken?.pkg?.unit)
     }
 
-    /** Движение держится за запись о коробке и объясняет, куда она делась, — и после неё (D7). */
-    @Test
-    fun movementsOutliveTheirPackage() = runTest {
-        movements.insert(
-            StockMovement.Receipt(movementId, pack().ref, tablets("20"), Instant.EPOCH, LATER)
-                .toMovementStorageEntity()
-        )
-
-        assertEquals(1, database.packages().delete(PACK))
-
-        val receipt = movements.ofPackage(PACK).single().toDomain(VOCABULARY) as StockMovement.Receipt
-        assertEquals(tablets("20"), receipt.amount)
-        assertEquals("Парацетамол", receipt.pkg.name)
-    }
-
     /** Части живой коробки уходят с ней: сведения и брони без коробки не значат ничего (PLAN F1, F2). */
     @Test
     fun thePartsOfAPackageGoAwayWithIt() = runTest {
@@ -234,18 +214,5 @@ class HistoryDaoTest {
         return database.openHelper.readableDatabase
             .query("SELECT COUNT(*) FROM $table WHERE $column = '$packageId'")
             .use { it.moveToFirst(); it.getInt(0) }
-    }
-
-    @Test
-    fun movementsOfAPackageComeBackInTimeOrder() = runTest {
-        val first = StockMovement.Receipt(movementId, pack().ref, tablets("20"), Instant.EPOCH, Instant.EPOCH)
-        val second = StockMovement.Recount(
-            Uuid.parse("00000000-0000-4000-8000-000000000082"),
-            pack().ref, tablets("20"), tablets("18"), FIRST_PLANNED_AT, FIRST_PLANNED_AT
-        )
-        movements.insert(second.toMovementStorageEntity())
-        movements.insert(first.toMovementStorageEntity())
-
-        assertEquals(listOf(first, second), movements.ofPackage(PACK).map { it.toDomain(VOCABULARY) })
     }
 }

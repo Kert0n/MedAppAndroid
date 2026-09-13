@@ -41,6 +41,8 @@ class ForeignKeysTest {
         // Запись о коробке держит словарь; живая коробка держится за запись, аптечку и словарь.
         "package_records.unit_id → quantity_units" to Relation.UNREMOVABLE,
         "package_records.form_id → form_types" to Relation.UNREMOVABLE,
+        "drug_templates.quantity_unit_id → quantity_units" to Relation.UNREMOVABLE,
+        "drug_templates.form_id → form_types" to Relation.UNREMOVABLE,
         "packages.id → package_records" to Relation.UNREMOVABLE,
         "packages.med_kit_id → med_kits" to Relation.UNREMOVABLE,
         "packages.quantity_unit_id → quantity_units" to Relation.UNREMOVABLE,
@@ -54,11 +56,10 @@ class ForeignKeysTest {
         // Состав уходит вместе с планом, но не молча: его снимает транзакция конца лечения (F5).
         "course_sources.course_id → courses" to Relation.UNREMOVABLE,
         "active_package_assignments.course_id → courses" to Relation.UNREMOVABLE,
-        // История держится за записи — о коробке и об эпизоде (D6, D7).
+        // История — приёмы — держится за записи: о коробке и об эпизоде (D6).
         "intakes.course_id → course_records" to Relation.HISTORY,
         "intakes.planned_package_id → package_records" to Relation.HISTORY,
         "intakes.taken_package_id → package_records" to Relation.HISTORY,
-        "stock_adjustments.package_id → package_records" to Relation.HISTORY,
         // Зависимости очереди: операцию с зависимыми не удаляют.
         "sync_operation_dependencies.operation_id → sync_operations" to Relation.UNREMOVABLE,
         "sync_operation_dependencies.depends_on_id → sync_operations" to Relation.UNREMOVABLE

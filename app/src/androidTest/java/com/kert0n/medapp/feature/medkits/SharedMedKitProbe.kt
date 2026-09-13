@@ -1,21 +1,23 @@
 package com.kert0n.medapp.feature.medkits
 
-import com.kert0n.medapp.domain.course.CourseDraft
+import com.kert0n.medapp.domain.medkit.InvitationKey
 import com.kert0n.medapp.domain.medkit.MedKit
 import com.kert0n.medapp.domain.pack.PackageStatus
-import com.kert0n.medapp.domain.stock.StockMovement
+import com.kert0n.medapp.domain.intake.CourseIntake
+import com.kert0n.medapp.domain.value.DosageForm
 import com.kert0n.medapp.domain.value.Dose
+import com.kert0n.medapp.domain.value.Doses
+import com.kert0n.medapp.feature.course.CourseActivation
+import com.kert0n.medapp.feature.course.CourseCalendar
+import com.kert0n.medapp.feature.course.CourseDrafting
 import com.kert0n.medapp.domain.value.Quantity
 import com.kert0n.medapp.domain.value.QuantityUnit
 import com.kert0n.medapp.feature.course.CourseClosing
 import com.kert0n.medapp.feature.intake.IntakeConfirmation
-import com.kert0n.medapp.fixture.COURSE
-import com.kert0n.medapp.fixture.FIRST_PLANNED_AT
-import com.kert0n.medapp.fixture.FIRST_SCHEDULED_ON
+import com.kert0n.medapp.fixture.MOSCOW
+import com.kert0n.medapp.fixture.schedule
 import com.kert0n.medapp.fixture.ProbeAccounts
 import com.kert0n.medapp.fixture.Scenarios
-import com.kert0n.medapp.fixture.activeCourse
-import com.kert0n.medapp.fixture.courseRecord
 import com.kert0n.medapp.fixture.courseRepository
 import com.kert0n.medapp.fixture.inMemoryDatabase
 import com.kert0n.medapp.fixture.intakeRepository
@@ -23,32 +25,34 @@ import com.kert0n.medapp.fixture.medKit
 import com.kert0n.medapp.fixture.medKitRepository
 import com.kert0n.medapp.fixture.pack
 import com.kert0n.medapp.fixture.packageRepository
-import com.kert0n.medapp.fixture.plannedIntake
 import com.kert0n.medapp.fixture.queueService
 import com.kert0n.medapp.fixture.queueStorage
-import com.kert0n.medapp.fixture.source
+import com.kert0n.medapp.fixture.snapshotStorage
 import com.kert0n.medapp.fixture.transactions
 import com.kert0n.medapp.network.medkit.MembershipPostNetworkDTO
+import com.kert0n.medapp.network.medkit.ServerMedKitInvitations
 import com.kert0n.medapp.network.server.ApiFailure
 import com.kert0n.medapp.network.server.ApiResult
 import com.kert0n.medapp.network.server.MedAppApi
 import com.kert0n.medapp.network.value.VocabularyResolver
+import com.kert0n.medapp.network.value.toDosageForm
 import com.kert0n.medapp.network.value.toQuantityUnit
 import com.kert0n.medapp.queue.PackageSnapshotResolver
 import com.kert0n.medapp.queue.QueueHttpTransport
 import com.kert0n.medapp.queue.QueueWorker
+import com.kert0n.medapp.queue.SnapshotApplier
 import com.kert0n.medapp.queue.StoredSyncOperation
 import com.kert0n.medapp.queue.SyncCommand
 import com.kert0n.medapp.queue.SyncOperationStatus
 import com.kert0n.medapp.queue.intake.IntakeAccounting
 import com.kert0n.medapp.feature.packages.PackageRelocation
 import com.kert0n.medapp.feature.packages.PackageRemoval
-import com.kert0n.medapp.storage.intake.toStorageEntity as toIntakeStorageEntity
 import com.kert0n.medapp.storage.medkit.toStorageEntity as toMedKitStorageEntity
 import com.kert0n.medapp.storage.value.VocabularyRoomRepository
 import java.math.BigDecimal
 import java.time.Clock
 import java.time.Duration
+import java.time.LocalDate
 import kotlin.uuid.Uuid
 import kotlinx.coroutines.runBlocking
 import org.junit.After
@@ -91,6 +95,7 @@ class SharedMedKitProbe {
     private lateinit var anna: Device
     private lateinit var boris: Device
     private lateinit var unit: QuantityUnit
+    private lateinit var form: DosageForm
     private val shelves = mutableListOf<Uuid>()
 
     @Before
@@ -103,6 +108,7 @@ class SharedMedKitProbe {
         success(anna.vocabulary.refresh())
         success(boris.vocabulary.refresh())
         unit = success(anna.api.quantityUnits()).first().toQuantityUnit()
+        form = success(anna.api.formTypes()).first().toDosageForm()
     }
 
     @After
@@ -135,7 +141,7 @@ class SharedMedKitProbe {
         val shelf = anna.localShelf("Общая")
         val box = anna.addBox(shelf, "20")
         anna.publish(shelf)
-        boris.join(success(anna.api.createInvitation(shelf)).key)
+        boris.join(anna.invite(shelf))
         val intakes = boris.treatFrom(box)
 
         boris.confirm(intakes[0], box)
@@ -217,7 +223,7 @@ class SharedMedKitProbe {
         val shared = sharedShelfWithBorisTreated()
         val dacha = anna.localShelf("Дача")
         anna.publish(dacha)
-        boris.join(success(anna.api.createInvitation(dacha)).key)
+        boris.join(anna.invite(dacha))
 
         assertEquals(MedKitRemoval.Outcome.MARKED, anna.scenarios().medKitRemoval.remove(shared.shelf, MedKitRemoval.Fate.MoveTo(dacha)))
         anna.drain()
@@ -233,7 +239,7 @@ class SharedMedKitProbe {
         val jumped = requireNotNull(boris.packages.find(shared.box))
         assertEquals(dacha, jumped.medKit.id)
         assertAmount("16", jumped.quantity.amount)
-        assertEquals(listOf(shared.box), boris.database.courses().sourcePackagesOf(COURSE))
+        assertEquals(listOf(shared.box), boris.database.courses().sourcePackagesOf(boris.course))
         assertNotNull(success(boris.api.packageSnapshot(shared.box)).claims.mine)
     }
 
@@ -247,7 +253,7 @@ class SharedMedKitProbe {
         val shared = sharedShelfWithBorisTreated()
         val dacha = anna.localShelf("Дача")
         anna.publish(dacha)
-        boris.join(success(anna.api.createInvitation(dacha)).key)
+        boris.join(anna.invite(dacha))
 
         assertEquals(PackageRelocation.Outcome.MARKED, anna.scenarios().packageRelocation.move(shared.box, dacha))
         anna.drain()
@@ -265,7 +271,7 @@ class SharedMedKitProbe {
 
         assertEquals(IntakeAccounting.REMOTE_APPLIED, boris.accountingOf(shared.intakes[1]))
         assertEquals(dacha, requireNotNull(boris.packages.find(shared.box)).medKit.id)
-        assertEquals(listOf(shared.box), boris.database.courses().sourcePackagesOf(COURSE))
+        assertEquals(listOf(shared.box), boris.database.courses().sourcePackagesOf(boris.course))
     }
 
     /**
@@ -340,11 +346,6 @@ class SharedMedKitProbe {
         assertEquals(listOf(SyncOperationStatus.APPLIED), anna.statuses().distinct())
         assertNull(anna.packages.find(shared.box))
         assertEquals(ApiFailure.NotFound, failure(anna.api.packageSnapshot(shared.box)))
-        val words = anna.vocabulary.snapshot()
-        assertTrue(
-            "след утилизации остался",
-            anna.database.stockMovements().ofPackage(shared.box).any { it.toDomain(words) is StockMovement.Disposal }
-        )
 
         boris.confirm(shared.intakes[1], shared.box)
         boris.drain()
@@ -371,11 +372,6 @@ class SharedMedKitProbe {
         assertEquals(listOf(SyncOperationStatus.APPLIED), anna.statuses().distinct())
         assertNull(anna.database.medKits().find(shared.shelf))
         assertNull(anna.packages.find(shared.box))
-        val words = anna.vocabulary.snapshot()
-        assertTrue(
-            "утрата доступа записана",
-            anna.database.stockMovements().ofPackage(shared.box).any { it.toDomain(words) is StockMovement.AccessLoss }
-        )
 
         boris.confirm(shared.intakes[1], shared.box)
         boris.drain()
@@ -384,7 +380,7 @@ class SharedMedKitProbe {
         // Спрашивает Борис: вышедшая Анна коробку уже не видит, и это тоже часть ожидаемого.
         assertAmount("16", BigDecimal(success(boris.api.packageSnapshot(shared.box)).pack.amount))
         assertEquals(ApiFailure.NotFound, failure(anna.api.packageSnapshot(shared.box)))
-        assertEquals(listOf(shared.box), boris.database.courses().sourcePackagesOf(COURSE))
+        assertEquals(listOf(shared.box), boris.database.courses().sourcePackagesOf(boris.course))
     }
 
     /**
@@ -406,11 +402,6 @@ class SharedMedKitProbe {
         assertNull(anna.database.medKits().find(shared.shelf))
         assertNull(anna.packages.find(shared.box))
         assertEquals(ApiFailure.NotFound, failure(anna.api.medKit(shared.shelf)))
-        val words = anna.vocabulary.snapshot()
-        assertTrue(
-            "след утилизации остался",
-            anna.database.stockMovements().ofPackage(shared.box).any { it.toDomain(words) is StockMovement.Disposal }
-        )
 
         boris.confirm(shared.intakes[1], shared.box)
         boris.drain()
@@ -429,7 +420,7 @@ class SharedMedKitProbe {
         val shared = sharedShelfWithBorisTreated()
         val dacha = anna.localShelf("Дача")
         anna.publish(dacha)
-        boris.join(success(anna.api.createInvitation(dacha)).key)
+        boris.join(anna.invite(dacha))
 
         boris.confirm(shared.intakes[1], shared.box)
         assertEquals(MedKitRemoval.Outcome.MARKED, anna.scenarios().medKitRemoval.remove(shared.shelf, MedKitRemoval.Fate.MoveTo(dacha)))
@@ -443,7 +434,7 @@ class SharedMedKitProbe {
         assertEquals(dacha, jumped.medKit.id)
         assertAmount("16", jumped.quantity.amount)
         assertAmount("16", serverAmount(shared.box))
-        assertEquals(listOf(shared.box), boris.database.courses().sourcePackagesOf(COURSE))
+        assertEquals(listOf(shared.box), boris.database.courses().sourcePackagesOf(boris.course))
     }
 
     /**
@@ -481,21 +472,22 @@ class SharedMedKitProbe {
         assertEquals(home, carried.medKit.id)
         assertEquals(PackageStatus.ACTIVE, carried.status)
         assertAmount("16", carried.quantity.amount)
-        assertEquals(listOf(shared.box), anna.database.courses().sourcePackagesOf(COURSE))
+        assertEquals(listOf(shared.box), anna.database.courses().sourcePackagesOf(anna.course))
     }
 
     /**
      * Анна переставила полку в общую, куда Борис вступил **только на сервере**: у него на устройстве
      * этой полки нет. Снимок называет незнакомую полку — это не «подождать», а утрата доступа:
      * операция закрыта, а не отложена навсегда; коробки у Бориса нет, лечение без источника (E6).
-     * Когда в приложении появится чтение общих полок, этот случай станет прыжком (сценарий 3).
+     * Следующий полный снимок приносит Борису и полку, и коробку на ней: сервер назвал полку нашей,
+     * и у нас её не было (E4).
      */
     @Test
     fun theBoxJumpsIntoAShelfBorisDoesNotHaveOnHisDevice(): Unit = runBlocking {
         val shared = sharedShelfWithBorisTreated()
         val dacha = anna.localShelf("Дача")
         anna.publish(dacha)
-        success(boris.api.joinMedKit(MembershipPostNetworkDTO(success(anna.api.createInvitation(dacha)).key)))
+        success(boris.api.joinMedKit(MembershipPostNetworkDTO(anna.invite(dacha))))
 
         assertEquals(MedKitRemoval.Outcome.MARKED, anna.scenarios().medKitRemoval.remove(shared.shelf, MedKitRemoval.Fate.MoveTo(dacha)))
         anna.drain()
@@ -505,15 +497,19 @@ class SharedMedKitProbe {
         assertTrue("операции Бориса закрыты, а не ждут", boris.statuses().none { it == SyncOperationStatus.PENDING || it == SyncOperationStatus.ANSWERED })
         assertEquals(IntakeAccounting.REMOTE_REFUSED, boris.accountingOf(shared.intakes[1]))
         assertBorisLostTheBox(shared.box)
+
+        // У Бориса на сервере могут быть и другие полки, а база у пробы всякий раз свежая: снимок
+        // приносит все, каких у него нет, и дача среди них.
+        boris.refresh()
+        assertEquals("Общая аптечка", requireNotNull(boris.database.medKits().find(dacha)).name)
+        assertEquals(dacha, requireNotNull(boris.packages.find(shared.box)).medKit.id)
     }
 
-    /** Коробки у Бориса нет, остаток ушёл в историю утратой доступа, лечение без источника, но идёт. */
+    /** Коробки у Бориса нет, лечение без источника, но идёт. */
     private suspend fun assertBorisLostTheBox(box: Uuid) {
         assertNull(boris.packages.find(box))
-        val words = boris.vocabulary.snapshot()
-        assertTrue(boris.database.stockMovements().ofPackage(box).any { it.toDomain(words) is StockMovement.AccessLoss })
-        assertEquals(emptyList<Uuid>(), boris.database.courses().sourcePackagesOf(COURSE))
-        assertNotNull(boris.database.courses().findRecord(COURSE))
+        assertEquals(emptyList<Uuid>(), boris.database.courses().sourcePackagesOf(boris.course))
+        assertNotNull(boris.database.courses().findRecord(boris.course))
     }
 
     private suspend fun serverAmount(box: Uuid): BigDecimal = BigDecimal(success(anna.api.packageSnapshot(box)).pack.amount)
@@ -528,15 +524,19 @@ class SharedMedKitProbe {
         private val transactions = database.transactions()
         val vocabulary = VocabularyResolver(VocabularyRoomRepository(database.vocabulary()), api)
         private val snapshots = PackageSnapshotResolver(vocabulary, database.queueStorage())
+        private val reading = SnapshotApplier(api, database.snapshotStorage(), vocabulary, snapshots, clock)
+        private val joining = MedKitJoining(reading)
         private val worker = QueueWorker(database.queueStorage(), QueueHttpTransport(api), vocabulary, snapshots, clock)
         val packages = database.packageRepository()
         private val courses = database.courseRepository()
         private val queue = database.queueService()
         private val medKits = database.medKitRepository()
+        private val invitation = MedKitInvitation(medKits, ServerMedKitInvitations(api), reading, Duration.ofMinutes(60), clock)
         private val relocation = PackageRelocation(packages, medKits, courses, queue, transactions, clock)
         private val publishing = MedKitPublishing(medKits, packages, relocation, queue, transactions, clock)
         private val confirmation = IntakeConfirmation(
-            database.intakeRepository(), courses, packages, transactions, queue, CourseClosing(courses, packages, queue), clock
+            database.intakeRepository(), courses, packages, transactions, queue, CourseClosing(courses, packages, queue),
+            CourseCalendar(database.intakeRepository(), packages), clock
         )
 
         fun scenarios() = Scenarios(database, clock.instant())
@@ -550,7 +550,7 @@ class SharedMedKitProbe {
 
         suspend fun addBox(shelf: Uuid, amount: String): Uuid {
             val id = Uuid.random()
-            packages.add(pack(id = id, medKit = medKit(id = shelf).ref, quantity = pills(amount)))
+            packages.add(pack(id = id, medKit = medKit(id = shelf).ref, quantity = pills(amount), form = form))
             return id
         }
 
@@ -566,36 +566,60 @@ class SharedMedKitProbe {
             assertTrue("полка не доведена: ${published.status}", published.acceptsInvitations)
         }
 
-        /** Вступление и то, что приложение пока не умеет само: положить полку с коробками к себе. */
+        /**
+         * Вступление — сценарием приложения: полка приходит «Общей аптечкой» вместе с коробками, и
+         * класть её руками пробе больше нечем (PLAN C0).
+         */
         suspend fun join(invitation: String) {
-            val joined = success(api.joinMedKit(MembershipPostNetworkDTO(invitation)))
-            database.medKits().upsert(
-                medKit(id = joined.id, name = "Общая", publication = MedKit.Publication.PUBLISHED, participantCount = joined.participantCount)
-                    .toMedKitStorageEntity()
-            )
-            val at = clock.instant()
-            for (dto in joined.packages) {
-                val resolved = snapshots.resolve(dto, at) as PackageSnapshotResolver.Resolution.Resolved
-                packages.applySnapshot(resolved.snapshot, at)
-            }
+            val outcome = joining.join(InvitationKey(invitation))
+            val joined = (outcome as? MedKitJoining.Outcome.Joined)?.medKitId
+                ?: throw AssertionError("вступление не состоялось: $outcome")
+            assertEquals("Общая аптечка", requireNotNull(database.medKits().find(joined)).name)
         }
 
-        /** Лечение из коробки: пять доз по две штуки выделено, три плановых приёма по дням. */
+        /** Приглашение сценарием приложения: звать можно только в полку, уехавшую целиком (PLAN D2). */
+        suspend fun invite(shelf: Uuid): String {
+            val outcome = invitation.invite(shelf)
+            return (outcome as? MedKitInvitation.Outcome.Invited)?.invitation?.key?.value
+                ?: throw AssertionError("приглашение не выдано: $outcome")
+        }
+
+        /** Полный снимок, как его читает приложение: легло всё, что названо. */
+        suspend fun refresh() {
+            val outcome = reading.refresh()
+            val applied = outcome as? SnapshotApplier.Outcome.Applied ?: throw AssertionError("снимок не прочитан: $outcome")
+            assertEquals("пропуски снимка: ${applied.skipped}", emptyList<String>(), applied.skipped)
+        }
+
+        /** Лечение этого устройства: номер эпизода, когда оно начато. */
+        lateinit var course: Uuid
+
+        /**
+         * Лечение из коробки сценариями приложения — черновик и начало: пять доз по две штуки
+         * выделено, раз в день с сегодняшнего дня. Бронь уезжает командой начала, а три ближайших
+         * плановых пункта строит календарь.
+         */
         suspend fun treatFrom(box: Uuid): List<Uuid> {
-            val ref = requireNotNull(packages.find(box)).ref
-            val plan = activeCourse(unit = unit, sources = listOf(source(ref, 5)))
-            courses.activate(CourseDraft.Activation(plan, courseRecord(prescription = plan.prescription)))
-            val intakes = (0L until 3L).map { day ->
-                plannedIntake(
-                    id = Uuid.random(),
-                    plannedPackage = ref,
-                    plannedAmount = twoPills(),
-                    scheduledOn = FIRST_SCHEDULED_ON.plusDays(day),
-                    plannedAt = FIRST_PLANNED_AT.plus(Duration.ofDays(day))
+            val scenarios = scenarios()
+            val created = scenarios.courseDrafting.create("Лечение из коробки")
+            val today = LocalDate.now(MOSCOW)
+            val edited = scenarios.courseDrafting.edit(
+                created.id,
+                created.revision,
+                listOf(
+                    CourseDrafting.Edit.SetDose(twoPills()),
+                    CourseDrafting.Edit.SetForm(form),
+                    CourseDrafting.Edit.SetSchedule(schedule(start = today, zone = MOSCOW)),
+                    CourseDrafting.Edit.SetTotalDoses(Doses(7)),
+                    CourseDrafting.Edit.Attach(box, Doses(5))
                 )
-            }
-            for (intake in intakes) database.intakes().upsert(intake.toIntakeStorageEntity())
-            return intakes.map { it.id }
+            )
+            val draft = (edited as? CourseDrafting.Outcome.Saved)?.draft ?: throw AssertionError("черновик не сохранён: $edited")
+            val started = scenarios.courseActivation.activate(draft.id, draft.revision)
+            assertTrue("лечение не началось: $started", started is CourseActivation.Outcome.Started)
+            course = draft.id
+            return database.intakeRepository().ofCourse(course).filterIsInstance<CourseIntake>()
+                .sortedBy { it.plannedAt }.take(3).map { it.id }
         }
 
         suspend fun confirm(intake: Uuid, box: Uuid) {

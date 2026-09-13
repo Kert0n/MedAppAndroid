@@ -1,0 +1,181 @@
+package com.kert0n.medapp.queue
+
+import com.kert0n.medapp.domain.Unavailability
+import com.kert0n.medapp.domain.medkit.MedKitRef
+import com.kert0n.medapp.domain.value.DosageForm
+import com.kert0n.medapp.domain.value.QuantityUnit
+import com.kert0n.medapp.domain.value.Vocabulary
+import com.kert0n.medapp.network.pack.PackageSnapshot
+import com.kert0n.medapp.network.pack.PackageSnapshotNetworkDTO
+import com.kert0n.medapp.network.server.ApiFailure
+import com.kert0n.medapp.network.server.ApiResult
+import com.kert0n.medapp.network.server.MedAppApi
+import com.kert0n.medapp.network.server.RawResponse
+import com.kert0n.medapp.network.server.medAppHttpClient
+import com.kert0n.medapp.network.value.VocabularyResolver
+import com.kert0n.medapp.network.value.VocabularyStore
+import io.ktor.client.engine.mock.MockEngine
+import io.ktor.client.engine.mock.respond
+import io.ktor.http.HttpHeaders
+import io.ktor.http.HttpStatusCode
+import io.ktor.http.headersOf
+import java.time.Clock
+import java.time.Instant
+import java.time.ZoneOffset
+import kotlin.uuid.Uuid
+import kotlinx.coroutines.CompletableDeferred
+import kotlinx.coroutines.async
+import kotlinx.coroutines.test.runTest
+import org.junit.Assert.assertEquals
+import org.junit.Assert.assertNull
+import org.junit.Assert.assertSame
+import org.junit.Test
+
+/**
+ * Поводов синхронизации много, а заход один: очередь, потом снимок, и совпавшие поводы сливаются.
+ * Остаток очереди поручается планировщику системы, пустая очередь не стоит ничего (PLAN E4).
+ */
+class SynchronizationTest {
+
+    private val now: Instant = Instant.parse("2027-03-10T12:00:00Z")
+    private val clock: Clock = Clock.fixed(now, ZoneOffset.UTC)
+
+    /** Очередь без готовых операций: проход кончается сразу, но известно, что он был. */
+    private class EmptyQueue(private val calls: MutableList<String>) : QueueStorage {
+        override suspend fun ready(now: Instant): List<StoredSyncOperation> {
+            calls += "очередь"
+            return emptyList()
+        }
+        override fun changes() = kotlinx.coroutines.flow.emptyFlow<Unit>()
+        override suspend fun nextDueAt(now: Instant): Instant? = null
+        override suspend fun medKit(id: Uuid): MedKitRef? = null
+        override suspend fun take(id: Uuid, fresh: PackageSnapshot?, at: Instant) = error("не для этого теста")
+        override suspend fun answered(id: Uuid, answer: RawResponse, at: Instant) = error("не для этого теста")
+        override suspend fun defer(id: Uuid, reason: String, at: Instant, notBefore: Instant) = error("не для этого теста")
+        override suspend fun settle(id: Uuid, settlement: Settlement, at: Instant) = error("не для этого теста")
+        override suspend fun enqueue(queued: QueuedCommand, shelf: Uuid, at: Instant) = error("не для этого теста")
+    }
+
+    private object NoTransport : QueueTransport {
+        override suspend fun send(request: PreparedRequest): ApiResult<RawResponse> = error("не для этого теста")
+        override suspend fun packageSnapshot(packageId: Uuid): ApiResult<PackageSnapshotNetworkDTO> = error("не для этого теста")
+        override suspend fun medKitIsOurs(medKitId: Uuid): ApiResult<Boolean> = ApiResult.Failure(ApiFailure.Unavailable)
+    }
+
+    private class Store : VocabularyStore {
+        override suspend fun snapshot() = Vocabulary(emptyList(), emptyList())
+        override suspend fun save(units: List<QuantityUnit>, forms: List<DosageForm>) = Unit
+    }
+
+    private class Nothing : SnapshotStorage {
+        override suspend fun serverKnows() = ServerKnowledge(emptySet(), emptySet(), emptySet(), emptySet())
+        override suspend fun lay(snapshot: ServerSnapshot, at: Instant) = Unit
+    }
+
+    private class Backlog(var due: Instant?) : QueueBacklog {
+        override suspend fun dueAt(now: Instant): Instant? = due
+    }
+
+    private class Schedule : SyncSchedule {
+        val comeBacks = ArrayList<Instant>()
+        override fun keepRegular() = Unit
+        override fun comeBackFor(dueAt: Instant) {
+            comeBacks += dueAt
+        }
+    }
+
+    /**
+     * Сервер: снимок пустой; [gate] держит ответ, пока тест не отпустит; `online = false` — связи нет.
+     * [calls] видит порядок: очередь, затем снимок.
+     */
+    private fun synchronization(
+        calls: MutableList<String>,
+        backlog: Backlog = Backlog(null),
+        schedule: Schedule = Schedule(),
+        gate: CompletableDeferred<Unit>? = null,
+        online: Boolean = true,
+        scope: kotlinx.coroutines.CoroutineScope
+    ): Synchronization {
+        val api = MedAppApi(
+            medAppHttpClient(
+                MockEngine {
+                    calls += "снимок"
+                    gate?.await()
+                    if (!online) throw java.io.IOException("нет связи")
+                    respond("""{"id":"${Uuid.random()}","medKits":[]}""", HttpStatusCode.OK, headersOf(HttpHeaders.ContentType, "application/json"))
+                },
+                "https://medapp.test",
+                retryDelay = { delayMillis(false) { 0L } }
+            )
+        )
+        val storage = EmptyQueue(calls)
+        val vocabulary = VocabularyResolver(Store(), api)
+        val resolver = PackageSnapshotResolver(vocabulary, storage)
+        val worker = QueueWorker(storage, NoTransport, vocabulary, resolver, clock)
+        val snapshots = SnapshotApplier(api, Nothing(), vocabulary, resolver, clock)
+        return Synchronization(worker, snapshots, backlog, schedule, clock, scope)
+    }
+
+    /**
+     * Обычный путь: сначала отдаём своё, потом читаем правду; очередь пуста — планировщику ничего не
+     * поручают, а время последнего чтения запомнено для экрана.
+     */
+    @Test
+    fun aRoundDeliversThenReadsAndAsksForNothingMore() = runTest {
+        val calls = ArrayList<String>()
+        val schedule = Schedule()
+
+        val round = synchronization(calls, schedule = schedule, scope = backgroundScope).let {
+            it.synchronize().also { _ -> assertEquals(now, it.state.value.refreshedAt) }
+        }
+
+        assertEquals(listOf("очередь", "снимок"), calls)
+        assertNull(round.backlogDueAt)
+        assertEquals(emptyList<Instant>(), schedule.comeBacks)
+    }
+
+    /**
+     * В очереди осталось неотправленное: планировщик придёт за ним не раньше срока — а срок, который
+     * уже прошёл, значит «как только будет связь».
+     */
+    @Test
+    fun whatIsLeftInTheQueueIsLeftToTheScheduler() = runTest {
+        val schedule = Schedule()
+        val backlog = Backlog(now.minusSeconds(60))
+
+        val first = synchronization(ArrayList(), backlog, schedule, scope = backgroundScope).synchronize()
+        backlog.due = now.plusSeconds(300)
+        val second = synchronization(ArrayList(), backlog, schedule, scope = backgroundScope).synchronize()
+
+        assertEquals(now, first.backlogDueAt)
+        assertEquals(listOf(now, now.plusSeconds(300)), schedule.comeBacks)
+        assertEquals(now.plusSeconds(300), second.backlogDueAt)
+    }
+
+    /** Повод, пришедший во время захода, ждёт его и получает его итог: снимок читается один раз. */
+    @Test
+    fun aReasonArrivingDuringARoundJoinsIt() = runTest {
+        val calls = ArrayList<String>()
+        val gate = CompletableDeferred<Unit>()
+        val synchronization = synchronization(calls, gate = gate, scope = backgroundScope)
+
+        val first = async { synchronization.synchronize() }
+        val second = async { synchronization.synchronize() }
+        testScheduler.advanceUntilIdle()
+        gate.complete(Unit)
+
+        assertSame(first.await(), second.await())
+        assertEquals(1, calls.count { it == "снимок" })
+    }
+
+    /** Не прочитали — кэш прежний, и время последнего успешного чтения не сдвигается (PLAN E4). */
+    @Test
+    fun aRoundThatCouldNotReadKeepsTheLastRefreshTime() = runTest {
+        val synchronization = synchronization(ArrayList(), online = false, scope = backgroundScope)
+
+        val round = synchronization.synchronize()
+
+        assertEquals(SnapshotApplier.Outcome.Refused(Unavailability.NO_CONNECTION), round.snapshot)
+        assertNull(synchronization.state.value.refreshedAt)
+    }
+}

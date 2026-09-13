@@ -96,4 +96,28 @@ class VocabularyResolverTest {
         )
         assertEquals(null, found.failure)
     }
+
+    /**
+     * Заход разбора многих записей дочитывает словарь один раз: вторая запись с тем же промахом не
+     * идёт на сервер ни когда связи нет, ни когда словарь уже свежий и записи в нём просто нет.
+     */
+    @Test
+    fun aSessionReadsTheVocabularyOnceWhateverMisses() = runTest {
+        val offline = resolver(online = false).session()
+        offline.resolve { it.unitOrMiss(MILLILITRES.id) }
+        // Чтения HTTP-слой повторяет сам: считается не число попыток, а то, что второй промах не добавил ни одной.
+        val afterFirst = requests.size
+        offline.resolve { it.unitOrMiss(MILLILITRES.id) }
+        assertEquals(afterFirst, requests.size)
+
+        requests.clear()
+        val unknown = kotlin.uuid.Uuid.random()
+        val online = resolver(online = true).session()
+        val first = online.resolve { it.unitOrMiss(unknown) }
+        val second = online.resolve { it.unitOrMiss(unknown) }
+        val known = online.resolve { it.unitOrMiss(MILLILITRES.id) }
+        assertEquals(listOf("/v1/quantity-units", "/v1/form-types"), requests)
+        assertTrue(first is VocabularyResolver.Resolution.Unresolved && second is VocabularyResolver.Resolution.Unresolved)
+        assertEquals(VocabularyResolver.Resolution.Resolved(MILLILITRES), known)
+    }
 }

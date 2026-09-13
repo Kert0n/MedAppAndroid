@@ -3,11 +3,15 @@ package com.kert0n.medapp.app
 import androidx.test.core.app.ActivityScenario
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import androidx.test.platform.app.InstrumentationRegistry
+import androidx.hilt.work.HiltWorkerFactory
+import androidx.work.testing.TestListenableWorkerBuilder
+import com.kert0n.medapp.platform.background.SyncWorker
 import dagger.hilt.android.testing.HiltAndroidRule
 import dagger.hilt.android.testing.HiltAndroidTest
 import kotlinx.coroutines.CoroutineDispatcher
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNotNull
+import org.junit.Assert.assertTrue
 import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
@@ -51,6 +55,23 @@ class AppLaunchTest {
         assertNotNull(io)
         assertNotNull(computation)
         assertNotNull(main)
+    }
+
+    @Inject
+    lateinit var workerFactory: HiltWorkerFactory
+
+    /**
+     * Фоновую задачу система создаёт по имени класса, и собрать её может только фабрика графа: без
+     * неё `SyncWorker` не получил бы координатор синхронизации (PLAN E4).
+     */
+    @Test
+    fun graphBuildsTheSyncWorker() {
+        hilt.inject()
+        val context = InstrumentationRegistry.getInstrumentation().targetContext
+
+        val worker = TestListenableWorkerBuilder<SyncWorker>(context).setWorkerFactory(workerFactory).build()
+
+        assertTrue(worker is SyncWorker)
     }
 
     @Test

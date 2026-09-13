@@ -112,6 +112,17 @@ class PackageSnapshotResolverTest {
         assertEquals(PackageSnapshotResolver.Resolution.Elsewhere(SHARED_KIT), resolution)
     }
 
+    /** Ту же полку полный снимок приносит сам: коробке на ней есть куда лечь (PLAN E4). */
+    @Test
+    fun aMedKitTheSnapshotBringsResolvesTheBoxOntoIt() = runTest {
+        val resolution = resolver(online = false).resolve(
+            dto(snapshotJson.replace(HOME_KIT.toString(), SHARED_KIT.toString())), EARLIER, arriving = setOf(SHARED_KIT)
+        )
+        val resolved = resolution as PackageSnapshotResolver.Resolution.Resolved
+        assertEquals(SHARED_KIT, resolved.snapshot.pack.medKit.id)
+        assertEquals(MedKit.Publication.PUBLISHED, resolved.snapshot.pack.medKit.publication)
+    }
+
     @Test
     fun anUnknownUnitIsReadFromTheServerAndResolved() = runTest {
         val resolution = resolver(online = true).resolve(dto(snapshotJson.replace(TABLETS.id.toString(), MILLILITRES.id.toString())), EARLIER)

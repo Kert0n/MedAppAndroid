@@ -1,5 +1,7 @@
 package com.kert0n.medapp.domain.course
 
+import com.kert0n.medapp.domain.intake.CourseIntake
+import com.kert0n.medapp.domain.intake.IntakeStatus
 import com.kert0n.medapp.domain.value.Doses
 import com.kert0n.medapp.domain.value.doses
 
@@ -45,5 +47,11 @@ class CourseProgress(
 
     companion object {
         val none: CourseProgress = CourseProgress()
+
+        /** Прогресс лечения — из его пунктов: принятые и пропущенные; план и отмена — не ответ. */
+        fun of(intakes: List<CourseIntake>): CourseProgress = CourseProgress(
+            taken = intakes.filter { it.status == IntakeStatus.TAKEN }.mapTo(HashSet()) { it.slot },
+            missed = intakes.filter { it.status == IntakeStatus.MISSED }.mapTo(HashSet()) { it.slot }
+        )
     }
 }

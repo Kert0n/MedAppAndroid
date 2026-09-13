@@ -47,12 +47,11 @@ class Settlement(val transition: Transition, effects: List<Effect> = emptyList()
         data class LayDown(val snapshot: PackageSnapshot) : Effect
 
         /**
-         * Коробки у нас больше нет. Чем это объясняется в истории, называет [ending]: решение
-         * выбросить — утилизацией всего остатка, пересчёт в ноль — пересчётом, расход — ничем
-         * (приём и есть учётная запись о себе), утрата доступа — последним виденным остатком
-         * (PLAN D7, H6). Хранение получает название и просит у пачки её переход.
+         * Коробки у нас больше нет — сервер подтвердил её конец либо утрату доступа. Истории у
+         * коробки нет, и чем конец вызван, хранение не различает: оно просит у пачки её переход
+         * (PLAN D3, D7).
          */
-        data class PackageEnded(val packageId: Uuid, val ending: Ending) : Effect
+        data class PackageEnded(val packageId: Uuid) : Effect
 
         /**
          * Унесённую домой коробку сервер больше не знает: у нас она просто местная — без версий и
@@ -65,9 +64,6 @@ class Settlement(val transition: Transition, effects: List<Effect> = emptyList()
          * чем ляжет ответ сервера, иначе снимку не на что было бы лечь (PLAN E1, E6).
          */
         data class Returned(val packageId: Uuid, val medKitId: Uuid) : Effect
-
-        /** Чем кончилась коробка по ответу сервера — ровно то, что различает её след. */
-        enum class Ending { THROWN_OUT, RECOUNTED, CONSUMED, ACCESS_LOST }
 
         /**
          * Полку разобрали: сервер согласился, и теперь её содержимое либо переезжает в
@@ -128,7 +124,7 @@ fun Delivery.settlement(command: SyncCommand): Settlement = when (this) {
     Delivery.AccessLost -> Settlement(
         Settlement.Transition.Close(SyncOperationStatus.ACCESS_LOST),
         listOf(Settlement.Effect.Account(IntakeAccounting.REMOTE_REFUSED)) +
-            listOfNotNull((command as? PackageSyncCommand)?.gone(Settlement.Effect.Ending.ACCESS_LOST)) +
+            listOfNotNull((command as? PackageSyncCommand)?.gone()) +
             Settlement.Effect.Cascade(SyncOperationStatus.ACCESS_LOST, IntakeAccounting.REMOTE_REFUSED) +
             Settlement.Effect.Settled
     )
@@ -137,19 +133,18 @@ fun Delivery.settlement(command: SyncCommand): Settlement = when (this) {
 /** Истина по пачке после закрытия — что положить: снимок, «пачки нет» либо ничего. */
 private fun PackageState.effects(command: SyncCommand): List<Settlement.Effect> = when (this) {
     is PackageState.Present -> listOf(Settlement.Effect.LayDown(snapshot))
-    PackageState.Gone -> listOfNotNull((command as? PackageSyncCommand)?.let { it.gone(it.endsAs()) })
-    // Команда своё сделала, а коробка ушла туда, где нас нет: у нас она кончается утратой доступа.
-    PackageState.Elsewhere -> listOfNotNull((command as? PackageSyncCommand)?.gone(Settlement.Effect.Ending.ACCESS_LOST))
+    // Пачки нет — либо команда своё сделала, а коробка ушла туда, где нас нет: у нас она кончается.
+    PackageState.Gone, PackageState.Elsewhere -> listOfNotNull((command as? PackageSyncCommand)?.gone())
     PackageState.None -> emptyList()
 }
 
 /**
  * Коробки нет на сервере. Для унесённой домой это и было желаемым — она остаётся у нас местной;
- * для остальных это конец, и [ending] называет его след (PLAN D7, E6).
+ * для остальных это конец (PLAN D3, E6).
  */
-private fun PackageSyncCommand.gone(ending: Settlement.Effect.Ending): Settlement.Effect =
+private fun PackageSyncCommand.gone(): Settlement.Effect =
     if (this is PackageSyncCommand.Withdraw) Settlement.Effect.Withdrawn(packageId)
-    else Settlement.Effect.PackageEnded(packageId, ending)
+    else Settlement.Effect.PackageEnded(packageId)
 
 /**
  * Отказ возвращает коробку туда, откуда её взяли: унос домой — на полку, с которой снимали;
@@ -162,16 +157,6 @@ private fun SyncCommand.returned(): List<Settlement.Effect> = when {
     this is PackageSyncCommand.Create && fromMedKitId != null ->
         listOf(Settlement.Effect.Returned(packageId, fromMedKitId))
     else -> emptyList()
-}
-
-/**
- * Чем кончилась коробка, у которой сервер подтвердил «её нет»: каждая команда знает, зачем её
- * посылали, и след истории берётся отсюда, а не выдумывается хранением (PLAN D7, H6).
- */
-private fun PackageSyncCommand.endsAs(): Settlement.Effect.Ending = when (this) {
-    is PackageSyncCommand.Delete -> Settlement.Effect.Ending.THROWN_OUT
-    is PackageSyncCommand.CorrectStock -> Settlement.Effect.Ending.RECOUNTED
-    else -> Settlement.Effect.Ending.CONSUMED
 }
 
 /**

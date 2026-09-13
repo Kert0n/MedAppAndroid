@@ -6,13 +6,16 @@ import com.kert0n.medapp.fixture.INTAKE
 import com.kert0n.medapp.fixture.OTHER_INTAKE
 import com.kert0n.medapp.fixture.PACK
 import com.kert0n.medapp.fixture.SHARED_KIT
+import com.kert0n.medapp.fixture.TABLETS
 import com.kert0n.medapp.fixture.TABLET_FORM
 import com.kert0n.medapp.fixture.millilitres
 import com.kert0n.medapp.fixture.dose
 import com.kert0n.medapp.fixture.tablets
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNotEquals
 import org.junit.Assert.assertThrows
+import org.junit.Assert.assertTrue
 import org.junit.Test
 
 /**
@@ -30,12 +33,12 @@ class PackageSyncCommandTest {
     fun anotherAmountIsAnotherCommand() {
         // Величина: подготовленный запрос неизменен, «поправить команду на месте» не бывает.
         assertNotEquals(
-            PackageSyncCommand.CorrectStock(PACK, tablets("20")),
-            PackageSyncCommand.CorrectStock(PACK, tablets("19"))
+            PackageSyncCommand.CorrectStock(PACK, tablets("20"), tablets("20")),
+            PackageSyncCommand.CorrectStock(PACK, tablets("20"), tablets("19"))
         )
         assertEquals(
-            PackageSyncCommand.CorrectStock(PACK, tablets("20")),
-            PackageSyncCommand.CorrectStock(PACK, tablets("20.000000"))
+            PackageSyncCommand.CorrectStock(PACK, tablets("20"), tablets("20")),
+            PackageSyncCommand.CorrectStock(PACK, tablets("20"), tablets("20.000000"))
         )
     }
 
@@ -45,7 +48,7 @@ class PackageSyncCommandTest {
         val commands: List<PackageSyncCommand> = listOf(
             PackageSyncCommand.Create(PACK, HOME_KIT, tablets("20"), paracetamol),
             PackageSyncCommand.Describe(PACK, paracetamol, paracetamol.copy(country = "Украина")),
-            PackageSyncCommand.CorrectStock(PACK, tablets("19")),
+            PackageSyncCommand.CorrectStock(PACK, tablets("20"), tablets("19")),
             PackageSyncCommand.Move(PACK, SHARED_KIT),
             PackageSyncCommand.Delete(PACK),
             PackageSyncCommand.Withdraw(PACK, SHARED_KIT, tablets("20")),
@@ -58,15 +61,43 @@ class PackageSyncCommandTest {
     }
 
     /**
-     * «Унёс домой» на проводе — то же удаление, но остатка не меняет и по отказу не спорит заново:
-     * коробка у человека, а чужая правка на сервере — повод решить снова (PLAN E1, E6).
+     * «Унёс домой» на проводе — то же удаление, но остатка не меняет: коробка у человека, и чего
+     * нет на сервере, то уже унесено (PLAN E1, E6).
      */
     @Test
     fun carryingHomeKeepsTheAmountAndTakesAnAbsentBoxAsDone() {
         val withdraw = PackageSyncCommand.Withdraw(PACK, SHARED_KIT, tablets("20"))
         assertEquals(null, withdraw.appliedTo(tablets("20")))
         assertEquals(com.kert0n.medapp.queue.NotFoundPolicy.APPLIED, withdraw.onNotFound)
-        assertEquals(com.kert0n.medapp.queue.StalePolicy.REFUSE, withdraw.onStale)
+    }
+
+    /**
+     * Пересчёт — разница относительно увиденного, а не названное число (C1): видел 20, назвал 17 —
+     * это «минус три» поверх любого свежего числа; поверх 10 выходит 7, а поверх 2 — ниже нуля, и
+     * такое соотнести нельзя.
+     */
+    @Test
+    fun recountIsADifferenceOverWhatWasSeen() {
+        val recount = PackageSyncCommand.CorrectStock(PACK, seen = tablets("20"), actual = tablets("17"))
+        assertEquals(tablets("7"), recount.onto(tablets("10")))
+        assertEquals(tablets("0"), recount.onto(tablets("2")))
+        assertTrue(recount.conflictsWith(tablets("2")))
+        assertFalse(recount.conflictsWith(tablets("3")))
+        assertEquals(TABLETS, recount.measuredIn)
+    }
+
+    /**
+     * Правка сведений ложится своими полями поверх серверных: нетронутое остаётся соседским,
+     * изменённое ложится, если сосед его не трогал или сделал то же, а то же поле, изменённое
+     * соседом иначе, соотнести нельзя (C1).
+     */
+    @Test
+    fun describingLaysOnlyItsOwnFieldsOverTheServers() {
+        val describe = PackageSyncCommand.Describe(PACK, paracetamol, paracetamol.copy(country = "Украина"))
+        val neighbourRenamed = paracetamol.copy(name = "Панадол")
+        assertEquals(neighbourRenamed.copy(country = "Украина"), describe.onto(neighbourRenamed))
+        assertEquals(paracetamol.copy(country = "Украина"), describe.onto(paracetamol.copy(country = "Украина")))
+        assertEquals(null, describe.onto(paracetamol.copy(country = "Польша")))
     }
 
     @Test

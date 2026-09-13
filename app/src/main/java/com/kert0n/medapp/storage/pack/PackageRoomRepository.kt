@@ -22,11 +22,10 @@ import com.kert0n.medapp.storage.course.toSourceStorageEntities
 import com.kert0n.medapp.storage.course.toStorageEntity as toCourseStorageEntity
 import com.kert0n.medapp.storage.database.MedAppDatabase
 import com.kert0n.medapp.storage.database.chunkedForQuery
+import com.kert0n.medapp.storage.database.observing
 import com.kert0n.medapp.queue.StoredSyncOperation
 import com.kert0n.medapp.storage.server.SyncOperationDao
 import com.kert0n.medapp.storage.server.SyncOperationStorageRow
-import com.kert0n.medapp.storage.stock.StockMovementDao
-import com.kert0n.medapp.storage.stock.toStorageEntity as toMovementStorageEntity
 import com.kert0n.medapp.storage.value.VocabularyDao
 import java.time.Instant
 import java.time.LocalDate
@@ -39,7 +38,6 @@ class PackageRoomRepository @Inject constructor(
     private val database: MedAppDatabase,
     private val packages: PackageDao,
     private val courses: CourseDao,
-    private val movements: StockMovementDao,
     private val queue: SyncOperationDao,
     private val vocabulary: VocabularyDao
 ) : PackageStorageRepository {
@@ -53,6 +51,8 @@ class PackageRoomRepository @Inject constructor(
 
     override suspend fun find(id: Uuid): Package? =
         packages.find(id)?.toDomain(vocabulary.snapshot())
+
+    override suspend fun projection(id: Uuid): PackageProjection? = projectionOf(id)
 
     override fun list(query: PackageQuery, today: LocalDate): Flow<List<PackageProjection>> =
         onChange { listing(query, today) }
@@ -81,7 +81,7 @@ class PackageRoomRepository @Inject constructor(
     }
 
     private suspend fun finish(ending: PackageEnding, at: Instant) =
-        packages.end(ending, courses, movements, vocabulary.snapshot(), at)
+        packages.end(ending, courses, vocabulary.snapshot(), at)
 
     override suspend fun contentsOf(medKitId: Uuid): List<Package> = database.withTransaction {
         val words = vocabulary.snapshot()
@@ -101,7 +101,7 @@ class PackageRoomRepository @Inject constructor(
         }
 
     override suspend fun applySnapshot(snapshot: PackageSnapshot, observedAt: Instant): SnapshotApplied =
-        packages.applySnapshot(snapshot, observedAt)
+        database.withTransaction { packages.applySnapshot(snapshot, observedAt) }
 
     override suspend fun saveClaims(packageId: Uuid, claims: Claims?) {
         if (claims == null) packages.deleteClaims(packageId)
@@ -114,9 +114,8 @@ class PackageRoomRepository @Inject constructor(
         at: Instant
     ): Boolean = database.withTransaction {
         val stored = packages.find(adjustment.packageId) ?: return@withTransaction false
-        when (val after = adjustment.applyTo(stored.toDomain(vocabulary.snapshot()), at)) {
+        when (val after = adjustment.applyTo(stored.toDomain(vocabulary.snapshot()))) {
             is PackageAfter.Left -> {
-                after.trace?.let { movements.insert(it.toMovementStorageEntity()) }
                 // Версии и время сверки остаются те, что записал снимок сервера: их двигает сеть (E4).
                 save(after.pkg, stored.pack.syncState())
                 // Пересчитанное обеспечение относится к пережившей переход коробке. У кончившейся
@@ -140,8 +139,7 @@ class PackageRoomRepository @Inject constructor(
      * этого не даёт — его значения относятся к разным состояниям базы, и экран получал бы
      * комбинацию, которой в базе никогда не было: свежий остаток со старой очередью.
      */
-    private fun <T> onChange(read: suspend () -> T): Flow<T> =
-        database.invalidationTracker.createFlow(*AVAILABILITY_TABLES).map { read() }
+    private fun <T> onChange(read: suspend () -> T): Flow<T> = database.observing(*AVAILABILITY_TABLES, read = read)
 
     private suspend fun projectionOf(id: Uuid): PackageProjection? = database.withTransaction {
         val words = vocabulary.snapshot()
@@ -225,9 +223,7 @@ class PackageRoomRepository @Inject constructor(
             "sync_operations",
             "courses",
             "course_sources",
-            "active_package_assignments",
-            "quantity_units",
-            "form_types"
+            "active_package_assignments"
         )
     }
 }

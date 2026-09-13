@@ -13,8 +13,6 @@ import com.kert0n.medapp.network.pack.PackageSnapshot
 import com.kert0n.medapp.network.pack.PackageSyncState
 import com.kert0n.medapp.storage.course.CourseDao
 import com.kert0n.medapp.storage.course.releaseSource
-import com.kert0n.medapp.storage.stock.StockMovementDao
-import com.kert0n.medapp.storage.stock.toStorageEntity
 import java.time.Instant
 import java.time.LocalDate
 import com.kert0n.medapp.domain.pack.PackageStatus
@@ -23,6 +21,12 @@ import kotlinx.coroutines.flow.Flow
 
 @Dao
 interface PackageDao {
+
+    /** Все живые коробки со сведениями — сводке, которой нужны все сразу (PLAN H6). */
+    @Transaction
+    @Query("SELECT * FROM packages")
+    suspend fun all(): List<PackageStorageRow>
+
 
     @Transaction
     @Query("SELECT * FROM packages WHERE id = :id")
@@ -242,6 +246,21 @@ interface PackageDao {
     @Query("DELETE FROM packages WHERE id = :id")
     suspend fun delete(id: Uuid): Int
 
+    /**
+     * Коробки, о которых сервер знает и по которым нечего ждать: без серверной версии он о коробке
+     * ещё не слышал, а помеченная ждёт ответа на своё решение — её отсутствие в снимке объяснит
+     * он, а не снимок (PLAN E4).
+     */
+    @Query(
+        "SELECT p.id FROM packages p JOIN med_kits k ON k.id = p.med_kit_id " +
+            "WHERE k.publication = 'PUBLISHED' AND p.version IS NOT NULL AND p.status = 'ACTIVE'"
+    )
+    suspend fun knownToServer(): List<Uuid>
+
+    /** Все живые коробки — чтобы снимок не вернул убранную, пока он летел (PLAN C0, E4). */
+    @Query("SELECT id FROM packages")
+    suspend fun held(): List<Uuid>
+
     @Transaction
     @Query("SELECT * FROM packages WHERE med_kit_id = :medKitId ORDER BY name")
     suspend fun ofMedKit(medKitId: Uuid): List<PackageStorageRow>
@@ -250,7 +269,11 @@ interface PackageDao {
 /**
  * Снимок пачки, разрешённый в домен, — в базу. Единственная дверь: половины расходятся только
  * тут, и только по своим версиям, поэтому версия картины броней всегда описывает ту картину,
- * что лежит рядом (PLAN B3, E1).
+ * что лежит рядом (PLAN B3, E1). Серверное число ложится только через неё — полным снимком,
+ * чтением перед отправкой или ответом на команду; чужое изменение просто становится нашим
+ * числом, истории у коробки нет (D7).
+ *
+ * Зовётся внутри уже открытой транзакции того, кто снимок кладёт.
  */
 suspend fun PackageDao.applySnapshot(snapshot: PackageSnapshot, observedAt: Instant): SnapshotApplied =
     applySnapshot(
@@ -268,24 +291,15 @@ suspend fun PackageDao.save(pkg: Package, sync: PackageSyncState = PackageSyncSt
 
 /**
  * Конец коробки — **одно место на всё приложение**: расход, утилизация, пересчёт в ноль,
- * выбрасывание, утрата доступа и «на сервере её нет» приходят сюда одним значением [PackageEnding],
- * и каждый вид конца уже принёс с собой свой след.
+ * выбрасывание, утрата доступа и «на сервере её нет» приходят сюда одним значением [PackageEnding].
  *
- * Порядок важен: след пишется раньше строки, потому что держится он за вечную запись и должен
- * пережить коробку (PLAN D7); источник снимается доменным переходом каждого лечения, которое
- * коробку держало, — с ростом редакции, — потому что состав курса не меняется мимо самого курса
- * (PLAN D5, F5); строка уходит последней.
+ * Источник снимается доменным переходом каждого лечения, которое коробку держало, — с ростом
+ * редакции, — потому что состав курса не меняется мимо самого курса (PLAN D5, F5); строка уходит
+ * последней, а запись о коробке остаётся: за неё держатся приёмы (D3).
  *
  * Зовётся внутри уже открытой транзакции того сценария, который коробку и кончает.
  */
-suspend fun PackageDao.end(
-    ending: PackageEnding,
-    courses: CourseDao,
-    movements: StockMovementDao,
-    vocabulary: Vocabulary,
-    at: Instant
-) {
-    ending.trace?.let { movements.insert(it.toStorageEntity()) }
+suspend fun PackageDao.end(ending: PackageEnding, courses: CourseDao, vocabulary: Vocabulary, at: Instant) {
     courses.releaseSource(ending.pkg.ref, vocabulary, at)
     delete(ending.record.id)
 }
