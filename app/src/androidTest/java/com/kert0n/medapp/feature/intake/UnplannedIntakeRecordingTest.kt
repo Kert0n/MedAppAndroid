@@ -263,7 +263,7 @@ class UnplannedIntakeRecordingTest {
         local()
         holdByACourse()
         val today = LATER.atZone(ZoneOffset.UTC).toLocalDate()
-        database.packageRepository().describe(PACK, factsOf(pack(quantity = tablets("20"))).copy(expiresOn = ExpiryDate(today.minusDays(1))))
+        database.packageRepository().describe(PACK, factsOf(pack(quantity = tablets("20"), form = TABLET_FORM)).copy(expiresOn = ExpiryDate(today.minusDays(1))))
 
         val asked = recording.record(PACK, dose("12"), LATER)
 
@@ -277,7 +277,7 @@ class UnplannedIntakeRecordingTest {
         assertEquals(tablets("8"), requireNotNull(database.packageRepository().find(PACK)).quantity)
 
         // Годен до сегодня — не просрочен: остаётся только вопрос о занятом (курс зажат под остаток).
-        database.packageRepository().describe(PACK, factsOf(pack(quantity = tablets("8"))).copy(expiresOn = ExpiryDate(today)))
+        database.packageRepository().describe(PACK, factsOf(pack(quantity = tablets("8"), form = TABLET_FORM)).copy(expiresOn = ExpiryDate(today)))
         val onlyReserved = recording.record(PACK, dose("1"), LATER) as UnplannedIntakeRecording.Outcome.Warned
         assertEquals(listOf(IntakeWarning.TouchesReserved(tablets("0"))), onlyReserved.warnings)
     }

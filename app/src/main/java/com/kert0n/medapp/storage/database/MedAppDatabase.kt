@@ -300,6 +300,7 @@ abstract class MedAppDatabase : RoomDatabase() {
                         CREATE TABLE IF NOT EXISTS `course_sources_new` (
                             `course_id` TEXT NOT NULL, `package_id` TEXT NOT NULL,
                             `position` INTEGER NOT NULL, `allocated_doses` INTEGER NOT NULL,
+                            `fault` TEXT,
                             PRIMARY KEY(`course_id`, `package_id`),
                             FOREIGN KEY(`course_id`) REFERENCES `courses`(`id`)
                                 ON UPDATE NO ACTION ON DELETE RESTRICT ,

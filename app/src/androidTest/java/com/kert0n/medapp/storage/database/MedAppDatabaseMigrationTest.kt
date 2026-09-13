@@ -164,7 +164,8 @@ class MedAppDatabaseMigrationTest {
         assertEquals(listOf("ACTIVE"), rows("SELECT status FROM med_kits").map { it.single() }.distinct())
         assertEquals(listOf(listOf(PACK.toString(), "в машине")), rows("SELECT package_id, note FROM package_details"))
         assertEquals(listOf(listOf(PACK.toString(), "5", "2")), rows("SELECT package_id, total, mine FROM claims"))
-        assertEquals(listOf(listOf(COURSE.toString(), PACK.toString(), "0", "5")), rows("SELECT * FROM course_sources"))
+        // Старые источники приходят исправными: отключать их было нечем (PLAN D5).
+        assertEquals(listOf(listOf(COURSE.toString(), PACK.toString(), "0", "5", null)), rows("SELECT * FROM course_sources"))
         assertEquals(listOf(listOf(PACK.toString(), COURSE.toString())), rows("SELECT * FROM active_package_assignments"))
         // История держится за запись: приём из кончившейся коробки на месте.
         assertEquals(

@@ -2,7 +2,7 @@
   "formatVersion": 1,
   "database": {
     "version": 3,
-    "identityHash": "72777cc7acdd140dff95167986f42307",
+    "identityHash": "f0097c48eccbdb4d86b8b68f36ecef16",
     "entities": [
       {
         "tableName": "quantity_units",
@@ -842,7 +842,7 @@
       },
       {
         "tableName": "course_sources",
-        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`course_id` TEXT NOT NULL, `package_id` TEXT NOT NULL, `position` INTEGER NOT NULL, `allocated_doses` INTEGER NOT NULL, PRIMARY KEY(`course_id`, `package_id`), FOREIGN KEY(`course_id`) REFERENCES `courses`(`id`) ON UPDATE NO ACTION ON DELETE RESTRICT , FOREIGN KEY(`package_id`) REFERENCES `packages`(`id`) ON UPDATE NO ACTION ON DELETE RESTRICT )",
+        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`course_id` TEXT NOT NULL, `package_id` TEXT NOT NULL, `position` INTEGER NOT NULL, `allocated_doses` INTEGER NOT NULL, `fault` TEXT, PRIMARY KEY(`course_id`, `package_id`), FOREIGN KEY(`course_id`) REFERENCES `courses`(`id`) ON UPDATE NO ACTION ON DELETE RESTRICT , FOREIGN KEY(`package_id`) REFERENCES `packages`(`id`) ON UPDATE NO ACTION ON DELETE RESTRICT )",
         "fields": [
           {
             "fieldPath": "courseId",
@@ -867,6 +867,11 @@
             "columnName": "allocated_doses",
             "affinity": "INTEGER",
             "notNull": true
+          },
+          {
+            "fieldPath": "fault",
+            "columnName": "fault",
+            "affinity": "TEXT"
           }
         ],
         "primaryKey": {
@@ -1468,7 +1473,7 @@
     ],
     "setupQueries": [
       "CREATE TABLE IF NOT EXISTS room_master_table (id INTEGER PRIMARY KEY,identity_hash TEXT)",
-      "INSERT OR REPLACE INTO room_master_table (id,identity_hash) VALUES(42, '72777cc7acdd140dff95167986f42307')"
+      "INSERT OR REPLACE INTO room_master_table (id,identity_hash) VALUES(42, 'f0097c48eccbdb4d86b8b68f36ecef16')"
     ]
   }
 }

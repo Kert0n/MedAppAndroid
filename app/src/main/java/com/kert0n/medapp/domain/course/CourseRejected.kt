@@ -6,6 +6,16 @@ package com.kert0n.medapp.domain.course
  */
 class CourseRejected(val reason: Reason) : IllegalStateException(reason.name) {
 
+    companion object {
+        /** Причина отключения источника — тем же словом, каким отказывают в подключении. */
+        val CourseSource.Fault.rejection: Reason
+            get() = when (this) {
+                CourseSource.Fault.UNIT_MISMATCH -> Reason.UNIT_MISMATCH
+                CourseSource.Fault.FORM_MISMATCH -> Reason.FORM_MISMATCH
+            }
+    }
+
+
     /** Причины различаются, потому что ведут человека к разным действиям. */
     enum class Reason {
 

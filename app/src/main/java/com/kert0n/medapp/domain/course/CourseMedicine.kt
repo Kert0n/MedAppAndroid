@@ -2,6 +2,7 @@ package com.kert0n.medapp.domain.course
 
 import com.kert0n.medapp.domain.pack.Availability
 import com.kert0n.medapp.domain.pack.Package
+import com.kert0n.medapp.domain.course.CourseRejected.Companion.rejection
 import com.kert0n.medapp.domain.pack.PackageRef
 import com.kert0n.medapp.domain.value.DosageForm
 import com.kert0n.medapp.domain.value.Dose
@@ -66,9 +67,7 @@ class CourseMedicine(sources: List<CourseSource> = emptyList()) {
             // Пачка без формы не годится ни под какое назначение: сказать, тот ли это препарат,
             // нечем, и сначала форму надо заполнить.
             ref.form == null -> CourseRejected.Reason.FORM_UNKNOWN
-            ref.form != form -> CourseRejected.Reason.FORM_MISMATCH
-            ref.unit != dose.unit -> CourseRejected.Reason.UNIT_MISMATCH
-            else -> null
+            else -> CourseSource.Fault.between(ref, dose, form)?.rejection
         }
         if (rejection != null) return Result.failure(CourseRejected(rejection))
         return Result.success(withSources(sources + CourseSource(ref, doses)))
@@ -94,8 +93,29 @@ class CourseMedicine(sources: List<CourseSource> = emptyList()) {
     /** Задаёт выделение пачки в целых дозах; верхнюю границу называет [maxDoses]. */
     internal fun allocate(pkg: PackageRef, doses: Doses): CourseMedicine {
         requireHolds(pkg)
-        return withSources(sources.map { if (it.pkg == pkg) CourseSource(pkg, doses) else it })
+        return withSources(sources.map { if (it.pkg == pkg) it.copy(allocatedDoses = doses) else it })
     }
+
+    /**
+     * Источник отключается с причиной: выделение — ноль, место в составе остаётся, чтобы человек
+     * увидел, что случилось и с какой коробкой (PLAN D5). Уже отключённый по той же причине не
+     * меняется.
+     */
+    internal fun fault(pkg: PackageRef, fault: CourseSource.Fault): CourseMedicine {
+        requireHolds(pkg)
+        return withSources(sources.map { if (it.pkg == pkg) CourseSource(pkg, 0.doses, fault) else it })
+    }
+
+    /** Совместимость вернулась: причина снимается, выделение остаётся нулём — сколько выделить, решает человек. */
+    internal fun restore(pkg: PackageRef): CourseMedicine {
+        requireHolds(pkg)
+        return withSources(sources.map { if (it.pkg == pkg) CourseSource(pkg, 0.doses) else it })
+    }
+
+    internal fun faultOf(pkg: PackageRef): CourseSource.Fault? = sources.firstOrNull { it.pkg == pkg }?.fault
+
+    /** Есть ли в составе отключённый источник: с ним лечение не начинается (PLAN D5). */
+    val firstFault: CourseSource.Fault? get() = sources.firstNotNullOfOrNull { it.fault }
 
     /**
      * Обеспечение [remaining] пунктов, данных в календарном порядке. Пачка покрывает не больше
@@ -107,17 +127,23 @@ class CourseMedicine(sources: List<CourseSource> = emptyList()) {
         remaining: List<ScheduledOccurrence>,
         availability: Availability
     ): CourseCoverage {
-        val capacities = capacities(dose, availability)
+        val capacities = capacities(dose, availability).associateBy { it.pkg }
         val required = Doses(remaining.size)
-        val supplied = capacities.fold(0.doses) { total, it -> total + it.covers }
+        val supplied = capacities.values.fold(0.doses) { total, it -> total + it.covers }
         val covered = minOf(required, supplied)
         return CourseCoverage(
             requiredDoses = required,
             coveredDoses = covered,
             coveredUntil = remaining.getOrNull(covered.count - 1)?.at,
             firstUncoveredAt = remaining.getOrNull(covered.count)?.at,
-            perSource = capacities.map {
-                CourseCoverage.Source(it.pkg, it.allocated, it.covers, it.leftover, maxDoses(it.pkg, dose, required, availability))
+            // Отключённый источник — строкой с причиной: ничего не даёт, но виден (PLAN D5).
+            perSource = sources.map { source ->
+                val capacity = capacities[source.pkg]
+                if (capacity == null) {
+                    CourseCoverage.Source(source.pkg, 0.doses, 0.doses, Quantity.zero(dose.unit), 0.doses, source.fault)
+                } else {
+                    CourseCoverage.Source(source.pkg, capacity.allocated, capacity.covers, capacity.leftover, maxDoses(source.pkg, dose, required, availability))
+                }
             }
         )
     }
@@ -134,6 +160,8 @@ class CourseMedicine(sources: List<CourseSource> = emptyList()) {
         required: Doses,
         availability: Availability
     ): Doses {
+        // Отключённому источнику выделять нечего: он не в той единице, чтобы считать дозы.
+        if (faultOf(pkg) != null) return 0.doses
         val here = allocatedTo(pkg) ?: 0.doses
         val stillNeeded = required.minusOrNone(allocatedTotal - here)
         return minOf(availability.dosesOf(pkg, dose), stillNeeded)
@@ -150,8 +178,9 @@ class CourseMedicine(sources: List<CourseSource> = emptyList()) {
         required: Doses,
         availability: Availability
     ): CourseMedicine {
-        val clamped = capacities(dose, availability)
-            .map { CourseSource(it.pkg, it.covers) }
+        val capacities = capacities(dose, availability).associateBy { it.pkg }
+        // Отключённый источник остаётся как есть: он ничего не держит и не зажимается.
+        val clamped = sources.map { source -> capacities[source.pkg]?.let { CourseSource(source.pkg, it.covers) } ?: source }
         var excess = clamped.fold(0.doses) { total, it -> total + it.allocatedDoses }
             .minusOrNone(required)
         val trimmed = clamped.toMutableList()
@@ -159,7 +188,7 @@ class CourseMedicine(sources: List<CourseSource> = emptyList()) {
             if (excess.isNone) break
             val source = trimmed[index]
             val taken = minOf(source.allocatedDoses, excess)
-            trimmed[index] = CourseSource(source.pkg, source.allocatedDoses - taken)
+            trimmed[index] = source.copy(allocatedDoses = source.allocatedDoses - taken)
             excess -= taken
         }
         return withSources(trimmed)
@@ -195,7 +224,7 @@ class CourseMedicine(sources: List<CourseSource> = emptyList()) {
     internal fun spent(spent: Map<PackageRef, Doses>): CourseMedicine = withSources(
         sources.map { source ->
             val taken = spent[source.pkg] ?: return@map source
-            CourseSource(source.pkg, source.allocatedDoses.minusOrNone(taken))
+            source.copy(allocatedDoses = source.allocatedDoses.minusOrNone(taken))
         }
     )
 
@@ -227,7 +256,7 @@ class CourseMedicine(sources: List<CourseSource> = emptyList()) {
      * целых доз, что в пачке есть» было написано трижды и могло разойтись.
      */
     private fun capacities(dose: Dose, availability: Availability): List<SourceCapacity> =
-        sources.map { source ->
+        sources.filter { it.isUsable }.map { source ->
             val available = availability.of(source.pkg)
             val whole = available.dosesIn(dose)
             SourceCapacity(

@@ -155,7 +155,8 @@ class CourseRoomRepository @Inject constructor(
         )
         if (!revised) return@withTransaction false
         courses.releaseAssignmentsOf(course.id)
-        for (source in course.sources) {
+        // Отключённый источник коробку не держит: другой курс, в её нынешней единице, может её взять.
+        for (source in course.sources.filter { it.isUsable }) {
             courses.assignPackage(ActivePackageAssignmentStorageEntity(source.pkg.id, course.id))
         }
         true
@@ -189,7 +190,7 @@ class CourseRoomRepository @Inject constructor(
             times = plan.schedule.toTimeStorageEntities(plan.id),
             sources = plan.medicine.toSourceStorageEntities(plan.id)
         )
-        for (source in plan.sources) {
+        for (source in plan.sources.filter { it.isUsable }) {
             courses.assignPackage(ActivePackageAssignmentStorageEntity(source.pkg.id, plan.id))
         }
         intakes.insertPlannedIfMissing(planned.map { it.toIntakeStorageEntity() })

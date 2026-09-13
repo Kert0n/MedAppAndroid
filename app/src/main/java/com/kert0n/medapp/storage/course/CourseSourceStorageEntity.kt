@@ -5,6 +5,7 @@ import androidx.room.Entity
 import androidx.room.ForeignKey
 import androidx.room.Index
 import com.kert0n.medapp.domain.course.CourseMedicine
+import com.kert0n.medapp.domain.course.CourseSource
 import com.kert0n.medapp.storage.pack.PackageStorageEntity
 import kotlin.uuid.Uuid
 
@@ -46,7 +47,9 @@ class CourseSourceStorageEntity(
     @ColumnInfo(name = "course_id") val courseId: Uuid,
     @ColumnInfo(name = "package_id") val packageId: Uuid,
     val position: Int,
-    @ColumnInfo(name = "allocated_doses") val allocatedDoses: Int
+    @ColumnInfo(name = "allocated_doses") val allocatedDoses: Int,
+    /** Источник отключён с причиной — перечислением, как и другие причины (PLAN D5). */
+    val fault: CourseSource.Fault? = null
 )
 
 fun CourseMedicine.toSourceStorageEntities(courseId: Uuid): List<CourseSourceStorageEntity> =
@@ -55,6 +58,7 @@ fun CourseMedicine.toSourceStorageEntities(courseId: Uuid): List<CourseSourceSto
             courseId = courseId,
             packageId = source.pkg.id,
             position = position,
-            allocatedDoses = source.allocatedDoses.count
+            allocatedDoses = source.allocatedDoses.count,
+            fault = source.fault
         )
     }

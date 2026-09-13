@@ -6,6 +6,7 @@ import androidx.room.Query
 import androidx.room.Transaction
 import androidx.room.Upsert
 import com.kert0n.medapp.domain.course.Course
+import com.kert0n.medapp.domain.course.CourseDraft
 import com.kert0n.medapp.domain.course.CourseProgress
 import com.kert0n.medapp.domain.pack.Availability
 import com.kert0n.medapp.domain.value.Quantity
@@ -246,19 +247,47 @@ suspend fun CourseDao.followBox(
     vocabulary: Vocabulary,
     at: Instant
 ): List<CourseFollowed> {
+    val ref = packages.find(packageId)?.toDomain(vocabulary)?.ref ?: return emptyList()
     val followed = mutableListOf<CourseFollowed>()
     for (courseId in coursesHolding(packageId)) {
+        val row = findPlan(courseId) ?: continue
+        if (row.isDraft) {
+            followTheBoxAsADraft(row.toDraft(vocabulary), ref, at)
+            continue
+        }
         val plan = planInProgress(courseId, intakes, vocabulary) ?: continue
         val course = plan.course
-        val availability = packages.availabilityOf(listOf(course), queue, intakes, vocabulary).getValue(course.id)
-        val clamped = course.clamped(course.remainingDoses(plan.progress), availability, at)
+        // Совместимость — первой: отключённый источник в расклад не входит, и считать по нему нечего.
+        val compatible = when (val fault = course.prescription.faultOf(ref)) {
+            null -> if (courseHolding(packageId) == null || courseHolding(packageId) == courseId) course.restoreSource(ref, at) else course
+            else -> course.faultSource(ref, fault, at)
+        }
+        val availability = packages.availabilityOf(listOf(compatible), queue, intakes, vocabulary).getValue(course.id)
+        val clamped = compatible.clamped(compatible.remainingDoses(plan.progress), availability, at)
         if (clamped === course) continue
         check(updateAllocations(clamped.toStorageEntity(), clamped.medicine.toSourceStorageEntities(clamped.id), course.revision)) {
             "план прочитан этой же транзакцией"
         }
+        // Назначение коробки следует за пригодностью источника: отключённый её не держит.
+        if (clamped.medicine.faultOf(ref) != null) releasePackage(packageId)
+        else if (course.medicine.faultOf(ref) != null) assignPackage(ActivePackageAssignmentStorageEntity(packageId, courseId))
         followed += CourseFollowed(course, clamped)
     }
     return followed
+}
+
+/** Черновик за коробкой следует только совместимостью: выделений и броней у него нет (PLAN D5). */
+private suspend fun CourseDao.followTheBoxAsADraft(draft: CourseDraft, ref: PackageRef, at: Instant) {
+    val followed = when (val fault = draft.faultOf(ref)) {
+        null -> draft.restoreSource(ref, at)
+        else -> draft.faultSource(ref, fault, at)
+    }
+    if (followed === draft) return
+    saveCourse(
+        course = followed.toStorageEntity(),
+        times = followed.schedule?.toTimeStorageEntities(followed.id).orEmpty(),
+        sources = followed.medicine.toSourceStorageEntities(followed.id)
+    )
 }
 
 /**

@@ -183,6 +183,22 @@ class Course(
         medicine.attach(pkg, doses, dose, form)
             .map { changed(medicine = it, revision = revision.next(), updatedAt = at) }
 
+    /**
+     * Сосед сменил у коробки единицу или форму: источник отключается с причиной, бронь и
+     * выделение — ноль, доза и форма лечения прежние (PLAN D5). Уже отключённый по той же
+     * причине — тот же курс, без роста редакции.
+     */
+    fun faultSource(pkg: PackageRef, fault: CourseSource.Fault, at: Instant): Course {
+        if (medicine.faultOf(pkg) == fault) return this
+        return changed(medicine = medicine.fault(pkg, fault), revision = revision.next(), updatedAt = at)
+    }
+
+    /** Совместимость вернулась: причина снимается, выделение — ноль; исправный источник не трогается. */
+    fun restoreSource(pkg: PackageRef, at: Instant): Course {
+        if (medicine.faultOf(pkg) == null) return this
+        return changed(medicine = medicine.restore(pkg), revision = revision.next(), updatedAt = at)
+    }
+
     /** Отвязка последней пачки лечения не отменяет: курс просто становится необеспеченным. */
     fun detach(pkg: PackageRef, at: Instant): Course = changed(
         medicine = medicine.detach(pkg),

@@ -2,10 +2,12 @@ package com.kert0n.medapp.storage.server
 
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import com.kert0n.medapp.domain.course.Course
+import com.kert0n.medapp.domain.course.CourseSource
 import com.kert0n.medapp.domain.medkit.MedKit
 import com.kert0n.medapp.domain.pack.Claims
 import com.kert0n.medapp.domain.value.Doses
 import com.kert0n.medapp.feature.course.CourseDrafting
+import com.kert0n.medapp.fixture.CAPSULE_FORM
 import com.kert0n.medapp.fixture.PACK
 import com.kert0n.medapp.fixture.SHARED_KIT
 import com.kert0n.medapp.fixture.Scenarios
@@ -15,6 +17,7 @@ import com.kert0n.medapp.fixture.courseRepository
 import com.kert0n.medapp.fixture.dose
 import com.kert0n.medapp.fixture.inMemoryDatabase
 import com.kert0n.medapp.fixture.medKit
+import com.kert0n.medapp.fixture.millilitres
 import com.kert0n.medapp.fixture.pack
 import com.kert0n.medapp.fixture.packageRepository
 import com.kert0n.medapp.fixture.queueStorage
@@ -37,9 +40,11 @@ import java.math.BigDecimal
 import java.time.Instant
 import java.time.LocalDate
 import kotlin.uuid.Uuid
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.test.runTest
 import org.junit.After
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertNull
 import org.junit.Before
 import org.junit.Test
 import org.junit.runner.RunWith
@@ -152,5 +157,48 @@ class SnapshotClampingTest {
 
         assertEquals(Doses(6), plan(id).sources.single().allocatedDoses)
         assertEquals(listOf(PackageSyncCommand.SetClaim(PACK, tablets("12"))), commands().drop(1))
+    }
+
+    /**
+     * Сосед сменил единицу коробки: источник отключён с причиной, выделение — ноль, коробку курс не
+     * держит, бронь снята; курс идёт, обеспечение читается (красная проверка: без `fault` —
+     * `dosesIn` бросает на чужой единице). Вернули таблетки — причина снята, выделение остаётся нулём.
+     */
+    @Test
+    fun aChangedUnitDisablesTheSourceWithAReasonAndAReturnRestoresIt() = runTest {
+        val id = treated()
+
+        lay(PackageSnapshot(
+            pack(id = PACK, medKit = shelf, quantity = millilitres("200"), form = TABLET_FORM, claims = Claims(BigDecimal("0"), BigDecimal("0"))),
+            PackageSyncState(PACK, ResourceVersion(4), ResourceVersion(2), syncedAt = now)
+        ))
+
+        val faulted = plan(id).sources.single()
+        assertEquals(CourseSource.Fault.UNIT_MISMATCH, faulted.fault)
+        assertEquals(Doses(0), faulted.allocatedDoses)
+        assertNull(database.courseRepository().courseHolding(PACK))
+        assertEquals(listOf(PackageSyncCommand.ReleaseClaim(PACK)), commands().drop(1))
+        assertEquals(TABLET_FORM, plan(id).form)
+        assertEquals(Doses(0), requireNotNull(database.courseRepository().observeCoverage(id).first()).coveredDoses)
+
+        lay(snapshot("20", total = "0", mine = "0", version = 5))
+
+        val restored = plan(id).sources.single()
+        assertNull(restored.fault)
+        assertEquals(Doses(0), restored.allocatedDoses)
+        assertEquals(id, database.courseRepository().courseHolding(PACK))
+    }
+
+    /** Смена формы отключает так же — своей причиной. */
+    @Test
+    fun aChangedFormDisablesTheSource() = runTest {
+        val id = treated()
+
+        lay(PackageSnapshot(
+            pack(id = PACK, medKit = shelf, quantity = tablets("20"), form = CAPSULE_FORM, claims = Claims(BigDecimal("0"), BigDecimal("0"))),
+            PackageSyncState(PACK, ResourceVersion(4), ResourceVersion(2), syncedAt = now)
+        ))
+
+        assertEquals(CourseSource.Fault.FORM_MISMATCH, plan(id).sources.single().fault)
     }
 }

@@ -2,6 +2,7 @@ package com.kert0n.medapp.domain.course
 
 import com.kert0n.medapp.domain.pack.Availability
 import com.kert0n.medapp.domain.pack.Package
+import com.kert0n.medapp.domain.course.CourseRejected.Companion.rejection
 import com.kert0n.medapp.domain.pack.PackageRef
 import com.kert0n.medapp.domain.value.DosageForm
 import com.kert0n.medapp.domain.value.Dose
@@ -126,6 +127,25 @@ class CourseDraft(
             .map { changed(medicine = it, revision = revision.next(), updatedAt = at) }
     }
 
+    /** Годится ли пачка под то, что уже названо; пока доза или форма не названы — сверять не с чем. */
+    fun faultOf(pkg: PackageRef): CourseSource.Fault? {
+        val dose = dose ?: return null
+        val form = form ?: return null
+        return CourseSource.Fault.between(pkg, dose, form)
+    }
+
+    /** Сосед сменил у коробки единицу или форму: источник отключён с причиной (PLAN D5). */
+    fun faultSource(pkg: PackageRef, fault: CourseSource.Fault, at: Instant): CourseDraft {
+        if (medicine.faultOf(pkg) == fault) return this
+        return changed(medicine = medicine.fault(pkg, fault), revision = revision.next(), updatedAt = at)
+    }
+
+    /** Совместимость вернулась: причина снимается, выделение — ноль. */
+    fun restoreSource(pkg: PackageRef, at: Instant): CourseDraft {
+        if (medicine.faultOf(pkg) == null) return this
+        return changed(medicine = medicine.restore(pkg), revision = revision.next(), updatedAt = at)
+    }
+
     /** Отвязка пачки назначения не касается: доза и форма заданы словарём, а не пачкой. */
     fun detach(pkg: PackageRef, at: Instant): CourseDraft = changed(
         medicine = medicine.detach(pkg),
@@ -169,6 +189,8 @@ class CourseDraft(
         val form = form ?: return rejected(CourseRejected.Reason.FORM_MISSING)
         val totalDoses = totalDoses?.takeUnless { it.isNone }
             ?: return rejected(CourseRejected.Reason.TOTAL_DOSES_MISSING)
+        // С отключённым источником лечение не начинается: человек его убирает или чинит (PLAN D5).
+        medicine.firstFault?.let { return rejected(it.rejection) }
         val prescription = Prescription(
             dose = dose,
             form = form,
