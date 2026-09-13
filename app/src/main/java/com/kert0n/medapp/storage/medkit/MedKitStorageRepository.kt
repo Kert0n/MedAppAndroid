@@ -3,7 +3,6 @@ package com.kert0n.medapp.storage.medkit
 import com.kert0n.medapp.domain.medkit.MedKit
 import com.kert0n.medapp.domain.medkit.MedKitProjection
 import com.kert0n.medapp.domain.medkit.MedKitStatus
-import com.kert0n.medapp.network.pack.PackageSnapshot
 import java.time.Instant
 import kotlin.uuid.Uuid
 import kotlinx.coroutines.flow.Flow
@@ -27,7 +26,15 @@ interface MedKitStorageRepository {
      */
     fun observeSyncedAt(id: Uuid): Flow<Instant?>
 
-    suspend fun save(medKit: MedKit, syncedAt: Instant? = null)
+    /** Новая полка: заводится местной, обвязки синхронизации у неё ещё нет (PLAN D2). */
+    suspend fun add(medKit: MedKit)
+
+    /**
+     * Название и место хранения — названными полями к полке, прочитанной в той же транзакции:
+     * публикацию, число участников, пометку и обвязку синхронизации правка не трогает (PLAN D2,
+     * F5). `false` — полки больше нет.
+     */
+    suspend fun describe(medKitId: Uuid, name: String, location: String?): Boolean
 
     /**
      * Строка аптечки уходит. Содержимое к этому моменту уже переехало или удалено — что с ним

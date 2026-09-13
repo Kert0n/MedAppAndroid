@@ -42,7 +42,7 @@ class SyncCommandStorageConverterTest {
         PackageSyncCommand.Create(PACK, HOME_KIT, tablets("20"), facts),
         PackageSyncCommand.Create(PACK, HOME_KIT, tablets("20"), facts, fromMedKitId = SHARED_KIT),
         PackageSyncCommand.Describe(PACK, facts, facts.copy(name = "Paracetamol", category = null)),
-        PackageSyncCommand.CorrectStock(PACK, tablets("18.5")),
+        PackageSyncCommand.CorrectStock(PACK, tablets("20"), tablets("18.5")),
         PackageSyncCommand.Move(PACK, SHARED_KIT),
         PackageSyncCommand.Delete(PACK),
         PackageSyncCommand.Withdraw(PACK, SHARED_KIT, tablets("20")),
@@ -144,6 +144,24 @@ class SyncCommandStorageConverterTest {
         )
     }
 
+    /**
+     * Пересчёт версии 1 нёс одно абсолютное число: разницы из него не восстановить, и строка — не
+     * повреждённая, а неизвестной версии. Виды, чей формат не менялся, с версии 1 читаются.
+     */
+    @Test
+    fun anAbsoluteRecountOfVersionOneIsOfUnknownVersionWhileOtherKindsStillRead() {
+        val oldRecount = """{"packageId":"$PACK","actual":"10","actualUnitId":"${TABLETS.id}"}"""
+        assertNull(SyncCommandStorageConverter.commandOf("PACKAGE_CORRECT_STOCK", oldRecount, 1, VOCABULARY))
+
+        val delete = PackageSyncCommand.Delete(OTHER_PACK)
+        assertEquals(
+            delete,
+            SyncCommandStorageConverter.commandOf(
+                SyncCommandStorageConverter.kindOf(delete), SyncCommandStorageConverter.payloadOf(delete), 1, VOCABULARY
+            )
+        )
+    }
+
     /** Вид команды, которого эта сборка не знает, — обычное следствие обновления приложения. */
     @Test
     fun anUnknownKindIsUnreadableToo() {
@@ -178,7 +196,7 @@ class SyncCommandStorageConverterTest {
     /** Единица вне снимка — промах словаря, а не порча payload: он лечится чтением, а не человеком. */
     @Test
     fun aUnitMissingFromTheSnapshotIsAVocabularyMissNotAFormatError() {
-        val command = PackageSyncCommand.CorrectStock(PACK, millilitres("10"))
+        val command = PackageSyncCommand.CorrectStock(PACK, millilitres("20"), millilitres("10"))
         val refusal = runCatching {
             SyncCommandStorageConverter.commandOf(
                 kind = SyncCommandStorageConverter.kindOf(command),

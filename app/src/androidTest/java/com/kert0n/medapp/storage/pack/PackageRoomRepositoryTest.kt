@@ -207,11 +207,12 @@ class PackageRoomRepositoryTest {
         assertNull(repository.observeSyncState(OTHER_PACK).first())
     }
 
-    /** Пересчёт заменяет число, а более новый расход ложится поверх него (PLAN E1). */
+    /** Пересчёт кладёт разницу поверх увиденного, а более новый расход — поверх него (PLAN E1, C1). */
     @Test
-    fun pendingRecountReplacesTheNumberAndLaterCommandsApplyOnTop() = runTest {
+    fun pendingRecountLaysItsDifferenceAndLaterCommandsApplyOnTop() = runTest {
         queue.enqueue(operation, PackageSyncCommand.Consume(PACK, dose("3"), INTAKE), at)
-        queue.enqueue(recount, PackageSyncCommand.CorrectStock(PACK, tablets("10")), at)
+        // Человек видел 17 (20 без трёх в пути) и насчитал 10.
+        queue.enqueue(recount, PackageSyncCommand.CorrectStock(PACK, tablets("17"), tablets("10")), at)
         queue.enqueue(later, PackageSyncCommand.Consume(PACK, dose("2"), OTHER_INTAKE), at)
 
         val availability = requireNotNull(repository.observe(PACK).first()).availability
@@ -265,7 +266,7 @@ class PackageRoomRepositoryTest {
     @Test
     fun describingDoesNotWriteBackAStaleAmount() = runTest {
         val sync = PackageSyncState(PACK, version = ResourceVersion(5), syncedAt = at)
-        repository.applySnapshot(PackageSnapshot(paracetamol.correctTo(tablets("11"), Uuid.random(), at).left(), sync), at)
+        repository.applySnapshot(PackageSnapshot(paracetamol.correctTo(tablets("11")).left(), sync), at)
 
         val renamed = paracetamol.facts.let { it.copy(shared = it.shared.copy(name = "Панадол")) }
 

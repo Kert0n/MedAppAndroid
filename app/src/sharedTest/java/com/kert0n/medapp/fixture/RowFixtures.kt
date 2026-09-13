@@ -6,7 +6,6 @@ import com.kert0n.medapp.domain.pack.Package
 import com.kert0n.medapp.domain.pack.PackageRef
 import com.kert0n.medapp.storage.medkit.MedKitStorageEntity
 import com.kert0n.medapp.storage.pack.PackageRefStorageRow
-import com.kert0n.medapp.domain.stock.StockMovement
 import com.kert0n.medapp.queue.intake.IntakeSyncState
 import com.kert0n.medapp.network.pack.PackageSyncState
 import com.kert0n.medapp.storage.intake.IntakeStorageRow
@@ -17,8 +16,6 @@ import com.kert0n.medapp.storage.pack.toDetailsStorageEntity
 import com.kert0n.medapp.storage.pack.toStorageEntity
 import com.kert0n.medapp.storage.pack.toStorageEntity as toClaimsStorageEntity
 import com.kert0n.medapp.domain.intake.CourseIntake
-import com.kert0n.medapp.storage.stock.StockMovementStorageRow
-import com.kert0n.medapp.storage.stock.toStorageEntity as toMovementStorageEntity
 
 /**
  * Строки хранения, собранные из доменных объектов так, как их собрала бы база: связи заполнены
@@ -52,6 +49,3 @@ fun Intake.toStorageRow(sync: IntakeSyncState = IntakeSyncState(id)): IntakeStor
         planned = (this as? CourseIntake)?.plannedPackage?.toStorageRow(),
         taken = taken?.pkg?.toStorageRow()
     )
-
-fun StockMovement.toStorageRow(): StockMovementStorageRow =
-    StockMovementStorageRow(movement = toMovementStorageEntity(), pack = pkg.toStorageRow())

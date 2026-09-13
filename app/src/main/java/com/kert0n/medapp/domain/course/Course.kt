@@ -99,6 +99,15 @@ class Course(
     fun remainingOccurrences(progress: CourseProgress): List<ScheduledOccurrence> =
         schedule.next(schedule.beginning, remainingDoses(progress).count, progress.answered)
 
+    /**
+     * Сколько доз придётся на [from, until), если все приёмы состоятся (ТЗ 4.1.1.10.1): оставшиеся
+     * дозы раскладываются по неотвеченным пунктам начиная с [from], и считаются те, что легли до
+     * [until]. Неотвеченный пункт раньше [from] в счёт не идёт: его место пропущено, и доза уехала
+     * вперёд, как уезжает у неответа (PLAN D6).
+     */
+    fun dosesDue(progress: CourseProgress, from: Instant, until: Instant): Doses =
+        Doses(schedule.next(from, remainingDoses(progress).count, progress.answered).count { it.at.isBefore(until) })
+
     /** Ожидаемый конец — последняя из оставшихся доз; `null` — принято всё. */
     fun expectedEnd(progress: CourseProgress): ScheduledOccurrence? =
         remainingOccurrences(progress).lastOrNull()

@@ -40,7 +40,7 @@ class CourseCalendar @Inject constructor(
      */
     suspend fun extend(course: Course, now: Instant): Int {
         val existing = intakes.ofCourse(course.id).filterIsInstance<CourseIntake>()
-        val remaining = course.remainingOccurrences(progressOf(existing))
+        val remaining = course.remainingOccurrences(CourseProgress.of(existing))
         prune(course, remaining.toSet(), now)
         val window = remaining.filter { it.at.isBefore(now.plus(WINDOW)) }
         if (window.isEmpty()) return 0
@@ -131,11 +131,5 @@ class CourseCalendar @Inject constructor(
     companion object {
         /** На сколько вперёд лежат плановые пункты: достраивает их `CourseUpkeep` (PLAN F4). */
         val WINDOW: Duration = Duration.ofDays(60)
-
-        /** Прогресс лечения — из его пунктов: принятые и пропущенные. */
-        fun progressOf(intakes: List<CourseIntake>): CourseProgress = CourseProgress(
-            taken = intakes.filter { it.status == IntakeStatus.TAKEN }.mapTo(HashSet()) { it.slot },
-            missed = intakes.filter { it.status == IntakeStatus.MISSED }.mapTo(HashSet()) { it.slot }
-        )
     }
 }

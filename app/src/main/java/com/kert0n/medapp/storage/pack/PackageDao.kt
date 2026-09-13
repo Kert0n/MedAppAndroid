@@ -8,14 +8,11 @@ import androidx.room.Transaction
 import androidx.room.Upsert
 import com.kert0n.medapp.domain.pack.Package
 import com.kert0n.medapp.domain.pack.PackageEnding
-import com.kert0n.medapp.domain.value.Quantity
 import com.kert0n.medapp.domain.value.Vocabulary
 import com.kert0n.medapp.network.pack.PackageSnapshot
 import com.kert0n.medapp.network.pack.PackageSyncState
 import com.kert0n.medapp.storage.course.CourseDao
 import com.kert0n.medapp.storage.course.releaseSource
-import com.kert0n.medapp.storage.stock.StockMovementDao
-import com.kert0n.medapp.storage.stock.toStorageEntity
 import java.time.Instant
 import java.time.LocalDate
 import com.kert0n.medapp.domain.pack.PackageStatus
@@ -24,6 +21,12 @@ import kotlinx.coroutines.flow.Flow
 
 @Dao
 interface PackageDao {
+
+    /** Все живые коробки со сведениями — сводке, которой нужны все сразу (PLAN H6). */
+    @Transaction
+    @Query("SELECT * FROM packages")
+    suspend fun all(): List<PackageStorageRow>
+
 
     @Transaction
     @Query("SELECT * FROM packages WHERE id = :id")
@@ -266,36 +269,18 @@ interface PackageDao {
 /**
  * Снимок пачки, разрешённый в домен, — в базу. Единственная дверь: половины расходятся только
  * тут, и только по своим версиям, поэтому версия картины броней всегда описывает ту картину,
- * что лежит рядом (PLAN B3, E1).
+ * что лежит рядом (PLAN B3, E1). Серверное число ложится только через неё — полным снимком,
+ * чтением перед отправкой или ответом на команду; чужое изменение просто становится нашим
+ * числом, истории у коробки нет (D7).
  *
- * Здесь же пишется разница, которую не объясняем мы сами (PLAN D7): серверное число ложится
- * только через эту дверь — полным снимком, чтением перед отправкой или ответом на команду, — и
- * чужое изменение, увиденное любым из них, попадает в историю. Что объясняем мы, говорит
- * [explained] по нашему подтверждённому остатку: без нашей команды в снимке — он сам, с
- * применённой — он с ней; `null` — сравнивать не с чем.
- *
- * Зовётся внутри уже открытой транзакции: прочитанное «было», укладка и разница — одно целое.
+ * Зовётся внутри уже открытой транзакции того, кто снимок кладёт.
  */
-suspend fun PackageDao.applySnapshot(
-    snapshot: PackageSnapshot,
-    observedAt: Instant,
-    movements: StockMovementDao,
-    vocabulary: Vocabulary,
-    explained: (confirmed: Quantity) -> Quantity? = { it }
-): SnapshotApplied {
-    val before = find(snapshot.pack.id)?.toDomain(vocabulary)
-    val applied = applySnapshot(
+suspend fun PackageDao.applySnapshot(snapshot: PackageSnapshot, observedAt: Instant): SnapshotApplied =
+    applySnapshot(
         snapshot.pack.toStorageEntity(snapshot.sync),
         snapshot.pack.claims?.toStorageEntity(snapshot.pack.id),
         observedAt
     )
-    // Коробку, увиденную впервые, объяснять не с чем: знакомство — не изменение.
-    if (!applied.pack || before == null) return applied
-    val ours = explained(before.quantity) ?: return applied
-    before.changedElsewhere(snapshot.pack.quantity, ours, Uuid.random(), observedAt)
-        ?.let { movements.insert(it.toStorageEntity()) }
-    return applied
-}
 
 /**
  * Пачка целиком: запись о коробке, живая строка и личные сведения собираются из одной сущности.
@@ -306,24 +291,15 @@ suspend fun PackageDao.save(pkg: Package, sync: PackageSyncState = PackageSyncSt
 
 /**
  * Конец коробки — **одно место на всё приложение**: расход, утилизация, пересчёт в ноль,
- * выбрасывание, утрата доступа и «на сервере её нет» приходят сюда одним значением [PackageEnding],
- * и каждый вид конца уже принёс с собой свой след.
+ * выбрасывание, утрата доступа и «на сервере её нет» приходят сюда одним значением [PackageEnding].
  *
- * Порядок важен: след пишется раньше строки, потому что держится он за вечную запись и должен
- * пережить коробку (PLAN D7); источник снимается доменным переходом каждого лечения, которое
- * коробку держало, — с ростом редакции, — потому что состав курса не меняется мимо самого курса
- * (PLAN D5, F5); строка уходит последней.
+ * Источник снимается доменным переходом каждого лечения, которое коробку держало, — с ростом
+ * редакции, — потому что состав курса не меняется мимо самого курса (PLAN D5, F5); строка уходит
+ * последней, а запись о коробке остаётся: за неё держатся приёмы (D3).
  *
  * Зовётся внутри уже открытой транзакции того сценария, который коробку и кончает.
  */
-suspend fun PackageDao.end(
-    ending: PackageEnding,
-    courses: CourseDao,
-    movements: StockMovementDao,
-    vocabulary: Vocabulary,
-    at: Instant
-) {
-    ending.trace?.let { movements.insert(it.toStorageEntity()) }
+suspend fun PackageDao.end(ending: PackageEnding, courses: CourseDao, vocabulary: Vocabulary, at: Instant) {
     courses.releaseSource(ending.pkg.ref, vocabulary, at)
     delete(ending.record.id)
 }

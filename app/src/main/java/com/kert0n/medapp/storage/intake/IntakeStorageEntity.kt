@@ -60,7 +60,8 @@ import kotlin.uuid.Uuid
         Index(value = ["course_id", "scheduled_on", "scheduled_time"], unique = true),
         Index("planned_package_id"),
         Index("taken_package_id"),
-        Index("operation_id")
+        Index("operation_id"),
+        Index("answered_at")
     ]
 )
 class IntakeStorageEntity(

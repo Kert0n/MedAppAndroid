@@ -12,11 +12,11 @@ import com.kert0n.medapp.storage.course.toSourceStorageEntities
 import com.kert0n.medapp.storage.course.toStorageEntity as toCourseStorageEntity
 import com.kert0n.medapp.storage.database.MedAppDatabase
 import com.kert0n.medapp.storage.database.chunkedForQuery
+import com.kert0n.medapp.storage.database.observing
 import com.kert0n.medapp.domain.pack.PackageAfter
 import com.kert0n.medapp.storage.pack.PackageDao
 import com.kert0n.medapp.storage.pack.end
 import com.kert0n.medapp.storage.pack.save
-import com.kert0n.medapp.storage.stock.StockMovementDao
 import com.kert0n.medapp.storage.value.VocabularyDao
 import com.kert0n.medapp.storage.value.toStorageAmount
 import java.time.Instant
@@ -30,19 +30,16 @@ class IntakeRoomRepository @Inject constructor(
     private val intakes: IntakeDao,
     private val packages: PackageDao,
     private val courses: CourseDao,
-    private val movements: StockMovementDao,
     private val vocabulary: VocabularyDao
 ) : IntakeStorageRepository {
 
     override fun observeOfCourse(courseId: Uuid): Flow<List<IntakeProjection>> =
-        intakes.observeOfCourse(courseId).map { rows ->
-            val words = vocabulary.snapshot()
-            rows.map { it.toDomain(words).projection() }
-        }
+        database.observing("intakes", "package_records") { ofCourse(courseId).map { it.projection() } }
 
-    override suspend fun ofCourse(courseId: Uuid): List<Intake> {
+    /** Строки и словарь — одной транзакцией: единица, записанная между ними, не потеряется. */
+    override suspend fun ofCourse(courseId: Uuid): List<Intake> = database.withTransaction {
         val words = vocabulary.snapshot()
-        return intakes.ofCourse(courseId).map { it.toDomain(words) }
+        intakes.ofCourse(courseId).map { it.toDomain(words) }
     }
 
     override suspend fun find(id: Uuid): Intake? = intakes.find(id)?.toDomain(vocabulary.snapshot())
@@ -102,11 +99,10 @@ class IntakeRoomRepository @Inject constructor(
         source?.let {
             val words = vocabulary.snapshot()
             when (val spent = it.toDomain(words).consume(requireNotNull(outcome.taken).amount)) {
-                // Коробка кончилась. Следа у расхода нет — приём и есть учётная запись о нём, — а
-                // держится он за вечную запись и конец переживает (PLAN D3, D6, H6).
-                // Момент записи, а не ответа: след расхода держит свой момент внутри себя, а
-                // редакцию курса двигает то, когда мы узнали (PLAN D5, D7).
-                is PackageAfter.Ended -> packages.end(spent.ending, courses, movements, words, outcome.recordedAt)
+                // Коробка кончилась. Приём и есть учётная запись о расходе: держится он за вечную
+                // запись и конец переживает (PLAN D3, D6). Момент записи, а не ответа: редакцию
+                // курса двигает то, когда мы узнали (PLAN D5).
+                is PackageAfter.Ended -> packages.end(spent.ending, courses, words, outcome.recordedAt)
                 // Расход не трогает обвязку доставки: версия и картина броней остаются прежними (E3).
                 is PackageAfter.Left -> packages.save(spent.pkg, it.pack.syncState())
             }

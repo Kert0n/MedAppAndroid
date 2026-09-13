@@ -136,7 +136,7 @@ class IntakeConfirmationTest {
     fun anIntakeThatEmptiesTheLocalPackageEndsItAndDetachesTheSource() = runTest {
         activate()
         // Пачка на две таблетки: одна доза — и она кончилась.
-        packages.adjust(PackageAdjustment.Recount(PACK, tablets("2"), Uuid.random()), at = FIRST_PLANNED_AT)
+        packages.adjust(PackageAdjustment.Recount(PACK, tablets("2")), at = FIRST_PLANNED_AT)
 
         val confirmed = confirmation.confirm(INTAKE, PACK, dose("2"), FIRST_PLANNED_AT).getOrThrow()
 
@@ -161,7 +161,7 @@ class IntakeConfirmationTest {
     @Test
     fun anAnswerAboutThePastDoesNotMoveTheCourseBackwards() = runTest {
         activate()
-        packages.adjust(PackageAdjustment.Recount(PACK, tablets("2"), Uuid.random()), at = now)
+        packages.adjust(PackageAdjustment.Recount(PACK, tablets("2")), at = now)
 
         confirmation.confirm(INTAKE, PACK, dose("2"), FIRST_PLANNED_AT).getOrThrow()
 
@@ -281,6 +281,23 @@ class IntakeConfirmationTest {
         assertEquals(IntakeRejected.Reason.UNIT_MISMATCH, (refused as IntakeRejected).reason)
         assertEquals(IntakeStatus.PLANNED, requireNotNull(intakes.find(INTAKE)).status)
         assertEquals(millilitres("100"), requireNotNull(packages.find(OTHER_PACK)).quantity)
+    }
+
+    /**
+     * Доза и пункт в таблетках, а пачку теперь считают в миллилитрах, и их меньше дозы: числа
+     * разных единиц не сравниваются — отказ по единице, а не по нехватке.
+     *
+     * Красная проверка: сравнить числа до акта по пачке — `INSUFFICIENT`.
+     */
+    @Test
+    fun aSmallPackageInAnotherUnitIsRefusedByUnitNotByShortage() = runTest {
+        activate()
+        packages.add(pack(id = OTHER_PACK, quantity = millilitres("1")))
+
+        val refused = confirmation.confirm(INTAKE, OTHER_PACK, dose("2"), FIRST_PLANNED_AT).exceptionOrNull()
+
+        assertEquals(IntakeRejected.Reason.UNIT_MISMATCH, (refused as IntakeRejected).reason)
+        assertEquals(IntakeStatus.PLANNED, requireNotNull(intakes.find(INTAKE)).status)
     }
 
     /**

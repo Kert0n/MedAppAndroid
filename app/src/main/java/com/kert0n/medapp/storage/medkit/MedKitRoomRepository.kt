@@ -27,19 +27,29 @@ class MedKitRoomRepository @Inject constructor(
 
     override fun observeSyncedAt(id: Uuid): Flow<Instant?> = medKits.observe(id).map { it?.syncedAt }
 
-    override suspend fun save(medKit: MedKit, syncedAt: Instant?) =
-        medKits.upsert(medKit.toStorageEntity(syncedAt))
+    override suspend fun add(medKit: MedKit) = medKits.upsert(medKit.toStorageEntity(syncedAt = null))
 
-    override suspend fun mark(medKitId: Uuid, status: MedKitStatus): Boolean = database.withTransaction {
-        val stored = medKits.find(medKitId) ?: return@withTransaction false
-        val marked = when (status) {
-            MedKitStatus.REMOVING -> stored.toDomain().markRemoving()
-            MedKitStatus.PUBLISHING -> stored.toDomain().markPublishing()
+    override suspend fun describe(medKitId: Uuid, name: String, location: String?): Boolean =
+        change(medKitId) { it.describe(name, location) }
+
+    override suspend fun mark(medKitId: Uuid, status: MedKitStatus): Boolean = change(medKitId) {
+        when (status) {
+            MedKitStatus.REMOVING -> it.markRemoving()
+            MedKitStatus.PUBLISHING -> it.markPublishing()
             MedKitStatus.ACTIVE -> throw IllegalArgumentException("пометку снимает ответ сервера, а не решение")
         }
-        medKits.upsert(marked.toStorageEntity(stored.syncedAt))
-        true
     }
+
+    /**
+     * Переход применяется к тому, что лежит в базе, и пишется вместе с сохранённой обвязкой: момент
+     * сверки принадлежит снимку сервера, а не действию человека (PLAN E4, F5).
+     */
+    private suspend fun change(medKitId: Uuid, transition: (MedKit) -> MedKit): Boolean =
+        database.withTransaction {
+            val stored = medKits.find(medKitId) ?: return@withTransaction false
+            medKits.upsert(transition(stored.toDomain()).toStorageEntity(stored.syncedAt))
+            true
+        }
 
     override suspend fun delete(id: Uuid): Boolean = medKits.delete(id) > 0
 
