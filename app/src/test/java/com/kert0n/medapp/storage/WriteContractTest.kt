@@ -93,9 +93,10 @@ class WriteContractTest {
         "CourseStorageRepository.reallocate" to (Shape.ACTION by "(CourseReallocation): Boolean"),
         "CourseStorageRepository.activate" to (Shape.ACTION by "(CourseDraft\$Activation, List<CourseIntake>): Unit"),
         "CourseStorageRepository.close" to (Shape.ACTION by "(CourseCompletion\$Closing): Unit"),
-        // Черновик — сам себе правка: человек держит его на экране целиком, и записывается он
-        // целиком же, а начатое лечение поверх не затирается (проверка живёт в реализации).
-        "CourseStorageRepository.saveDraft" to (Shape.UNGUARDED by "(CourseDraft): Boolean"),
+        // Черновик записывается целиком, но условно по редакции, из которой его правили; новый —
+        // только туда, где под его номером ещё ничего нет (PLAN F5).
+        "CourseStorageRepository.saveDraft" to (Shape.GUARDED by "(CourseDraft, Revision): Boolean"),
+        "CourseStorageRepository.discardDraft" to (Shape.NAMED_FIELDS by "(Uuid): Boolean"),
         // Аптечка
         "MedKitStorageRepository.observeAll" to (Shape.READ by "(): Flow<List<MedKitProjection>>"),
         "MedKitStorageRepository.observe" to (Shape.READ by "(Uuid): Flow<MedKitProjection>"),
@@ -130,7 +131,6 @@ class WriteContractTest {
      * редакции, в него молча не попадёт — его придётся приписать сюда руками и объяснить.
      */
     private val known: Set<String> = setOf(
-        "CourseStorageRepository.saveDraft",
         "MedKitStorageRepository.save"
     )
 

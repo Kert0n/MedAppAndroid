@@ -143,4 +143,5 @@ class Scenarios(database: MedAppDatabase, now: java.time.Instant) {
     val medKitPublishing = com.kert0n.medapp.feature.medkits.MedKitPublishing(
         medKits, packages, packageRelocation, queue, transactions, clock
     )
+    val courseDrafting = com.kert0n.medapp.feature.course.CourseDrafting(courses, packages, transactions, clock)
 }

@@ -44,17 +44,31 @@ class CourseRoomRepository @Inject constructor(
     override suspend fun findPlan(id: Uuid): Course? =
         courses.findPlan(id)?.takeUnless { it.isDraft }?.toPlan(vocabulary.snapshot())
 
-    override suspend fun saveDraft(draft: CourseDraft): Boolean = database.withTransaction {
+    override suspend fun saveDraft(draft: CourseDraft, expected: Revision?): Boolean = database.withTransaction {
         val existing = courses.findPlan(draft.id)
         if (existing != null && !existing.isDraft) return@withTransaction false
         // Запись эпизода живёт вечно, а план после конца лечения удаляется: «плана нет» само по
         // себе не значит «черновик ещё можно сохранить».
         if (existing == null && courses.findRecord(draft.id) != null) return@withTransaction false
+        // Новый черновик не ложится поверх существующего, а правка — поверх чужой правки.
+        when (expected) {
+            null -> if (existing != null) return@withTransaction false
+            else -> if (existing == null || existing.course.revision != expected.number) return@withTransaction false
+        }
         courses.saveCourse(
             course = draft.toStorageEntity(),
             times = draft.schedule?.toTimeStorageEntities(draft.id).orEmpty(),
             sources = draft.medicine.toSourceStorageEntities(draft.id)
         )
+        true
+    }
+
+    override suspend fun discardDraft(id: Uuid): Boolean = database.withTransaction {
+        val existing = courses.findPlan(id) ?: return@withTransaction false
+        if (!existing.isDraft) return@withTransaction false
+        courses.deleteSourcesOf(id)
+        courses.deleteTimesOf(id)
+        courses.deletePlan(id)
         true
     }
 

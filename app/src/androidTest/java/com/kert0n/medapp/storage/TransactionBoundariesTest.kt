@@ -195,7 +195,7 @@ class TransactionBoundariesTest {
     fun aDraftLosesTheBoxItHeldWhenTheBoxEnds() = runTest {
         val ibuprofen = pack(id = OTHER_PACK, quantity = tablets("10"), form = TABLET_FORM)
         packages.add(ibuprofen)
-        assertTrue(courses.saveDraft(course(dose = dose("2"), form = TABLET_FORM, sources = listOf(source(ibuprofen, 3)))))
+        assertTrue(courses.saveDraft(course(dose = dose("2"), form = TABLET_FORM, sources = listOf(source(ibuprofen, 3))), expected = null))
         assertEquals(listOf(OTHER_PACK), database.courses().sourcePackagesOf(COURSE))
 
         assertTrue(packages.end(ibuprofen.thrownOut(Uuid.random(), LATER), LATER))
@@ -460,7 +460,7 @@ class TransactionBoundariesTest {
         val stale = course(title = "Старый черновик")
         courses.activate(activation)
 
-        assertFalse(courses.saveDraft(stale))
+        assertFalse(courses.saveDraft(stale, expected = stale.revision))
         assertNull(courses.findDraft(COURSE))
         assertNotNull(courses.findPlan(COURSE))
     }
@@ -475,7 +475,7 @@ class TransactionBoundariesTest {
         courses.activate(activation)
         courses.close(closing(activation.record.close(CourseRecord.Outcome.COMPLETED, LATER)))
 
-        assertFalse(courses.saveDraft(course(title = "Старый черновик")))
+        assertFalse(courses.saveDraft(course(title = "Старый черновик"), expected = null))
         assertNull(courses.findDraft(COURSE))
         assertEquals(
             CourseRecord.Outcome.COMPLETED,
