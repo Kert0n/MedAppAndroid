@@ -214,6 +214,18 @@ class Package(
         PackageEnding(this, StockMovement.AccessLoss(movementId, ref, quantity, observedAt = at))
 
     /**
+     * Сервер назвал остаток [server], а наши установленные изменения объясняют [explained] — наш
+     * подтверждённый остаток с тем, что сделали мы сами. Необъяснённая разница — чужое изменение, и
+     * причина его не выдумывается (PLAN D7): иначе наш расход попал бы в историю дважды — приёмом и
+     * разницей. Нет разницы — нет и записи, поэтому повтор того же снимка движений не плодит. В
+     * разных единицах разницы не существует: сосед сменил единицу, и сравнивать нечего.
+     */
+    fun changedElsewhere(server: Quantity, explained: Quantity, movementId: Uuid, at: Instant): StockMovement.RemoteChange? {
+        if (server.unit != explained.unit || server == explained) return null
+        return StockMovement.RemoteChange(movementId, ref, server.amount - explained.amount, server.unit, observedAt = at)
+    }
+
+    /**
      * Изменение ушло к полке и ждёт её согласия. Пометка не мешает пользоваться коробкой: полка
      * ответит за каждое изменение по порядку (PLAN E1).
      */

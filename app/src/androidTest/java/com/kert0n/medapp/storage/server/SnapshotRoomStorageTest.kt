@@ -6,6 +6,11 @@ import com.kert0n.medapp.domain.pack.Claims
 import com.kert0n.medapp.fixture.HOME_KIT
 import com.kert0n.medapp.fixture.OTHER_PACK
 import com.kert0n.medapp.fixture.PACK
+import com.kert0n.medapp.fixture.INTAKE
+import com.kert0n.medapp.fixture.dose
+import com.kert0n.medapp.fixture.queueStorage
+import com.kert0n.medapp.fixture.snapshotStorage
+import com.kert0n.medapp.queue.pack.PackageSyncCommand
 import com.kert0n.medapp.fixture.SHARED_KIT
 import com.kert0n.medapp.fixture.inMemoryDatabase
 import com.kert0n.medapp.fixture.medKit
@@ -51,10 +56,7 @@ class SnapshotRoomStorageTest {
     @Before
     fun setUp() = runTest {
         database = inMemoryDatabase()
-        storage = SnapshotRoomStorage(
-            database, database.medKits(), database.packages(), database.courses(),
-            database.stockMovements(), database.vocabulary(), arrivedName = "Общая аптечка"
-        )
+        storage = database.snapshotStorage()
         database.medKits().upsert(
             medKit(id = HOME_KIT, publication = MedKit.Publication.PUBLISHED, participantCount = 1).toMedKitStorageEntity()
         )
@@ -63,14 +65,20 @@ class SnapshotRoomStorageTest {
     @After
     fun tearDown() = database.close()
 
-    private fun snapshot(id: Uuid, medKitId: Uuid = HOME_KIT, quantity: String = "17") = PackageSnapshot(
+    private fun snapshot(id: Uuid, medKitId: Uuid = HOME_KIT, quantity: String = "17", version: Long = 4) = PackageSnapshot(
         pack = pack(
             id = id,
             medKit = medKit(id = medKitId, publication = MedKit.Publication.PUBLISHED).ref,
             quantity = tablets(quantity)
         ),
-        sync = PackageSyncState(id, version = ResourceVersion(4), claimsVersion = ResourceVersion(2))
+        sync = PackageSyncState(id, version = ResourceVersion(version), claimsVersion = ResourceVersion(2))
     )
+
+    private suspend fun remoteChanges(id: Uuid = PACK): List<BigDecimal> {
+        val words = database.vocabulary().snapshot()
+        return database.stockMovements().ofPackage(id).map { it.toDomain(words) }
+            .filterIsInstance<StockMovement.RemoteChange>().map { it.delta.stripTrailingZeros() }
+    }
 
     private fun serverSnapshot(
         participants: Map<Uuid, Long>,
@@ -91,6 +99,55 @@ class SnapshotRoomStorageTest {
         assertEquals(tablets("17"), database.packageRepository().find(OTHER_PACK)?.quantity)
         // Чужая коробка, увиденная впервые, датируется моментом наблюдения (PLAN E4, F1).
         assertEquals(at, database.packages().find(PACK)?.record?.addedAt)
+    }
+
+    /**
+     * Обычный путь: сервер знает то же, что и мы. Снимок ложится целиком, и в истории нет ни одной
+     * записи — ни появления, ни разницы (PLAN E1, E4).
+     */
+    @Test
+    fun aSnapshotThatAgreesWithUsLeavesNoTrace() = runTest {
+        storage.lay(serverSnapshot(mapOf(HOME_KIT to 2L), listOf(snapshot(PACK))), at)
+
+        storage.lay(serverSnapshot(mapOf(HOME_KIT to 2L), listOf(snapshot(PACK, version = 5))), at.plusSeconds(60))
+
+        assertEquals(tablets("17"), database.packageRepository().find(PACK)?.quantity)
+        assertTrue(database.stockMovements().ofPackage(PACK).isEmpty())
+    }
+
+    /**
+     * Сосед принял таблетки — состав полки и число участников те же, а остаток другой: это видно
+     * только полным снимком, и разница идёт в историю чужим изменением. Причину сервер не знает,
+     * и она не выдумывается; повтор того же снимка второй записи не заводит (PLAN B6, D7).
+     */
+    @Test
+    fun aNeighboursChangeIsWrittenOnceAsUnexplained() = runTest {
+        storage.lay(serverSnapshot(mapOf(HOME_KIT to 2L), listOf(snapshot(PACK))), at)
+
+        val changed = serverSnapshot(mapOf(HOME_KIT to 2L), listOf(snapshot(PACK, quantity = "12", version = 5)))
+        storage.lay(changed, at.plusSeconds(60))
+        storage.lay(changed, at.plusSeconds(120))
+
+        assertEquals(tablets("12"), database.packageRepository().find(PACK)?.quantity)
+        assertEquals(listOf(BigDecimal("-5")), remoteChanges())
+    }
+
+    /**
+     * Запрос по коробке уже ушёл, а ответ не лёг: снимок мог увидеть наш расход, а подтверждённое
+     * число о нём не знает. Снимок коробку не трогает — иначе расход вычелся бы из числа дважды, а
+     * наш же расход записался бы чужим. Истину принесёт ответ на ту же команду (PLAN E1, D7).
+     */
+    @Test
+    fun aBoxWithARequestInFlightIsLeftToItsAnswer() = runTest {
+        storage.lay(serverSnapshot(mapOf(HOME_KIT to 2L), listOf(snapshot(PACK))), at)
+        val operation = Uuid.random()
+        database.syncOperations().enqueue(operation, PackageSyncCommand.Consume(PACK, dose("3"), INTAKE), at)
+        database.queueStorage().take(operation, null, at)
+
+        storage.lay(serverSnapshot(mapOf(HOME_KIT to 2L), listOf(snapshot(PACK, quantity = "14", version = 5))), at)
+
+        assertEquals(tablets("17"), database.packageRepository().find(PACK)?.quantity)
+        assertEquals(emptyList<BigDecimal>(), remoteChanges())
     }
 
     /**

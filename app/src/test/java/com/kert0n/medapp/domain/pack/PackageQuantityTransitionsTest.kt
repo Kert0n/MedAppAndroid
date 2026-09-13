@@ -105,4 +105,21 @@ class PackageQuantityTransitionsTest {
         // Пустой коробки не бывает — ни новой, ни прочитанной из базы: кончившаяся удаляется.
         pack(quantity = Quantity.zero(TABLETS))
     }
+
+    /**
+     * Сервер назвал 12, а мы объясняем 17: разница −5 — чужое изменение, и в историю идёт только она
+     * (PLAN D7). Объяснённое целиком следа не оставляет, а в разных единицах разницы нет вовсе.
+     */
+    @Test
+    fun aDifferenceWeDoNotExplainIsARemoteChange() {
+        val box = pack(quantity = tablets("20"))
+
+        val change = box.changedElsewhere(tablets("12"), explained = tablets("17"), movementId, LATER)
+
+        assertEquals(java.math.BigDecimal("-5"), change?.delta?.stripTrailingZeros())
+        assertEquals(TABLETS, change?.unit)
+        assertNull(change?.occurredAt)
+        assertNull(box.changedElsewhere(tablets("17.000"), explained = tablets("17"), movementId, LATER))
+        assertNull(box.changedElsewhere(millilitres("12"), explained = tablets("17"), movementId, LATER))
+    }
 }

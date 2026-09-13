@@ -184,7 +184,7 @@ class QueueRoomStorage @Inject constructor(
 
     private suspend fun apply(id: Uuid, effect: Settlement.Effect, at: Instant) {
         when (effect) {
-            is Settlement.Effect.LayDown -> layDown(effect.snapshot, at, carried = withdrawalOf(id)?.carried)
+            is Settlement.Effect.LayDown -> layDown(effect.snapshot, at, includes = effect.includes, carried = withdrawalOf(id)?.carried)
             // Коробки у нас больше нет; чем это объясняется, названо в самом эффекте, а переход
             // приносит пачка (PLAN D7).
             is Settlement.Effect.PackageEnded -> ended(effect.packageId, at) { it.endedAs(effect.ending, at) }
@@ -348,11 +348,28 @@ class QueueRoomStorage @Inject constructor(
      * Разрешённый снимок поверх подтверждённого остатка и броней; разрешать здесь нечего. Коробка,
      * которую не вышло унести ([carried] — с чем уносили), уже вернулась на полку: число полки
      * ложится, и сделанное дома после решения переносится на него (PLAN E6).
+     *
+     * Необъяснённую разницу пишет дверь (PLAN D7). Объясняет её [includes] — наша команда, которую
+     * снимок уже содержит, — а у вернувшейся коробки то, с чем её уносили: остаток у неё сейчас
+     * домашний, и с полкой сравнивается не он.
      */
-    private suspend fun layDown(snapshot: PackageSnapshot, at: Instant, carried: Quantity? = null) {
+    private suspend fun layDown(
+        snapshot: PackageSnapshot,
+        at: Instant,
+        includes: PackageSyncCommand? = null,
+        carried: Quantity? = null
+    ) {
         val words = vocabulary.snapshot()
         val atHome = carried?.let { packages.find(snapshot.pack.id)?.toDomain(words)?.quantity }
-        packages.applySnapshot(snapshot, observedAt = at)
+        packages.applySnapshot(snapshot, observedAt = at, movements, words) { confirmed ->
+            when {
+                carried != null -> carried
+                includes == null -> confirmed
+                // Команда в чужой единице ничего не объясняет: разницы в разных единицах нет.
+                includes.measuredIn.let { it != null && it != confirmed.unit } -> null
+                else -> includes.appliedTo(confirmed) ?: confirmed
+            }
+        }
         if (carried == null || atHome == null) return
         val row = packages.find(snapshot.pack.id) ?: return
         val laid = row.toDomain(words)

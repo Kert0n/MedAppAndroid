@@ -43,8 +43,12 @@ class Settlement(val transition: Transition, effects: List<Effect> = emptyList()
     /** Что ещё меняется в базе вместе с переходом. */
     sealed interface Effect {
 
-        /** Разрешённый снимок ложится поверх подтверждённого остатка и броней; старее нынешнего — нет. */
-        data class LayDown(val snapshot: PackageSnapshot) : Effect
+        /**
+         * Разрешённый снимок ложится поверх подтверждённого остатка и броней; старее нынешнего — нет.
+         * [includes] — наша команда, которую снимок уже содержит: применённая объясняет часть
+         * разницы, а необъяснённая идёт в историю чужим изменением (PLAN D7, E4).
+         */
+        data class LayDown(val snapshot: PackageSnapshot, val includes: PackageSyncCommand? = null) : Effect
 
         /**
          * Коробки у нас больше нет. Чем это объясняется в истории, называет [ending]: решение
@@ -109,7 +113,7 @@ class Settlement(val transition: Transition, effects: List<Effect> = emptyList()
 fun Delivery.settlement(command: SyncCommand): Settlement = when (this) {
     is Delivery.Applied -> Settlement(
         Settlement.Transition.Close(SyncOperationStatus.APPLIED),
-        listOf(Settlement.Effect.Account(IntakeAccounting.REMOTE_APPLIED)) + state.effects(command) +
+        listOf(Settlement.Effect.Account(IntakeAccounting.REMOTE_APPLIED)) + state.effects(command, applied = true) +
             command.appliedToTheShelf() + Settlement.Effect.Settled
     )
     is Delivery.Stale -> Settlement(
@@ -118,7 +122,7 @@ fun Delivery.settlement(command: SyncCommand): Settlement = when (this) {
     )
     is Delivery.Refused -> Settlement(
         Settlement.Transition.Close(SyncOperationStatus.REFUSED, reason.name),
-        listOf(Settlement.Effect.Account(IntakeAccounting.REMOTE_REFUSED)) + command.returned() + state.effects(command) +
+        listOf(Settlement.Effect.Account(IntakeAccounting.REMOTE_REFUSED)) + command.returned() + state.effects(command, applied = false) +
             Settlement.Effect.Cascade(SyncOperationStatus.REFUSED, IntakeAccounting.REMOTE_REFUSED) +
             Settlement.Effect.Settled
     )
@@ -134,9 +138,13 @@ fun Delivery.settlement(command: SyncCommand): Settlement = when (this) {
     )
 }
 
-/** Истина по пачке после закрытия — что положить: снимок, «пачки нет» либо ничего. */
-private fun PackageState.effects(command: SyncCommand): List<Settlement.Effect> = when (this) {
-    is PackageState.Present -> listOf(Settlement.Effect.LayDown(snapshot))
+/**
+ * Истина по пачке после закрытия — что положить: снимок, «пачки нет» либо ничего. Снимок
+ * применённой команды содержит её саму, отказанной — нет (PLAN D7).
+ */
+private fun PackageState.effects(command: SyncCommand, applied: Boolean): List<Settlement.Effect> = when (this) {
+    is PackageState.Present ->
+        listOf(Settlement.Effect.LayDown(snapshot, includes = (command as? PackageSyncCommand).takeIf { applied }))
     PackageState.Gone -> listOfNotNull((command as? PackageSyncCommand)?.let { it.gone(it.endsAs()) })
     // Команда своё сделала, а коробка ушла туда, где нас нет: у нас она кончается утратой доступа.
     PackageState.Elsewhere -> listOfNotNull((command as? PackageSyncCommand)?.gone(Settlement.Effect.Ending.ACCESS_LOST))

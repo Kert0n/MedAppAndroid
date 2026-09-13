@@ -22,9 +22,9 @@ import kotlin.uuid.Uuid
 
 /**
  * Укладка полного снимка — одной транзакцией (PLAN E4, F5). Ничего не толкует: что именно ляжет,
- * решает дверь `PackageDao.applySnapshot` по версиям, что появилось и чего не стало — решено в
- * очереди, а у знакомой полки снимок трогает **только** число участников: название и место
- * хранения серверу неизвестны (F1).
+ * решает дверь `PackageDao.applySnapshot` по версиям, и она же пишет необъяснённую разницу; что
+ * появилось и чего не стало — решено в очереди, а у знакомой полки снимок трогает **только**
+ * число участников: название и место хранения серверу неизвестны (F1).
  */
 class SnapshotRoomStorage @Inject constructor(
     private val database: MedAppDatabase,
@@ -33,6 +33,7 @@ class SnapshotRoomStorage @Inject constructor(
     private val courses: CourseDao,
     private val movements: StockMovementDao,
     private val vocabulary: VocabularyDao,
+    private val queue: SyncOperationDao,
     @ArrivedMedKitName private val arrivedName: String
 ) : SnapshotStorage {
 
@@ -61,13 +62,17 @@ class SnapshotRoomStorage @Inject constructor(
             medKits.insertIfMissing(arrived.toStorageEntity(syncedAt = at))
         }
         for ((medKitId, count) in snapshot.participants) medKits.applyServerParticipants(medKitId, count, at)
+        val inFlight = queue.packagesInFlight().toSet()
         for (resolved in snapshot.packages) {
             val packageId = resolved.pack.id
+            // Коробку с запросом в полёте кладёт ответ на него: снимок мог уже увидеть наш расход,
+            // а подтверждённое число его ещё не знает (PLAN E1).
+            if (packageId in inFlight) continue
             // Убранное, пока снимок летел, он не возвращает: коробку выбросили или унесли вместе с
             // полкой, и ответ, прочитанный раньше, об этом не знает (PLAN C0).
             val removed = packageId in snapshot.heldPackages && packages.find(packageId) == null
             if (removed || medKits.find(resolved.pack.medKit.id) == null) continue
-            packages.applySnapshot(resolved, observedAt = at)
+            packages.applySnapshot(resolved, observedAt = at, movements, words)
         }
         // Коробка кончается своим переходом со следом, полка уходит вместе с содержимым — обе
         // двери те же, какими пользуется ответ сервера на нашу команду (PLAN D7, E6).

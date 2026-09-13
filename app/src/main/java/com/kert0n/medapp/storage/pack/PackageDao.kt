@@ -8,6 +8,7 @@ import androidx.room.Transaction
 import androidx.room.Upsert
 import com.kert0n.medapp.domain.pack.Package
 import com.kert0n.medapp.domain.pack.PackageEnding
+import com.kert0n.medapp.domain.value.Quantity
 import com.kert0n.medapp.domain.value.Vocabulary
 import com.kert0n.medapp.network.pack.PackageSnapshot
 import com.kert0n.medapp.network.pack.PackageSyncState
@@ -266,13 +267,33 @@ interface PackageDao {
  * Снимок пачки, разрешённый в домен, — в базу. Единственная дверь: половины расходятся только
  * тут, и только по своим версиям, поэтому версия картины броней всегда описывает ту картину,
  * что лежит рядом (PLAN B3, E1).
+ *
+ * Здесь же пишется разница, которую не объясняем мы сами (PLAN D7): серверное число ложится
+ * только через эту дверь — полным снимком, чтением перед отправкой или ответом на команду, — и
+ * чужое изменение, увиденное любым из них, попадает в историю. Что объясняем мы, говорит
+ * [explained] по нашему подтверждённому остатку: без нашей команды в снимке — он сам, с
+ * применённой — он с ней; `null` — сравнивать не с чем.
  */
-suspend fun PackageDao.applySnapshot(snapshot: PackageSnapshot, observedAt: Instant): SnapshotApplied =
-    applySnapshot(
+suspend fun PackageDao.applySnapshot(
+    snapshot: PackageSnapshot,
+    observedAt: Instant,
+    movements: StockMovementDao,
+    vocabulary: Vocabulary,
+    explained: (confirmed: Quantity) -> Quantity? = { it }
+): SnapshotApplied {
+    val before = find(snapshot.pack.id)?.toDomain(vocabulary)
+    val applied = applySnapshot(
         snapshot.pack.toStorageEntity(snapshot.sync),
         snapshot.pack.claims?.toStorageEntity(snapshot.pack.id),
         observedAt
     )
+    // Коробку, увиденную впервые, объяснять не с чем: знакомство — не изменение.
+    if (!applied.pack || before == null) return applied
+    val ours = explained(before.quantity) ?: return applied
+    before.changedElsewhere(snapshot.pack.quantity, ours, Uuid.random(), observedAt)
+        ?.let { movements.insert(it.toStorageEntity()) }
+    return applied
+}
 
 /**
  * Пачка целиком: запись о коробке, живая строка и личные сведения собираются из одной сущности.

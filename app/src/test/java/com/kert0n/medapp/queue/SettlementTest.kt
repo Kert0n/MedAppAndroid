@@ -36,11 +36,18 @@ class SettlementTest {
     )
     private val later: Instant = Instant.parse("2026-09-12T12:00:00Z")
 
+    /**
+     * Снимок применённой команды содержит её саму: наш расход объясняет часть разницы, и в историю
+     * чужим изменением идёт только остаток (PLAN D7).
+     */
     @Test
     fun appliedWithASnapshotClosesLaysItDownAndAccountsTheIntake() {
         val settlement = Delivery.Applied(PackageState.Present(snapshot)).settlement(consume)
         assertEquals(Transition.Close(SyncOperationStatus.APPLIED), settlement.transition)
-        assertEquals(listOf(Effect.Account(IntakeAccounting.REMOTE_APPLIED), Effect.LayDown(snapshot), Effect.Settled), settlement.effects)
+        assertEquals(
+            listOf(Effect.Account(IntakeAccounting.REMOTE_APPLIED), Effect.LayDown(snapshot, includes = consume), Effect.Settled),
+            settlement.effects
+        )
     }
 
     @Test

@@ -143,7 +143,14 @@ class QueueRoomStorageTest {
         assertEquals(tablets("17"), request.quantityBefore)
         assertEquals(tablets("4"), request.mineBefore)
         assertEquals(tablets("17"), requireNotNull(database.packageRepository().find(PACK)).quantity)
+        // Команда ещё не уходила — разницу между 20 и 17 объяснить нам нечем: это чужое (PLAN D7).
+        assertEquals(listOf(BigDecimal("-3")), remoteChanges())
     }
+
+    /** Чужие изменения пачки в истории — как их записала дверь снимка. */
+    private suspend fun remoteChanges(): List<BigDecimal> =
+        database.stockMovements().ofPackage(PACK).map { it.toDomain(VOCABULARY) }
+            .filterIsInstance<StockMovement.RemoteChange>().map { it.delta.stripTrailingZeros() }
 
     @Test
     fun takingAgainDoesNotRebuildTheRequest() = runTest {
@@ -189,6 +196,25 @@ class QueueRoomStorageTest {
         assertEquals(IntakeAccounting.REMOTE_APPLIED, requireNotNull(database.intakes().findEntity(INTAKE)).accounting)
         assertEquals(IntakeStatus.TAKEN, requireNotNull(database.intakes().findEntity(INTAKE)).status)
         assertTrue(storage.ready(at.plusSeconds(600)).isEmpty())
+        // 20 − 3 = 17: всю разницу объясняет наш расход, и чужого изменения в истории нет — иначе
+        // он попал бы туда дважды, приёмом и разницей (PLAN D7).
+        assertEquals(emptyList<BigDecimal>(), remoteChanges())
+    }
+
+    /** Ответ на наш расход увидел ещё и соседа: в историю идёт только то, чего мы не объясняем. */
+    @Test
+    fun anAnswerThatSawANeighbourWritesOnlyTheUnexplainedRemainder() = runTest {
+        database.syncOperations().enqueue(operation, PackageSyncCommand.Consume(PACK, dose("3"), INTAKE), at)
+        storage.take(operation, null, at)
+
+        storage.settle(
+            operation,
+            Delivery.Applied(PackageState.Present(resolved(snapshotJson.replace("17.000000", "15.000000")))),
+            at.plusSeconds(1)
+        )
+
+        assertEquals(tablets("15"), requireNotNull(database.packageRepository().find(PACK)).quantity)
+        assertEquals(listOf(BigDecimal("-2")), remoteChanges())
     }
 
     @Test

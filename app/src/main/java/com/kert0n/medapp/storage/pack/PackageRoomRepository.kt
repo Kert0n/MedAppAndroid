@@ -101,7 +101,7 @@ class PackageRoomRepository @Inject constructor(
         }
 
     override suspend fun applySnapshot(snapshot: PackageSnapshot, observedAt: Instant): SnapshotApplied =
-        packages.applySnapshot(snapshot, observedAt)
+        packages.applySnapshot(snapshot, observedAt, movements, vocabulary.snapshot())
 
     override suspend fun saveClaims(packageId: Uuid, claims: Claims?) {
         if (claims == null) packages.deleteClaims(packageId)

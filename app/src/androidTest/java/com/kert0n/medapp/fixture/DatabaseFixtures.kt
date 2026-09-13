@@ -97,6 +97,12 @@ fun MedAppDatabase.queueStorage() = com.kert0n.medapp.storage.server.QueueRoomSt
     this, syncOperations(), packages(), intakes(), medKits(), courses(), stockMovements(), vocabulary()
 )
 
+/** Порт полного снимка — укладка целиком одной транзакцией; полка с сервера зовётся как в ресурсах. */
+fun MedAppDatabase.snapshotStorage() = com.kert0n.medapp.storage.server.SnapshotRoomStorage(
+    this, medKits(), packages(), courses(), stockMovements(), vocabulary(), syncOperations(),
+    arrivedName = "Общая аптечка"
+)
+
 /**
  * Пачка целиком в базу: запись о коробке, живая строка и сведения — как их пишет репозиторий.
  * Тестам DAO не нужно повторять сборку трёх строк, чтобы положить одну пачку.
