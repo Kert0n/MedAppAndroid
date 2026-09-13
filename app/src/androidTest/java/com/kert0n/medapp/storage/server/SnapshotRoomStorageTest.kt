@@ -3,6 +3,9 @@ package com.kert0n.medapp.storage.server
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import com.kert0n.medapp.domain.medkit.MedKit
 import com.kert0n.medapp.domain.pack.Claims
+import com.kert0n.medapp.fixture.medKitRepository
+import com.kert0n.medapp.fixture.Scenarios
+import com.kert0n.medapp.domain.medkit.MedKitStatus
 import com.kert0n.medapp.fixture.HOME_KIT
 import com.kert0n.medapp.fixture.OTHER_PACK
 import com.kert0n.medapp.fixture.PACK
@@ -157,13 +160,54 @@ class SnapshotRoomStorageTest {
     }
 
     /**
+     * Снимок, прочитанный до того, как коробку унесли домой, её не кончает: к укладке она уже
+     * местная и лежит у человека в руках, а истину по ней принесёт ответ на её `Withdraw` (PLAN E4).
+     *
+     * Красная проверка: пока путь отсутствия не перепроверял нынешнее состояние, физически
+     * существующая коробка исчезала у человека из-за решения, посчитанного до запроса.
+     */
+    @Test
+    fun aSnapshotStartedBeforeTheBoxWasCarriedHomeDoesNotEndIt() = runTest {
+        storage.lay(serverSnapshot(mapOf(HOME_KIT to 2L), listOf(snapshot(PACK))), at)
+        val knew = storage.serverKnows()
+        assertTrue(PACK in knew.packages)
+        // Пока снимок летел, человек унёс коробку на местную полку: она сразу у него, а серверу
+        // уехало снятие.
+        Scenarios(database, at).packageRelocation.move(PACK, SHARED_KIT)
+
+        storage.lay(
+            serverSnapshot(mapOf(HOME_KIT to 2L), emptyList(), gonePackages = setOf(PACK), heldPackages = knew.heldPackages),
+            at
+        )
+
+        val kept = requireNotNull(database.packageRepository().find(PACK))
+        assertEquals(SHARED_KIT, kept.medKit.id)
+        assertEquals(tablets("17"), kept.quantity)
+    }
+
+    /**
+     * Полку, о которой уже принято решение, отсутствие в снимке не отбирает: её ответ ещё в пути
+     * (PLAN E4, E6).
+     */
+    @Test
+    fun aSnapshotDoesNotTakeAwayAShelfWhoseDecisionIsStillWaiting() = runTest {
+        storage.lay(serverSnapshot(mapOf(HOME_KIT to 2L), listOf(snapshot(PACK))), at)
+        database.medKitRepository().mark(HOME_KIT, MedKitStatus.REMOVING)
+
+        storage.lay(serverSnapshot(emptyMap(), emptyList(), goneMedKits = setOf(HOME_KIT)), at)
+
+        assertNotNull(database.medKits().find(HOME_KIT))
+        assertNotNull(database.packageRepository().find(PACK))
+    }
+
+    /**
      * О чём сервер знает: коробка без его версии ему неизвестна, а помеченная ждёт ответа на своё
      * решение — её отсутствие в снимке объяснит он, а не снимок (PLAN E4).
      */
     @Test
     fun whatTheServerKnowsLeavesOutTheUnsentAndTheUndecided() = runTest {
         storage.lay(serverSnapshot(mapOf(HOME_KIT to 2L), listOf(snapshot(PACK), snapshot(OTHER_PACK))), at)
-        database.packages().setStatus(OTHER_PACK, PackageStatus.REMOVING)
+        database.packages().setDecision(OTHER_PACK, PackageStatus.REMOVING, decidedBy = Uuid.random())
         database.packageRepository().add(pack(id = third, quantity = tablets("5")))
 
         val knew = storage.serverKnows()

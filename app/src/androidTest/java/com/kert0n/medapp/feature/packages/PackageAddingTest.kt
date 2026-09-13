@@ -7,6 +7,7 @@ import com.kert0n.medapp.domain.pack.PackageStatus
 import com.kert0n.medapp.network.server.ResourceVersion
 import com.kert0n.medapp.fixture.HOME_KIT
 import com.kert0n.medapp.fixture.LATER
+import com.kert0n.medapp.fixture.medKitRepository
 import com.kert0n.medapp.fixture.SHARED_KIT
 import com.kert0n.medapp.fixture.Scenarios
 import com.kert0n.medapp.fixture.TABLET_FORM
@@ -107,7 +108,7 @@ class PackageAddingTest {
         assertEquals(PackageStatus.CHANGING, stored.status)
         assertEquals("от головы", stored.facts.note)
         assertEquals(
-            listOf(PackageSyncCommand.Create(id, SHARED_KIT, tablets("30"), facts.shared)),
+            listOf(PackageSyncCommand.Create(id, SHARED_KIT)),
             commands()
         )
         // Помеченной `CHANGING` пользуются: расход из неё возможен.
@@ -156,5 +157,23 @@ class PackageAddingTest {
     @Test
     fun aShelfThatIsGoneTakesNoBoxes() = runTest {
         assertEquals(PackageAdding.Outcome.MedKitGone, adding.add(Uuid.random(), facts, tablets("30")))
+    }
+
+    /**
+     * В полку, о которой принято решение, не кладут: уборка унесла бы коробку с собой, а
+     * публикация уже назвала серверу своё содержимое — эта коробка в сказанное не вошла, и
+     * рассказать о ней было бы нечем (PLAN E5, E6).
+     */
+    @Test
+    fun aShelfWaitingForItsOwnAnswerTakesNoNewBoxes() = runTest {
+        // Публикуемая полка — ещё местная: сервер о ней не слышал, потому и публикуется.
+        database.medKitRepository().mark(SHARED_KIT, MedKitStatus.PUBLISHING)
+        database.medKitRepository().mark(HOME_KIT, MedKitStatus.REMOVING)
+
+        assertEquals(PackageAdding.Outcome.MedKitBusy, adding.add(SHARED_KIT, facts, tablets("30")))
+        assertEquals(PackageAdding.Outcome.MedKitBusy, adding.add(HOME_KIT, facts, tablets("30")))
+
+        assertTrue(database.packages().held().isEmpty())
+        assertTrue(commands().isEmpty())
     }
 }

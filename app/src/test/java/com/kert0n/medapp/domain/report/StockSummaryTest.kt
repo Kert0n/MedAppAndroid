@@ -1,7 +1,5 @@
 package com.kert0n.medapp.domain.report
 
-import com.kert0n.medapp.domain.pack.Package
-import com.kert0n.medapp.domain.pack.PackageStatus
 import com.kert0n.medapp.domain.value.Money
 import com.kert0n.medapp.fixture.CAPSULE_FORM
 import com.kert0n.medapp.fixture.TABLET_FORM
@@ -70,9 +68,7 @@ class StockSummaryTest {
     /** Коробка, которую решили выбросить, — уже не то, что у человека есть. Единицы не мешают. */
     @Test
     fun aBoxBeingRemovedIsNotCountedAndUnitsDoNotMatter() {
-        val removing = pack(id = Uuid.random()).let {
-            Package(it.id, it.medKit, it.facts, it.quantity, it.addedAt, status = PackageStatus.REMOVING)
-        }
+        val removing = pack(id = Uuid.random()).markRemoving(by = Uuid.random())
         val summary = StockSummary.of(listOf(box(), pack(id = Uuid.random(), quantity = millilitres("100")), removing))
 
         assertEquals(2, summary.packages)

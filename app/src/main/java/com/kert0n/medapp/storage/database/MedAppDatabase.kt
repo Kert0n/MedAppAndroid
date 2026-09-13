@@ -103,8 +103,10 @@ abstract class MedAppDatabase : RoomDatabase() {
          *   вместе с ней (`CASCADE`), а связи с лечением снимает домен, и схема их держит
          *   (`RESTRICT`): состав курса не меняется мимо самого курса;
          * - истории коробки нет: таблица движений `stock_adjustments` уходит (D7);
-         * - у коробки и аптечки появился статус — неподтверждённое решение о них (E1, E6). До версии
-         *   3 решений в пути не было, поэтому все переезжают обычными.
+         * - у коробки и аптечки появился статус — неподтверждённое решение о них (E1, E6), а у
+         *   коробки ещё и `decided_by` — команда, которая пометку поставила и только которая её
+         *   снимет. До версии 3 решений в пути не было, поэтому все переезжают обычными и без
+         *   владельца.
          *
          * Ни убрать колонку с внешним ключом, ни поменять его поведение SQLite не умеет, поэтому
          * каждая задетая таблица пересоздаётся и переливается; части переливаются только у
@@ -170,7 +172,7 @@ abstract class MedAppDatabase : RoomDatabase() {
                             `quantity_sort` TEXT NOT NULL, `quantity_unit_id` TEXT NOT NULL,
                             `form_id` TEXT, `category` TEXT, `manufacturer` TEXT, `country` TEXT,
                             `description` TEXT, `version` INTEGER, `claims_version` INTEGER,
-                            `synced_at` INTEGER, `status` TEXT NOT NULL,
+                            `synced_at` INTEGER, `status` TEXT NOT NULL, `decided_by` TEXT,
                             PRIMARY KEY(`id`),
                             FOREIGN KEY(`id`) REFERENCES `package_records`(`id`)
                                 ON UPDATE NO ACTION ON DELETE RESTRICT ,
@@ -187,16 +189,18 @@ abstract class MedAppDatabase : RoomDatabase() {
                         INSERT INTO `packages_new`
                             (`id`, `med_kit_id`, `name`, `name_search`, `quantity`, `quantity_sort`,
                              `quantity_unit_id`, `form_id`, `category`, `manufacturer`, `country`,
-                             `description`, `version`, `claims_version`, `synced_at`, `status`)
+                             `description`, `version`, `claims_version`, `synced_at`, `status`,
+                             `decided_by`)
                         SELECT `id`, `med_kit_id`, `name`, `name_search`, `quantity`, `quantity_sort`,
                                `quantity_unit_id`, `form_id`, `category`, `manufacturer`, `country`,
-                               `description`, `version`, `claims_version`, `synced_at`, 'ACTIVE'
+                               `description`, `version`, `claims_version`, `synced_at`, 'ACTIVE', NULL
                         FROM `packages` WHERE `lifecycle` = 'ACTIVE' AND `access` = 'AVAILABLE'
                     """.trimIndent(),
                     "CREATE INDEX IF NOT EXISTS `index_packages_med_kit_id` ON `packages` (`med_kit_id`)",
                     "CREATE INDEX IF NOT EXISTS `index_packages_name_search` ON `packages` (`name_search`)",
                     "CREATE INDEX IF NOT EXISTS `index_packages_quantity_unit_id` ON `packages` (`quantity_unit_id`)",
-                    "CREATE INDEX IF NOT EXISTS `index_packages_form_id` ON `packages` (`form_id`)"
+                    "CREATE INDEX IF NOT EXISTS `index_packages_form_id` ON `packages` (`form_id`)",
+                    "CREATE INDEX IF NOT EXISTS `index_packages_decided_by` ON `packages` (`decided_by`)"
                 )
                 // Движения ничего не объясняют никому: ни экран, ни отчёт их не читают (D7).
                 connection.execSQL("DROP TABLE `stock_adjustments`")

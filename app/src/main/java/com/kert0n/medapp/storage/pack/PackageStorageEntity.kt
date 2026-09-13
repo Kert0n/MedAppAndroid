@@ -68,7 +68,12 @@ import kotlin.uuid.Uuid
             onDelete = ForeignKey.RESTRICT
         )
     ],
-    indices = [Index("med_kit_id"), Index("name_search"), Index("quantity_unit_id"), Index("form_id")]
+    indices = [
+        Index("med_kit_id"), Index("name_search"), Index("quantity_unit_id"), Index("form_id"),
+        // «Чьи пометки снимать» спрашивают у каждой закрытой команды: без индекса это чтение всех
+        // коробок на каждый ответ сервера (PLAN E1).
+        Index("decided_by")
+    ]
 )
 class PackageStorageEntity(
     @PrimaryKey val id: Uuid,
@@ -87,7 +92,13 @@ class PackageStorageEntity(
     @ColumnInfo(name = "claims_version") val claimsVersion: Long? = null,
     @ColumnInfo(name = "synced_at") val syncedAt: Instant? = null,
     /** Неподтверждённое решение о коробке; снимок сервера его не переписывает (PLAN E1). */
-    val status: PackageStatus = PackageStatus.ACTIVE
+    val status: PackageStatus = PackageStatus.ACTIVE,
+    /**
+     * Команда, которая пометку поставила: снять её может только она (PLAN E1). Ключа на
+     * `sync_operations` здесь нет — ровно как у `intakes.operation_id`: очередь живёт своей
+     * таблицей, а коробка о её строках ничего не обещает.
+     */
+    @ColumnInfo(name = "decided_by") val decidedBy: Uuid? = null
 ) {
     /** Аптечка пачки, прочитанная связью: её нет — строка пачки повреждена, ключ это держит (F2). */
     fun medKitRow(read: MedKitStorageEntity?): MedKitStorageEntity =
@@ -128,6 +139,7 @@ fun Package.toStorageEntity(sync: PackageSyncState = PackageSyncState(id)): Pack
         version = sync.version?.number,
         claimsVersion = sync.claimsVersion?.number,
         syncedAt = sync.syncedAt,
-        status = status
+        status = status,
+        decidedBy = decidedBy
     )
 }

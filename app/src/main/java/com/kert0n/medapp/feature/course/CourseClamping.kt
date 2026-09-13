@@ -4,7 +4,7 @@ import com.kert0n.medapp.domain.course.CourseProgress
 import com.kert0n.medapp.domain.course.Course
 import com.kert0n.medapp.domain.intake.CourseIntake
 import com.kert0n.medapp.domain.pack.Package
-import com.kert0n.medapp.domain.value.Quantity
+import com.kert0n.medapp.domain.pack.PackageAvailability
 import com.kert0n.medapp.queue.QueueService
 import com.kert0n.medapp.queue.QueuedCommand
 import com.kert0n.medapp.queue.pack.PackageSyncCommand
@@ -19,8 +19,9 @@ import kotlin.uuid.Uuid
 /**
  * Шаг внутри чужой транзакции: коробка стала меньше — пересчёт, утилизация, разовый приём, — и
  * лечение, державшее её, зажимается под то, что в ней теперь есть (PLAN D5): выделение не больше
- * доступного, а на общей полке изменившаяся бронь уезжает разницей — `SetClaim` либо
- * `ReleaseClaim`. Расписание не трогается: нехватка меняет обеспечение, а не план (C1).
+ * **доступного мне** — физического остатка без чужих броней — и считается оно от того же числа,
+ * которое человек видит на экране. На общей полке изменившаяся бронь уезжает разницей — `SetClaim`
+ * либо `ReleaseClaim`. Расписание не трогается: нехватка меняет обеспечение, а не план (C1).
  * Прошлое отмечается раньше, чем лечение трогают (F4).
  *
  * Зовут это те, кто меняет число коробки, оставшейся у человека: кончившуюся коробку лечение
@@ -34,12 +35,16 @@ class CourseClamping @Inject constructor(
     private val queue: QueueService
 ) {
 
-    /** [after] — сколько в [pkg] теперь доступно: названное число или проекция после команды. */
-    suspend fun clampTheCourseHolding(pkg: Package, after: Quantity, now: Instant) {
+    /**
+     * [after] — чем стала коробка после действия человека: та самая оценка, которую он видит на
+     * экране, с чужими бронями, уже вычтенными из неё (PLAN D4). Зовущий читает её у коробки после
+     * своей записи — своё действие в ней уже учтено.
+     */
+    suspend fun clampTheCourseHolding(pkg: Package, after: PackageAvailability, now: Instant) {
         val course = courses.courseHolding(pkg.id)?.let { courses.openPlan(it) } ?: return
         calendar.missOverdue(course, now)
         val progress = CourseProgress.of(intakes.ofCourse(course.id).filterIsInstance<CourseIntake>())
-        val availability = calendar.availabilityOf(course).with(pkg.ref, after)
+        val availability = calendar.availabilityOf(course).with(after)
         val clamped = course.clamped(course.remainingDoses(progress), availability, now)
         if (clamped === course) return
         check(courses.reallocate(CourseReallocation(clamped, course.revision))) { "план прочитан этой же транзакцией" }

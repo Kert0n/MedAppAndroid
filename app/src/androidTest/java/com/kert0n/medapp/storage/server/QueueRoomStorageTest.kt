@@ -2,6 +2,9 @@ package com.kert0n.medapp.storage.server
 
 import com.kert0n.medapp.domain.intake.IntakeStatus
 import com.kert0n.medapp.domain.pack.PackageStatus
+import com.kert0n.medapp.fixture.medKitRepository
+import com.kert0n.medapp.queue.medkit.MedKitSyncCommand
+import com.kert0n.medapp.domain.medkit.MedKitStatus
 import com.kert0n.medapp.fixture.HOME_KIT
 import com.kert0n.medapp.fixture.INTAKE
 import com.kert0n.medapp.fixture.PACK
@@ -232,18 +235,62 @@ class QueueRoomStorageTest {
     }
 
     /**
+     * Пометку снимает только та команда, которая её поставила. Решение полки — выбросить её вместе
+     * с лекарствами — держит пометку коробки до **своего** ответа, и старая бронь, доехавшая
+     * позже, коробку в оборот не возвращает (PLAN E1).
+     *
+     * Красная проверка: пока пометку снимало закрытие последней незакрытой команды коробки, между
+     * ответом на бронь и ответом на уборку полки коробка становилась обычной — из неё можно было
+     * принять и назначить её курсом, а через секунду она исчезала вместе с полкой.
+     */
+    @Test
+    fun anOlderCommandOfTheBoxDoesNotReleaseTheShelfsDecision() = runTest {
+        val claim = PackageSyncCommand.ReleaseClaim(PACK)
+        val older = storage.enqueue(QueuedCommand(Uuid.random(), claim), HOME_KIT, at)
+        val removal = storage.enqueue(QueuedCommand(Uuid.random(), MedKitSyncCommand.Delete(HOME_KIT)), HOME_KIT, at.plusSeconds(1))
+        database.packageRepository().mark(PACK, PackageStatus.REMOVING, by = removal.id)
+        database.medKitRepository().mark(HOME_KIT, MedKitStatus.REMOVING)
+
+        storage.settle(older.id, Delivery.Applied(PackageState.None), at.plusSeconds(2))
+
+        val pkg = requireNotNull(database.packageRepository().find(PACK))
+        assertEquals(PackageStatus.REMOVING, pkg.status)
+        assertEquals(removal.id, pkg.decidedBy)
+        assertFalse(pkg.take(dose("1"), at).isSuccess)
+    }
+
+    /** Отказ по команде полки возвращает её коробки в оборот: решение доведено, и ждать нечего. */
+    @Test
+    fun theRefusalOfTheShelfsCommandReleasesTheBoxesItMarked() = runTest {
+        val removal = storage.enqueue(QueuedCommand(Uuid.random(), MedKitSyncCommand.Delete(HOME_KIT)), HOME_KIT, at)
+        database.packageRepository().mark(PACK, PackageStatus.REMOVING, by = removal.id)
+        database.medKitRepository().mark(HOME_KIT, MedKitStatus.REMOVING)
+
+        storage.settle(removal.id, Delivery.Refused(RefusalReason.CONFLICT, PackageState.None), at.plusSeconds(1))
+
+        val pkg = requireNotNull(database.packageRepository().find(PACK))
+        assertEquals(PackageStatus.ACTIVE, pkg.status)
+        assertNull(pkg.decidedBy)
+        assertEquals(MedKitStatus.ACTIVE, database.medKitRepository().find(HOME_KIT)?.status)
+    }
+
+    /**
      * Снимок, пришедший, пока решение ждёт, пометку не снимает: статус — наше решение, а не
      * сведения сервера, и снимает его только закрытие команды (PLAN E1).
      */
     @Test
     fun aSnapshotDoesNotReleaseTheMark() = runTest {
-        database.packageRepository().mark(PACK, PackageStatus.REMOVING)
+        val decision = Uuid.random()
+        database.packageRepository().mark(PACK, PackageStatus.REMOVING, by = decision)
 
         database.packageRepository().applySnapshot(snapshot, at)
 
         val pkg = requireNotNull(database.packageRepository().find(PACK))
         assertEquals(tablets("17"), pkg.quantity)
         assertEquals(PackageStatus.REMOVING, pkg.status)
+        // Снимок переписывает серверную часть целиком, и владелец решения переживает её вместе с
+        // пометкой: иначе снять пометку стало бы некому (PLAN E1).
+        assertEquals(decision, pkg.decidedBy)
     }
 
     /**

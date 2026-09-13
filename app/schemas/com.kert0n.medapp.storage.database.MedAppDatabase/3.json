@@ -2,7 +2,7 @@
   "formatVersion": 1,
   "database": {
     "version": 3,
-    "identityHash": "68c9b790e4f7216c91bac97ef1a40668",
+    "identityHash": "dfd8c0e90b04ef447f64845018849098",
     "entities": [
       {
         "tableName": "quantity_units",
@@ -327,7 +327,7 @@
       },
       {
         "tableName": "packages",
-        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`id` TEXT NOT NULL, `med_kit_id` TEXT NOT NULL, `name` TEXT NOT NULL, `name_search` TEXT NOT NULL, `quantity` TEXT NOT NULL, `quantity_sort` TEXT NOT NULL, `quantity_unit_id` TEXT NOT NULL, `form_id` TEXT, `category` TEXT, `manufacturer` TEXT, `country` TEXT, `description` TEXT, `version` INTEGER, `claims_version` INTEGER, `synced_at` INTEGER, `status` TEXT NOT NULL, PRIMARY KEY(`id`), FOREIGN KEY(`id`) REFERENCES `package_records`(`id`) ON UPDATE NO ACTION ON DELETE RESTRICT , FOREIGN KEY(`med_kit_id`) REFERENCES `med_kits`(`id`) ON UPDATE NO ACTION ON DELETE RESTRICT , FOREIGN KEY(`quantity_unit_id`) REFERENCES `quantity_units`(`id`) ON UPDATE NO ACTION ON DELETE RESTRICT , FOREIGN KEY(`form_id`) REFERENCES `form_types`(`id`) ON UPDATE NO ACTION ON DELETE RESTRICT )",
+        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`id` TEXT NOT NULL, `med_kit_id` TEXT NOT NULL, `name` TEXT NOT NULL, `name_search` TEXT NOT NULL, `quantity` TEXT NOT NULL, `quantity_sort` TEXT NOT NULL, `quantity_unit_id` TEXT NOT NULL, `form_id` TEXT, `category` TEXT, `manufacturer` TEXT, `country` TEXT, `description` TEXT, `version` INTEGER, `claims_version` INTEGER, `synced_at` INTEGER, `status` TEXT NOT NULL, `decided_by` TEXT, PRIMARY KEY(`id`), FOREIGN KEY(`id`) REFERENCES `package_records`(`id`) ON UPDATE NO ACTION ON DELETE RESTRICT , FOREIGN KEY(`med_kit_id`) REFERENCES `med_kits`(`id`) ON UPDATE NO ACTION ON DELETE RESTRICT , FOREIGN KEY(`quantity_unit_id`) REFERENCES `quantity_units`(`id`) ON UPDATE NO ACTION ON DELETE RESTRICT , FOREIGN KEY(`form_id`) REFERENCES `form_types`(`id`) ON UPDATE NO ACTION ON DELETE RESTRICT )",
         "fields": [
           {
             "fieldPath": "id",
@@ -416,6 +416,11 @@
             "columnName": "status",
             "affinity": "TEXT",
             "notNull": true
+          },
+          {
+            "fieldPath": "decidedBy",
+            "columnName": "decided_by",
+            "affinity": "TEXT"
           }
         ],
         "primaryKey": {
@@ -460,6 +465,15 @@
             ],
             "orders": [],
             "createSql": "CREATE INDEX IF NOT EXISTS `index_packages_form_id` ON `${TABLE_NAME}` (`form_id`)"
+          },
+          {
+            "name": "index_packages_decided_by",
+            "unique": false,
+            "columnNames": [
+              "decided_by"
+            ],
+            "orders": [],
+            "createSql": "CREATE INDEX IF NOT EXISTS `index_packages_decided_by` ON `${TABLE_NAME}` (`decided_by`)"
           }
         ],
         "foreignKeys": [
@@ -1449,7 +1463,7 @@
     ],
     "setupQueries": [
       "CREATE TABLE IF NOT EXISTS room_master_table (id INTEGER PRIMARY KEY,identity_hash TEXT)",
-      "INSERT OR REPLACE INTO room_master_table (id,identity_hash) VALUES(42, '68c9b790e4f7216c91bac97ef1a40668')"
+      "INSERT OR REPLACE INTO room_master_table (id,identity_hash) VALUES(42, 'dfd8c0e90b04ef447f64845018849098')"
     ]
   }
 }

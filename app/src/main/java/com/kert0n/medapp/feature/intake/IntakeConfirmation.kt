@@ -71,9 +71,12 @@ class IntakeConfirmation @Inject constructor(
         // Акт по пачке — первым: он сверяет единицу коробки, а сравнивать числа разных единиц
         // нечем. Единица источника, проверенная при подключении, могла прийти другой снимком.
         val taken = pkg.take(amount, at).getOrElse { return Result.failure(it) }
+        // Кому отвечает эта коробка: серверу — только когда он её знает, иначе расход местный и
+        // команды не ставит, а расскажет о нём её же создание (PLAN E6).
+        val spendsLocally = !packages.answersToServer(packageId)
         // Своя коробка списывается здесь же, и списать больше, чем в ней есть, нечем; у общей
         // истина по количеству — сервер, и нехватку отвечает он (PLAN E3).
-        if (!pkg.medKit.answersToServer && !pkg.quantity.covers(amount)) {
+        if (spendsLocally && !pkg.quantity.covers(amount)) {
             return rejected(IntakeRejected.Reason.INSUFFICIENT)
         }
         // Пункт курса принимают из пачки курса; из любой другой это внеплановый факт, и пункт им
@@ -96,7 +99,6 @@ class IntakeConfirmation @Inject constructor(
         // Выделение пачки после приёма и бронь, которая уезжает вместе с расходом (PLAN D5, E2).
         // Местную коробку расход опустошает здесь же, и кончившаяся коробка источником не бывает:
         // курс теряет её тем же решением, что записывает приём (D3). У общей истина — сервер.
-        val spendsLocally = !pkg.medKit.answersToServer
         val emptied = spendsLocally && pkg.consume(amount) is PackageAfter.Ended
         val allocated = course.sources.firstOrNull { it.pkg == pkg.ref }?.allocatedDoses
         val reallocation = when {
@@ -105,7 +107,10 @@ class IntakeConfirmation @Inject constructor(
             // (PLAN D3, D5). Второй раз отвязывать нечего, и считать по ней обеспечение не из чего.
             emptied -> null
             else -> {
-                val availableAfter = PackageAvailability(pkg, effective = pkg.quantity).availableToMe.minusOrZero(amount.quantity)
+                // От того же числа, что на экране: незакрытые решения по коробке в нём уже есть,
+                // и чужие брони из него вычтены (PLAN D4).
+                val seen = checkNotNull(packages.projection(pkg.id)) { "пачка прочитана этой же транзакцией" }.availability
+                val availableAfter = seen.availableToMe.minusOrZero(amount.quantity)
                 val doses = course.dosesAfterIntake(pkg.ref, amount, availableAfter)
                 if (doses == allocated) null else CourseReallocation(course.allocate(pkg.ref, doses, now), course.revision)
             }
@@ -125,7 +130,9 @@ class IntakeConfirmation @Inject constructor(
             IntakeSyncState(intake.id, IntakeAccounting.PENDING, consume.id)
         }
         val outcome = IntakeOutcome(confirmed, setOf(IntakeStatus.PLANNED, IntakeStatus.MISSED), sync, reallocation, recordedAt = now)
-        val recorded = queue.change(pkg.medKit, listOfNotNull(consume, release), now) { intakes.record(outcome) }
+        // Местному расходу везти нечего: сервер о коробке не знает — расскажет о ней её создание (E6).
+        val commands = if (spendsLocally) emptyList() else listOfNotNull(consume, release)
+        val recorded = queue.change(pkg.medKit, commands, now) { intakes.record(outcome) }
         check(recorded) { "пункт и пачка прочитаны этой же транзакцией" }
 
         if (finished) {

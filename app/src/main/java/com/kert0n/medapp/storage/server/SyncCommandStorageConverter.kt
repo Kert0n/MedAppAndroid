@@ -35,11 +35,21 @@ object SyncCommandStorageConverter {
      * обновление приложения: неизвестную версию работник пропускает и называет, а не роняет
      * процесс (PLAN F4). Версия 2 — пересчёт стал разницей `seen → actual` (C1); прежний нёс одно
      * абсолютное число, и увиденного человеком из него не восстановить.
+     *
+     * **Номер растёт только за выпущенный формат.** Пока приложение не выпущено, payload правится
+     * на месте — тем же правилом, каким правится невыпущенная схема Room: строк прежнего формата
+     * нет ни у кого, а правка схемы и так требует `pm clear`. Поэтому создание, переставшее носить
+     * количество и сведения (E6), номера не прибавило.
      */
     const val PAYLOAD_VERSION = 2
 
-    /** С какой версии вид пишется нынешним форматом; остальные виды с версии 1 не менялись. */
-    private fun currentSince(kind: String): Int = if (kind == PACKAGE_CORRECT_STOCK) 2 else 1
+    /**
+     * С какой версии вид **читается** нынешним разбором — вопрос не тот же, что «с какой версии он
+     * пишется»: формат мог измениться так, что прежний payload по-прежнему понятен. Сейчас такой
+     * один: пересчёт читается с версии 2, потому что первая несла одно абсолютное число, и разницу
+     * из неё не собрать. Остальные виды читаются с версии 1.
+     */
+    private fun readableSince(kind: String): Int = if (kind == PACKAGE_CORRECT_STOCK) 2 else 1
 
     fun kindOf(command: SyncCommand): String = when (command) {
         is PackageSyncCommand -> when (command) {
@@ -101,7 +111,7 @@ object SyncCommandStorageConverter {
         payloadVersion: Int,
         vocabulary: Vocabulary
     ): SyncCommand? {
-        if (payloadVersion !in currentSince(kind)..PAYLOAD_VERSION) return null
+        if (payloadVersion !in readableSince(kind)..PAYLOAD_VERSION) return null
         val fields = runCatching { json.parseToJsonElement(payload) as JsonObject }.getOrNull()
             ?: throw IllegalArgumentException("payload команды «$kind» не разбирается")
         return try {
@@ -117,8 +127,6 @@ object SyncCommandStorageConverter {
         PACKAGE_CREATE -> PackageSyncCommand.Create(
             packageId = fields.uuid("packageId"),
             medKitId = fields.uuid("medKitId"),
-            quantity = fields.quantity("quantity", vocabulary),
-            facts = fields.facts(vocabulary),
             fromMedKitId = if (fields.containsKey("fromMedKitId")) fields.uuid("fromMedKitId") else null
         )
         PACKAGE_DESCRIBE -> PackageSyncCommand.Describe(
@@ -169,9 +177,6 @@ object SyncCommandStorageConverter {
             is PackageSyncCommand.Create -> {
                 put("medKitId", JsonPrimitive(command.medKitId.toString()))
                 command.fromMedKitId?.let { put("fromMedKitId", JsonPrimitive(it.toString())) }
-                putQuantity("quantity", command.quantity)
-                put("name", JsonPrimitive(command.facts.name))
-                putFacts(command.facts)
             }
             is PackageSyncCommand.Describe -> {
                 put("before", factsObject(command.before))

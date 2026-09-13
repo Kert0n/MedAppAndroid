@@ -30,6 +30,9 @@ import org.junit.Test
  */
 class PackageStateTransitionsTest {
 
+    /** Команда, которая ставит пометку: её закрытие — единственное, что пометку снимает (E1). */
+    private val DECISION: Uuid = Uuid.parse("00000000-0000-4000-8000-0000000000d1")
+
     @Test
     fun editReplacesTheWholeDescriptiveState() {
         val described = pack().describe(
@@ -93,10 +96,10 @@ class PackageStateTransitionsTest {
         // не отменяют, иначе ответ было бы нечем применить (PLAN E1, E6).
         val shared = pack(medKit = medKit(id = SHARED_KIT, name = "Общая").ref)
         val home = medKit(id = HOME_KIT, status = MedKitStatus.REMOVING).ref
-        val carried = shared.markChanging().movedByAnswer(home)
+        val carried = shared.markChanging(DECISION).movedByAnswer(home)
         assertEquals(HOME_KIT, carried.medKit.id)
         assertEquals(PackageStatus.CHANGING, carried.status)
-        assertEquals(PackageStatus.REMOVING, shared.markRemoving().movedByAnswer(home).status)
+        assertEquals(PackageStatus.REMOVING, shared.markRemoving(DECISION).movedByAnswer(home).status)
     }
 
     @Test(expected = IllegalArgumentException::class)
@@ -117,7 +120,7 @@ class PackageStateTransitionsTest {
 
     @Test
     fun aBoxMarkedToGoIsReadOnly() {
-        for (marked in listOf(pack().markRemoving(), pack().markLost())) {
+        for (marked in listOf(pack().markRemoving(DECISION), pack().markLost(DECISION))) {
             assertTrue(marked.take(Dose(tablets("1")), LATER).isFailure)
             assertThrows(IllegalStateException::class.java) { marked.dispose(tablets("1")) }
             assertThrows(IllegalStateException::class.java) { marked.correctTo(tablets("5")) }
@@ -128,16 +131,42 @@ class PackageStateTransitionsTest {
 
     @Test
     fun aBoxBeingChangedIsStillInUseAndTheAnswerSettlesIt() {
-        val changing = pack().markChanging()
+        val changing = pack().markChanging(DECISION)
         assertEquals(PackageStatus.CHANGING, changing.status)
         assertTrue(changing.take(Dose(tablets("1")), LATER).isSuccess)
-        assertEquals(PackageStatus.ACTIVE, changing.settled().status)
+        assertEquals(PackageStatus.ACTIVE, changing.settledBy(DECISION).status)
+    }
+
+    /**
+     * Пометку снимает только та команда, которая её поставила: чужая закрытая команда оставляет
+     * решение в силе (PLAN E1).
+     *
+     * Красная проверка: пока пометку снимало закрытие любой команды коробки, доехавшая старая бронь
+     * возвращала в оборот коробку, которую полка уже решила выбросить.
+     */
+    @Test
+    fun onlyTheCommandThatMarkedTheBoxReleasesIt() {
+        val marked = pack().markRemoving(DECISION)
+        assertEquals(PackageStatus.REMOVING, marked.settledBy(Uuid.random()).status)
+        assertEquals(PackageStatus.ACTIVE, marked.settledBy(DECISION).status)
+        assertNull(marked.settledBy(DECISION).decidedBy)
+    }
+
+    /** Пометки без своей команды не бывает: такое состояние не выражается (PLAN E1). */
+    @Test
+    fun aMarkWithoutItsCommandIsNotExpressible() {
+        assertThrows(IllegalArgumentException::class.java) {
+            pack().let { Package(it.id, it.medKit, it.facts, it.quantity, it.addedAt, status = PackageStatus.REMOVING) }
+        }
+        assertThrows(IllegalArgumentException::class.java) {
+            pack().let { Package(it.id, it.medKit, it.facts, it.quantity, it.addedAt, decidedBy = Uuid.random()) }
+        }
     }
 
     @Test
     fun theEndOfAMarkedBoxIsNotRefused() {
         // Конец — ответ на решение, а не пользование: помеченная коробка обязана уметь кончиться.
-        assertEquals(pack().id, pack().markRemoving().ended().record.id)
-        assertEquals(pack().id, pack().markLost().ended().record.id)
+        assertEquals(pack().id, pack().markRemoving(DECISION).ended().record.id)
+        assertEquals(pack().id, pack().markLost(DECISION).ended().record.id)
     }
 }

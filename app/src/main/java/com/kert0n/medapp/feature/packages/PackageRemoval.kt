@@ -37,7 +37,7 @@ class PackageRemoval @Inject constructor(
         val now = clock.instant()
         if (pkg.medKit.answersToServer) {
             val delete = QueuedCommand(Uuid.random(), PackageSyncCommand.Delete(pkg.id))
-            queue.change(pkg.medKit, listOf(delete), now) { packages.mark(pkg.id, PackageStatus.REMOVING) }
+            queue.change(pkg.medKit, listOf(delete), now) { packages.mark(pkg.id, PackageStatus.REMOVING, by = delete.id) }
             Outcome.MARKED
         } else {
             discard(pkg, now)

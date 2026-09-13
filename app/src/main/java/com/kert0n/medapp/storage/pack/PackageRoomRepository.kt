@@ -64,12 +64,19 @@ class PackageRoomRepository @Inject constructor(
     override suspend fun describe(packageId: Uuid, facts: PackageFacts): Boolean =
         change(packageId) { it.describe(facts) }
 
-    override suspend fun mark(packageId: Uuid, status: PackageStatus): Boolean =
+    override suspend fun answersToServer(packageId: Uuid): Boolean {
+        val row = packages.find(packageId) ?: return false
+        // Полка отвечает серверу по своему правилу, а коробка — только когда он о ней узнал:
+        // признак этого один, и это серверная версия, которую приносит ответ на её создание (E6).
+        return row.pack.medKitRow(row.medKit).toRef().answersToServer && row.pack.version != null
+    }
+
+    override suspend fun mark(packageId: Uuid, status: PackageStatus, by: Uuid): Boolean =
         change(packageId) {
             when (status) {
-                PackageStatus.CHANGING -> it.markChanging()
-                PackageStatus.REMOVING -> it.markRemoving()
-                PackageStatus.LOST -> it.markLost()
+                PackageStatus.CHANGING -> it.markChanging(by)
+                PackageStatus.REMOVING -> it.markRemoving(by)
+                PackageStatus.LOST -> it.markLost(by)
                 PackageStatus.ACTIVE -> throw IllegalArgumentException("пометку снимает ответ полки, а не решение")
             }
         }

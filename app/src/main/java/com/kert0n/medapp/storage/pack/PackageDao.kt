@@ -107,11 +107,12 @@ interface PackageDao {
             PackageRecordStorageEntity(pack.id, pack.name, pack.quantityUnitId, pack.formId, observedAt)
         )
         describeRecord(pack.id, pack.name, pack.quantityUnitId, pack.formId)
-        // Статус — наше неподтверждённое решение, а не сведения сервера: снимок, пришедший, пока
-        // решение ждёт, его не снимает. Снимает его закрытие команды (PLAN E1).
-        val decided = statusOf(pack.id)
+        // Решение — наше, а не сведения сервера: снимок, пришедший, пока оно ждёт, его не
+        // снимает. Снимает его закрытие той команды, что его поставила, — поэтому возвращается
+        // пара целиком: статус без своей команды был бы невыразимым состоянием (PLAN E1).
+        val decided = decisionOf(pack.id)
         upsertServerPart(pack)
-        decided?.let { setStatus(pack.id, it) }
+        decided?.let { setDecision(pack.id, it.status, it.decidedBy) }
         insertDetailsIfMissing(PackageDetailsStorageEntity(packageId = pack.id))
     }
 
@@ -134,11 +135,21 @@ interface PackageDao {
     @Query("UPDATE packages SET version = :version WHERE id = :id")
     suspend fun setVersion(id: Uuid, version: Long?)
 
-    @Query("SELECT status FROM packages WHERE id = :id")
-    suspend fun statusOf(id: Uuid): PackageStatus?
+    /** Решение о коробке целиком: пометка и команда, которая её поставила (PLAN E1). */
+    @Query("SELECT status, decided_by FROM packages WHERE id = :id")
+    suspend fun decisionOf(id: Uuid): PackageDecisionStorageRow?
 
-    @Query("UPDATE packages SET status = :status WHERE id = :id")
-    suspend fun setStatus(id: Uuid, status: PackageStatus)
+    @Query("UPDATE packages SET status = :status, decided_by = :decidedBy WHERE id = :id")
+    suspend fun setDecision(id: Uuid, status: PackageStatus, decidedBy: Uuid?)
+
+    /**
+     * Коробки, чью пометку поставила эта команда: её закрытие снимает ровно их и никого больше
+     * (PLAN E1). Решение полки метит своё содержимое, поэтому ответ по одной команде отпускает и
+     * несколько коробок сразу.
+     */
+    @Transaction
+    @Query("SELECT * FROM packages WHERE decided_by = :operationId")
+    suspend fun decidedBy(operationId: Uuid): List<PackageStorageRow>
 
     @Query("SELECT version, claims_version FROM packages WHERE id = :id")
     suspend fun versionsOf(id: Uuid): PackageVersionsStorageRow?

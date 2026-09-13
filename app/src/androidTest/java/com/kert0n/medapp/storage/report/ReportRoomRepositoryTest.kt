@@ -238,7 +238,7 @@ class ReportRoomRepositoryTest {
         scenarios.unplannedIntakeRecording.record(OTHER_PACK, dose("1"), now)
         assertEquals(1, summary.first().packages)
 
-        database.packageRepository().mark(PACK, PackageStatus.REMOVING)
+        database.packageRepository().mark(PACK, PackageStatus.REMOVING, by = Uuid.random())
         assertEquals(0, summary.first().packages)
     }
 

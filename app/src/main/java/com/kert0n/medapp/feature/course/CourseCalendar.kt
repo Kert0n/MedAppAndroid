@@ -115,14 +115,15 @@ class CourseCalendar @Inject constructor(
     }
 
     /**
-     * Расклад «сколько доступно мне» по пачкам курса — от подтверждённого остатка, как считает
-     * приём (PLAN D4). Пачку, которой уже нет, курс вот-вот потеряет своим переходом; до тех пор
-     * она не даёт ничего.
+     * Расклад «сколько доступно мне» по пачкам курса — от того же числа, которое видит человек:
+     * подтверждённого остатка с незакрытыми решениями по коробке поверх и без чужих броней
+     * (PLAN D4). Пачку, которой уже нет, курс вот-вот потеряет своим переходом; до тех пор она не
+     * даёт ничего.
      */
     internal suspend fun availabilityOf(course: Course): Availability = Availability(
         course.sources.associate { source ->
             source.pkg.id to (
-                packages.find(source.pkg.id)?.let { PackageAvailability(it, effective = it.quantity).availableToMe }
+                packages.projection(source.pkg.id)?.availability?.availableToMe
                     ?: Quantity.zero(source.pkg.unit)
                 )
         }

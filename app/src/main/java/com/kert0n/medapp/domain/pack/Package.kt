@@ -33,11 +33,17 @@ class Package(
     val addedAt: Instant,         // для чужой пачки — момент ПЕРВОГО НАБЛЮДЕНИЯ
     val templateId: Uuid? = null, // из какой карточки справочника заполнено
     val claims: Claims? = null,   // null у неопубликованной аптечки
-    val status: PackageStatus = PackageStatus.ACTIVE
+    val status: PackageStatus = PackageStatus.ACTIVE,
+    val decidedBy: Uuid? = null   // команда, которая пометку поставила; снять её может только она
 ) {
 
     init {
         require(!quantity.isZero) { "пустой коробки не бывает: кончившаяся удаляется" }
+        // Пометки без решения не бывает, а решения без пометки — тоже: пара выражает один факт,
+        // и «кто её снимет» отвечается самой коробкой, а не поиском по очереди (PLAN E1).
+        require((status == PackageStatus.ACTIVE) == (decidedBy == null)) {
+            "пометка живёт вместе со своей командой: $status и $decidedBy друг другу не пара"
+        }
         // Подсказка — это «сколько я обычно принимаю из ЭТОЙ пачки»: величина в чужой единице
         // не подставится в форму приёма и молча притворилась бы подходящей.
         val hint = facts.defaultIntakeAmount
@@ -175,34 +181,36 @@ class Package(
     }
 
     /**
-     * Изменение ушло к полке и ждёт её согласия. Пометка не мешает пользоваться коробкой: полка
-     * ответит за каждое изменение по порядку (PLAN E1).
+     * Изменение ушло к полке командой [by] и ждёт её согласия. Пометка не мешает пользоваться
+     * коробкой: полка ответит за каждое изменение по порядку (PLAN E1).
      */
-    fun markChanging(): Package {
-        requireUsable()
-        return changed(status = PackageStatus.CHANGING)
-    }
+    fun markChanging(by: Uuid): Package = marked(PackageStatus.CHANGING, by)
 
     /**
-     * Человек решил выбросить коробку, а полка ещё не согласилась. Коробка видна, но выведена из
-     * оборота; «ок» доведёт её до конца ([thrownOut]), сбой снимет пометку ([settled]) (PLAN E6).
+     * Человек решил выбросить коробку командой [by], а полка ещё не согласилась. Коробка видна, но
+     * выведена из оборота; «ок» доведёт решение до конца ([ended]), сбой снимет пометку (E6).
      */
-    fun markRemoving(): Package {
-        requireUsable()
-        return changed(status = PackageStatus.REMOVING)
-    }
+    fun markRemoving(by: Uuid): Package = marked(PackageStatus.REMOVING, by)
 
     /**
-     * Человек уходит из общей полки, а коробка остаётся остальным. До ответа она видна, но трогать
-     * её нельзя; «ок» доведёт её до конца ([lost]), сбой снимет пометку ([settled]) (PLAN E6).
+     * Человек уходит из общей полки командой [by], а коробка остаётся остальным. До ответа она
+     * видна, но трогать её нельзя; «ок» доведёт решение до конца, сбой снимет пометку (PLAN E6).
      */
-    fun markLost(): Package {
-        requireUsable()
-        return changed(status = PackageStatus.LOST)
-    }
+    fun markLost(by: Uuid): Package = marked(PackageStatus.LOST, by)
 
-    /** Полка ответила, а решать больше нечего: пометка снимается, коробка снова обычная. */
-    fun settled(): Package = changed(status = PackageStatus.ACTIVE)
+    /**
+     * Команда [operation] закрыта. Пометку снимает **только та команда, которая её поставила**:
+     * решение живёт, пока не отвечено оно само, а не первая попавшаяся команда коробки (PLAN E1).
+     * Чужая закрытая команда оставляет коробку как есть — и это не сбой, а обычный порядок:
+     * пометку выбрасывания не снимает ни расход, ни бронь, ни правка сведений.
+     */
+    fun settledBy(operation: Uuid): Package =
+        if (decidedBy != operation) this else changed(status = PackageStatus.ACTIVE, decidedBy = null)
+
+    private fun marked(status: PackageStatus, by: Uuid): Package {
+        requireUsable()
+        return changed(status = status, decidedBy = by)
+    }
 
     private fun requireUsable() {
         check(status.allowsUse) { "коробка помечена ($status): ею не пользуются до ответа полки" }
@@ -223,7 +231,8 @@ class Package(
         quantity: Quantity = this.quantity,
         templateId: Uuid? = this.templateId,
         claims: Claims? = this.claims,
-        status: PackageStatus = this.status
+        status: PackageStatus = this.status,
+        decidedBy: Uuid? = this.decidedBy
     ): Package = Package(
         id = id,
         medKit = medKit,
@@ -232,7 +241,8 @@ class Package(
         addedAt = addedAt,
         templateId = templateId,
         claims = claims,
-        status = status
+        status = status,
+        decidedBy = decidedBy
     )
 
     /** Тождество — [id]. Пачка, из которой приняли таблетку, та же самая пачка. */

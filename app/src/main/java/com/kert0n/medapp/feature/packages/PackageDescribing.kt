@@ -39,13 +39,21 @@ class PackageDescribing @Inject constructor(
         if (!pkg.status.allowsUse) return@run Outcome.UNUSABLE
         val before = pkg.facts.shared
         val after = facts.shared
-        val announced = pkg.medKit.answersToServer && before != after
+        val announced = packages.answersToServer(packageId) && before != after
         if (announced && before.form != null && after.form == null) return@run Outcome.FORM_CLEAR_UNSUPPORTED
         val now = clock.instant()
-        val commands = if (announced) listOf(QueuedCommand(Uuid.random(), PackageSyncCommand.Describe(pkg.id, before, after))) else emptyList()
-        queue.change(pkg.medKit, commands, now) {
+        // Личная правка серверу не едет, и команды у неё нет: «есть ли команда» и «уехало ли
+        // изменение» — один вопрос, и отвечается он одним значением.
+        val description = if (announced) {
+            QueuedCommand(Uuid.random(), PackageSyncCommand.Describe(pkg.id, before, after))
+        } else {
+            null
+        }
+        queue.change(pkg.medKit, listOfNotNull(description), now) {
             check(packages.describe(pkg.id, facts)) { "пачка прочитана этой же транзакцией" }
-            if (announced) check(packages.mark(pkg.id, PackageStatus.CHANGING)) { "пачка прочитана этой же транзакцией" }
+            description?.let {
+                check(packages.mark(pkg.id, PackageStatus.CHANGING, by = it.id)) { "пачка прочитана этой же транзакцией" }
+            }
             true
         }
         Outcome.SAVED

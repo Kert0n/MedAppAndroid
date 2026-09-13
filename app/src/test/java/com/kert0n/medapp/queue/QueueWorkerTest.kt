@@ -865,7 +865,7 @@ class QueueWorkerTest {
     /** 400 на создании — пачка не заведена, читать нечего и терять доступ не к чему. */
     @Test
     fun invalidCreateIsRefusedWithoutTouchingThePackage() = runTest {
-        val create = PackageSyncCommand.Create(PACK, HOME_KIT, tablets("20"), com.kert0n.medapp.domain.pack.PackageSharedFacts("Парацетамол", TABLET_FORM))
+        val create = PackageSyncCommand.Create(PACK, HOME_KIT)
         val storage = Storage(listOf(operation(create)))
         val transport = Transport { ApiResult.Failure(ApiFailure.Invalid(emptyList())) }
 
@@ -878,7 +878,7 @@ class QueueWorkerTest {
     /** 409 на создании — пачка с нашим номером уже есть: читаем, она наша, значит уже применено. */
     @Test
     fun createUnderAnIdentifierThatIsAlreadyOursIsApplied() = runTest {
-        val create = PackageSyncCommand.Create(PACK, HOME_KIT, tablets("20"), com.kert0n.medapp.domain.pack.PackageSharedFacts("Парацетамол", TABLET_FORM))
+        val create = PackageSyncCommand.Create(PACK, HOME_KIT)
         val storage = Storage(listOf(operation(create)))
         val transport = Transport { ApiResult.Failure(ApiFailure.Conflict) }
         transport.snapshotAnswer = ApiResult.Success(snapshot)
@@ -896,11 +896,7 @@ class QueueWorkerTest {
      */
     @Test
     fun aBoxWhoseTargetShelfIsGoneComesBackInsteadOfEnding() = runTest {
-        val create = PackageSyncCommand.Create(
-            PACK, SHARED_KIT, tablets("20"),
-            com.kert0n.medapp.domain.pack.PackageSharedFacts("Парацетамол", TABLET_FORM),
-            fromMedKitId = HOME_KIT
-        )
+        val create = PackageSyncCommand.Create(PACK, SHARED_KIT, fromMedKitId = HOME_KIT)
         val storage = Storage(listOf(operation(create)))
         val transport = Transport { ApiResult.Failure(ApiFailure.NotFound) }
 

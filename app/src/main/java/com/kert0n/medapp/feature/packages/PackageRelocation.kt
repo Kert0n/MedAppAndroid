@@ -48,11 +48,15 @@ class PackageRelocation @Inject constructor(
     suspend fun move(packageId: Uuid, targetMedKitId: Uuid): Outcome = transactions.run {
         val pkg = packages.find(packageId) ?: return@run Outcome.GONE
         if (!pkg.status.allowsUse) return@run Outcome.UNUSABLE
+        // С полки, о которой принято решение, не переносят: её публикация уже назвала серверу своё
+        // содержимое, и коробка, ушедшая из-под неё, оказалась бы у сервера мимо своего создания —
+        // или ушла бы вместе с уборкой. Человек либо ждёт ответа, либо решает о полке заново (E5).
+        if (!pkg.medKit.status.allowsDecision) return@run Outcome.ORIGIN_BUSY
         val target = medKits.find(targetMedKitId) ?: return@run Outcome.TARGET_GONE
         if (target.id == pkg.medKit.id) return@run Outcome.TARGET_IS_THE_SAME
-        // В полку, о которой уже принято решение, не кладут: она вот-вот уйдёт, и коробка ушла бы
-        // с ней, ничего человеку не сказав (PLAN E1, E6).
-        if (!target.status.allowsUse) return@run Outcome.TARGET_BUSY
+        // В полку, о которой уже принято решение, не кладут: она вот-вот уйдёт или уже рассказала
+        // серверу о своём содержимом, ничего человеку не сказав (PLAN E1, E5, E6).
+        if (!target.status.allowsDecision) return@run Outcome.TARGET_BUSY
         relocate(pkg, target, clock.instant())
     }
 
@@ -71,8 +75,9 @@ class PackageRelocation @Inject constructor(
         val to = target.ref
         return when {
             from.answersToServer && !to.answersToServer -> {
-                queue.change(from, listOf(withdrawal(pkg)), at) {
-                    carryHome(pkg, to, at)
+                val withdrawal = withdrawal(pkg)
+                queue.change(from, listOf(withdrawal), at) {
+                    carryHome(pkg, to, at, by = withdrawal.id)
                     true
                 }
                 Outcome.MOVED
@@ -82,8 +87,9 @@ class PackageRelocation @Inject constructor(
             // место придёт снимком ответа — он же истина по этой коробке.
             from.answersToServer -> {
                 // Переставляют с полки, где коробка лежит: там её команды и ждут своей очереди.
-                queue.change(from, listOf(command(PackageSyncCommand.Move(pkg.id, to.id))), at) {
-                    packages.mark(pkg.id, PackageStatus.CHANGING)
+                val move = command(PackageSyncCommand.Move(pkg.id, to.id))
+                queue.change(from, listOf(move), at) {
+                    packages.mark(pkg.id, PackageStatus.CHANGING, by = move.id)
                 }
                 Outcome.MARKED
             }
@@ -106,12 +112,12 @@ class PackageRelocation @Inject constructor(
 
     /**
      * Локальная половина «унёс домой»: коробка на моей полке, чужих броней у местной коробки нет,
-     * а пометка держится до ответа сервера (PLAN E1, E6).
+     * а пометка держится до ответа на команду [by], которая её и поставила (PLAN E1, E6).
      */
-    internal suspend fun carryHome(pkg: Package, to: MedKitRef, at: Instant) {
+    internal suspend fun carryHome(pkg: Package, to: MedKitRef, at: Instant, by: Uuid) {
         place(pkg, to, at)
         packages.saveClaims(pkg.id, null)
-        check(packages.mark(pkg.id, PackageStatus.CHANGING)) { "пачка прочитана этой же транзакцией" }
+        check(packages.mark(pkg.id, PackageStatus.CHANGING, by = by)) { "пачка прочитана этой же транзакцией" }
     }
 
     /** Только место: переход пачки к прочитанному состоянию, без команд. */
@@ -121,8 +127,10 @@ class PackageRelocation @Inject constructor(
 
     /** Местная коробка на общей полке: рассказать о ней серверу, а с ней — о выделении курса. */
     private suspend fun publish(pkg: Package, to: MedKitRef, at: Instant, originSurvives: Boolean) {
-        queue.change(to, announcement(pkg, to, originSurvives = originSurvives), at) {
-            packages.mark(pkg.id, PackageStatus.CHANGING)
+        val announcement = announcement(pkg, to, originSurvives = originSurvives)
+        queue.change(to, announcement.commands, at) {
+            // Пометку держит создание: им коробка и становится известна серверу (PLAN E6).
+            packages.mark(pkg.id, PackageStatus.CHANGING, by = announcement.create.id)
         }
     }
 
@@ -144,18 +152,12 @@ class PackageRelocation @Inject constructor(
         to: MedKitRef,
         after: Set<Uuid> = emptySet(),
         originSurvives: Boolean = true
-    ): List<QueuedCommand> {
+    ): Announcement {
         val create = QueuedCommand(
             Uuid.random(),
             // Откуда коробку принесли: не вышло — она вернётся туда. Если её никуда не несли, а
             // общей стала полка под ней, возвращать некуда (PLAN E6).
-            PackageSyncCommand.Create(
-                pkg.id,
-                to.id,
-                pkg.quantity,
-                pkg.facts.shared,
-                pkg.medKit.id.takeIf { originSurvives && it != to.id }
-            ),
+            PackageSyncCommand.Create(pkg.id, to.id, pkg.medKit.id.takeIf { originSurvives && it != to.id }),
             dependsOn = after
         )
         val claim = courses.courseHolding(pkg.id)
@@ -163,7 +165,16 @@ class PackageRelocation @Inject constructor(
             ?.allocatedOf(pkg.ref)
             ?.takeUnless { it.isZero }
             ?.let { QueuedCommand(Uuid.random(), PackageSyncCommand.SetClaim(pkg.id, it), dependsOn = setOf(create.id)) }
-        return listOfNotNull(create, claim)
+        return Announcement(create, claim)
+    }
+
+    /**
+     * Чем коробка объявляется серверу: создание и, если курс её держит, бронь следом. Две команды
+     * лежат тут раздельно, а не списком, потому что пометку коробки держит именно создание, и
+     * вынимать его из списка по месту значило бы называть порядок дважды (PLAN E1, E6).
+     */
+    internal class Announcement(val create: QueuedCommand, val claim: QueuedCommand?) {
+        val commands: List<QueuedCommand> get() = listOfNotNull(create, claim)
     }
 
     private fun command(command: PackageSyncCommand) = QueuedCommand(Uuid.random(), command)
@@ -172,7 +183,10 @@ class PackageRelocation @Inject constructor(
      * Чем кончилось. Переставили — экран показывает новую полку; пометили — коробка остаётся на
      * прежней и ждёт ответа сервера; коробки уже нет — закрывает молча; цели нет — просит выбрать
      * другую; та же полка — говорит об этом; коробка ждёт удаления или выхода — трогать её нельзя;
-     * целевая полка сама ждёт ответа — класть в неё рано (PLAN E1, E6).
+     * целевая полка сама ждёт ответа — класть в неё рано; полка, с которой несут, ждёт ответа на
+     * своё решение — переносить из неё рано (PLAN E1, E5, E6).
      */
-    enum class Outcome { MOVED, MARKED, GONE, UNUSABLE, TARGET_GONE, TARGET_IS_THE_SAME, TARGET_BUSY }
+    enum class Outcome {
+        MOVED, MARKED, GONE, UNUSABLE, ORIGIN_BUSY, TARGET_GONE, TARGET_IS_THE_SAME, TARGET_BUSY
+    }
 }

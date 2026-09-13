@@ -172,7 +172,7 @@ class SyncOperationDaoTest {
         queue.enqueue(first, MedKitSyncCommand.Publish(HOME_KIT), createdAt)
         queue.enqueue(
             second,
-            PackageSyncCommand.Create(PACK, HOME_KIT, tablets("20"), pack().facts.shared),
+            PackageSyncCommand.Create(PACK, HOME_KIT),
             createdAt,
             dependsOn = setOf(first)
         )

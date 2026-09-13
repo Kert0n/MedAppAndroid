@@ -20,8 +20,9 @@ import kotlin.uuid.Uuid
  *
  * Полке, которая отвечает серверу (D2), коробку везёт `Create` — той же транзакцией, — и до ответа
  * коробка помечена `CHANGING`: пользоваться ею можно, а первое подтверждённое число принесёт ответ
- * на её создание (E1). Броней у новой коробки нет: курс её ещё не держит. На полку, помеченную
- * уборкой, не кладут — она вот-вот уйдёт, и коробка ушла бы с ней (E6).
+ * на её создание (E1). Броней у новой коробки нет: курс её ещё не держит. На полку, о которой
+ * принято решение — уборка или публикация, — не кладут: она вот-вот уйдёт или уже рассказала
+ * серверу о своём содержимом без этой коробки (E5, E6).
  */
 class PackageAdding @Inject constructor(
     private val packages: PackageStorageRepository,
@@ -34,7 +35,10 @@ class PackageAdding @Inject constructor(
     suspend fun add(medKitId: Uuid, facts: PackageFacts, quantity: Quantity, templateId: Uuid? = null): Outcome =
         transactions.run {
             val medKit = medKits.find(medKitId) ?: return@run Outcome.MedKitGone
-            if (!medKit.status.allowsUse) return@run Outcome.MedKitBusy
+            // В полку, о которой принято решение, не кладут: уборка унесла бы коробку с собой, а
+            // публикация уже пересчитала своё содержимое и об этой коробке серверу не расскажет
+            // (PLAN E1, E5).
+            if (!medKit.status.allowsDecision) return@run Outcome.MedKitBusy
             val now = clock.instant()
             val pkg = Package(
                 id = Uuid.random(),
@@ -44,11 +48,8 @@ class PackageAdding @Inject constructor(
                 addedAt = now,
                 templateId = templateId
             )
-            val announced = if (medKit.answersToServer) pkg.markChanging() else pkg
-            val create = QueuedCommand(
-                Uuid.random(),
-                PackageSyncCommand.Create(pkg.id, medKit.id, pkg.quantity, pkg.facts.shared)
-            )
+            val create = QueuedCommand(Uuid.random(), PackageSyncCommand.Create(pkg.id, medKit.id))
+            val announced = if (medKit.answersToServer) pkg.markChanging(create.id) else pkg
             queue.change(medKit.ref, listOf(create), now) {
                 packages.add(announced)
                 true

@@ -102,7 +102,7 @@ class CourseDraftingTest {
     /** Пачкой, судьба которой уже решена, не пользуются: подключить её к черновику нельзя (PLAN D3). */
     @Test
     fun aMarkedPackageIsNotAttached() = runTest {
-        database.packageRepository().mark(PACK, PackageStatus.REMOVING)
+        database.packageRepository().mark(PACK, PackageStatus.REMOVING, by = Uuid.random())
         val created = drafting.create("Ибупрофен")
 
         val outcome = drafting.edit(created.id, created.revision, prescribed + CourseDrafting.Edit.Attach(PACK, Doses(5)))

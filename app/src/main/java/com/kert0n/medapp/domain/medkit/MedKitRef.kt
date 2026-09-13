@@ -19,6 +19,9 @@ class MedKitRef(
     /** Кому отвечает лежащее в ней — то же правило, что у самой аптечки. */
     val answersToServer: Boolean get() = MedKit.answersToServer(publication, status)
 
+    /** Есть ли куда доставлять её команды — то же правило, что у самой аптечки (PLAN E5). */
+    val acceptsCommands: Boolean get() = MedKit.acceptsCommands(publication, status)
+
     override fun equals(other: Any?): Boolean =
         this === other || (other is MedKitRef && other.id == id)
 

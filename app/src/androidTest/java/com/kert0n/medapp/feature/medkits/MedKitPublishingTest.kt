@@ -18,6 +18,9 @@ import com.kert0n.medapp.fixture.courseRecord
 import com.kert0n.medapp.fixture.courseRepository
 import com.kert0n.medapp.fixture.inMemoryDatabase
 import com.kert0n.medapp.fixture.medKit
+import com.kert0n.medapp.fixture.dose
+import com.kert0n.medapp.queue.intake.IntakeAccounting
+import com.kert0n.medapp.feature.intake.UnplannedIntakeRecording
 import com.kert0n.medapp.fixture.pack
 import com.kert0n.medapp.fixture.packageRepository
 import com.kert0n.medapp.fixture.queueStorage
@@ -122,20 +125,24 @@ class MedKitPublishingTest {
     }
 
     /**
-     * Публикуемая полка уже отвечает серверу — иначе первое же изменение после решения никуда бы не
-     * уехало, — но приглашений ещё не выдаёт: коробки в пути, и приглашённый увидел бы половину
-     * полки (PLAN D2, E1).
+     * Полка, которая к серверу только едет, серверу ещё не отвечает: его там нет, спорить не с кем,
+     * и содержимое учитывается местно. Команды её при этом доставляются — ими она и станет
+     * известна, — а приглашений она не выдаёт ни до ответа, ни после: коробки в пути, и
+     * приглашённый увидел бы половину полки (PLAN D2, E5).
      */
     @Test
-    fun aShelfOnItsWayAnswersToTheServerButInvitesNobody() = runTest {
+    fun aShelfOnItsWayIsStillLocalDeliversItsCommandsAndInvitesNobody() = runTest {
         publishing.publish(HOME_KIT)
-        assertTrue(shelf().answersToServer)
+        assertFalse(shelf().answersToServer)
+        assertTrue(shelf().acceptsCommands)
         assertFalse(shelf().acceptsInvitations)
 
         theShelfIsCreated()
 
         assertEquals(MedKit.Publication.PUBLISHED, shelf().publication)
         assertEquals(MedKitStatus.PUBLISHING, shelf().status)
+        // Полка у сервера есть: с этого мига её содержимое отвечает ему.
+        assertTrue(shelf().answersToServer)
         assertFalse(shelf().acceptsInvitations)
     }
 
@@ -176,6 +183,54 @@ class MedKitPublishingTest {
             emptyList<SyncOperationStatus>(),
             operations().map { it.status }.filter { !it.isClosed }
         )
+    }
+
+    /**
+     * Сделанное, пока полка едет к серверу, учитывается местно — и отказ его не отменяет: сервер о
+     * полке не слышал, спорить не с кем, и число у человека верное (PLAN E5, решение владельца
+     * 2026-09-13).
+     *
+     * Красная проверка: пока публикуемая полка считалась отвечающей серверу, расход уезжал командой,
+     * получал 404 «такой коробки нет» и кончал коробку утратой доступа — уничтожал вещь, которую
+     * человек держит в руках.
+     */
+    @Test
+    fun whatWasDoneWhileTheShelfWasOnItsWayIsLocalAndSurvivesTheRefusal() = runTest {
+        publishing.publish(HOME_KIT)
+
+        val recorded = Scenarios(database, LATER).unplannedIntakeRecording.record(PACK, dose("1"), LATER)
+
+        // Расход списан у себя, и везти его некуда: коробки у сервера нет.
+        assertEquals(IntakeAccounting.LOCAL_APPLIED, (recorded as UnplannedIntakeRecording.Outcome.Recorded).accounting)
+        assertEquals(tablets("19"), requireNotNull(database.packageRepository().find(PACK)).quantity)
+        assertFalse(commands().any { it is PackageSyncCommand.Consume })
+
+        serverAnswers(
+            operations().first { it.command is MedKitSyncCommand.Publish }.id,
+            Delivery.Refused(RefusalReason.INVALID, PackageState.None)
+        )
+
+        val kept = requireNotNull(database.packageRepository().find(PACK))
+        assertEquals(tablets("19"), kept.quantity)
+        assertEquals(PackageStatus.ACTIVE, kept.status)
+        assertEquals(MedKit.Publication.LOCAL, shelf().publication)
+    }
+
+    /**
+     * Успешная публикация везёт серверу то, что в коробке есть **сейчас**, а не то, что было в миг
+     * решения: тело создания собирается по прочитанной коробке при взятии (PLAN E1, E6).
+     */
+    @Test
+    fun theCreationCarriesTheNumberTheBoxHasWhenItLeaves() = runTest {
+        publishing.publish(HOME_KIT)
+        Scenarios(database, LATER).unplannedIntakeRecording.record(PACK, dose("1"), LATER)
+        theShelfIsCreated()
+
+        val create = operations().first { (it.command as? PackageSyncCommand.Create)?.packageId == PACK }
+        val taken = database.queueStorage().take(create.id, null, LATER) as com.kert0n.medapp.queue.Take.Sending
+
+        val body = requireNotNull(taken.operation.prepared?.body)
+        assertTrue(body.contains("\"quantity\":\"19\""))
     }
 
     /** Полка уже общая — публиковать нечего; решение о ней уже принято — ждём его ответа. */
