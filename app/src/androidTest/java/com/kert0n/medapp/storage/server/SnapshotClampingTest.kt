@@ -3,19 +3,24 @@ package com.kert0n.medapp.storage.server
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import com.kert0n.medapp.domain.course.Course
 import com.kert0n.medapp.domain.course.CourseSource
+import com.kert0n.medapp.domain.course.CoverageReduction
+import com.kert0n.medapp.domain.intake.CourseIntake
 import com.kert0n.medapp.domain.medkit.MedKit
 import com.kert0n.medapp.domain.pack.Claims
 import com.kert0n.medapp.domain.value.Doses
 import com.kert0n.medapp.feature.course.CourseDrafting
+import com.kert0n.medapp.feature.packages.PackageAdjusting
 import com.kert0n.medapp.fixture.CAPSULE_FORM
 import com.kert0n.medapp.fixture.PACK
 import com.kert0n.medapp.fixture.SHARED_KIT
 import com.kert0n.medapp.fixture.Scenarios
 import com.kert0n.medapp.fixture.TABLET_FORM
 import com.kert0n.medapp.fixture.VOCABULARY
+import com.kert0n.medapp.fixture.confirmed
 import com.kert0n.medapp.fixture.courseRepository
 import com.kert0n.medapp.fixture.dose
 import com.kert0n.medapp.fixture.inMemoryDatabase
+import com.kert0n.medapp.fixture.intakeRepository
 import com.kert0n.medapp.fixture.medKit
 import com.kert0n.medapp.fixture.millilitres
 import com.kert0n.medapp.fixture.pack
@@ -200,5 +205,43 @@ class SnapshotClampingTest {
         ))
 
         assertEquals(CourseSource.Fault.FORM_MISMATCH, plan(id).sources.single().fault)
+    }
+
+    private suspend fun reductions(id: Uuid) = database.courseRepository().observeReductions(id).first()
+
+    /**
+     * Сокращение — событие: пишется при зажиме снимком и пересчётом человека, было и стало; повтор
+     * снимка и снимок с большим числом второго события не дают (PLAN D5).
+     */
+    @Test
+    fun aReductionIsRecordedOnceForEachShrinkage() = runTest {
+        val id = treated()
+
+        lay(snapshot("12"))
+        lay(snapshot("12", version = 5))
+        lay(snapshot("25", version = 6))
+
+        val fromNeighbour = reductions(id).single()
+        assertEquals(Doses(10), fromNeighbour.coveredBefore)
+        assertEquals(Doses(6), fromNeighbour.coveredAfter)
+        assertEquals(PACK, fromNeighbour.packageId)
+
+        scenarios.packageAdjusting.adjust(PACK, PackageAdjusting.Action.Recount(seen = tablets("25"), actual = tablets("8")))
+
+        val fromMe = reductions(id).last()
+        assertEquals(2, reductions(id).size)
+        assertEquals(Doses(6), fromMe.coveredBefore)
+        assertEquals(Doses(4), fromMe.coveredAfter)
+    }
+
+    /** Мой приём по плану уменьшает выделение на принятое — это не сокращение. */
+    @Test
+    fun myOwnPlannedIntakeIsNotAReduction() = runTest {
+        val id = treated()
+        val first = database.intakeRepository().ofCourse(id).filterIsInstance<CourseIntake>().minBy { it.plannedAt }
+
+        scenarios.intakeConfirmation.confirm(first.id, PACK, dose("2"), now).confirmed()
+
+        assertEquals(emptyList<CoverageReduction>(), reductions(id))
     }
 }

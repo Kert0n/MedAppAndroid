@@ -3,6 +3,7 @@ package com.kert0n.medapp.storage.course
 import com.kert0n.medapp.domain.course.Course
 import com.kert0n.medapp.domain.course.CourseCompletion
 import com.kert0n.medapp.domain.course.CourseCoverage
+import com.kert0n.medapp.domain.course.CoverageReduction
 import com.kert0n.medapp.domain.course.CourseDraft
 import com.kert0n.medapp.domain.course.CourseDraftProjection
 import com.kert0n.medapp.domain.course.CourseProjection
@@ -37,6 +38,9 @@ interface CourseStorageRepository {
 
     /** То же по всем идущим лечениям сразу — списку курсов, где нехватка видна значком (H3 №13). */
     fun observeCoverages(): Flow<Map<Uuid, CourseCoverage>>
+
+    /** Сокращения обеспечения эпизода по времени — карточке курса и уведомлениям (PLAN D5, D8). */
+    fun observeReductions(courseId: Uuid): Flow<List<CoverageReduction>>
 
     suspend fun findDraft(id: Uuid): CourseDraft?
 

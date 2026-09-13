@@ -60,6 +60,9 @@ class ForeignKeysTest {
         "intakes.course_id → course_records" to Relation.HISTORY,
         "intakes.planned_package_id → package_records" to Relation.HISTORY,
         "intakes.taken_package_id → package_records" to Relation.HISTORY,
+        // Событие сокращения — история: переживает и конец лечения, и конец коробки (PLAN D5).
+        "coverage_reductions.course_id → course_records" to Relation.HISTORY,
+        "coverage_reductions.package_id → package_records" to Relation.HISTORY,
         // Зависимости очереди: операцию с зависимыми не удаляют.
         "sync_operation_dependencies.operation_id → sync_operations" to Relation.UNREMOVABLE,
         "sync_operation_dependencies.depends_on_id → sync_operations" to Relation.UNREMOVABLE

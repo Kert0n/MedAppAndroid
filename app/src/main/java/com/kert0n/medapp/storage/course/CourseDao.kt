@@ -8,6 +8,7 @@ import androidx.room.Upsert
 import com.kert0n.medapp.domain.course.Course
 import com.kert0n.medapp.domain.course.CourseDraft
 import com.kert0n.medapp.domain.course.CourseProgress
+import com.kert0n.medapp.domain.course.CoverageReduction
 import com.kert0n.medapp.domain.pack.Availability
 import com.kert0n.medapp.domain.value.Quantity
 import com.kert0n.medapp.domain.course.Revision
@@ -170,6 +171,13 @@ interface CourseDao {
     @Insert
     suspend fun assignPackage(assignment: ActivePackageAssignmentStorageEntity)
 
+    @Insert
+    suspend fun insertReduction(reduction: CoverageReductionStorageEntity)
+
+    /** События сокращения обеспечения курса по времени — карточке курса и уведомлениям (PLAN D5). */
+    @Query("SELECT * FROM coverage_reductions WHERE course_id = :courseId ORDER BY at")
+    suspend fun reductionsOf(courseId: Uuid): List<CoverageReductionStorageEntity>
+
     @Query("SELECT course_id FROM active_package_assignments WHERE package_id = :packageId")
     suspend fun courseHolding(packageId: Uuid): Uuid?
 
@@ -263,10 +271,18 @@ suspend fun CourseDao.followBox(
             else -> course.faultSource(ref, fault, at)
         }
         val availability = packages.availabilityOf(listOf(compatible), queue, intakes, vocabulary).getValue(course.id)
-        val clamped = compatible.clamped(compatible.remainingDoses(plan.progress), availability, at)
+        val required = compatible.remainingDoses(plan.progress)
+        val clamped = compatible.clamped(required, availability, at)
         if (clamped === course) continue
         check(updateAllocations(clamped.toStorageEntity(), clamped.medicine.toSourceStorageEntities(clamped.id), course.revision)) {
             "план прочитан этой же транзакцией"
+        }
+        // Обеспеченных доз стало меньше — событие (PLAN D5). До — выделенное прежним курсом:
+        // после каждого зажима выделение и есть обеспечение; после — обеспечение нового.
+        val coveredBefore = minOf(course.allocatedDosesTotal, required)
+        val coveredAfter = clamped.coverage(plan.progress, availability).coveredDoses
+        if (coveredAfter < coveredBefore) {
+            insertReduction(CoverageReduction(Uuid.random(), courseId, packageId, coveredBefore, coveredAfter, at).toStorageEntity())
         }
         // Назначение коробки следует за пригодностью источника: отключённый её не держит.
         if (clamped.medicine.faultOf(ref) != null) releasePackage(packageId)

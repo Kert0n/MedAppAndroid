@@ -4,6 +4,7 @@ import androidx.room.withTransaction
 import com.kert0n.medapp.domain.course.Course
 import com.kert0n.medapp.domain.course.CourseCompletion
 import com.kert0n.medapp.domain.course.CourseCoverage
+import com.kert0n.medapp.domain.course.CoverageReduction
 import com.kert0n.medapp.domain.course.CourseDraft
 import com.kert0n.medapp.domain.course.CourseDraftProjection
 import com.kert0n.medapp.domain.course.CourseProjection
@@ -64,6 +65,9 @@ class CourseRoomRepository @Inject constructor(
         val availability = packages.availabilityOf(plans.map { it.course }, queue, intakes, words)
         return plans.associate { plan -> plan.course.id to plan.course.coverage(plan.progress, availability.getValue(plan.course.id)) }
     }
+
+    override fun observeReductions(courseId: Uuid): Flow<List<CoverageReduction>> =
+        database.observing("coverage_reductions") { courses.reductionsOf(courseId).map { it.toDomain() } }
 
     override suspend fun clampHolding(packageId: Uuid, at: Instant): List<CourseFollowed> = database.withTransaction {
         courses.followBox(packageId, packages, intakes, queue, vocabulary.snapshot(), at)
