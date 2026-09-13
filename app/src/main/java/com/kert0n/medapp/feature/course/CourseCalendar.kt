@@ -71,7 +71,7 @@ class CourseCalendar @Inject constructor(
      * приём (PLAN D4). Пачку, которой уже нет, курс вот-вот потеряет своим переходом; до тех пор
      * она не даёт ничего.
      */
-    private suspend fun availabilityOf(course: Course): Availability = Availability(
+    internal suspend fun availabilityOf(course: Course): Availability = Availability(
         course.sources.associate { source ->
             source.pkg.id to (
                 packages.find(source.pkg.id)?.let { PackageAvailability(it, effective = it.quantity).availableToMe }
