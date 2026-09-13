@@ -105,7 +105,10 @@ class IntakeConfirmation @Inject constructor(
             // (PLAN D3, D5). Второй раз отвязывать нечего, и считать по ней обеспечение не из чего.
             emptied -> null
             else -> {
-                val availableAfter = PackageAvailability(pkg, effective = pkg.quantity).availableToMe.minusOrZero(amount.quantity)
+                // От того же числа, что на экране: незакрытые решения по коробке в нём уже есть,
+                // и чужие брони из него вычтены (PLAN D4).
+                val seen = checkNotNull(packages.projection(pkg.id)) { "пачка прочитана этой же транзакцией" }.availability
+                val availableAfter = seen.availableToMe.minusOrZero(amount.quantity)
                 val doses = course.dosesAfterIntake(pkg.ref, amount, availableAfter)
                 if (doses == allocated) null else CourseReallocation(course.allocate(pkg.ref, doses, now), course.revision)
             }

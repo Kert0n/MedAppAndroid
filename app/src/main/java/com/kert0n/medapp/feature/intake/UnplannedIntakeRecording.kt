@@ -29,7 +29,7 @@ import kotlin.uuid.Uuid
  * чем принято»: местный остаток списать не из чего, у общей истина — сервер (E3).
  *
  * **Заденет занятое** — принято больше, чем свободно любому (D4: доступное мне без моего
- * выделения). Такой приём сценарий не записывает, а отвечает этим и называет свободное; после
+ * выделения, посчитанное от числа на экране). Такой приём сценарий не записывает, а отвечает этим и называет свободное; после
  * подтверждения человеком ([touchingReservedConfirmed]) факт записан, расход — местно либо
  * `Consume` без брони, а мой курс, державший коробку, зажат под оставшееся ([CourseClamping]);
  * соседям нехватку приносит снимок (C1 «Разовый приём из занятого»). Кончившуюся коробку курс
@@ -55,10 +55,10 @@ class UnplannedIntakeRecording @Inject constructor(
         val taken = pkg.take(amount, at).getOrElse { return@run Outcome.Rejected((it as IntakeRejected).reason) }
         val spendsLocally = !pkg.medKit.answersToServer
         if (spendsLocally && !pkg.quantity.covers(amount)) return@run Outcome.Rejected(IntakeRejected.Reason.INSUFFICIENT)
-        // Занятое — моё выделение и чужие брони: домен считает от факта, а не от очереди (D4).
-        val myAllocation = courses.courseHolding(pkg.id)?.let { courses.openPlan(it).allocatedOf(pkg.ref) }
-            ?: Quantity.zero(pkg.quantity.unit)
-        val free = PackageAvailability(pkg, effective = pkg.quantity, myAllocation = myAllocation).freeForAnyone
+        // Занятое — моё выделение и чужие брони, посчитанные от того же числа, которое человек
+        // видит на экране: решает он по нему (PLAN D4).
+        val seen = checkNotNull(packages.projection(pkg.id)) { "пачка прочитана этой же транзакцией" }.availability
+        val free = seen.freeForAnyone
         if (!free.covers(amount) && !touchingReservedConfirmed) return@run Outcome.TouchesReserved(free)
 
         val now = clock.instant()
@@ -73,10 +73,11 @@ class UnplannedIntakeRecording @Inject constructor(
         val recorded = queue.change(pkg.medKit, listOf(consume), now) { intakes.record(outcome) }
         check(recorded) { "пачка прочитана этой же транзакцией" }
 
-        // Что осталось: на своей полке — записанный остаток, на общей — проекция после расхода.
-        // Ноль — коробка кончилась или кончится по ответу, и её теряет дверь конца.
-        val after = pkg.quantity.minusOrZero(amount.quantity)
-        if (!after.isZero) clamping.clampTheCourseHolding(pkg, after, now)
+        // Что осталось — то же, что увидит человек: на своей полке расход уже списан, на общей он
+        // лежит в проекции командой. Ноль — коробка кончилась или кончится по ответу, и её теряет
+        // дверь конца (PLAN D4, E1).
+        val after = packages.projection(pkg.id)?.availability
+        if (after != null && !after.effective.isZero) clamping.clampTheCourseHolding(pkg, after, now)
         Outcome.Recorded(intake.projection(), sync.accounting)
     }
 

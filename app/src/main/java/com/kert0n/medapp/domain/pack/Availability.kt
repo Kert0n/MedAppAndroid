@@ -25,11 +25,15 @@ class Availability(availableToMe: Map<Uuid, Quantity>) {
     fun dosesOf(pkg: PackageRef, dose: Dose): Doses = of(pkg).dosesIn(dose)
 
     /**
-     * Тот же расклад, где у [pkg] — [quantity]: так курс зажимается под число, которое станет
-     * доступным после действия человека, ещё не записанного или ещё не подтверждённого полкой.
+     * Тот же расклад со свежей оценкой по одной пачке: так курс зажимается под то, что станет
+     * доступным после действия человека, ещё не подтверждённого полкой.
+     *
+     * Принимает посчитанную доступность, а не число: в раскладе лежит **доступное мне**, и
+     * положить туда сырое количество значило бы отдать курсу чужие брони. Такой подстановки тут
+     * теперь нет по типу (PLAN D4).
      */
-    fun with(pkg: PackageRef, quantity: Quantity): Availability =
-        Availability(availableToMe + (pkg.id to quantity))
+    fun with(availability: PackageAvailability): Availability =
+        Availability(availableToMe + (availability.packageId to availability.availableToMe))
 
     companion object {
 

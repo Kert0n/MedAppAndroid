@@ -186,20 +186,24 @@ class IntakeConfirmationTest {
     }
 
     /**
-     * Домен считает от факта: подтверждённый остаток минус чужие брони минус принятое. Незакрытый
-     * расход в очереди — доставка, и на выделение после приёма он не влияет (PLAN D4).
+     * Выделение считается от того же числа, которое видит человек: незакрытый расход уже вычтен из
+     * него, и обещать лечению таблетки, которых в коробке нет, нечем (PLAN D4, решение владельца
+     * 2026-09-13).
+     *
+     * Красная проверка: пока считали от подтверждённого числа, курс после этого приёма оставался с
+     * четырьмя дозами при трёх таблетках на экране, и нехватка вскрывалась только ответом сервера.
      */
     @Test
-    fun anUnclosedConsumeInTheQueueDoesNotChangeTheAllocationAfterTheIntake() = runTest {
+    fun theAllocationAfterTheIntakeFollowsWhatThePersonSees() = runTest {
         publishHomeKit()
         activate(totalDoses = 7)
-        // Уже уехавший расход на 15 таблеток: по свёртке очереди в пачке было бы 5.
+        // Уже уехавший расход на 15 таблеток: по свёртке очереди в пачке пять.
         database.syncOperations().enqueue(third, PackageSyncCommand.Consume(PACK, dose("15"), third), now)
 
         confirmation.confirm(INTAKE, PACK, dose("2"), FIRST_PLANNED_AT).getOrThrow()
 
-        // От подтверждённых 20: выделено было 5 доз (10 таблеток), ушло 2 таблетки — осталось 4 дозы.
-        assertEquals(Doses(4), requireNotNull(courses.findPlan(COURSE)).sources.single().allocatedDoses)
+        // Человек видел пять, принял две — осталось три, и это одна доза по две таблетки.
+        assertEquals(Doses(1), requireNotNull(courses.findPlan(COURSE)).sources.single().allocatedDoses)
     }
 
     @Test

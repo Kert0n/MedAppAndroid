@@ -54,6 +54,7 @@ class UnplannedIntakeRecordingTest {
 
     private lateinit var database: MedAppDatabase
     private lateinit var recording: UnplannedIntakeRecording
+    private lateinit var adjusting: com.kert0n.medapp.feature.packages.PackageAdjusting
 
     private val sync = PackageSyncState(PACK, version = ResourceVersion(4), claimsVersion = ResourceVersion(2))
 
@@ -61,6 +62,7 @@ class UnplannedIntakeRecordingTest {
     fun setUp() = runTest {
         database = inMemoryDatabase()
         recording = Scenarios(database, LATER).unplannedIntakeRecording
+        adjusting = Scenarios(database, LATER).packageAdjusting
     }
 
     @After
@@ -196,5 +198,30 @@ class UnplannedIntakeRecordingTest {
             UnplannedIntakeRecording.Outcome.Rejected(IntakeRejected.Reason.PACKAGE_UNUSABLE),
             recording.record(PACK, dose("1"), LATER)
         )
+    }
+
+    /**
+     * Человек открыл коробку, увидел там не двадцать, а пять, и пересчитал её. Связи нет,
+     * подтверждённое число остаётся двадцать, а на экране — пять, и курс зажат под пять доз по
+     * одной. Следом он пьёт одну таблетку мимо плана: на экране четыре — и курсу остаётся четыре
+     * дозы, а не пять (PLAN D4, решение владельца 2026-09-13).
+     *
+     * Красная проверка: пока разовый приём считал от подтверждённого числа, он зажимал курс под
+     * девятнадцать, лечение оставалось с пятью дозами, и нехватка вскрывалась только после ответа
+     * сервера.
+     */
+    @Test
+    fun anIntakeClampsByWhatThePersonSeesNotByTheConfirmedNumber() = runTest {
+        shared()
+        val plan = activeCourse(sources = listOf(source(PACK, 5)), totalDoses = 5, doseAmount = java.math.BigDecimal.ONE)
+        database.courseRepository().activate(CourseDraft.Activation(plan, courseRecord(prescription = plan.prescription)))
+        adjusting.adjust(PACK, com.kert0n.medapp.feature.packages.PackageAdjusting.Action.Recount(seen = tablets("20"), actual = tablets("5")))
+        assertEquals(Doses(5), allocated())
+
+        recording.record(PACK, dose("1"), LATER, touchingReservedConfirmed = true)
+
+        assertEquals(tablets("20"), requireNotNull(database.packageRepository().find(PACK)).quantity)
+        assertEquals(tablets("4"), requireNotNull(database.packageRepository().projection(PACK)).availability.effective)
+        assertEquals(Doses(4), allocated())
     }
 }

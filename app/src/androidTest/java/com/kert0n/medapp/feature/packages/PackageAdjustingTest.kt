@@ -13,6 +13,8 @@ import com.kert0n.medapp.fixture.SHARED_KIT
 import com.kert0n.medapp.fixture.Scenarios
 import com.kert0n.medapp.fixture.TABLET_FORM
 import com.kert0n.medapp.fixture.VOCABULARY
+import com.kert0n.medapp.domain.pack.Claims
+import java.math.BigDecimal
 import com.kert0n.medapp.fixture.activeCourse
 import com.kert0n.medapp.fixture.courseRecord
 import com.kert0n.medapp.fixture.courseRepository
@@ -195,5 +197,24 @@ class PackageAdjustingTest {
     @Test
     fun aBoxThatIsGoneSaysSo() = runTest {
         assertEquals(PackageAdjusting.Outcome.GONE, adjusting.adjust(Uuid.random(), PackageAdjusting.Action.Recount(tablets("20"), tablets("7"))))
+    }
+
+    /**
+     * Чужая бронь из обеспечения вычтена: в коробке 20, сосед держит 8, курс просит 10 доз по две.
+     * После пересчёта до 14 доступно мне 6 — три дозы, а не семь (PLAN D4, решение владельца
+     * 2026-09-13).
+     *
+     * Красная проверка: пока зажатие клало в расклад сырое количество, курс видел все 14 таблеток
+     * и оставался с семью дозами — обещал лечение из чужих таблеток, а нехватка всплывала у соседа.
+     */
+    @Test
+    fun clampingSubtractsWhatOthersReserved() = runTest {
+        shared()
+        holdByACourse()
+        database.packageRepository().saveClaims(PACK, Claims(total = BigDecimal("8"), mine = null))
+
+        adjusting.adjust(PACK, PackageAdjusting.Action.Recount(seen = tablets("20"), actual = tablets("14")))
+
+        assertEquals(Doses(3), allocated())
     }
 }

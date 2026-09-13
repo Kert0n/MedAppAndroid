@@ -42,33 +42,30 @@ class PackageAdjusting @Inject constructor(
         val pkg = packages.find(packageId) ?: return@run Outcome.GONE
         if (!pkg.status.allowsUse) return@run Outcome.UNUSABLE
         val now = clock.instant()
-        val after: Quantity? = if (pkg.medKit.answersToServer) announce(pkg, action, now) else apply(pkg, action, now)
+        val ended = if (pkg.medKit.answersToServer) announce(pkg, action, now) else apply(pkg, action, now)
         // Кончившуюся коробку лечение уже потеряло своей дверью; кончающуюся на полке потеряет
-        // ответ. Зажимать есть что только у оставшейся.
-        if (after != null && !after.isZero) clamping.clampTheCourseHolding(pkg, after, now)
-        if (after == null) Outcome.ENDED else Outcome.ADJUSTED
+        // ответ. Зажимать есть что только у оставшейся — и по тому же числу, что на экране (D4).
+        val after = if (ended) null else packages.projection(pkg.id)?.availability
+        if (after != null && !after.effective.isZero) clamping.clampTheCourseHolding(pkg, after, now)
+        if (ended) Outcome.ENDED else Outcome.ADJUSTED
     }
 
-    /** Своя полка: переход и запись; `null` — коробка кончилась. */
-    private suspend fun apply(pkg: Package, action: Action, now: Instant): Quantity? {
+    /** Своя полка: переход и запись; `true` — коробка кончилась. */
+    private suspend fun apply(pkg: Package, action: Action, now: Instant): Boolean {
         val adjustment = when (action) {
             is Action.Recount -> PackageAdjustment.Recount(pkg.id, action.actual)
             is Action.Dispose -> PackageAdjustment.Disposal(pkg.id, action.amount)
         }
-        val after = when (val outcome = adjustment.applyTo(pkg)) {
-            is PackageAfter.Left -> outcome.pkg.quantity
-            is PackageAfter.Ended -> null
-        }
+        val ended = adjustment.applyTo(pkg) is PackageAfter.Ended
         check(packages.adjust(adjustment, at = now)) { "пачка прочитана этой же транзакцией" }
-        return after
+        return ended
     }
 
     /**
-     * Полка, отвечающая серверу: команда-разница и пометка; число — то, что покажет проекция, со
-     * всеми незакрытыми решениями по коробке, а не с одним этим: прежний пересчёт, ещё не
-     * доехавший, в нём уже учтён.
+     * Полка, отвечающая серверу: команда-разница и пометка. Коробка при этом остаётся: ноль в
+     * проекции значит «кончится, когда полка согласится», а строка живёт до ответа (PLAN E1).
      */
-    private suspend fun announce(pkg: Package, action: Action, now: Instant): Quantity {
+    private suspend fun announce(pkg: Package, action: Action, now: Instant): Boolean {
         val command = when (action) {
             is Action.Recount -> PackageSyncCommand.CorrectStock(pkg.id, seen = action.seen, actual = action.actual)
             is Action.Dispose -> PackageSyncCommand.CorrectStock(pkg.id, seen = action.seen, actual = action.seen.minusOrZero(action.amount))
@@ -78,7 +75,8 @@ class PackageAdjusting @Inject constructor(
             check(packages.mark(pkg.id, PackageStatus.CHANGING, by = announced.id)) { "пачка прочитана этой же транзакцией" }
             true
         }
-        return checkNotNull(packages.projection(pkg.id)) { "пачка прочитана этой же транзакцией" }.availability.effective
+        // Коробка кончится, когда полка согласится: до ответа строка живёт, и терять её нечем.
+        return false
     }
 
     /**
