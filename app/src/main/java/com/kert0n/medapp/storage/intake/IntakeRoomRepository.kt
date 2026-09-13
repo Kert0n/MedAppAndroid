@@ -36,6 +36,12 @@ class IntakeRoomRepository @Inject constructor(
     override fun observeOfCourse(courseId: Uuid): Flow<List<IntakeProjection>> =
         database.observing("intakes", "package_records") { ofCourse(courseId).map { it.projection() } }
 
+    override fun observeOfPackage(packageId: Uuid): Flow<List<IntakeProjection>> =
+        database.observing("intakes", "package_records") {
+            val words = vocabulary.snapshot()
+            intakes.takenFrom(packageId).map { it.toDomain(words).projection() }
+        }
+
     /** Строки и словарь — одной транзакцией: единица, записанная между ними, не потеряется. */
     override suspend fun ofCourse(courseId: Uuid): List<Intake> = database.withTransaction {
         val words = vocabulary.snapshot()

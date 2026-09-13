@@ -18,6 +18,13 @@ interface IntakeStorageRepository {
     /** Поток несёт проекции — величины для экрана; сущности отдают `find`/`ofCourse` в транзакции сценария. */
     fun observeOfCourse(courseId: Uuid): Flow<List<IntakeProjection>>
 
+    /**
+     * История коробки — факты приёма из неё, курсовые и разовые вместе, по моменту приёма
+     * (PLAN D6). Читается по записи о коробке: кончившаяся коробка историю не теряет, а
+     * одноимённая — другая запись, и её приёмы сюда не попадают.
+     */
+    fun observeOfPackage(packageId: Uuid): Flow<List<IntakeProjection>>
+
     /** Пункты курса одним чтением — из них сценарий собирает прогресс внутри своей транзакции. */
     suspend fun ofCourse(courseId: Uuid): List<Intake>
 

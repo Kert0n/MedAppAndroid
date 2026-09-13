@@ -63,6 +63,15 @@ interface IntakeDao {
     suspend fun ofCourses(courseIds: List<Uuid>): List<IntakeStorageRow>
 
     /**
+     * Факты приёма из коробки — курсовые и разовые вместе, по моменту приёма: история коробки
+     * (PLAN D6, экран 19). По записи о коробке, поэтому кончившаяся коробка историю не теряет.
+     * Плановые пункты сюда не входят: до ответа пачка может смениться.
+     */
+    @Transaction
+    @Query("SELECT * FROM intakes WHERE taken_package_id = :packageId ORDER BY answered_at")
+    suspend fun takenFrom(packageId: Uuid): List<IntakeStorageRow>
+
+    /**
      * Когда из каждой из названных коробок брали последний раз — самый поздний мой приём из неё,
      * курсовой или разовый, по моменту, который назвал человек: приём задним числом назад его не
      * сдвигает (PLAN D4). Одним чтением на порцию — списку пачек, а не по пачке.
