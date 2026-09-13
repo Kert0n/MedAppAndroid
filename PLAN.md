@@ -3427,6 +3427,7 @@ Base — всё, что работает без экранов: домен, хр
 | B11 | #19 `data/server-reading` | `SnapshotApplier`, `MedKitJoining`, `MedKitInvitation`, `Synchronization`, `SyncWorker` | — |
 | B12 | #20 `data/course-scenarios` | `CourseDrafting`, `CourseActivation`, `CourseCancellation`, `CourseAmendment`, `SourceEditing`, `CourseCalendar`, `CourseUpkeep` | «уменьшения броней вперёд» сняты (C1) |
 | B13 | #21 `data/package-accounting` | `MedKitKeeping`, `PackageAdding`, `PackageDescribing`, `PackageAdjusting`, `UnplannedIntakeRecording`, `IntakeDeclining`, `CourseOffPlanCounting`, `CourseClamping`; разбор закрыт (932cf0b) | — |
+| B14 | #22 `data/reports-and-catalog` | справочник ищет сервер (`TemplateSearching`), кэш — заготовка (#23); отчёты `ReportStorageRepository`: истраченное, расход на дату, сводка, план на дату; `CourseProgress.of`, `Course.dosesDue`; прогноз пачки удалён; готов, на разборе | — |
 
 **Долги сделанных PR, названные и перенесённые:**
 
@@ -3479,7 +3480,7 @@ Base — всё, что работает без экранов: домен, хр
 | 3 | `Расход на дату — по моим курсам` | **сделан**: идущие эпизоды: оставшиеся дозы до даты × доза, с начала суток в зоне курса, до трёх месяцев, «все приёмы успешны»; уходят `PackageForecast` и `forecastOn` |
 | 4 | `Сводка считает пачки, а не догадки` | **сделан**: все доступные живые пачки по категориям и формам; цена всей пачки, валюты раздельно, без цены — отдельным числом |
 | 5 | `План на дату` | **сделан**: пункты моих курсов со статусом и пачкой, разовые приёмы даты; дальше окна — пункты по расписанию без строк |
-| 6 | `PLAN отражает отчёты и справочник` | H5, H6, I, U2, J4 REQ-011, REQ-033 – REQ-036, REQ-043 |
+| 6 | `PLAN отражает отчёты и справочник` | **сделан**: H5, H6, I, U2, J4 REQ-011, REQ-033 – REQ-036, REQ-043; эталон J1 |
 
 **Тесты.**
 
@@ -3835,7 +3836,7 @@ grep -rnE '^import com.kert0n.medapp.(network|storage\..*Dao|storage\.database|q
 | 9 пересчёт | `PackageAdjusting` | `observe(id)` | B13 | U1 |
 | 10 разовый приём | `UnplannedIntakeRecording` (заденет занятое, просрочено) | `observe(id)` (`defaultIntakeAmount`) | B13, B16 | U4 |
 | 11 перенос | `PackageRelocation` | `MedKitStorageRepository.observeAll` | B10 | U1 |
-| 12 план на дату | `IntakeConfirmation`, `IntakeDeclining` | план на дату | B13, B14 | U4 |
+| 12 план на дату | `IntakeConfirmation`, `IntakeDeclining` | `ReportStorageRepository.observeDayPlan(date, zone)` | B13, B14 | U4 |
 | 13 список курсов | `CourseDrafting.create`, `CourseCancellation` | `observeDrafts`, `observeRecords`, признак нехватки | B12, B15 | U3 |
 | 14 карточка курса | `CourseAmendment`, `CourseOffPlanCounting`, переименование | `observePlan`, `observeRecord`, `observeOfCourse`, обеспечение | B12, B13, B15 | U3, U8 |
 | 15 редактор курса | `CourseDrafting.edit`, `CourseActivation`, `CourseAmendment` | `observeDrafts` / `observePlan` | B12 | U3 |
@@ -3849,7 +3850,7 @@ grep -rnE '^import com.kert0n.medapp.(network|storage\..*Dao|storage\.database|q
 | 23 удаление и выход | `MedKitRemoval(fate)` | `observeAll`, затронутые источники из чтения курсов | B10, B16 | U7 |
 | 24 сканер | сценарий кода «Честного знака» | — | B19 | U9 |
 | 25 результат сканирования | заполнение формы экрана 7 | предложение кода в состоянии | B19 | U9 |
-| 26 аналитика | — | истраченное, расход на дату, сводка | B14 | U10 |
+| 26 аналитика | — | `ReportStorageRepository.observeSpending(period, zone)`, `observeFutureSpending(horizon)`, `observeStockSummary()` | B14 | U10 |
 | 27 настройки | хранилище настроек, интервал, решение «ключ утрачен» | настройки, состояние разрешений, `Synchronization.state` | B18 | U11 |
 | 28 состояние синхронизации | `Synchronization` (повторить) | очередь: незакрытые, отказанные, нечитаемые; `Synchronization.state` | B11, B15 | U6 |
 | шторка и баннеры | «Принял», «Пропустить», «Отложить» | запланированные уведомления, баннер дня | B17 | U5 |
@@ -4139,7 +4140,7 @@ ANDROID_SERIAL=emulator-5554 ./gradlew :app:connectedDebugAndroidTest -Pprobe
 (`grep -rn '^import com.kert0n.medapp.network' app/src/main/java/com/kert0n/medapp/feature` — пусто).
 Эмулятор — уже запущенный `emulator-5554`, новых не поднимать. Итог инструментальных читать из
 `app/build/outputs/androidTest-results/connected/debug/TEST-*.xml`: `AssumptionViolatedException` у
-`RegistrationProbe` — пропуск, не провал. **Эталон после B14 коммита 2: 706 unit, 373
+`RegistrationProbe` — пропуск, не провал. **Эталон после B14: 713 unit, 379
 инструментальных, 1 пропуск, 0 провалов** — каждый PR записывает свой. Тесты поднимают `HiltTestApplication` и
 падений на старте не видят: после правки графа Hilt/WorkManager и после правки схемы запускается
 настоящий `MedApp` на эмуляторе (`adb shell pm clear com.kert0n.medapp`, затем
@@ -4243,7 +4244,7 @@ TalkBack; отсутствие связи при запуске уже наст�
 | REQ-009 | Предупреждение о необратимости и неотзываемости доступа             | ТЗ 4.1.1.2; уточнение C1 от 2026-09-09  | E5         | B10, U7 | экран последствий; решение ставит `feature/medkits/MedKitPublishing`, полка ждёт ответа помеченной | B10 (логика), экран — U7 |
 |         | **Управление препаратом**                                           |                                         |            |           |                                            |           |
 | REQ-010 | Добавление вручную с валидацией                                     | ТЗ 4.1.1.3                              | H3 №7      | B13, U1 | `PackageAdding`: запись, строка и детали одной транзакцией; на общей полке `Create` и `CHANGING`; пустой коробки не бывает — правило пачки | B13 (логика), экран — U1 |
-| REQ-011 | Подсказки справочника по названию                                   | ТЗ 4.1.1.3                              | H5         | B14, U2 | дебаунс, отмена, кэш                       | B14 (поиск сервера), экран — U2 |
+| REQ-011 | Подсказки справочника по названию                                   | ТЗ 4.1.1.3                              | H5         | B14, U2 | `ServerPackageTemplatesTest`: limit 10, словарь, «не найдено», причины; кэш без сети — заготовка (#23) | B14 (поиск сервера), экран — U2 |
 | REQ-012 | Добавление сканированием DataMatrix «Честного знака» | ТЗ 4.1.1.3                              | H5         | B19, U9 | фикстуры DataMatrix; EAN-13 не отправляется | — |
 | REQ-013 | Правка полей                                                        | ТЗ 4.1.1.3                              | H3 №8      | B13, U1 | `PackageDescribing`: личное локально, общее — `Describe(before, after)` своими полями; очистка формы у серверной коробки отвергается | B13 (логика), экран — U1 |
 | REQ-014 | Изменение количества с разрешением конфликтов                       | ТЗ 4.1.1.3                              | E1, E3     | B13, B16, U1, U6, U8 | `PackageAdjusting`: своя полка — переход, общая — `CorrectStock(seen, actual)` разницей; 412 — переподготовка, `CONFLICT` только где соотнести нельзя; курс зажат под новую доступность | B13 (логика), экраны — U1, U6, U8 |
@@ -4271,8 +4272,8 @@ TalkBack; отсутствие связи при запуске уже наст�
 |         | **Личный кабинет**                                                  |                                         |            |           |                                            |           |
 | REQ-033 | Расчёт на дату, не далее трёх месяцев                               | ТЗ 4.1.1.10; H6 от 2026-09-13           | H6         | B14, U10 | мой будущий расход по идущим курсам, «все приёмы успешны»; прогноза остатка пачки нет; `FutureSpendingTest`, `ReportRoomRepositoryTest` | B14 (чтение), экран — U10 |
 | REQ-034 | История израсходованного, не более года                             | ТЗ 4.1.1.10; H6 от 2026-09-13           | H6         | B14, U10 | только мои приёмы: эпизоды и разовые по коробке; `ReportRoomRepositoryTest`, `SpendingTest` | B14 (чтение), экран — U10 |
-| REQ-035 | Сводная статистика: категории, формы, общая цена                    | ТЗ 4.1.1.10                             | H6         | B14, U10 | все доступные пачки; без цены отдельно     | B14 (чтение), экран — U10 |
-| REQ-036 | Сводный план лечения на дату                                        | ТЗ 4.1.1.10                             | H6, H3 №12 | B14, U4 | пункты моих курсов и разовые приёмы даты   | B14 (чтение), экран — U4 |
+| REQ-035 | Сводная статистика: категории, формы, общая цена                    | ТЗ 4.1.1.10                             | H6         | B14, U10 | все живые пачки доступных полок; без цены отдельно; `StockSummaryTest`, `ReportRoomRepositoryTest` | B14 (чтение), экран — U10 |
+| REQ-036 | Сводный план лечения на дату                                        | ТЗ 4.1.1.10                             | H6, H3 №12 | B14, U4 | записанные пункты со статусом, ожидаемые дальше окна, разовые приёмы; `DayPlanTest`, `ReportRoomRepositoryTest` | B14 (чтение), экран — U4 |
 |         | **Общая аптечка**                                                   |                                         |            |           |                                            |           |
 | REQ-037 | Нет различия прав, нет администрирования                            | ТЗ 4.1.1.11                             | —          | U7 | свойство сервера                           | — |
 | REQ-038 | Выход сохраняет курс; физический перенос удаляет исходную аптечку   | ТЗ 4.1.1.11; уточнение C1 от 2026-09-09 | E6         | B10, B16, U7 | `MedKitRemoval.Fate.LeaveToOthers`: затрагиваются только источники этой аптечки; `Fate.MoveTo` — перенос | B10 (логика), экран — U7 |
@@ -4281,7 +4282,7 @@ TalkBack; отсутствие связи при запуске уже наст�
 | REQ-041 | Предупреждение при разовом использовании забронированного           | ТЗ 4.1.1.11                             | D4         | B13, U4, U8 | `freeForAnyone`                            | B13 (логика) |
 | REQ-042 | Забронированное нельзя взять в другой курс                          | ТЗ 4.1.1.11                             | F1, F2     | B4, B12, U3 | `active_package_assignments`: первичный ключ по пачке; одновременная запись из двух корутин оставляет одного | B4, B12 |
 |         | **База препаратов**                                                 |                                         |            |           |                                            |           |
-| REQ-043 | Справочник с названием и формой; прочее необязательно               | ТЗ 4.1.1.12                             | B4, H5     | B14, U2 | `DrugTemplateDTO`                          | B14 |
+| REQ-043 | Справочник с названием и формой; прочее необязательно               | ТЗ 4.1.1.12                             | B4, H5     | B14, U2 | `PackageTemplate` из `DrugTemplateDTO`: название и форма, прочее необязательно | B14 (поиск), экран — U2 |
 |         | **Границы продукта**                                                |                                         |            |           |                                            |           |
 | REQ-044 | Взаимозаменяемость, подбор лечения, пересчёт единиц — **не делаем** | Решение C2                              | C2         | — | раздел «чего нет»                          | ✔ |
 |         | **Конфликты**                                                       |                                         |            |           |                                            |           |
