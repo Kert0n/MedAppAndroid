@@ -50,13 +50,17 @@ class CourseCoverage(
     /**
      * Строка по одной пачке. [coveredDoses] — часть выделения, которую подтверждает остаток;
      * разница с [allocatedDoses] объясняет человеку, почему обеспечено меньше выделенного.
-     * [leftover] — остаток меньше дозы, не переливающийся в следующую пачку.
+     * [leftover] — остаток меньше дозы, не переливающийся в следующую пачку. [maxDoses] —
+     * верхняя граница ползунка этой пачки: не больше того, что она даёт, и того, что потребность
+     * оставляет сверх выделенного остальным (PLAN D5); считается теми же входами, что и
+     * обеспечение, и лежит в той же строке.
      */
     data class Source(
         val pkg: PackageRef,
         val allocatedDoses: Doses,
         val coveredDoses: Doses,
-        val leftover: Quantity
+        val leftover: Quantity,
+        val maxDoses: Doses
     ) {
         init {
             require(coveredDoses <= allocatedDoses) {
