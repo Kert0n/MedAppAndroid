@@ -236,7 +236,9 @@ class QueueRoomStorage @Inject constructor(
         val row = packages.find(packageId) ?: return
         val shelf = medKits.find(medKitId)?.toRef() ?: return
         val pkg = row.toDomain(vocabulary.snapshot())
-        if (pkg.medKit != shelf) packages.save(pkg.moveTo(shelf), row.pack.syncState())
+        // Возврат — тоже ответ полки, а не решение человека: полка, с которой коробку брали, сама
+        // помечена уборкой, и это ровно та уборка, которая не вышла (PLAN E6).
+        if (pkg.medKit != shelf) packages.save(pkg.movedByAnswer(shelf), row.pack.syncState())
     }
 
     /**
@@ -325,8 +327,9 @@ class QueueRoomStorage @Inject constructor(
             when {
                 transferTo == null -> packages.end(pkg.thrownOut(Uuid.random(), at), courses, movements, words, at)
                 // Переехавшая коробка отпускается ответом полки — там, куда её поставили: на прежней
-                // полке её уже не найти (PLAN E1).
-                target != null -> packages.save(pkg.moveTo(target), row.pack.syncState()).also { release(pkg.id) }
+                // полке её уже не найти (PLAN E1). Едет она вместе с полкой, а не по своему
+                // решению, поэтому ждущая собственного ответа коробка переезжает наравне со всеми.
+                target != null -> packages.save(pkg.movedByAnswer(target), row.pack.syncState()).also { release(pkg.id) }
                 else -> packages.end(pkg.lost(Uuid.random(), at), courses, movements, words, at)
             }
         }

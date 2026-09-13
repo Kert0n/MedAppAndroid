@@ -115,6 +115,73 @@ class MedKitRemovalTest {
     }
 
 
+    /** Ответ сервера по команде самой полки, когда в очереди есть и команды её коробок. */
+    private suspend fun theServerAgreesAboutTheShelf() {
+        val stored = database.syncOperations().all()
+            .map { it.toDomain(VOCABULARY) as StoredSyncOperation.Readable }
+            .single { it.operation.command is MedKitSyncCommand }
+        database.queueStorage().settle(
+            stored.operation.id,
+            Delivery.Applied(PackageState.None).settlement(stored.operation.command),
+            LATER
+        )
+    }
+
+    /**
+     * Коробка ждёт ответа по своему удалению, а полку в это время переставляют на другую общую.
+     * Едет она **вместе с полкой** — не по своему решению, — поэтому пометка переезду не мешает, и
+     * ответ полки не роняет применение исхода (PLAN E1, E6).
+     *
+     * Красная проверка: переставлять её человеческим `moveTo` — помеченная коробка отвергает
+     * переход, и ответ полки падает исключением посреди транзакции.
+     */
+    @Test
+    fun theShelfAnswerCarriesEvenABoxThatWaitsForItsOwn() = runTest {
+        publish(HOME_KIT, SHARED_KIT)
+        Scenarios(database, LATER).packageRemoval.remove(PACK)
+        assertEquals(PackageStatus.REMOVING, database.packageRepository().find(PACK)?.status)
+
+        assertEquals(MedKitRemoval.Outcome.MARKED, removal.remove(HOME_KIT, MedKitRemoval.Fate.MoveTo(SHARED_KIT)))
+        theServerAgreesAboutTheShelf()
+
+        assertEquals(SHARED_KIT, database.packageRepository().find(PACK)?.medKit?.id)
+        // Своё решение коробки живо: его отпустит ответ по её собственной команде.
+        assertEquals(PackageStatus.REMOVING, database.packageRepository().find(PACK)?.status)
+        assertNull(database.medKits().find(HOME_KIT))
+    }
+
+    /**
+     * Унести домой полку, коробка которой ждёт своего ответа, нельзя: унести её нечем, а полка
+     * ушла бы у всех и забрала коробку с собой. Ждём ответа по коробке (PLAN E6).
+     */
+    @Test
+    fun aShelfIsNotCarriedHomeWhileOneOfItsBoxesWaits() = runTest {
+        publish(HOME_KIT)
+        Scenarios(database, LATER).packageRemoval.remove(PACK)
+
+        val outcome = removal.remove(HOME_KIT, MedKitRemoval.Fate.MoveTo(SHARED_KIT))
+
+        assertEquals(MedKitRemoval.Outcome.CONTENTS_BUSY, outcome)
+        assertEquals(MedKitStatus.ACTIVE, database.medKits().find(HOME_KIT)?.toDomain()?.status)
+        assertEquals(HOME_KIT, database.packageRepository().find(OTHER_PACK)?.medKit?.id)
+    }
+
+    /**
+     * В полку, которую уже убирают, не переносят: она вот-вот уйдёт, и коробки ушли бы с ней,
+     * ничего человеку не сказав (PLAN E1, E6).
+     */
+    @Test
+    fun aShelfBeingRemovedTakesNoNewBoxes() = runTest {
+        publish(SHARED_KIT)
+        assertEquals(MedKitRemoval.Outcome.MARKED, removal.remove(SHARED_KIT, MedKitRemoval.Fate.ThrowAway))
+
+        val outcome = removal.remove(HOME_KIT, MedKitRemoval.Fate.MoveTo(SHARED_KIT))
+
+        assertEquals(MedKitRemoval.Outcome.TARGET_BUSY, outcome)
+        assertNotNull(database.medKits().find(HOME_KIT))
+        assertEquals(HOME_KIT, database.packageRepository().find(PACK)?.medKit?.id)
+    }
+
     /** «Забрал аптечку домой», обе местные: содержимое переезжает целиком, курс коробку не теряет. */
     @Test
     fun takingALocalMedKitAwayIntoALocalOneMovesEverythingAndKeepsTheCourse() = runTest {

@@ -50,6 +50,9 @@ class PackageRelocation @Inject constructor(
         if (!pkg.status.allowsUse) return@run Outcome.UNUSABLE
         val target = medKits.find(targetMedKitId) ?: return@run Outcome.TARGET_GONE
         if (target.id == pkg.medKit.id) return@run Outcome.TARGET_IS_THE_SAME
+        // В полку, о которой уже принято решение, не кладут: она вот-вот уйдёт, и коробка ушла бы
+        // с ней, ничего человеку не сказав (PLAN E1, E6).
+        if (!target.status.allowsUse) return@run Outcome.TARGET_BUSY
         relocate(pkg, target, clock.instant())
     }
 
@@ -58,7 +61,12 @@ class PackageRelocation @Inject constructor(
      * Аптечка, которую разбирают целиком, зовёт его по каждой местной коробке; свою общую она
      * переставляет одной командой аптечки и зовёт [place].
      */
-    internal suspend fun relocate(pkg: Package, target: MedKit, at: Instant): Outcome {
+    internal suspend fun relocate(
+        pkg: Package,
+        target: MedKit,
+        at: Instant,
+        originSurvives: Boolean = true
+    ): Outcome {
         val from = pkg.medKit
         val to = target.ref
         return when {
@@ -83,7 +91,7 @@ class PackageRelocation @Inject constructor(
             // меняется сразу. Серверу она едет созданием — вместе с выделением курса.
             to.answersToServer -> {
                 place(pkg, to, at)
-                publish(pkg, to, at)
+                publish(pkg, to, at, originSurvives)
                 Outcome.MOVED
             }
             else -> {
@@ -112,8 +120,10 @@ class PackageRelocation @Inject constructor(
     }
 
     /** Местная коробка на общей полке: рассказать о ней серверу, а с ней — о выделении курса. */
-    private suspend fun publish(pkg: Package, to: MedKitRef, at: Instant) {
-        queue.change(to, announcement(pkg, to), at) { packages.mark(pkg.id, PackageStatus.CHANGING) }
+    private suspend fun publish(pkg: Package, to: MedKitRef, at: Instant, originSurvives: Boolean) {
+        queue.change(to, announcement(pkg, to, originSurvives = originSurvives), at) {
+            packages.mark(pkg.id, PackageStatus.CHANGING)
+        }
     }
 
     /**
@@ -124,13 +134,28 @@ class PackageRelocation @Inject constructor(
      * Зовут это двое, и событие у коробки одно и то же: её переносят на общую полку — или полка под
      * ней сама становится общей (`feature/medkits/MedKitPublishing`). Во втором случае [after]
      * называет команду публикации: класть коробку некуда, пока полки у сервера нет (PLAN E5, E6).
+     *
+     * [originSurvives] `false` — полку, с которой коробку принесли, разбирают прямо сейчас: адреса
+     * возврата у отказа не будет, и обещать его нечем. Тогда отказ сервера оставляет коробку там,
+     * куда её положили, а сводит это с сервером снимок (PLAN E4, E6).
      */
-    internal suspend fun announcement(pkg: Package, to: MedKitRef, after: Set<Uuid> = emptySet()): List<QueuedCommand> {
+    internal suspend fun announcement(
+        pkg: Package,
+        to: MedKitRef,
+        after: Set<Uuid> = emptySet(),
+        originSurvives: Boolean = true
+    ): List<QueuedCommand> {
         val create = QueuedCommand(
             Uuid.random(),
             // Откуда коробку принесли: не вышло — она вернётся туда. Если её никуда не несли, а
             // общей стала полка под ней, возвращать некуда (PLAN E6).
-            PackageSyncCommand.Create(pkg.id, to.id, pkg.quantity, pkg.facts.shared, pkg.medKit.id.takeIf { it != to.id }),
+            PackageSyncCommand.Create(
+                pkg.id,
+                to.id,
+                pkg.quantity,
+                pkg.facts.shared,
+                pkg.medKit.id.takeIf { originSurvives && it != to.id }
+            ),
             dependsOn = after
         )
         val claim = courses.courseHolding(pkg.id)
@@ -146,8 +171,8 @@ class PackageRelocation @Inject constructor(
     /**
      * Чем кончилось. Переставили — экран показывает новую полку; пометили — коробка остаётся на
      * прежней и ждёт ответа сервера; коробки уже нет — закрывает молча; цели нет — просит выбрать
-     * другую; та же полка — говорит об этом; коробка ждёт удаления или выхода — трогать её нельзя
-     * (PLAN E1, E6).
+     * другую; та же полка — говорит об этом; коробка ждёт удаления или выхода — трогать её нельзя;
+     * целевая полка сама ждёт ответа — класть в неё рано (PLAN E1, E6).
      */
-    enum class Outcome { MOVED, MARKED, GONE, UNUSABLE, TARGET_GONE, TARGET_IS_THE_SAME }
+    enum class Outcome { MOVED, MARKED, GONE, UNUSABLE, TARGET_GONE, TARGET_IS_THE_SAME, TARGET_BUSY }
 }

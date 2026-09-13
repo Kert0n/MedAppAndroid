@@ -3,6 +3,7 @@ package com.kert0n.medapp.feature.packages
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import com.kert0n.medapp.domain.course.CourseDraft
 import com.kert0n.medapp.domain.medkit.MedKit
+import com.kert0n.medapp.domain.medkit.MedKitStatus
 import com.kert0n.medapp.domain.pack.PackageStatus
 import com.kert0n.medapp.fixture.queueStorage
 import com.kert0n.medapp.queue.Delivery
@@ -237,6 +238,22 @@ class PackageRelocationTest {
     private suspend fun theServerAnswers(delivery: Delivery) {
         val stored = database.syncOperations().all().single().toDomain(VOCABULARY) as StoredSyncOperation.Readable
         database.queueStorage().settle(stored.operation.id, delivery.settlement(stored.operation.command), LATER)
+    }
+
+    /**
+     * Полка, о которой уже принято решение, новых коробок не берёт: она вот-вот уйдёт, и коробка
+     * ушла бы с ней, ничего человеку не сказав (PLAN E1, E6).
+     */
+    @Test
+    fun aShelfBeingRemovedTakesNoBoxes() = runTest {
+        database.medKits().upsert(
+            medKit(id = SHARED_KIT, name = "Дача", status = MedKitStatus.REMOVING).toMedKitStorageEntity()
+        )
+
+        assertEquals(PackageRelocation.Outcome.TARGET_BUSY, relocation.move(PACK, SHARED_KIT))
+
+        assertEquals(HOME_KIT, database.packageRepository().find(PACK)?.medKit?.id)
+        assertEquals(emptyList<SyncCommand>(), commands())
     }
 
     @Test

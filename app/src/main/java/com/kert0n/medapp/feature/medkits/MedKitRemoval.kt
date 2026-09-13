@@ -68,8 +68,15 @@ class MedKitRemoval @Inject constructor(
         }
         val target = (fate as? Fate.MoveTo)?.let { medKits.find(it.medKitId) ?: return@run Outcome.TARGET_GONE }
         if (target != null && target.id == medKit.id) return@run Outcome.TARGET_IS_THE_SAME
+        // В полку, о которой уже принято решение, не кладут: она вот-вот уйдёт, и коробки ушли бы
+        // с ней (PLAN E1, E6).
+        if (target != null && !target.status.allowsUse) return@run Outcome.TARGET_BUSY
         if (medKit.answersToServer && target != null && !target.answersToServer) {
-            val withdrawals = packages.contentsOf(medKitId).filter { it.status.allowsUse }.associateWith { relocation.withdrawal(it) }
+            val contents = packages.contentsOf(medKitId)
+            // Коробку, которая ждёт своего ответа, унести нечем, а полка уйдёт у всех — и унесёт
+            // её с собой. Лучше подождать ответа по коробке, чем выбросить её молча (PLAN E6).
+            if (contents.any { !it.status.allowsUse }) return@run Outcome.CONTENTS_BUSY
+            val withdrawals = contents.associateWith { relocation.withdrawal(it) }
             val delete = QueuedCommand(
                 Uuid.random(),
                 MedKitSyncCommand.Delete(medKitId),
@@ -99,7 +106,9 @@ class MedKitRemoval @Inject constructor(
             if (target == null) {
                 removal.discard(pkg, now)
             } else {
-                val moved = relocation.relocate(pkg, target, now)
+                // Полки, с которой несут, сейчас не станет: возвращать на неё при отказе сервера
+                // будет некуда, и обещать возврат нечем (PLAN E6).
+                val moved = relocation.relocate(pkg, target, now, originSurvives = false)
                 check(moved == PackageRelocation.Outcome.MOVED) { "местная коробка переезжает сразу, а не $moved" }
             }
         }
@@ -124,7 +133,8 @@ class MedKitRemoval @Inject constructor(
      * Чем кончилось. Случаи различает поведение экрана: убрали — уходим со списка; пометили —
      * полка остаётся на месте и ждёт согласия сервера; аптечки уже нет — закрываем молча; некуда
      * переносить — просим выбрать другую; та же — говорим об этом; полка уже ждёт другого решения —
-     * ждём его ответа; оставить остальным местную полку нельзя — остальных нет (PLAN E1, E6).
+     * ждём его ответа; оставить остальным местную полку нельзя — остальных нет; цель сама ждёт
+     * ответа или одна из коробок ждёт своего — просим подождать (PLAN E1, E6).
      */
     enum class Outcome {
         REMOVED,
@@ -133,6 +143,8 @@ class MedKitRemoval @Inject constructor(
         BUSY,
         TARGET_GONE,
         TARGET_IS_THE_SAME,
+        TARGET_BUSY,
+        CONTENTS_BUSY,
         NOT_SHARED
     }
 }

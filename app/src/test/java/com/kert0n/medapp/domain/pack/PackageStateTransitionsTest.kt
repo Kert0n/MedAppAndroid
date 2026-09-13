@@ -1,5 +1,6 @@
 package com.kert0n.medapp.domain.pack
 
+import com.kert0n.medapp.domain.medkit.MedKitStatus
 import com.kert0n.medapp.domain.stock.StockMovement
 import com.kert0n.medapp.domain.value.Dose
 import com.kert0n.medapp.domain.value.Money
@@ -75,6 +76,33 @@ class PackageStateTransitionsTest {
     @Test(expected = IllegalArgumentException::class)
     fun movingIntoTheSameKitIsRefused() {
         pack(medKit = medKit(id = HOME_KIT).ref).moveTo(medKit(id = HOME_KIT).ref)
+    }
+
+    @Test
+    fun aShelfBeingRemovedTakesNothingWhileAPublishedOneStillDoes() {
+        // Убираемая полка вот-вот уйдёт: положенная в неё коробка уехала бы с ней, ничего человеку
+        // не сказав. Публикуемой это не касается — ею пользуются, пока сервер её заводит (E5, E6).
+        val removing = medKit(id = SHARED_KIT, name = "Общая", status = MedKitStatus.REMOVING).ref
+        assertThrows(IllegalStateException::class.java) { pack().moveTo(removing) }
+        val publishing = medKit(id = SHARED_KIT, name = "Общая", status = MedKitStatus.PUBLISHING).ref
+        assertEquals(SHARED_KIT, pack().moveTo(publishing).medKit.id)
+    }
+
+    @Test
+    fun theAnswerOfAShelfCarriesEvenAMarkedBoxAndKeepsItsMark() {
+        // Переезд по ответу полки — не пользование: ни своя пометка коробки, ни пометка полки его
+        // не отменяют, иначе ответ было бы нечем применить (PLAN E1, E6).
+        val shared = pack(medKit = medKit(id = SHARED_KIT, name = "Общая").ref)
+        val home = medKit(id = HOME_KIT, status = MedKitStatus.REMOVING).ref
+        val carried = shared.markChanging().movedByAnswer(home)
+        assertEquals(HOME_KIT, carried.medKit.id)
+        assertEquals(PackageStatus.CHANGING, carried.status)
+        assertEquals(PackageStatus.REMOVING, shared.markRemoving().movedByAnswer(home).status)
+    }
+
+    @Test(expected = IllegalArgumentException::class)
+    fun theAnswerDoesNotMoveABoxIntoTheShelfItAlreadyLiesIn() {
+        pack(medKit = medKit(id = HOME_KIT).ref).movedByAnswer(medKit(id = HOME_KIT).ref)
     }
 
     @Test
