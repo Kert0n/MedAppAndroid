@@ -83,7 +83,7 @@ class UnplannedIntakeRecording @Inject constructor(
         // лежит в проекции командой. Ноль — коробка кончилась или кончится по ответу, и её теряет
         // дверь конца (PLAN D4, E1).
         val after = packages.projection(pkg.id)?.availability
-        if (after != null && !after.effective.isZero) clamping.clampTheCourseHolding(pkg, after, now)
+        if (after != null && !after.effective.isZero) clamping.clampTheCourseHolding(pkg, now)
         Outcome.Recorded(intake.projection(), sync.accounting)
     }
 

@@ -12,19 +12,16 @@ import com.kert0n.medapp.domain.course.CourseRecord
 import com.kert0n.medapp.domain.course.Revision
 import com.kert0n.medapp.domain.intake.CourseIntake
 import com.kert0n.medapp.domain.intake.IntakeAnswer
-import com.kert0n.medapp.domain.pack.Availability
 import com.kert0n.medapp.domain.report.CourseInProgress
-import com.kert0n.medapp.domain.value.Quantity
 import com.kert0n.medapp.domain.value.Vocabulary
 import com.kert0n.medapp.storage.database.MedAppDatabase
-import com.kert0n.medapp.storage.database.chunkedForQuery
 import com.kert0n.medapp.storage.database.observing
 import com.kert0n.medapp.storage.pack.PackageDao
-import com.kert0n.medapp.storage.pack.projectionsOf
 import com.kert0n.medapp.storage.server.SyncOperationDao
 import com.kert0n.medapp.storage.intake.IntakeDao
 import com.kert0n.medapp.storage.intake.toStorageEntity as toIntakeStorageEntity
 import com.kert0n.medapp.storage.value.VocabularyDao
+import java.time.Instant
 import javax.inject.Inject
 import kotlin.uuid.Uuid
 import kotlinx.coroutines.flow.Flow
@@ -62,24 +59,14 @@ class CourseRoomRepository @Inject constructor(
             coveragesOf(courses.plansInProgress(intakes, words), words)
         }
 
-    /**
-     * Расклад «сколько доступно мне» по пачкам лечений — от того же числа, которое видит человек:
-     * с незакрытыми командами поверх и без чужих броней (PLAN D4). Пачки, которой уже нет, в
-     * раскладе ничего: курс вот-вот потеряет её своим переходом. Проекции всех пачек всех
-     * лечений — одной порцией, а не по курсу.
-     */
+    /** Обеспечение — от того же расклада, по которому курс зажимается (`availabilityOf`, PLAN D4). */
     private suspend fun coveragesOf(plans: List<CourseInProgress>, words: Vocabulary): Map<Uuid, CourseCoverage> {
-        val ids = plans.flatMap { plan -> plan.course.sources.map { it.pkg.id } }.distinct()
-        val living = ids.chunkedForQuery().flatMap { packages.among(it) }.map { it.toDomain(words) }
-        val projected = packages.projectionsOf(living, queue, intakes, words).associateBy { it.id }
-        return plans.associate { plan ->
-            val availability = Availability(
-                plan.course.sources.associate { source ->
-                    source.pkg.id to (projected[source.pkg.id]?.availability?.availableToMe ?: Quantity.zero(source.pkg.unit))
-                }
-            )
-            plan.course.id to plan.course.coverage(plan.progress, availability)
-        }
+        val availability = packages.availabilityOf(plans.map { it.course }, queue, intakes, words)
+        return plans.associate { plan -> plan.course.id to plan.course.coverage(plan.progress, availability.getValue(plan.course.id)) }
+    }
+
+    override suspend fun clampHolding(packageId: Uuid, at: Instant): List<CourseFollowed> = database.withTransaction {
+        courses.followBox(packageId, packages, intakes, queue, vocabulary.snapshot(), at)
     }
 
     override suspend fun findDraft(id: Uuid): CourseDraft? =

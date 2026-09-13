@@ -46,7 +46,7 @@ class PackageAdjusting @Inject constructor(
         // Кончившуюся коробку лечение уже потеряло своей дверью; кончающуюся на полке потеряет
         // ответ. Зажимать есть что только у оставшейся — и по тому же числу, что на экране (D4).
         val after = if (ended) null else packages.projection(pkg.id)?.availability
-        if (after != null && !after.effective.isZero) clamping.clampTheCourseHolding(pkg, after, now)
+        if (after != null && !after.effective.isZero) clamping.clampTheCourseHolding(pkg, now)
         if (ended) Outcome.ENDED else Outcome.ADJUSTED
     }
 

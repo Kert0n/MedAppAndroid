@@ -31,11 +31,14 @@ import com.kert0n.medapp.storage.course.CourseDao
 import com.kert0n.medapp.storage.database.MedAppDatabase
 import com.kert0n.medapp.storage.intake.IntakeDao
 import com.kert0n.medapp.storage.medkit.MedKitDao
+import com.kert0n.medapp.queue.pack.claimChangesSince
+import com.kert0n.medapp.storage.course.followBox
 import com.kert0n.medapp.storage.medkit.loseAccess
 import com.kert0n.medapp.storage.pack.PackageDao
 import com.kert0n.medapp.storage.pack.applySnapshot
 import com.kert0n.medapp.storage.pack.end
 import com.kert0n.medapp.storage.pack.save
+import com.kert0n.medapp.domain.value.Vocabulary
 import com.kert0n.medapp.storage.value.VocabularyDao
 import java.time.Instant
 import javax.inject.Inject
@@ -367,13 +370,30 @@ class QueueRoomStorage @Inject constructor(
         val words = vocabulary.snapshot()
         val atHome = carried?.let { packages.find(snapshot.pack.id)?.toDomain(words)?.quantity }
         packages.applySnapshot(snapshot, observedAt = at)
-        if (carried == null || atHome == null) return
-        val row = packages.find(snapshot.pack.id) ?: return
-        val laid = row.toDomain(words)
-        if (laid.quantity.unit != carried.unit || atHome.unit != carried.unit) return
-        when (val after = laid.rebased(from = carried, onto = atHome)) {
-            is PackageAfter.Left -> packages.save(after.pkg, row.pack.syncState())
-            is PackageAfter.Ended -> packages.end(after.ending, courses, words, at)
+        if (carried != null && atHome != null) {
+            val row = packages.find(snapshot.pack.id) ?: return
+            val laid = row.toDomain(words)
+            if (laid.quantity.unit != carried.unit || atHome.unit != carried.unit) return
+            when (val after = laid.rebased(from = carried, onto = atHome)) {
+                is PackageAfter.Left -> packages.save(after.pkg, row.pack.syncState())
+                is PackageAfter.Ended -> return packages.end(after.ending, courses, words, at)
+            }
+        }
+        followTheBox(snapshot.pack.id, words, at)
+    }
+
+    /**
+     * Курс следует за коробкой той же транзакцией, что кладёт ответ сервера: чужой расход или бронь,
+     * увиденные ответом, зажимают выделения, и бронь уезжает разницей (PLAN D5, E4). Полке,
+     * серверу не отвечающей, команды не ставятся — унесённую домой коробку зажим не трогает.
+     */
+    private suspend fun followTheBox(packageId: Uuid, words: Vocabulary, at: Instant) {
+        val shelf = packages.find(packageId)?.let { it.pack.medKitRow(it.medKit).toRef() } ?: return
+        for (followed in courses.followBox(packageId, packages, intakes, queue, words, at)) {
+            if (!shelf.answersToServer) continue
+            for (command in followed.after.claimChangesSince(followed.before)) {
+                queue.enqueue(Uuid.random(), command, at, medKitId = shelf.id)
+            }
         }
     }
 
