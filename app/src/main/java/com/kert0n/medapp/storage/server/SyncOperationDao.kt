@@ -108,9 +108,14 @@ interface SyncOperationDao {
      * который ещё не применён, — у которых каждая зависимость **применена** — зависимость значит «нужен эффект», и закрытая отказом её не
      * даёт. Порядок — номер очереди; кто ещё не готов, ждёт своей зависимости.
      *
-     * **Внутри полки — строго по номеру** (PLAN E3): операция ждёт, пока не закрыта более ранняя по
-     * той же коробке **или по той же полке**. Полка ждёт расход, поставленный на её коробку раньше, а
-     * расход, поставленный позже, ждёт полку — и ответ одной не подвешивает другую.
+     * **Полка ждёт свои коробки, коробки ждут полку** (PLAN E3): команда о полке ждёт любую более
+     * раннюю незакрытую по этой полке, а команда о коробке — более ранние по этой коробке и более
+     * ранние команды самой полки. Поэтому уборка ждёт расход, поставленный на её коробку раньше, а
+     * расход, поставленный позже, ждёт уборку — и ответ одной не подвешивает другую.
+     *
+     * Команды **двух разных коробок** одной полки друг друга не ждут: сервер их не связывает.
+     * Иначе коробка на откате держала бы всю полку до своего срока, а публикация полки с пятью
+     * коробками растянулась бы на пять проходов вместо одного (PLAN E1).
      */
     @Transaction
     @Query(
@@ -120,9 +125,10 @@ interface SyncOperationDao {
             "  SELECT 1 FROM sync_operation_dependencies d JOIN sync_operations p ON p.id = d.depends_on_id " +
             "  WHERE d.operation_id = o.id AND p.status != 'APPLIED'" +
             ") AND NOT EXISTS (" +
-            "  SELECT 1 FROM sync_operations e WHERE (e.package_id = o.package_id OR e.med_kit_id = o.med_kit_id) " +
-            "  AND e.sequence < o.sequence " +
-            "  AND e.status IN ('PENDING', 'SENDING', 'ANSWERED')" +
+            "  SELECT 1 FROM sync_operations e WHERE e.sequence < o.sequence " +
+            "  AND e.status IN ('PENDING', 'SENDING', 'ANSWERED') " +
+            "  AND (e.package_id = o.package_id " +
+            "    OR (e.med_kit_id = o.med_kit_id AND (o.package_id IS NULL OR e.package_id IS NULL)))" +
             ") ORDER BY sequence"
     )
     suspend fun ready(now: Instant): List<SyncOperationStorageRow>

@@ -127,14 +127,14 @@ class SyncOperationDaoTest {
     }
 
     /**
-     * Внутри полки — строго по номеру: полка ждёт расход, поставленный на её коробку раньше, а
-     * расход другой коробки той же полки, поставленный позже, ждёт полку. Чужая полка не ждёт никого
-     * (PLAN E3).
+     * Полка ждёт свои коробки, коробки ждут полку: уборка ждёт расход, поставленный на её коробку
+     * раньше, а расход другой коробки той же полки, поставленный позже, ждёт уборку. Чужая полка не
+     * ждёт никого (PLAN E3).
      *
      * Красная проверка: порядок только по пачке пропускает полку раньше расхода.
      */
     @Test
-    fun withinAShelfTheQueueGoesStrictlyByNumber() = runTest {
+    fun theShelfWaitsForItsBoxesAndTheBoxesWaitForTheShelf() = runTest {
         val elsewhere = Uuid.random()
         queue.enqueue(first, PackageSyncCommand.Consume(PACK, dose("2"), INTAKE), createdAt, medKitId = SHARED_KIT)
         queue.enqueue(second, MedKitSyncCommand.Delete(SHARED_KIT), createdAt)
@@ -146,6 +146,25 @@ class SyncOperationDaoTest {
         assertEquals(listOf(second, elsewhere), queue.ready(createdAt.plusSeconds(60)).map { it.operation.id })
         queue.settle(second, SyncOperationStatus.APPLIED, null, createdAt, attempted = 0)
         assertEquals(listOf(third, elsewhere), queue.ready(createdAt.plusSeconds(60)).map { it.operation.id })
+    }
+
+    /**
+     * Команды **двух разных коробок** одной полки друг друга не ждут: сервер их не связывает, и
+     * при связи они уезжают одним проходом (PLAN E1, E3). Коробка, отложенная до своего срока,
+     * соседнюю тоже не держит.
+     *
+     * Красная проверка: порядок по всей полке отдаёт одну команду вместо двух.
+     */
+    @Test
+    fun twoBoxesOfOneShelfDoNotWaitForEachOther() = runTest {
+        queue.enqueue(first, PackageSyncCommand.Consume(PACK, dose("2"), INTAKE), createdAt, medKitId = SHARED_KIT)
+        queue.enqueue(second, PackageSyncCommand.Consume(OTHER_PACK, dose("1"), INTAKE), createdAt, medKitId = SHARED_KIT)
+
+        assertEquals(listOf(first, second), queue.ready(createdAt.plusSeconds(60)).map { it.operation.id })
+
+        queue.settle(first, SyncOperationStatus.PENDING, "обрыв", createdAt, attempted = 1, notBefore = createdAt.plusSeconds(300))
+
+        assertEquals(listOf(second), queue.ready(createdAt.plusSeconds(60)).map { it.operation.id })
     }
 
     @Test
