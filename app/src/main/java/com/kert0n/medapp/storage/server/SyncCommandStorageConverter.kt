@@ -107,7 +107,8 @@ object SyncCommandStorageConverter {
             packageId = fields.uuid("packageId"),
             medKitId = fields.uuid("medKitId"),
             quantity = fields.quantity("quantity", vocabulary),
-            facts = fields.facts(vocabulary)
+            facts = fields.facts(vocabulary),
+            fromMedKitId = if (fields.containsKey("fromMedKitId")) fields.uuid("fromMedKitId") else null
         )
         PACKAGE_DESCRIBE -> PackageSyncCommand.Describe(
             packageId = fields.uuid("packageId"),
@@ -155,6 +156,7 @@ object SyncCommandStorageConverter {
         when (command) {
             is PackageSyncCommand.Create -> {
                 put("medKitId", JsonPrimitive(command.medKitId.toString()))
+                command.fromMedKitId?.let { put("fromMedKitId", JsonPrimitive(it.toString())) }
                 putQuantity("quantity", command.quantity)
                 put("name", JsonPrimitive(command.facts.name))
                 putFacts(command.facts)

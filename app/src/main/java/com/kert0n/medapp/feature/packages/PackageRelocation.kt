@@ -128,7 +128,9 @@ class PackageRelocation @Inject constructor(
     internal suspend fun announcement(pkg: Package, to: MedKitRef, after: Set<Uuid> = emptySet()): List<QueuedCommand> {
         val create = QueuedCommand(
             Uuid.random(),
-            PackageSyncCommand.Create(pkg.id, to.id, pkg.quantity, pkg.facts.shared),
+            // Откуда коробку принесли: не вышло — она вернётся туда. Если её никуда не несли, а
+            // общей стала полка под ней, возвращать некуда (PLAN E6).
+            PackageSyncCommand.Create(pkg.id, to.id, pkg.quantity, pkg.facts.shared, pkg.medKit.id.takeIf { it != to.id }),
             dependsOn = after
         )
         val claim = courses.courseHolding(pkg.id)

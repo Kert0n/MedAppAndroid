@@ -62,13 +62,16 @@ sealed interface PackageSyncCommand : SyncCommand {
         }
 
     /**
-     * 404: у команд над пачкой и переносом нет пачки или аптечки — доступа нет; у правки брони
-     * нет своей брони — заявить заново по свежему `mine`; у снятия брони и удаления нет того, что
-     * снимают или удаляют, — уже так. Заявление брони 404 не отвечает иначе как пачкой.
+     * 404: у команд над пачкой и переносом нет пачки или аптечки — доступа нет; у создания нет
+     * **полки**, куда кладут, и это отказ, а не конец коробки; у правки брони нет своей брони —
+     * заявить заново по свежему `mine`; у снятия брони и удаления нет того, что снимают или
+     * удаляют, — уже так. Заявление брони 404 не отвечает иначе как пачкой.
      */
     val onNotFound: NotFoundPolicy
         get() = when (this) {
-            is Create, is Describe, is Move, is Consume -> NotFoundPolicy.ACCESS_LOST
+            // Создания нет полки, а не коробки: коробка у человека в руках, и кончать её нечем.
+            is Create -> NotFoundPolicy.REFUSE
+            is Describe, is Move, is Consume -> NotFoundPolicy.ACCESS_LOST
             is CorrectStock -> if (actual.isZero) NotFoundPolicy.APPLIED else NotFoundPolicy.ACCESS_LOST
             is SetClaim -> NotFoundPolicy.REPREPARE
             is ReleaseClaim, is Delete, is Withdraw -> NotFoundPolicy.APPLIED
@@ -111,15 +114,21 @@ sealed interface PackageSyncCommand : SyncCommand {
      * Начальный остаток строго положителен — и в доменном сценарии, и в POST-DTO: пачка, которой
      * нет, не заводится (PLAN E2). Личные срок, заметка и цена в команде отсутствуют по типу:
      * уезжает [PackageSharedFacts], остальное остаётся на устройстве (PLAN C0).
+     *
+     * [fromMedKitId] — полка, с которой коробку принесли: местная, если её переложили на общую.
+     * Не вышло — коробка возвращается туда, и потому команда помнит это место сама. `null` — её
+     * никуда не перекладывали, общей стала полка под ней (публикация), и возвращать некуда.
      */
     data class Create(
         override val packageId: Uuid,
         val medKitId: Uuid,
         val quantity: Quantity,
-        val facts: PackageSharedFacts
+        val facts: PackageSharedFacts,
+        val fromMedKitId: Uuid? = null
     ) : PackageSyncCommand {
         init {
             require(!quantity.isZero) { "пачка заводится с положительным остатком" }
+            require(fromMedKitId != medKitId) { "коробка приезжает с другой полки, а не с этой же" }
         }
     }
 

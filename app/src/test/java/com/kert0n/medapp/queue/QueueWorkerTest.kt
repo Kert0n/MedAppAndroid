@@ -801,6 +801,31 @@ class QueueWorkerTest {
     }
 
     /**
+     * 404 на создании — не стало **полки**, куда коробку кладут: сосед удалил её, пока команда
+     * ждала связи. Сама коробка при этом лежит у человека дома, поэтому это отказ, а не утрата
+     * доступа, и коробка возвращается на ту полку, с которой её принесли (PLAN E6).
+     */
+    @Test
+    fun aBoxWhoseTargetShelfIsGoneComesBackInsteadOfEnding() = runTest {
+        val create = PackageSyncCommand.Create(
+            PACK, SHARED_KIT, tablets("20"),
+            com.kert0n.medapp.domain.pack.PackageSharedFacts("Парацетамол", TABLET_FORM),
+            fromMedKitId = HOME_KIT
+        )
+        val storage = Storage(listOf(operation(create)))
+        val transport = Transport { ApiResult.Failure(ApiFailure.NotFound) }
+
+        worker(storage, transport).drain()
+
+        val settlement = storage.settled.single().second.settlement(create)
+        assertEquals(Delivery.Refused(RefusalReason.STALE, PackageState.None), storage.settled.single().second)
+        assertTrue(
+            "коробка не возвращена: ${settlement.effects}",
+            Settlement.Effect.Returned(PACK, HOME_KIT) in settlement.effects
+        )
+    }
+
+    /**
      * 409 на команде аптечки — номер занят, и сам по себе он не значит «наше»: аптечка читается, и
      * только увиденная своя делает желаемое сбывшимся (PLAN C0, E3).
      */

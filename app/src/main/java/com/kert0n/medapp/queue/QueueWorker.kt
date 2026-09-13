@@ -276,6 +276,10 @@ class QueueWorker @Inject constructor(
             NotFoundPolicy.APPLIED ->
                 if (command is PackageSyncCommand.ReleaseClaim) snapshotThen(command.packageId) { Delivery.Applied(PackageState.Present(it)) }
                 else Delivery.Applied(PackageState.Gone)
+            // Полки, куда кладут коробку, не стало. Коробка при этом никуда не делась — она у
+            // человека в руках, — поэтому это отказ, а не её конец: снимка читать не у кого,
+            // а вернуть её на прежнее место умеет закрытие (PLAN E6).
+            NotFoundPolicy.REFUSE -> Delivery.Refused(RefusalReason.STALE, PackageState.None)
         }
         // Аптечки нет или мы не участник: удаление и выход тем самым исполнены (PLAN E3).
         is MedKitSyncCommand -> Delivery.Applied(PackageState.None)

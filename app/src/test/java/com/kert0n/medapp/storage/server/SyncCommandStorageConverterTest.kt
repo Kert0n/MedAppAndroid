@@ -40,6 +40,7 @@ class SyncCommandStorageConverterTest {
 
     private val everyKind: List<SyncCommand> = listOf(
         PackageSyncCommand.Create(PACK, HOME_KIT, tablets("20"), facts),
+        PackageSyncCommand.Create(PACK, HOME_KIT, tablets("20"), facts, fromMedKitId = SHARED_KIT),
         PackageSyncCommand.Describe(PACK, facts, facts.copy(name = "Paracetamol", category = null)),
         PackageSyncCommand.CorrectStock(PACK, tablets("18.5")),
         PackageSyncCommand.Move(PACK, SHARED_KIT),
@@ -79,6 +80,14 @@ class SyncCommandStorageConverterTest {
             ),
             everyKind.map(SyncCommandStorageConverter::kindOf).distinct()
         )
+    }
+
+    /** Полка, с которой коробку принесли, переживает перезапуск: по ней её и возвращают. */
+    @Test
+    fun theShelfABoxCameFromSurvivesTheRoundTrip() {
+        val carried = PackageSyncCommand.Create(PACK, HOME_KIT, tablets("20"), facts, fromMedKitId = SHARED_KIT)
+        assertEquals(SHARED_KIT, (roundTrip(carried) as PackageSyncCommand.Create).fromMedKitId)
+        assertNull((roundTrip(PackageSyncCommand.Create(PACK, HOME_KIT, tablets("20"), facts)) as PackageSyncCommand.Create).fromMedKitId)
     }
 
     /** Пустая бронь и заполненная — разные команды, и различать их должен именно payload. */

@@ -151,9 +151,18 @@ private fun PackageSyncCommand.gone(ending: Settlement.Effect.Ending): Settlemen
     if (this is PackageSyncCommand.Withdraw) Settlement.Effect.Withdrawn(packageId)
     else Settlement.Effect.PackageEnded(packageId, ending)
 
-/** Отказ унести домой возвращает коробку на прежнюю полку; у прочих отказов возвращать нечего. */
-private fun SyncCommand.returned(): List<Settlement.Effect> =
-    if (this is PackageSyncCommand.Withdraw) listOf(Settlement.Effect.Returned(packageId, fromMedKitId)) else emptyList()
+/**
+ * Отказ возвращает коробку туда, откуда её взяли: унос домой — на полку, с которой снимали;
+ * создание — на полку, с которой её переложили. Полка есть, а коробка на сервере не завелась —
+ * значит она осталась там, где и была, и вид у неё должен быть тот же (PLAN E6). У прочих отказов
+ * возвращать нечего: коробка никуда не переезжала.
+ */
+private fun SyncCommand.returned(): List<Settlement.Effect> = when {
+    this is PackageSyncCommand.Withdraw -> listOf(Settlement.Effect.Returned(packageId, fromMedKitId))
+    this is PackageSyncCommand.Create && fromMedKitId != null ->
+        listOf(Settlement.Effect.Returned(packageId, fromMedKitId))
+    else -> emptyList()
+}
 
 /**
  * Чем кончилась коробка, у которой сервер подтвердил «её нет»: каждая команда знает, зачем её

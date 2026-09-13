@@ -28,6 +28,7 @@ import com.kert0n.medapp.fixture.packageRepository
 import com.kert0n.medapp.fixture.source
 import com.kert0n.medapp.fixture.tablets
 import com.kert0n.medapp.queue.StoredSyncOperation
+import com.kert0n.medapp.queue.SyncOperationStatus
 import com.kert0n.medapp.queue.SyncCommand
 import com.kert0n.medapp.queue.pack.PackageSyncCommand
 import com.kert0n.medapp.storage.database.MedAppDatabase
@@ -200,6 +201,37 @@ class PackageRelocationTest {
         val pkg = requireNotNull(database.packageRepository().find(PACK))
         assertEquals(HOME_KIT, pkg.medKit.id)
         assertEquals(PackageStatus.ACTIVE, pkg.status)
+    }
+
+    /**
+     * Коробку переложили на общую полку, а полки не стало, пока команда ждала связи. Сама коробка
+     * при этом никуда не делась — она у человека в руках, — поэтому она возвращается на ту полку, с
+     * которой её принесли, а бронь уходит каскадом за своим созданием (PLAN E6).
+     */
+    @Test
+    fun aBoxWhoseSharedShelfIsGoneComesHomeInsteadOfEnding() = runTest {
+        publish(SHARED_KIT)
+        relocation.move(PACK, SHARED_KIT)
+
+        val create = database.syncOperations().all()
+            .map { (it.toDomain(VOCABULARY) as StoredSyncOperation.Readable).operation }
+            .single { it.command is PackageSyncCommand.Create }
+        database.queueStorage().settle(
+            create.id,
+            Delivery.Refused(RefusalReason.STALE, PackageState.None).settlement(create.command),
+            LATER
+        )
+
+        val pkg = requireNotNull(database.packageRepository().find(PACK))
+        assertEquals(HOME_KIT, pkg.medKit.id)
+        assertEquals(PackageStatus.ACTIVE, pkg.status)
+        assertEquals(listOf(PACK), database.courses().sourcePackagesOf(COURSE))
+        assertEquals(
+            emptyList<SyncOperationStatus>(),
+            database.syncOperations().all()
+                .map { (it.toDomain(VOCABULARY) as StoredSyncOperation.Readable).operation.status }
+                .filter { !it.isClosed }
+        )
     }
 
     private suspend fun theServerAnswers(delivery: Delivery) {
