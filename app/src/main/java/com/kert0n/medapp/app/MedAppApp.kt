@@ -5,9 +5,9 @@ import androidx.compose.runtime.getValue
 import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.kert0n.medapp.app.navigation.MedAppShell
-import com.kert0n.medapp.feature.bootstrap.AppStartState
-import com.kert0n.medapp.feature.bootstrap.AppStartViewModel
-import com.kert0n.medapp.feature.bootstrap.SetupScreen
+import com.kert0n.medapp.presentation.bootstrap.AppStartState
+import com.kert0n.medapp.presentation.bootstrap.AppStartViewModel
+import com.kert0n.medapp.ui.bootstrap.SetupScreen
 
 /**
  * Корень приложения: пока оно не настроено, виден экран настройки и ничего больше — до успешной

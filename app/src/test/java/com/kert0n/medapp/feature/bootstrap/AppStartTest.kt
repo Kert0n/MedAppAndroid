@@ -51,7 +51,7 @@ class AppStartTest {
 
         val state = AppStart(Account(AccountReadiness.Ready), library).begin()
 
-        assertEquals(AppStartState.Ready, state)
+        assertEquals(AppStart.Outcome.Ready, state)
         assertEquals(1, library.refreshed)
     }
 
@@ -66,7 +66,7 @@ class AppStartTest {
     fun aLostKeyAsksTheHumanInsteadOfRegisteringAgain() = runTest {
         val state = AppStart(Account(AccountReadiness.KeyLost), Library(Vocabulary.empty)).begin()
 
-        assertEquals(AppStartState.KeyLost, state)
+        assertEquals(AppStart.Outcome.KeyLost, state)
     }
 
     /** Причина отказа доезжает до экрана как есть: он по ней и выбирает, что сказать. */
@@ -77,7 +77,7 @@ class AppStartTest {
 
             val state = AppStart(account, Library(Vocabulary.empty)).begin()
 
-            assertEquals(AppStartState.Setup(reason), state)
+            assertEquals(AppStart.Outcome.Setup(reason), state)
         }
     }
 
@@ -88,7 +88,7 @@ class AppStartTest {
 
         val state = AppStart(Account(AccountReadiness.Ready), library).begin()
 
-        assertEquals(AppStartState.Setup(Unavailability.NO_CONNECTION), state)
+        assertEquals(AppStart.Outcome.Setup(Unavailability.NO_CONNECTION), state)
     }
 
     /**
@@ -105,7 +105,7 @@ class AppStartTest {
 
         val state = AppStart(Account(AccountReadiness.Ready), library).begin()
 
-        assertEquals(AppStartState.Setup(Unavailability.NO_CONNECTION), state)
+        assertEquals(AppStart.Outcome.Setup(Unavailability.NO_CONNECTION), state)
     }
 
     /** Сервер ответил, а единиц всё равно нет: считать по-прежнему нечем, и настройка не закончена. */
@@ -115,7 +115,7 @@ class AppStartTest {
 
         val state = AppStart(Account(AccountReadiness.Ready), library).begin()
 
-        assertEquals(AppStartState.Setup(Unavailability.SERVER_SILENT), state)
+        assertEquals(AppStart.Outcome.Setup(Unavailability.SERVER_SILENT), state)
     }
 
     /**
@@ -130,7 +130,7 @@ class AppStartTest {
 
         val state = AppStart(Account(AccountReadiness.Ready), library).begin()
 
-        assertEquals(AppStartState.Ready, state)
+        assertEquals(AppStart.Outcome.Ready, state)
         assertEquals(0, library.refreshed)
     }
 }

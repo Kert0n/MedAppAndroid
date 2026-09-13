@@ -2938,10 +2938,11 @@ com.kert0n.medapp                         есть · [B17] — появится
 │              SourceEditing, CourseClamping, CourseOffPlanCounting), intake/ (IntakeConfirmation,
 │              UnplannedIntakeRecording, IntakeDeclining), template/ (TemplateSearching);
 │              [B18] account/; [B19] scan/
-├─ presentation/ представление, по понятиям: value/, pack/, medkit/ — DTO состояния, мапперы
-│              из проекций, разбор ввода, ViewModel; ParsedInput, ScreenState в корне. Пишут UI-PR
+├─ presentation/ представление, по понятиям: value/, pack/, medkit/, bootstrap/ — DTO состояния,
+│              мапперы из проекций, разбор ввода, ViewModel; ParsedInput, ScreenState в корне.
+│              Пишут UI-PR; `bootstrap/` появилось с оболочкой и живёт по тем же правилам
 └─ ui/         тема и общие составляющие экрана (LoadingState, EmptyState, ErrorMessage),
-               Compose-экраны. Пишут UI-PR
+               Compose-экраны по понятиям: bootstrap/ (SetupScreen). Пишут UI-PR
 ```
 
 **Кто чем владеет и кто кого видит** — таблица согласования слоёв. Base-PR (часть I) пишет первые
@@ -2952,16 +2953,16 @@ com.kert0n.medapp                         есть · [B17] — появится
 | `domain/` | сущности, величины, правила, порты действий | только `java.*`, `kotlin.*`, себя | Base |
 | `network/` | провод: DTO, мапперы, клиенты, резолвер словаря, исполнение портов домена | `domain/` | Base |
 | `queue/` | доставка: операции, подготовка, исход, снимок, заход синхронизации | `network/`, `domain/` | Base |
-| `storage/` | Room: таблицы, DAO, репозитории и их порты, проекции одним снимком | `queue/`, `domain/` | Base |
+| `storage/` | Room: таблицы, DAO, репозитории и их порты, проекции одним снимком | `queue/`, `network/` (обвязка доставки лежит в его же строках), `domain/` | Base |
 | `feature/` | сценарии: действие человека одной транзакцией; чтения отчётов | `storage/`, `queue/`, `domain/` (сеть — только через порты домена) | Base |
-| `platform/` | Android-службы без экранов: фон, уведомления, настройки, ключи | `feature/`, `queue/`, `storage/` порты, `domain/` | Base |
+| `platform/` | Android-службы без экранов: фон, уведомления, настройки, ключи | `feature/`, `queue/`, `storage/` порты, `network/` (исполняет её порты), `domain/` | Base |
 | `di/`, `app/` без `navigation/` | граф и точка входа | всё | Base |
 | `presentation/` | DTO состояния, мапперы, разбор ввода, ViewModel | `domain/`, `feature/`, порты чтения `storage/`, порты `platform/` | UI |
 | `ui/`, `app/navigation/`, `res/` | Compose, маршруты, строки, значки | `presentation/`, `domain/` | UI |
 
 **Направления зависимостей:** `presentation → domain`; `queue → network → domain` — сеть про
-очередь не знает, и это проверяет греп AGENTS; `storage → queue`; `feature → storage, queue,
-domain`. Сценарий `feature/<понятие>` владеет целым действием человека: читает, решает доменом и
+очередь не знает; `storage → queue`; `feature → storage, queue, domain`. Всю эту таблицу утверждает
+`LayerBoundariesTest`: она его договор, и правится вместе с ним. Сценарий `feature/<понятие>` владеет целым действием человека: читает, решает доменом и
 пишет одной транзакцией — так `feature/intake/IntakeConfirmation` держит «принял».
 
 **Внутри слоя каталог называет понятие, а не вид файла.** `domain/pack/`, `network/pack/`,
@@ -3693,9 +3694,9 @@ Base — всё, что работает без экранов: домен, хр
 
 **Счастливый путь отдельно:** своя полка с пятью коробками публикуется при связи **одним** проходом
 очереди — правило порядка кругов не добавляет (E1).
-**Что названо и не чинится:** `AppStartViewModel`/`SetupScreen` лежат мимо таблицы H1/U1;
-`PackageDao.end` организует целое действие в хранении; `MedKitJoining` зовёт `SnapshotApplier` мимо
-доменного порта — это другая болезнь, и лечится она своим PR.
+**Что названо и не чинится:** `AppStartViewModel`/`SetupScreen` лежат мимо таблицы H1/U1 (**сделано
+в B14.2**); `PackageDao.end` организует целое действие в хранении; `MedKitJoining` зовёт
+`SnapshotApplier` мимо доменного порта — это другая болезнь, и лечится она своим PR.
 
 ### B15 — у каждого экрана есть чтение
 
@@ -4308,8 +4309,8 @@ ANDROID_SERIAL=emulator-5554 ./gradlew :app:connectedDebugAndroidTest -Pprobe
 ./gradlew :app:lintDebug :app:assembleDebug
 ```
 
-плюс четыре грепа AGENTS «Проверки» и греп границы `feature → network`
-(`grep -rn '^import com.kert0n.medapp.network' app/src/main/java/com/kert0n/medapp/feature` — пусто).
+плюс греп AGENTS «Проверки» о повторе правила: границы и раскладку держит `LayerBoundariesTest`,
+и отдельными грепами их больше не смотрят.
 Эмулятор — уже запущенный `emulator-5554`, новых не поднимать. Итог инструментальных читать из
 `app/build/outputs/androidTest-results/connected/debug/TEST-*.xml`: `AssumptionViolatedException` у
 `RegistrationProbe` — пропуск, не провал. **Эталон после B14.1: 714 unit, 391

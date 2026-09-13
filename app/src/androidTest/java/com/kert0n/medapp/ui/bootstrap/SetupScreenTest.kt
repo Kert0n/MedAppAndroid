@@ -1,4 +1,6 @@
-package com.kert0n.medapp.feature.bootstrap
+package com.kert0n.medapp.ui.bootstrap
+
+import com.kert0n.medapp.presentation.bootstrap.AppStartState
 
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.junit4.createComposeRule
