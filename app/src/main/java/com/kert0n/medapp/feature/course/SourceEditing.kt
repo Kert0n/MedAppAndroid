@@ -1,5 +1,6 @@
 package com.kert0n.medapp.feature.course
 
+import com.kert0n.medapp.domain.course.CourseProgress
 import com.kert0n.medapp.domain.course.CourseProjection
 import com.kert0n.medapp.domain.course.CourseRejected
 import com.kert0n.medapp.domain.course.Revision
@@ -77,7 +78,7 @@ class SourceEditing @Inject constructor(
 
         // Прошлое до правки: неответ, чей день кончился, — пропуск, иначе перестройка вернула бы его в план.
         calendar.missOverdue(before, now)
-        val progress = CourseCalendar.progressOf(intakes.ofCourse(id).filterIsInstance<CourseIntake>())
+        val progress = CourseProgress.of(intakes.ofCourse(id).filterIsInstance<CourseIntake>())
         val required = course.remainingDoses(progress)
         val availability = calendar.availabilityOf(course)
         // Предел нарушает прежде всего та пачка, которой прибавили: её человек и двигал.

@@ -50,6 +50,11 @@ interface IntakeDao {
     )
     suspend fun takenBetween(from: Instant, until: Instant): List<IntakeStorageRow>
 
+    /** Пункты нескольких курсов — порцией, которую называет вызывающий (`chunkedForQuery`). */
+    @Transaction
+    @Query("SELECT * FROM intakes WHERE course_id IN (:courseIds) ORDER BY scheduled_at")
+    suspend fun ofCourses(courseIds: List<Uuid>): List<IntakeStorageRow>
+
     @Upsert
     suspend fun upsert(intake: IntakeStorageEntity)
 

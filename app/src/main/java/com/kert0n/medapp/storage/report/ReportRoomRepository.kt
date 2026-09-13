@@ -3,7 +3,12 @@ package com.kert0n.medapp.storage.report
 import androidx.room.withTransaction
 import com.kert0n.medapp.domain.intake.CourseIntake
 import com.kert0n.medapp.domain.intake.Intake
+import com.kert0n.medapp.domain.course.CourseProgress
+import com.kert0n.medapp.domain.course.CourseRecordProjection
+import com.kert0n.medapp.domain.report.FutureSpending
 import com.kert0n.medapp.domain.report.Spending
+import com.kert0n.medapp.domain.report.SpendingHorizon
+import com.kert0n.medapp.domain.value.Vocabulary
 import com.kert0n.medapp.domain.report.SpendingPeriod
 import com.kert0n.medapp.storage.course.CourseDao
 import com.kert0n.medapp.storage.database.MedAppDatabase
@@ -31,16 +36,40 @@ class ReportRoomRepository @Inject constructor(
         val words = vocabulary.snapshot()
         val taken = intakes.takenBetween(period.startsAt(zone), period.endsBefore(zone)).map { it.toDomain(words) }
         val episodeIds = taken.mapNotNull { it.courseIdOrNull() }.distinct()
-        val records = episodeIds.chunkedForQuery()
+        Spending.of(taken, recordsOf(episodeIds, words))
+    }
+
+    override fun observeFutureSpending(horizon: SpendingHorizon): Flow<FutureSpending> =
+        database.invalidationTracker.createFlow(*PLAN_TABLES).map {
+            database.withTransaction {
+                val words = vocabulary.snapshot()
+                val plans = plans(words)
+                FutureSpending.of(plans, recordsOf(plans.map { it.course.id }, words), horizon)
+            }
+        }
+
+    /** Идущие лечения с их прогрессом: пункты всех курсов — порциями, а не по курсу. */
+    private suspend fun plans(words: Vocabulary): List<FutureSpending.Plan> {
+        val courses = this.courses.plans().map { it.toPlan(words) }
+        val intakesByCourse = courses.map { it.id }.chunkedForQuery()
+            .flatMap { intakes.ofCourses(it) }
+            .map { it.toDomain(words) as CourseIntake }
+            .groupBy { it.courseId }
+        return courses.map { FutureSpending.Plan(it, CourseProgress.of(intakesByCourse[it.id].orEmpty())) }
+    }
+
+    private suspend fun recordsOf(ids: List<Uuid>, words: Vocabulary): Map<Uuid, CourseRecordProjection> =
+        ids.distinct().chunkedForQuery()
             .flatMap { courses.recordsAmong(it) }
             .associate { it.record.id to it.toDomain(words).projection() }
-        Spending.of(taken, records)
-    }
 
     private fun Intake.courseIdOrNull(): Uuid? = (this as? CourseIntake)?.courseId
 
     private companion object {
         /** Из чего складывается истраченное: приёмы, записи эпизодов и записи о коробках. */
         val SPENDING_TABLES = arrayOf("intakes", "course_records", "course_times", "package_records")
+
+        /** Из чего складывается расход идущих лечений: планы, их времена и пункты, записи эпизодов. */
+        val PLAN_TABLES = arrayOf("courses", "course_times", "course_sources", "intakes", "course_records", "package_records")
     }
 }

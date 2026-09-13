@@ -1,5 +1,6 @@
 package com.kert0n.medapp.feature.course
 
+import com.kert0n.medapp.domain.course.CourseProgress
 import com.kert0n.medapp.domain.course.Course
 import com.kert0n.medapp.domain.intake.CourseIntake
 import com.kert0n.medapp.domain.pack.Package
@@ -37,7 +38,7 @@ class CourseClamping @Inject constructor(
     suspend fun clampTheCourseHolding(pkg: Package, after: Quantity, now: Instant) {
         val course = courses.courseHolding(pkg.id)?.let { courses.openPlan(it) } ?: return
         calendar.missOverdue(course, now)
-        val progress = CourseCalendar.progressOf(intakes.ofCourse(course.id).filterIsInstance<CourseIntake>())
+        val progress = CourseProgress.of(intakes.ofCourse(course.id).filterIsInstance<CourseIntake>())
         val availability = calendar.availabilityOf(course).with(pkg.ref, after)
         val clamped = course.clamped(course.remainingDoses(progress), availability, now)
         if (clamped === course) return

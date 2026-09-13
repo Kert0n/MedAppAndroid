@@ -5,7 +5,9 @@ import androidx.test.ext.junit.runners.AndroidJUnit4
 import com.kert0n.medapp.domain.course.CourseDraft
 import com.kert0n.medapp.domain.intake.CourseIntake
 import com.kert0n.medapp.domain.intake.TakenDose
+import com.kert0n.medapp.domain.report.FutureSpending
 import com.kert0n.medapp.domain.report.Spending
+import com.kert0n.medapp.domain.report.SpendingHorizon
 import com.kert0n.medapp.domain.report.SpendingPeriod
 import com.kert0n.medapp.domain.value.Doses
 import com.kert0n.medapp.feature.course.CourseDrafting
@@ -177,6 +179,43 @@ class ReportRoomRepositoryTest {
         database.courseRepository().rename(id, "Парацетамол от простуды", null)
 
         assertEquals("Парацетамол от простуды", spent().episodes.single().record.title)
+    }
+
+    private suspend fun future(until: Int): FutureSpending =
+        reports.observeFutureSpending(SpendingHorizon(LocalDate.of(2027, 3, 10), LocalDate.of(2027, 3, until))).first()
+
+    /**
+     * Сегодня 10 марта, 15:00; утренний пункт не отвечен — он ещё состоится. С 10 по 12 марта —
+     * три дозы; принятый сегодня пункт уходит из расчёта, и на те же дни остаётся две.
+     */
+    @Test
+    fun futureSpendingCountsTheDosesStillAheadFromTheStartOfToday() = runTest {
+        val id = treated()
+        assertEquals(FutureSpending.Episode(requireNotNull(database.courseRepository().findRecord(id)).projection(), Doses(3), tablets("6")),
+            future(12).episodes.single())
+
+        scenarios.intakeConfirmation.confirm(items(id).first().id, PACK, dose("2"), now).getOrThrow()
+
+        assertEquals(Doses(2), future(12).episodes.single().doses)
+        // Лечение пять доз: одна принята, до конца месяца осталось четыре, а не двадцать один день.
+        assertEquals(tablets("8"), future(31).episodes.single().total)
+    }
+
+    /** Нехватка расчёт не режет: курс обещает дозы, а не их обеспечение (H6). */
+    @Test
+    fun futureSpendingIsNotCutByShortage() = runTest {
+        treated()
+        scenarios.packageAdjusting.adjust(PACK, PackageAdjusting.Action.Recount(seen = tablets("20"), actual = tablets("1")))
+
+        assertEquals(tablets("6"), future(12).episodes.single().total)
+    }
+
+    @Test
+    fun aCancelledCourseHasNoFutureSpending() = runTest {
+        val id = treated()
+        scenarios.courseCancellation.cancel(id)
+
+        assertTrue(future(31).isEmpty)
     }
 
     /** Пустая база — пустой отчёт и одно чтение приёмов, без чтения записей. */
