@@ -151,4 +151,27 @@ class PackageDescribingTest {
         assertEquals(PackageDescribing.Outcome.GONE, describing.describe(Uuid.random(), factsOf(pack())))
         assertNull(database.packageRepository().find(PACK))
     }
+
+    /**
+     * Пока сервер о коробке не знает — её создание только уехало, — правка сведений остаётся у нас
+     * и командой не едет: менять у сервера нечего, а нынешние сведения увезёт то же создание,
+     * собранное по прочитанной коробке (PLAN E6, замечание разбора #24).
+     */
+    @Test
+    fun anEditOfABoxTheServerDoesNotKnowYetStaysLocal() = runTest {
+        database.medKits().upsert(
+            medKit(id = SHARED_KIT, publication = MedKit.Publication.PUBLISHED, participantCount = 2).toMedKitStorageEntity()
+        )
+        database.packageRepository().add(
+            pack(medKit = medKit(id = SHARED_KIT, publication = MedKit.Publication.PUBLISHED).ref, quantity = tablets("20"), form = TABLET_FORM)
+        )
+
+        val outcome = describing.describe(PACK, factsOf(requireNotNull(database.packageRepository().find(PACK))).withShared(name = "Панадол"))
+
+        assertEquals(PackageDescribing.Outcome.SAVED, outcome)
+        val stored = requireNotNull(database.packageRepository().find(PACK))
+        assertEquals("Панадол", stored.name)
+        assertEquals(PackageStatus.ACTIVE, stored.status)
+        assertTrue(commands().isEmpty())
+    }
 }

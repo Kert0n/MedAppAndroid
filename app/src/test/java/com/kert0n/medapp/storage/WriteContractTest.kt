@@ -70,6 +70,7 @@ class WriteContractTest {
         "PackageStorageRepository.list" to (Shape.READ by "(PackageQuery, LocalDate): Flow<List<PackageProjection>>"),
         "PackageStorageRepository.contentsOf" to (Shape.READ by "(Uuid): List<Package>"),
         "PackageStorageRepository.observeSyncState" to (Shape.READ by "(Uuid): Flow<PackageSyncState>"),
+        "PackageStorageRepository.answersToServer" to (Shape.READ by "(Uuid): Boolean"),
         "PackageStorageRepository.add" to (Shape.CREATION by "(Package, PackageSyncState): Unit"),
         "PackageStorageRepository.describe" to (Shape.NAMED_FIELDS by "(Uuid, PackageFacts): Boolean"),
         "PackageStorageRepository.saveClaims" to (Shape.NAMED_FIELDS by "(Uuid, Claims): Unit"),

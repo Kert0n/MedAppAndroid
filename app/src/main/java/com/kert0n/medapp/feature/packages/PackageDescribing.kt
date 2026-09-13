@@ -39,7 +39,7 @@ class PackageDescribing @Inject constructor(
         if (!pkg.status.allowsUse) return@run Outcome.UNUSABLE
         val before = pkg.facts.shared
         val after = facts.shared
-        val announced = pkg.medKit.answersToServer && before != after
+        val announced = packages.answersToServer(packageId) && before != after
         if (announced && before.form != null && after.form == null) return@run Outcome.FORM_CLEAR_UNSUPPORTED
         val now = clock.instant()
         // Личная правка серверу не едет, и команды у неё нет: «есть ли команда» и «уехало ли

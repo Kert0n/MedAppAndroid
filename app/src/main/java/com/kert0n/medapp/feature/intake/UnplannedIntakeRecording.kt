@@ -53,7 +53,7 @@ class UnplannedIntakeRecording @Inject constructor(
     ): Outcome = transactions.run {
         val pkg = packages.find(packageId) ?: return@run Outcome.Rejected(IntakeRejected.Reason.PACKAGE_UNUSABLE)
         val taken = pkg.take(amount, at).getOrElse { return@run Outcome.Rejected((it as IntakeRejected).reason) }
-        val spendsLocally = !pkg.medKit.answersToServer
+        val spendsLocally = !packages.answersToServer(packageId)
         if (spendsLocally && !pkg.quantity.covers(amount)) return@run Outcome.Rejected(IntakeRejected.Reason.INSUFFICIENT)
         // Занятое — моё выделение и чужие брони, посчитанные от того же числа, которое человек
         // видит на экране: решает он по нему (PLAN D4).
@@ -70,7 +70,9 @@ class UnplannedIntakeRecording @Inject constructor(
             IntakeSyncState(intake.id, IntakeAccounting.PENDING, consume.id)
         }
         val outcome = IntakeOutcome(intake, expected = emptySet(), sync = sync, recordedAt = now)
-        val recorded = queue.change(pkg.medKit, listOf(consume), now) { intakes.record(outcome) }
+        // Местному расходу везти нечего: сервер о коробке не знает — расскажет о ней её создание (E6).
+        val commands = if (spendsLocally) emptyList() else listOf(consume)
+        val recorded = queue.change(pkg.medKit, commands, now) { intakes.record(outcome) }
         check(recorded) { "пачка прочитана этой же транзакцией" }
 
         // Что осталось — то же, что увидит человек: на своей полке расход уже списан, на общей он

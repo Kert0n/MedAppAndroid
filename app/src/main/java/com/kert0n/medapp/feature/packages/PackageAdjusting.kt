@@ -42,7 +42,7 @@ class PackageAdjusting @Inject constructor(
         val pkg = packages.find(packageId) ?: return@run Outcome.GONE
         if (!pkg.status.allowsUse) return@run Outcome.UNUSABLE
         val now = clock.instant()
-        val ended = if (pkg.medKit.answersToServer) announce(pkg, action, now) else apply(pkg, action, now)
+        val ended = if (packages.answersToServer(packageId)) announce(pkg, action, now) else apply(pkg, action, now)
         // Кончившуюся коробку лечение уже потеряло своей дверью; кончающуюся на полке потеряет
         // ответ. Зажимать есть что только у оставшейся — и по тому же числу, что на экране (D4).
         val after = if (ended) null else packages.projection(pkg.id)?.availability

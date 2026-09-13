@@ -95,8 +95,15 @@ class IntakeConfirmationTest {
         database.close()
     }
 
-    private suspend fun publishHomeKit() =
+    /**
+     * Полка общая, и коробка на ней серверу известна: версию ей дал ответ на её создание. Без
+     * версии коробка на общей полке — та, о которой сервер ещё не слышал, и расход из неё местный
+     * (PLAN E6).
+     */
+    private suspend fun publishHomeKit() {
         database.medKits().upsert(medKit(publication = MedKit.Publication.PUBLISHED).toMedKitStorageEntity())
+        database.packages().setVersion(PACK, 4)
+    }
 
     /** Курс на [totalDoses] доз по две таблетки из PACK; выделено столько же, но не больше пяти. */
     private suspend fun activate(totalDoses: Int = 7, planned: List<CourseIntake> = listOf(plannedIntake())) {

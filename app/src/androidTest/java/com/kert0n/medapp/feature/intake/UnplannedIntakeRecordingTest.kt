@@ -224,4 +224,30 @@ class UnplannedIntakeRecordingTest {
         assertEquals(tablets("4"), requireNotNull(database.packageRepository().projection(PACK)).availability.effective)
         assertEquals(Doses(4), allocated())
     }
+
+    /**
+     * Коробка лежит на общей полке, но сервер о ней ещё не знает: её создание только уехало.
+     * Расход из неё местный — число меняется сразу, команды не ставятся, — а расскажет о нём то же
+     * создание, собранное по прочитанной коробке (PLAN E6).
+     *
+     * Красная проверка: пока «отвечает ли коробка серверу» спрашивали только у полки, расход
+     * уезжал командой; отказ создания — целевой полки не стало, пока команда ждала связи — закрывал
+     * его каскадом, и выпитая таблетка пропадала из счёта.
+     */
+    @Test
+    fun anIntakeFromABoxTheServerDoesNotKnowYetIsLocal() = runTest {
+        database.medKits().upsert(
+            medKit(id = SHARED_KIT, publication = MedKit.Publication.PUBLISHED, participantCount = 2).toMedKitStorageEntity()
+        )
+        // Обвязки нет: первое подтверждённое число даст ответ на создание (PLAN E1).
+        database.packageRepository().add(
+            pack(medKit = medKit(id = SHARED_KIT, publication = MedKit.Publication.PUBLISHED).ref, quantity = tablets("20"), form = TABLET_FORM)
+        )
+
+        val outcome = recording.record(PACK, dose("1"), LATER)
+
+        assertEquals(IntakeAccounting.LOCAL_APPLIED, (outcome as UnplannedIntakeRecording.Outcome.Recorded).accounting)
+        assertEquals(tablets("19"), requireNotNull(database.packageRepository().find(PACK)).quantity)
+        assertTrue(commands().none { it is PackageSyncCommand.Consume })
+    }
 }
