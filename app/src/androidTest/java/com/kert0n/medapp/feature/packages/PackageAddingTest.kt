@@ -107,7 +107,7 @@ class PackageAddingTest {
         assertEquals(PackageStatus.CHANGING, stored.status)
         assertEquals("от головы", stored.facts.note)
         assertEquals(
-            listOf(PackageSyncCommand.Create(id, SHARED_KIT, tablets("30"), facts.shared)),
+            listOf(PackageSyncCommand.Create(id, SHARED_KIT)),
             commands()
         )
         // Помеченной `CHANGING` пользуются: расход из неё возможен.

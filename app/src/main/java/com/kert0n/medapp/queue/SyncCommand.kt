@@ -1,5 +1,8 @@
 package com.kert0n.medapp.queue
 
+import com.kert0n.medapp.queue.medkit.MedKitSyncCommand
+import com.kert0n.medapp.queue.pack.PackageSyncCommand
+
 /**
  * Общий маркер команды очереди. Обычный интерфейс, а не `sealed`: корней два, по понятиям —
  * `PackageSyncCommand` и `MedKitSyncCommand`, — потому что деление по понятиям важнее одного
@@ -20,3 +23,11 @@ interface SyncCommand {
  * новое понятие и забыли про остальных — исчерпывающего `when` у маркера нет (PLAN E2).
  */
 fun SyncCommand.unknownRoot(): Nothing = error("команда неизвестного корня: ${this::class.simpleName}")
+
+/**
+ * Объявляет ли команда вещь серверу впервые. Таких две — создание коробки и публикация полки, — и
+ * только они едут к полке, которую сервер ещё не завёл: всё остальное меняет уже известное, а
+ * менять у сервера нечего, пока он о вещи не слышал (PLAN E5).
+ */
+val SyncCommand.announcesToServer: Boolean
+    get() = this is PackageSyncCommand.Create || this is MedKitSyncCommand.Publish

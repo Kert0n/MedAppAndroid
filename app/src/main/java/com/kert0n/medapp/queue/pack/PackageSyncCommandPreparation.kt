@@ -41,6 +41,11 @@ fun PackageSyncCommand.prepare(operationId: Uuid, pkg: Package, sync: PackageSyn
         this is PackageSyncCommand.SetClaim && mine == amount -> Preparation.AlreadyApplied
         this is PackageSyncCommand.ReleaseClaim && mine == null && sync.claimsVersion != null -> Preparation.AlreadyApplied
         this is PackageSyncCommand.CorrectStock && conflictsWith(pkg.quantity) -> Preparation.Refuse(RefusalReason.CONFLICT)
+        // Создание рассказывает серверу о коробке, какая она сейчас: до ответа она местная, и
+        // сделанное с ней после решения уже в этом числе и в этих сведениях (PLAN E6).
+        this is PackageSyncCommand.Create -> Preparation.Request(
+            toPreparedRequest(operationId, sync, confirmed = pkg.quantity, mine = mine, at = at, known = pkg.facts.shared)
+        )
         this is PackageSyncCommand.Describe -> when (val merged = onto(pkg.facts.shared)) {
             null -> Preparation.Refuse(RefusalReason.CONFLICT)
             pkg.facts.shared -> Preparation.AlreadyApplied
@@ -61,7 +66,9 @@ fun PackageSyncCommand.prepare(operationId: Uuid, pkg: Package, sync: PackageSyn
  * Расход — всегда `sync` под [operationId]: у него есть номер, и повтор под ним сервер применит
  * один раз; внеплановый расход — тот же `sync` без блока брони (решение владельца, B4).
  * Пересчёт везёт [confirmed] с разницей человека; итог ноль — `DELETE`: это форма провода, а не
- * смысл команды. Правка сведений везёт свои поля поверх [known] — того, что у сервера сейчас.
+ * смысл команды. Правка сведений везёт свои поля поверх [known] — того, что у сервера сейчас, — а
+ * создание везёт [confirmed] и [known] как есть: у сервера этой коробки нет, и поверх нечего
+ * класть (PLAN E6).
  */
 fun PackageSyncCommand.toPreparedRequest(
     operationId: Uuid,
@@ -74,25 +81,29 @@ fun PackageSyncCommand.toPreparedRequest(
     val version = sync.version
     val claimsVersion = sync.claimsVersion
     return when (this) {
-        is PackageSyncCommand.Create -> prepared(
-            method = "POST",
-            path = MedAppRoutes.packagesOf(medKitId),
-            body = medAppJson.encodeToString(
-                PackagePostNetworkDTO.serializer(),
-                PackagePostNetworkDTO(
-                    id = packageId,
-                    name = facts.name,
-                    amount = quantity.toNetworkAmount(),
-                    unitId = quantity.unit.id,
-                    formId = facts.form?.id,
-                    category = facts.category,
-                    manufacturer = facts.manufacturer,
-                    country = facts.country,
-                    description = facts.description
-                )
-            ),
-            sync = sync, confirmed = confirmed, mine = mine, at = at
-        )
+        is PackageSyncCommand.Create -> {
+            val amount = requireNotNull(confirmed) { "создание готовится по прочитанному остатку" }
+            val facts = requireNotNull(known) { "создание готовится по прочитанным сведениям" }
+            prepared(
+                method = "POST",
+                path = MedAppRoutes.packagesOf(medKitId),
+                body = medAppJson.encodeToString(
+                    PackagePostNetworkDTO.serializer(),
+                    PackagePostNetworkDTO(
+                        id = packageId,
+                        name = facts.name,
+                        amount = amount.toNetworkAmount(),
+                        unitId = amount.unit.id,
+                        formId = facts.form?.id,
+                        category = facts.category,
+                        manufacturer = facts.manufacturer,
+                        country = facts.country,
+                        description = facts.description
+                    )
+                ),
+                sync = sync, confirmed = confirmed, mine = mine, at = at
+            )
+        }
         is PackageSyncCommand.Describe -> {
             val theirs = requireNotNull(known) { "правка сведений готовится по прочитанным сведениям" }
             prepared(

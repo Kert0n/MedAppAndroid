@@ -71,9 +71,9 @@ class MedKitRemoval @Inject constructor(
         }
         val target = (fate as? Fate.MoveTo)?.let { medKits.find(it.medKitId) ?: return@run Outcome.TARGET_GONE }
         if (target != null && target.id == medKit.id) return@run Outcome.TARGET_IS_THE_SAME
-        // В полку, о которой уже принято решение, не кладут: она вот-вот уйдёт, и коробки ушли бы
-        // с ней (PLAN E1, E6).
-        if (target != null && !target.status.allowsUse) return@run Outcome.TARGET_BUSY
+        // В полку, о которой уже принято решение, не кладут: она вот-вот уйдёт или уже рассказала
+        // серверу о своём содержимом (PLAN E1, E5, E6).
+        if (target != null && !target.status.allowsDecision) return@run Outcome.TARGET_BUSY
         if (medKit.answersToServer && target != null && !target.answersToServer) {
             val contents = packages.contentsOf(medKitId)
             // Коробку, которая ждёт своего ответа, унести нечем, а полка уйдёт у всех — и унесёт

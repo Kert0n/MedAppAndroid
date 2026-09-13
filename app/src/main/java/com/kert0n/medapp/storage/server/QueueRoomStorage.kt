@@ -178,7 +178,7 @@ class QueueRoomStorage @Inject constructor(
 
     private suspend fun apply(id: Uuid, effect: Settlement.Effect, at: Instant) {
         when (effect) {
-            is Settlement.Effect.LayDown -> layDown(effect.snapshot, at, carried = withdrawalOf(id)?.carried)
+            is Settlement.Effect.LayDown -> layDown(effect.snapshot, at, carried = sentFrom(id))
             // Коробки у нас больше нет; переход приносит пачка (PLAN D3).
             is Settlement.Effect.PackageEnded -> ended(effect.packageId, at)
             // Полку разобрали или из неё вышли: до согласия сервера ничего не трогали, и всё
@@ -221,6 +221,22 @@ class QueueRoomStorage @Inject constructor(
 
     private suspend fun withdrawalOf(id: Uuid): PackageSyncCommand.Withdraw? =
         operationOf(id)?.command as? PackageSyncCommand.Withdraw
+
+    /**
+     * Число, от которого команда считала, когда уходила, — если сделанное дома после неё нужно
+     * перенести на ответ полки (PLAN E6). Таких команд две, и обе о границе публикации: «унёс
+     * домой» помнит его сама, а создание — в замороженном запросе, потому что до ответа коробка
+     * местная и человек волен из неё принимать. Остальным командам сводить нечего: их коробку
+     * сервер уже знает, и его ответ и есть истина.
+     */
+    private suspend fun sentFrom(id: Uuid): Quantity? {
+        val operation = operationOf(id) ?: return null
+        return when (operation.command) {
+            is PackageSyncCommand.Withdraw -> (operation.command as PackageSyncCommand.Withdraw).carried
+            is PackageSyncCommand.Create -> operation.prepared?.quantityBefore
+            else -> null
+        }
+    }
 
     /**
      * Унести домой не вышло: коробка возвращается на полку, откуда её взяли. Той полки уже нет —
@@ -338,9 +354,11 @@ class QueueRoomStorage @Inject constructor(
         medKits.loseAccess(medKitId, packages, courses, vocabulary.snapshot(), at)
 
     /**
-     * Разрешённый снимок поверх подтверждённого остатка и броней; разрешать здесь нечего. Коробка,
-     * которую не вышло унести ([carried] — с чем уносили), уже вернулась на полку: число полки
-     * ложится, и сделанное дома после решения переносится на него (PLAN E6).
+     * Разрешённый снимок поверх подтверждённого остатка и броней; разрешать здесь нечего.
+     * [carried] — число, от которого команда считала, когда уходила: у «унёс домой» это то, с чем
+     * уносили, у создания — то, что ушло на провод. В обоих случаях коробка до ответа была
+     * местной, человек мог из неё принять, и сделанное после отправки переносится на число полки
+     * (PLAN E6).
      */
     private suspend fun layDown(snapshot: PackageSnapshot, at: Instant, carried: Quantity? = null) {
         val words = vocabulary.snapshot()

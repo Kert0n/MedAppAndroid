@@ -48,11 +48,15 @@ class PackageRelocation @Inject constructor(
     suspend fun move(packageId: Uuid, targetMedKitId: Uuid): Outcome = transactions.run {
         val pkg = packages.find(packageId) ?: return@run Outcome.GONE
         if (!pkg.status.allowsUse) return@run Outcome.UNUSABLE
+        // С полки, о которой принято решение, не переносят: её публикация уже назвала серверу своё
+        // содержимое, и коробка, ушедшая из-под неё, оказалась бы у сервера мимо своего создания —
+        // или ушла бы вместе с уборкой. Человек либо ждёт ответа, либо решает о полке заново (E5).
+        if (!pkg.medKit.status.allowsDecision) return@run Outcome.ORIGIN_BUSY
         val target = medKits.find(targetMedKitId) ?: return@run Outcome.TARGET_GONE
         if (target.id == pkg.medKit.id) return@run Outcome.TARGET_IS_THE_SAME
-        // В полку, о которой уже принято решение, не кладут: она вот-вот уйдёт, и коробка ушла бы
-        // с ней, ничего человеку не сказав (PLAN E1, E6).
-        if (!target.status.allowsUse) return@run Outcome.TARGET_BUSY
+        // В полку, о которой уже принято решение, не кладут: она вот-вот уйдёт или уже рассказала
+        // серверу о своём содержимом, ничего человеку не сказав (PLAN E1, E5, E6).
+        if (!target.status.allowsDecision) return@run Outcome.TARGET_BUSY
         relocate(pkg, target, clock.instant())
     }
 
@@ -153,13 +157,7 @@ class PackageRelocation @Inject constructor(
             Uuid.random(),
             // Откуда коробку принесли: не вышло — она вернётся туда. Если её никуда не несли, а
             // общей стала полка под ней, возвращать некуда (PLAN E6).
-            PackageSyncCommand.Create(
-                pkg.id,
-                to.id,
-                pkg.quantity,
-                pkg.facts.shared,
-                pkg.medKit.id.takeIf { originSurvives && it != to.id }
-            ),
+            PackageSyncCommand.Create(pkg.id, to.id, pkg.medKit.id.takeIf { originSurvives && it != to.id }),
             dependsOn = after
         )
         val claim = courses.courseHolding(pkg.id)
@@ -185,7 +183,10 @@ class PackageRelocation @Inject constructor(
      * Чем кончилось. Переставили — экран показывает новую полку; пометили — коробка остаётся на
      * прежней и ждёт ответа сервера; коробки уже нет — закрывает молча; цели нет — просит выбрать
      * другую; та же полка — говорит об этом; коробка ждёт удаления или выхода — трогать её нельзя;
-     * целевая полка сама ждёт ответа — класть в неё рано (PLAN E1, E6).
+     * целевая полка сама ждёт ответа — класть в неё рано; полка, с которой несут, ждёт ответа на
+     * своё решение — переносить из неё рано (PLAN E1, E5, E6).
      */
-    enum class Outcome { MOVED, MARKED, GONE, UNUSABLE, TARGET_GONE, TARGET_IS_THE_SAME, TARGET_BUSY }
+    enum class Outcome {
+        MOVED, MARKED, GONE, UNUSABLE, ORIGIN_BUSY, TARGET_GONE, TARGET_IS_THE_SAME, TARGET_BUSY
+    }
 }

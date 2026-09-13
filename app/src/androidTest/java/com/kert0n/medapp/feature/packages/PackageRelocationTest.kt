@@ -134,7 +134,9 @@ class PackageRelocationTest {
         val create = queued[0] as PackageSyncCommand.Create
         assertEquals(PACK, create.packageId)
         assertEquals(SHARED_KIT, create.medKitId)
-        assertEquals(tablets("20"), create.quantity)
+        // Числа команда не носит: его прочитают у коробки при взятии — тем, каким оно станет к
+        // отправке, а не каким было в миг решения (PLAN E6).
+        assertEquals(HOME_KIT, create.fromMedKitId)
         val claim = queued[1] as PackageSyncCommand.SetClaim
         assertEquals(tablets("10"), claim.amount)
         assertEquals(2, queued.size)

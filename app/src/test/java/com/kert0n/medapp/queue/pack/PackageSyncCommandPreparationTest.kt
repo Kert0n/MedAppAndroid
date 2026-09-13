@@ -156,8 +156,11 @@ class PackageSyncCommandPreparationTest {
         assertEquals(mapOf("version" to "3"), withdraw.query)
         assertEquals("DELETE /v1/reservations/$PACK", PackageSyncCommand.ReleaseClaim(PACK).prepared().let { "${it.method} ${it.path}" })
         val facts = PackageSharedFacts("Парацетамол", TABLET_FORM)
-        val create = PackageSyncCommand.Create(PACK, HOME_KIT, tablets("20"), facts).prepared()
+        // Создание собирается по прочитанной коробке: число и сведения приходят аргументами (E6).
+        val create = PackageSyncCommand.Create(PACK, HOME_KIT).prepared(known = facts)
         assertEquals("POST /v1/med-kits/$HOME_KIT/drugs", "${create.method} ${create.path}")
+        assertTrue(create.body!!.contains("\"quantity\":\"20\""))
+        assertTrue(create.body!!.contains("\"name\":\"Парацетамол\""))
         val describe = PackageSyncCommand.Describe(PACK, facts, facts.copy(category = "жар")).prepared(known = facts)
         assertEquals("PATCH", describe.method)
         assertTrue(describe.body!!.contains("\"category\":\"жар\""))
@@ -171,6 +174,6 @@ class PackageSyncCommandPreparationTest {
         assertEquals(Expected.SNAPSHOT_OR_GONE, PackageSyncCommand.CorrectStock(PACK, tablets("20"), tablets("5")).expects)
         assertEquals(Expected.CLAIM, PackageSyncCommand.SetClaim(PACK, tablets("6")).expects)
         assertEquals(Expected.NOTHING, PackageSyncCommand.Delete(PACK).expects)
-        assertEquals(Expected.SNAPSHOT, PackageSyncCommand.Create(PACK, HOME_KIT, tablets("5"), PackageSharedFacts("Парацетамол", TABLET_FORM)).expects)
+        assertEquals(Expected.SNAPSHOT, PackageSyncCommand.Create(PACK, HOME_KIT).expects)
     }
 }

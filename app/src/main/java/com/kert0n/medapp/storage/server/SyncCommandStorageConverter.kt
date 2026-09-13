@@ -34,12 +34,18 @@ object SyncCommandStorageConverter {
      * Версия формата payload, которой пишутся новые строки. Незавершённые операции переживают
      * обновление приложения: неизвестную версию работник пропускает и называет, а не роняет
      * процесс (PLAN F4). Версия 2 — пересчёт стал разницей `seen → actual` (C1); прежний нёс одно
-     * абсолютное число, и увиденного человеком из него не восстановить.
+     * абсолютное число, и увиденного человеком из него не восстановить. Версия 3 — создание
+     * перестало носить количество и сведения: они читаются у коробки при взятии, а записанные
+     * в миг решения успевали устареть (E6).
      */
-    const val PAYLOAD_VERSION = 2
+    const val PAYLOAD_VERSION = 3
 
     /** С какой версии вид пишется нынешним форматом; остальные виды с версии 1 не менялись. */
-    private fun currentSince(kind: String): Int = if (kind == PACKAGE_CORRECT_STOCK) 2 else 1
+    private fun currentSince(kind: String): Int = when (kind) {
+        PACKAGE_CORRECT_STOCK -> 2
+        PACKAGE_CREATE -> 3
+        else -> 1
+    }
 
     fun kindOf(command: SyncCommand): String = when (command) {
         is PackageSyncCommand -> when (command) {
@@ -117,8 +123,6 @@ object SyncCommandStorageConverter {
         PACKAGE_CREATE -> PackageSyncCommand.Create(
             packageId = fields.uuid("packageId"),
             medKitId = fields.uuid("medKitId"),
-            quantity = fields.quantity("quantity", vocabulary),
-            facts = fields.facts(vocabulary),
             fromMedKitId = if (fields.containsKey("fromMedKitId")) fields.uuid("fromMedKitId") else null
         )
         PACKAGE_DESCRIBE -> PackageSyncCommand.Describe(
@@ -169,9 +173,6 @@ object SyncCommandStorageConverter {
             is PackageSyncCommand.Create -> {
                 put("medKitId", JsonPrimitive(command.medKitId.toString()))
                 command.fromMedKitId?.let { put("fromMedKitId", JsonPrimitive(it.toString())) }
-                putQuantity("quantity", command.quantity)
-                put("name", JsonPrimitive(command.facts.name))
-                putFacts(command.facts)
             }
             is PackageSyncCommand.Describe -> {
                 put("before", factsObject(command.before))

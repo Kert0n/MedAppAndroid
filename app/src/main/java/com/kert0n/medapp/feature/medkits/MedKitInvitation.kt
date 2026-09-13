@@ -33,7 +33,9 @@ class MedKitInvitation @Inject constructor(
 
     suspend fun invite(medKitId: Uuid): Outcome {
         val medKit = medKits.find(medKitId) ?: return Outcome.MedKitGone
-        if (!medKit.answersToServer) return Outcome.NotShared
+        // Полка, которая к серверу только едет, местной не считается: решение о ней уже принято, и
+        // человеку остаётся дождаться ответа, а не публиковать её заново (PLAN E5).
+        if (!medKit.acceptsCommands) return Outcome.NotShared
         if (!medKit.acceptsInvitations) return Outcome.Busy
         return when (val issue = invitations.issue(medKit)) {
             is MedKitInvitations.Issue.Issued -> Outcome.Invited(Invitation(issue.key, clock.instant(), term))

@@ -12,6 +12,7 @@ import com.kert0n.medapp.fixture.millilitres
 import com.kert0n.medapp.fixture.dose
 import com.kert0n.medapp.fixture.tablets
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertNull
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNotEquals
 import org.junit.Assert.assertThrows
@@ -46,7 +47,7 @@ class PackageSyncCommandTest {
     fun everyCommandNamesItsPackage() {
         // Поле корня, а не разбор вариантов: строка очереди называет пачку своей колонкой.
         val commands: List<PackageSyncCommand> = listOf(
-            PackageSyncCommand.Create(PACK, HOME_KIT, tablets("20"), paracetamol),
+            PackageSyncCommand.Create(PACK, HOME_KIT),
             PackageSyncCommand.Describe(PACK, paracetamol, paracetamol.copy(country = "Украина")),
             PackageSyncCommand.CorrectStock(PACK, tablets("20"), tablets("19")),
             PackageSyncCommand.Move(PACK, SHARED_KIT),
@@ -139,19 +140,18 @@ class PackageSyncCommandTest {
     }
 
     @Test
-    fun packageIsCreatedWithAPositiveStock() {
-        // Пачка, которой нет, не заводится — и в доменном сценарии, и в POST-DTO.
+    fun creationCarriesNeitherStockNorFacts() {
+        // Число и сведения команда не носит: до ответа коробка местная, человек волен из неё
+        // принимать и править её, и замороженная копия успела бы устареть. Тело собирается по
+        // прочитанной коробке при взятии (PLAN E6).
+        val command = PackageSyncCommand.Create(PACK, HOME_KIT)
+        assertEquals(PACK, command.packageId)
+        assertEquals(HOME_KIT, command.medKitId)
+        assertNull(command.fromMedKitId)
+        // Коробку, которую принесли с этой же полки, объявлять некуда: возвращать было бы туда же.
         assertThrows(IllegalArgumentException::class.java) {
-            PackageSyncCommand.Create(PACK, HOME_KIT, tablets("0"), paracetamol)
+            PackageSyncCommand.Create(PACK, HOME_KIT, fromMedKitId = HOME_KIT)
         }
-    }
-
-    @Test
-    fun creationCarriesOnlyWhatCrossesTheBoundary() {
-        // Личных сведений в команде нет по типу: срок годности, заметка и цена остаются на
-        // устройстве, и «забыть» их в маппере невозможно (PLAN C0).
-        val command = PackageSyncCommand.Create(PACK, HOME_KIT, tablets("20"), paracetamol)
-        assertEquals(paracetamol, command.facts)
     }
 
     @Test
