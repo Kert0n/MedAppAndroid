@@ -156,6 +156,9 @@ class Scenarios(database: MedAppDatabase, now: java.time.Instant) {
     val courseAmendment = com.kert0n.medapp.feature.course.CourseAmendment(
         courses, database.intakeRepository(), packages, courseCalendar, courseClosing, queue, transactions, clock
     )
+    val sourceEditing = com.kert0n.medapp.feature.course.SourceEditing(
+        courses, database.intakeRepository(), packages, courseCalendar, queue, transactions, clock
+    )
     val intakeConfirmation = com.kert0n.medapp.feature.intake.IntakeConfirmation(
         database.intakeRepository(), courses, packages, transactions, queue, courseClosing, clock
     )
