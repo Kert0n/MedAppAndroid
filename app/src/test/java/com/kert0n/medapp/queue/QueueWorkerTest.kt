@@ -24,6 +24,8 @@ import com.kert0n.medapp.fixture.TABLET_FORM
 import com.kert0n.medapp.fixture.dose
 import com.kert0n.medapp.fixture.tablets
 import com.kert0n.medapp.network.pack.PackageSnapshotNetworkDTO
+import com.kert0n.medapp.queue.medkit.MedKitSyncCommand
+import com.kert0n.medapp.queue.medkit.toPreparedRequest
 import com.kert0n.medapp.queue.pack.PackageSyncCommand
 import com.kert0n.medapp.network.pack.PackageSyncState
 import com.kert0n.medapp.queue.pack.toPreparedRequest
@@ -137,10 +139,15 @@ class QueueWorkerTest {
             fresh?.let(::learn)
             val prepared = operation.prepared ?: run {
                 frozen++
-                when (val prepared = (operation.command as PackageSyncCommand).prepare(operation.id, knownPack, known, at)) {
-                    is Preparation.Request -> prepared.request
-                    is Preparation.Refuse -> return Take.Closed(Delivery.Refused(prepared.reason, PackageState.None)).also { settle(id, it.delivery.settlement(operation.command), at) }
-                    Preparation.AlreadyApplied -> return Take.Closed(Delivery.Applied(PackageState.None)).also { settle(id, it.delivery.settlement(operation.command), at) }
+                when (val command = operation.command) {
+                    // У аптечки предусловий нет: замораживать нечего, кроме самого пути.
+                    is MedKitSyncCommand -> command.toPreparedRequest(at)
+                    is PackageSyncCommand -> when (val prepared = command.prepare(operation.id, knownPack, known, at)) {
+                        is Preparation.Request -> prepared.request
+                        is Preparation.Refuse -> return Take.Closed(Delivery.Refused(prepared.reason, PackageState.None)).also { settle(id, it.delivery.settlement(operation.command), at) }
+                        Preparation.AlreadyApplied -> return Take.Closed(Delivery.Applied(PackageState.None)).also { settle(id, it.delivery.settlement(operation.command), at) }
+                    }
+                    else -> command.unknownRoot()
                 }
             }
             // Операция, найденная в отправке, — прошлый полёт умер вместе с процессом: исход неизвестен.
@@ -255,6 +262,15 @@ class QueueWorkerTest {
             snapshots++
             val answer = if (snapshots == 1) fresh ?: snapshotAnswer else snapshotAnswer ?: fresh
             return requireNotNull(answer) { "снимок в этом тесте не ожидался" }
+        }
+
+        /** Чем кончится проверка занятого номера аптечки; счётчик — чтобы видеть, что её сделали. */
+        var medKitIsOurs: ApiResult<Boolean> = ApiResult.Success(true)
+        var medKitReads = 0
+
+        override suspend fun medKitIsOurs(medKitId: Uuid): ApiResult<Boolean> {
+            medKitReads++
+            return medKitIsOurs
         }
     }
 
@@ -784,6 +800,48 @@ class QueueWorkerTest {
         assertEquals(SyncOperationStatus.APPLIED, storage.operations.getValue(INTAKE).status)
     }
 
+    /**
+     * 409 на команде аптечки — номер занят, и сам по себе он не значит «наше»: аптечка читается, и
+     * только увиденная своя делает желаемое сбывшимся (PLAN C0, E3).
+     */
+    @Test
+    fun aTakenMedKitIdentifierIsExplainedByReadingIt() = runTest {
+        val storage = Storage(listOf(operation(MedKitSyncCommand.Publish(HOME_KIT))))
+        val transport = Transport { ApiResult.Failure(ApiFailure.Conflict) }
+
+        worker(storage, transport).drain()
+
+        assertEquals(1, transport.medKitReads)
+        assertEquals(Delivery.Applied(PackageState.None), storage.settled.single().second)
+    }
+
+    /**
+     * Номер занят чужой полкой. Объявить это успешной публикацией нельзя: мы начали бы класть
+     * коробки в полку, которой не видим (PLAN C0).
+     */
+    @Test
+    fun aMedKitIdentifierTakenBySomebodyElseIsRefused() = runTest {
+        val storage = Storage(listOf(operation(MedKitSyncCommand.Publish(HOME_KIT))))
+        val transport = Transport { ApiResult.Failure(ApiFailure.Conflict) }
+        transport.medKitIsOurs = ApiResult.Success(false)
+
+        worker(storage, transport).drain()
+
+        assertEquals(Delivery.Refused(RefusalReason.INVALID, PackageState.None), storage.settled.single().second)
+    }
+
+    /** Проверку не дочитали — повтор тем же запросом: он снова даст 409, и вопрос зададут заново. */
+    @Test
+    fun aTakenMedKitIdentifierThatCouldNotBeCheckedWaitsForARetry() = runTest {
+        val storage = Storage(listOf(operation(MedKitSyncCommand.Publish(HOME_KIT))))
+        val transport = Transport { ApiResult.Failure(ApiFailure.Conflict) }
+        transport.medKitIsOurs = ApiResult.Failure(ApiFailure.Unavailable)
+
+        worker(storage, transport).drain()
+
+        assertEquals(SyncOperationStatus.PENDING, storage.operations.getValue(INTAKE).status)
+    }
+
     /** Расход больше остатка — отказ по количеству, пачка остаётся какой её знает сервер: удалять её нечем. */
     @Test
     fun consumeBeyondTheStockIsRefusedAsInsufficientAndThePackageStays() = runTest {
@@ -993,6 +1051,7 @@ class QueueWorkerTest {
                 return ApiResult.Success(RawResponse(200, snapshotJson))
             }
             override suspend fun packageSnapshot(packageId: Uuid): ApiResult<PackageSnapshotNetworkDTO> = ApiResult.Success(snapshot)
+            override suspend fun medKitIsOurs(medKitId: Uuid): ApiResult<Boolean> = ApiResult.Success(true)
         }
         val worker = worker(storage, transport)
 

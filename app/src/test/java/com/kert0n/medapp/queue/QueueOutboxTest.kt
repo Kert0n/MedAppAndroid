@@ -97,6 +97,9 @@ class QueueOutboxTest {
         }
         override suspend fun packageSnapshot(packageId: Uuid): ApiResult<PackageSnapshotNetworkDTO> =
             ApiResult.Failure(ApiFailure.Unavailable)
+
+        override suspend fun medKitIsOurs(medKitId: Uuid): ApiResult<Boolean> =
+            ApiResult.Failure(ApiFailure.Unavailable)
     }
 
     /** Часы, которые тест двигает рукой вместе с виртуальным временем `runTest`. */

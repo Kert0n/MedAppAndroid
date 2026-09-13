@@ -227,6 +227,11 @@ class QueueWorker @Inject constructor(
      * 409 — не о версии (её отвергает 412), а о занятом номере: объект с ним уже есть, бронь уже
      * заявлена или под этим номером уже применили другое тело. Последнее — дефект клиента:
      * переподготовка тела не меняет, и сервер ответит так же всегда (PLAN E3).
+     *
+     * **Занятый номер сам по себе не значит «наше»** (PLAN C0): желаемое уже так, только если мы
+     * этот объект видим. Поэтому и у пачки, и у аптечки 409 объясняется чтением, а не догадкой —
+     * иначе чужая полка объявлялась бы опубликованной нами, и мы начали бы класть в неё коробки.
+     * Не дочитали — повтор: тот же запрос снова даст 409, и вопрос будет задан заново.
      */
     private suspend fun conflict(command: SyncCommand): Delivery = when (command) {
         is PackageSyncCommand -> when (command.onConflict) {
@@ -234,8 +239,12 @@ class QueueWorker @Inject constructor(
             ConflictPolicy.REPREPARE -> snapshotThen(command.packageId) { Delivery.Stale(it) }
             ConflictPolicy.REFUSE -> refused(command, RefusalReason.INVALID)
         }
-        // Аптечка с нашим номером уже есть, участник уже вступил — желаемое уже так (PLAN B4).
-        is MedKitSyncCommand -> Delivery.Applied(PackageState.None)
+        is MedKitSyncCommand -> when (val ours = transport.medKitIsOurs(command.medKitId)) {
+            is ApiResult.Success ->
+                if (ours.value) Delivery.Applied(PackageState.None)
+                else Delivery.Refused(RefusalReason.INVALID, PackageState.None)
+            is ApiResult.Failure -> Delivery.Retry("занятый номер аптечки не проверен")
+        }
         else -> command.unknownRoot()
     }
 
