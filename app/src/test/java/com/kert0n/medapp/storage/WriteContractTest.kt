@@ -77,6 +77,8 @@ class WriteContractTest {
         "PackageStorageRepository.end" to (Shape.ACTION by "(PackageEnding, Instant): Boolean"),
         "PackageStorageRepository.adjust" to (Shape.ACTION by "(PackageAdjustment, CourseReallocation, Instant): Boolean"),
         "PackageStorageRepository.applySnapshot" to (Shape.SNAPSHOT by "(PackageSnapshot, Instant): SnapshotApplied"),
+        // Отчёты
+        "ReportStorageRepository.observeSpending" to (Shape.READ by "(SpendingPeriod, ZoneId): Flow<Spending>"),
         // Лечение
         "CourseStorageRepository.observeDrafts" to (Shape.READ by "(): Flow<List<CourseDraftProjection>>"),
         "CourseStorageRepository.observePlan" to (Shape.READ by "(Uuid): Flow<CourseProjection>"),
@@ -130,7 +132,8 @@ class WriteContractTest {
         PackageStorageRepository::class.java,
         CourseStorageRepository::class.java,
         MedKitStorageRepository::class.java,
-        IntakeStorageRepository::class.java
+        IntakeStorageRepository::class.java,
+        com.kert0n.medapp.storage.report.ReportStorageRepository::class.java
     )
 
     /**

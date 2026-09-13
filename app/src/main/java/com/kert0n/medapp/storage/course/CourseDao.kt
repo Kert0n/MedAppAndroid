@@ -44,6 +44,11 @@ interface CourseDao {
     @Query("SELECT * FROM course_records WHERE id = :id")
     fun observeRecord(id: Uuid): Flow<CourseRecordStorageRow?>
 
+    /** Записи эпизодов по номерам — порцией, которую называет вызывающий (`chunkedForQuery`). */
+    @Transaction
+    @Query("SELECT * FROM course_records WHERE id IN (:ids)")
+    suspend fun recordsAmong(ids: List<Uuid>): List<CourseRecordStorageRow>
+
     /** Аналитика читает записи: идущее и законченное лечение для неё одной формы (PLAN H6). */
     @Transaction
     @Query("SELECT * FROM course_records ORDER BY started_at DESC")

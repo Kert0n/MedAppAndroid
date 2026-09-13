@@ -237,7 +237,10 @@ abstract class MedAppDatabase : RoomDatabase() {
                     "CREATE INDEX IF NOT EXISTS `index_intakes_taken_package_id` " +
                         "ON `intakes` (`taken_package_id`)",
                     "CREATE INDEX IF NOT EXISTS `index_intakes_operation_id` " +
-                        "ON `intakes` (`operation_id`)"
+                        "ON `intakes` (`operation_id`)",
+                    // Истраченное за год читается по моменту ответа, а не перебором (PLAN H6).
+                    "CREATE INDEX IF NOT EXISTS `index_intakes_answered_at` " +
+                        "ON `intakes` (`answered_at`)"
                 )
                 connection.rebuild(
                     table = "package_details",

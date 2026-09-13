@@ -38,6 +38,18 @@ interface IntakeDao {
     )
     suspend fun plannedBefore(until: Instant): List<IntakeStorageRow>
 
+    /**
+     * Мои состоявшиеся приёмы с моментом в полуинтервале [from, until) — курсовые и разовые, со
+     * ссылками на записи о коробках (PLAN H6). Пропуск и отмена — не приём, и условие по
+     * `TAKEN`, а не «не план».
+     */
+    @Transaction
+    @Query(
+        "SELECT * FROM intakes WHERE status = 'TAKEN' AND answered_at >= :from AND answered_at < :until " +
+            "ORDER BY answered_at"
+    )
+    suspend fun takenBetween(from: Instant, until: Instant): List<IntakeStorageRow>
+
     @Upsert
     suspend fun upsert(intake: IntakeStorageEntity)
 

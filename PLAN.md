@@ -2504,7 +2504,7 @@ sealed interface MedKitSyncCommand {
 | `course_times`                | `course_id`, `minutes_of_day`; PK(пара)                                                                                                                                    | Времена — список; ключ из пары не даёт завести одно время дважды. Внешнего ключа нет: `course_id` — тождество **эпизода**, и строки нужны и черновику, у которого записи ещё нет, и закрытой записи, у которой плана уже нет — ключ на любую из двух таблиц отрезал бы один из этих случаев                                                                                                                                                                                                                      |
 | `course_sources`              | `course_id` FK **RESTRICT**, `package_id` FK **CASCADE** на `packages`, `position`, `allocated_doses`; PK(`course_id`,`package_id`), UNIQUE(`course_id`,`position`)                                          | Порядок = приоритет. Уникальность позиции ловит сбой перетаскивания. Ключ на план `RESTRICT`: состав уходит вместе с планом, но не молча — его снимает транзакция конца лечения (F5). Ключ на живую коробку `CASCADE` — страховка: состав меняет домен (`detach`) там, где коробки не стало (D5)                                                                                                                                                                                                                        |
 | `active_package_assignments`  | **`package_id` PRIMARY KEY**/FK **CASCADE** на `packages`, `course_id` FK **RESTRICT**                                                                                                     | Это и есть механизм «одна пачка — один активный курс». Проверка «а нет ли уже» перед вставкой не годится: два экрана записали бы одновременно и оба увидели бы пусто. Строка появляется при `activate()`, исчезает при завершении, отмене и отвязке                                        |
-| `intakes`                     | поля `CourseIntake` и `UnplannedIntake` в одной таблице, вид различается наличием курса; `accounting` и `operation_id` — обвязка синхронизации (`IntakeSyncState`), доменная модель их не носит; UNIQUE(`course_id`,`scheduled_on`,`scheduled_time`); FK на плановую/фактическую `package_records` **RESTRICT**, FK на `course_records` **RESTRICT** | Приём переживает коробку: он держится за запись о ней, и имя с единицей читаются после её конца (D3, D6). Колонки учёта живут в той же строке: их меняют только транзакционные сценарии F5, и правила о приёме их не читают |
+| `intakes`                     | поля `CourseIntake` и `UnplannedIntake` в одной таблице, вид различается наличием курса; `accounting` и `operation_id` — обвязка синхронизации (`IntakeSyncState`), доменная модель их не носит; UNIQUE(`course_id`,`scheduled_on`,`scheduled_time`); индекс `answered_at` — истраченное за период (H6); FK на плановую/фактическую `package_records` **RESTRICT**, FK на `course_records` **RESTRICT** | Приём переживает коробку: он держится за запись о ней, и имя с единицей читаются после её конца (D3, D6). Колонки учёта живут в той же строке: их меняют только транзакционные сценарии F5, и правила о приёме их не читают |
 | `sync_operations`             | поля `SyncOperation`; `kind` + `payload` + `payload_version`; `package_id?`, `med_kit_id?`; подготовленный запрос колонками `prepared_*`; `sequence` UNIQUE, монотонен; `status` из четырёх | Очередь. Вид команды хранится дискриминатором колонки и её конвертером. `package_id` называет затронутую пачку и `NULL` у команд аптечки, `med_kit_id` — полку, **на которой команда действует**, и называет её тот, кто команду ставит: порядок строится запросом (`ready`, E3), а не доменной функцией. Подготовленный запрос лежит колонками той же строки: он замораживается при взятии в отправку и умирает вместе со своей операцией |
 | `sync_operation_dependencies` | `operation_id` FK **RESTRICT**, `depends_on_id` FK **RESTRICT**; PK(пара)                                                                                                                                   | Зависимости отдельной таблицей, а не размазанными по payload                                                                                                                                                                                                                               |
 | `notification_log`            | `key`, `delivery`, `kind`, `shown_at`; PK(`key`,`delivery`)                                                                                                                       | Без него ежедневная проверка сообщала бы об одной просрочке каждый день                                                                                                                                                                                                                    |
@@ -2789,7 +2789,8 @@ com.kert0n.medapp                         есть · [B17] — появится
 │              navigation/ — Route(@Serializable), Destination, MedAppShell; WorkManager графом
 ├─ di/         NetworkModule, DatabaseModule, StorageModule, WorkModule, DispatcherModule,
 │              CredentialsModule
-├─ domain/     бизнес, по понятиям: value/, pack/, medkit/, course/, intake/, account/, template/;
+├─ domain/     бизнес, по понятиям: value/, pack/, medkit/, course/, intake/, account/, template/,
+│              report/ (отчёты личного кабинета);
 │              [B17] notification/ — модель, её правила и **порты действий**: `DeviceAccount`,
 │              `VocabularyLibrary`, `MedKitInvitations`, `PackageTemplates`; [B18] порт настроек.
 │              Время — через `Clock`; о хранении и доставке не знает ничего
@@ -2804,7 +2805,7 @@ com.kert0n.medapp                         есть · [B17] — появится
 │   ├─ pack/ — команды и подготовка запроса по прочитанному состоянию
 │   ├─ medkit/ — команды аптечки: публикация, удаление у всех, выход (E5, E6)
 │   └─ intake/ — IntakeAccounting, IntakeSyncState: где расход приёма и какой операцией уехал
-├─ storage/    хранение, по понятиям: value/, pack/, medkit/, course/, intake/, template/
+├─ storage/    хранение, по понятиям: value/, pack/, medkit/, course/, intake/, report/, template/
 │   │          (заготовка кэша справочника, #23) — entity, dao, строки со связями, мапперы,
 │   │          описание запроса, репозитории и их порты
 │   ├─ server/ таблицы без предметного понятия: очередь (SyncOperationRoomRepository — строки,
@@ -2820,7 +2821,7 @@ com.kert0n.medapp                         есть · [B17] — появится
 │              CourseCalendar, CourseUpkeep, CourseActivation, CourseCancellation, CourseAmendment,
 │              SourceEditing, CourseClamping, CourseOffPlanCounting), intake/ (IntakeConfirmation,
 │              UnplannedIntakeRecording, IntakeDeclining), template/ (TemplateSearching);
-│              [B14] reports/; [B18] account/; [B19] scan/
+│              [B18] account/; [B19] scan/
 ├─ presentation/ представление, по понятиям: value/, pack/, medkit/ — DTO состояния, мапперы
 │              из проекций, разбор ввода, ViewModel; ParsedInput, ScreenState в корне. Пишут UI-PR
 └─ ui/         тема и общие составляющие экрана (LoadingState, EmptyState, ErrorMessage),
@@ -3328,6 +3329,20 @@ data class PackageQuery(
 и разовые приёмы этой даты. Дата дальше окна материализации отвечается по расписанию идущих
 курсов — пунктами без строк.
 
+**Модель истраченного (B14, коммит 2).** Отчёт — величина `domain/report/Spending`, собранная из
+фактов методом своего типа `Spending.of(приёмы, записи эпизодов)`: строка `Episode` — эпизод и
+единица (эпизод, чью единицу сменили, даёт строку на каждую, и `Quantity.plus` разные единицы не
+складывает), строка `Box` — разовые приёмы одной коробки, названной величинами, а не ссылкой.
+Эпизоды — от начатых позже, коробки — по названию. Период — `SpendingPeriod(from, to)`: календарные
+дни включительно, не больше года; `startsAt(zone)` и `endsBefore(zone)` дают полуинтервал моментов.
+Зона — аргумент чтения, как `today` у списка пачек: база системных часов и пояса не читает. Приём
+относится к дню своего момента — `answered_at`, названного человеком, — а не к дню пункта.
+
+Читает хранение: `storage/report/ReportStorageRepository.observeSpending(period, zone)` — поток по
+изменению `intakes`, `course_records`, `course_times`, `package_records`, отчёт — одной транзакцией:
+`IntakeDao.takenBetween` (только `TAKEN`, момент в полуинтервале, индекс `answered_at`) и записи
+эпизодов порциями `CourseDao.recordsAmong`. Сценария нет: это чтение, а не действие.
+
 ---
 
 # ЧАСТЬ I. План работ — Base
@@ -3431,7 +3446,7 @@ Base — всё, что работает без экранов: домен, хр
 | # | коммит | содержание |
 |---|---|---|
 | 1 | `Справочник ищется сервером, а кэшу оставлено место` | **сделан** (318d722): `PackageTemplate`, `TemplateQuery`, порт `PackageTemplates`, `ServerPackageTemplates`, `TemplateSearching`; кэш `drug_templates` — заготовка без логики (#23) |
-| 2 | `Истраченное — это мои приёмы` | период до года; строки — эпизоды лечения и разовые приёмы по коробке (`package_records`); только количества, разные единицы — разные строки |
+| 2 | `Истраченное — это мои приёмы` | **сделан**: период до года; строки — эпизоды лечения и разовые приёмы по коробке (`package_records`); только количества, разные единицы — разные строки |
 | 3 | `Расход на дату — по моим курсам` | идущие эпизоды: оставшиеся дозы до даты × доза, с начала суток в зоне курса, до трёх месяцев, «все приёмы успешны»; уходят `PackageForecast` и `forecastOn` |
 | 4 | `Сводка считает пачки, а не догадки` | все доступные живые пачки по категориям и формам; цена всей пачки, валюты раздельно, без цены — отдельным числом |
 | 5 | `План на дату` | пункты моих курсов со статусом и пачкой, разовые приёмы даты; дальше окна — пункты по расписанию без строк |
@@ -4095,7 +4110,7 @@ ANDROID_SERIAL=emulator-5554 ./gradlew :app:connectedDebugAndroidTest -Pprobe
 (`grep -rn '^import com.kert0n.medapp.network' app/src/main/java/com/kert0n/medapp/feature` — пусто).
 Эмулятор — уже запущенный `emulator-5554`, новых не поднимать. Итог инструментальных читать из
 `app/build/outputs/androidTest-results/connected/debug/TEST-*.xml`: `AssumptionViolatedException` у
-`RegistrationProbe` — пропуск, не провал. **Эталон после B14 коммита 1 (318d722): 696 unit, 365
+`RegistrationProbe` — пропуск, не провал. **Эталон после B14 коммита 2: 706 unit, 373
 инструментальных, 1 пропуск, 0 провалов** — каждый PR записывает свой. Тесты поднимают `HiltTestApplication` и
 падений на старте не видят: после правки графа Hilt/WorkManager и после правки схемы запускается
 настоящий `MedApp` на эмуляторе (`adb shell pm clear com.kert0n.medapp`, затем
@@ -4226,7 +4241,7 @@ TalkBack; отсутствие связи при запуске уже наст�
 | REQ-032 | Каждая пачка — отдельная единица                                    | ТЗ 4.1.1.6–9                            | C0         | B2, U1 | две одноимённые остаются двумя             | — |
 |         | **Личный кабинет**                                                  |                                         |            |           |                                            |           |
 | REQ-033 | Расчёт на дату, не далее трёх месяцев                               | ТЗ 4.1.1.10; H6 от 2026-09-13           | H6         | B14, U10 | мой будущий расход по идущим курсам, «все приёмы успешны»; прогноза остатка пачки нет | — |
-| REQ-034 | История израсходованного, не более года                             | ТЗ 4.1.1.10; H6 от 2026-09-13           | H6         | B14, U10 | только мои приёмы: эпизоды и разовые по коробке | — |
+| REQ-034 | История израсходованного, не более года                             | ТЗ 4.1.1.10; H6 от 2026-09-13           | H6         | B14, U10 | только мои приёмы: эпизоды и разовые по коробке; `ReportRoomRepositoryTest`, `SpendingTest` | B14 (чтение), экран — U10 |
 | REQ-035 | Сводная статистика: категории, формы, общая цена                    | ТЗ 4.1.1.10                             | H6         | B14, U10 | все доступные пачки; без цены отдельно     | — |
 | REQ-036 | Сводный план лечения на дату                                        | ТЗ 4.1.1.10                             | H6, H3 №12 | B14, U4 | пункты моих курсов и разовые приёмы даты   | — |
 |         | **Общая аптечка**                                                   |                                         |            |           |                                            |           |
