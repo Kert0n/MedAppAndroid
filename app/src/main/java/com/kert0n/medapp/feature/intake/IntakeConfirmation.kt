@@ -68,6 +68,11 @@ class IntakeConfirmation @Inject constructor(
         val course = courses.openPlan(intake.courseId)
         val pkg = packages.find(packageId) ?: return rejected(IntakeRejected.Reason.PACKAGE_UNUSABLE)
         if (amount.unit != intake.unit) return rejected(IntakeRejected.Reason.UNIT_MISMATCH)
+        // Своя коробка списывается здесь же, и списать больше, чем в ней есть, нечем; у общей
+        // истина по количеству — сервер, и нехватку отвечает он (PLAN E3).
+        if (!pkg.medKit.answersToServer && amount.quantity.amount > pkg.quantity.amount) {
+            return rejected(IntakeRejected.Reason.INSUFFICIENT)
+        }
         // Пункт курса принимают из пачки курса; из любой другой это внеплановый факт, и пункт им
         // не закрывается (PLAN D5). Отказ — до `take`: не записано ничего.
         if (!course.isSource(pkg.ref)) return rejected(IntakeRejected.Reason.PACKAGE_NOT_A_SOURCE)
