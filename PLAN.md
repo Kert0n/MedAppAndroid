@@ -4301,8 +4301,8 @@ ANDROID_SERIAL=emulator-5554 ./gradlew :app:connectedDebugAndroidTest -Pprobe
 (`grep -rn '^import com.kert0n.medapp.network' app/src/main/java/com/kert0n/medapp/feature` — пусто).
 Эмулятор — уже запущенный `emulator-5554`, новых не поднимать. Итог инструментальных читать из
 `app/build/outputs/androidTest-results/connected/debug/TEST-*.xml`: `AssumptionViolatedException` у
-`RegistrationProbe` — пропуск, не провал. **Эталон после B14: 713 unit, 380
-инструментальных, 1 пропуск, 0 провалов** — каждый PR записывает свой. Тесты поднимают `HiltTestApplication` и
+`RegistrationProbe` — пропуск, не провал. **Эталон после B14.1: 714 unit, 391
+инструментальный, 1 пропуск, 0 провалов** (после B14 было 713 и 380) — каждый PR записывает свой. Тесты поднимают `HiltTestApplication` и
 падений на старте не видят: после правки графа Hilt/WorkManager и после правки схемы запускается
 настоящий `MedApp` на эмуляторе (`adb shell pm clear com.kert0n.medapp`, затем
 `am start -n com.kert0n.medapp/.app.MainActivity`, `logcat` без `FATAL`, `SyncWorker` — `SUCCESS`).
