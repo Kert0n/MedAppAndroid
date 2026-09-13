@@ -62,7 +62,7 @@ class CourseScheduleRemainingTest {
     fun shorteningTheTotalEndsTheTreatmentEarlierAndRaisesTheRevision() {
         // Хочет закончить раньше — сокращает число доз рукой; отдельного «отказался» не нужно.
         val week = activeCourse()
-        val shortened = week.setTotalDoses(3.doses, week.updatedAt.plusSeconds(1))
+        val shortened = week.setTotalDoses(3.doses, week.updatedAt.plusSeconds(1)).getOrThrow()
         assertEquals(3.doses, shortened.totalDoses)
         assertEquals(week.revision.next(), shortened.revision)
         assertEquals(week.schedule.start.plusDays(2), shortened.expectedEnd(CourseProgress.none)?.localDate)

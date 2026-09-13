@@ -14,7 +14,6 @@ import com.kert0n.medapp.storage.medkit.toStorageEntity
 import com.kert0n.medapp.storage.pack.PackageDao
 import com.kert0n.medapp.storage.pack.applySnapshot
 import com.kert0n.medapp.storage.pack.end
-import com.kert0n.medapp.storage.stock.StockMovementDao
 import com.kert0n.medapp.storage.value.VocabularyDao
 import java.time.Instant
 import javax.inject.Inject
@@ -22,16 +21,15 @@ import kotlin.uuid.Uuid
 
 /**
  * Укладка полного снимка — одной транзакцией (PLAN E4, F5). Ничего не толкует: что именно ляжет,
- * решает дверь `PackageDao.applySnapshot` по версиям, и она же пишет необъяснённую разницу; что
- * появилось и чего не стало — решено в очереди, а у знакомой полки снимок трогает **только**
- * число участников: название и место хранения серверу неизвестны (F1).
+ * решает дверь `PackageDao.applySnapshot` по версиям; что появилось и чего не стало — решено в
+ * очереди, а у знакомой полки снимок трогает **только** число участников: название и место
+ * хранения серверу неизвестны (F1).
  */
 class SnapshotRoomStorage @Inject constructor(
     private val database: MedAppDatabase,
     private val medKits: MedKitDao,
     private val packages: PackageDao,
     private val courses: CourseDao,
-    private val movements: StockMovementDao,
     private val vocabulary: VocabularyDao,
     private val queue: SyncOperationDao,
     @ArrivedMedKitName private val arrivedName: String
@@ -72,14 +70,14 @@ class SnapshotRoomStorage @Inject constructor(
             // полкой, и ответ, прочитанный раньше, об этом не знает (PLAN C0).
             val removed = packageId in snapshot.heldPackages && packages.find(packageId) == null
             if (removed || medKits.find(resolved.pack.medKit.id) == null) continue
-            packages.applySnapshot(resolved, observedAt = at, movements, words)
+            packages.applySnapshot(resolved, observedAt = at)
         }
-        // Коробка кончается своим переходом со следом, полка уходит вместе с содержимым — обе
-        // двери те же, какими пользуется ответ сервера на нашу команду (PLAN D7, E6).
+        // Коробка кончается своим переходом, полка уходит вместе с содержимым — обе двери те же,
+        // какими пользуется ответ сервера на нашу команду (PLAN D3, E6).
         for (packageId in snapshot.gonePackages) {
             val pkg = packages.find(packageId)?.toDomain(words) ?: continue
-            packages.end(pkg.lost(Uuid.random(), at), courses, movements, words, at)
+            packages.end(pkg.ended(), courses, words, at)
         }
-        for (medKitId in snapshot.goneMedKits) medKits.loseAccess(medKitId, packages, courses, movements, words, at)
+        for (medKitId in snapshot.goneMedKits) medKits.loseAccess(medKitId, packages, courses, words, at)
     }
 }

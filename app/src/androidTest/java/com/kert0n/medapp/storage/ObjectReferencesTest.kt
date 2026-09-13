@@ -3,17 +3,22 @@ package com.kert0n.medapp.storage
 import androidx.room.Room
 import androidx.test.platform.app.InstrumentationRegistry
 import com.kert0n.medapp.domain.medkit.MedKit
-import com.kert0n.medapp.domain.stock.StockMovement
+import com.kert0n.medapp.domain.course.CourseDraft
+import com.kert0n.medapp.domain.intake.CourseIntake
 import com.kert0n.medapp.fixture.COURSE
 import com.kert0n.medapp.fixture.HOME_KIT
-import com.kert0n.medapp.fixture.LATER
 import com.kert0n.medapp.fixture.MILLILITRES
 import com.kert0n.medapp.fixture.OTHER_PACK
 import com.kert0n.medapp.fixture.PACK
 import com.kert0n.medapp.fixture.SHARED_KIT
 import com.kert0n.medapp.fixture.TABLETS
 import com.kert0n.medapp.fixture.TABLET_FORM
+import com.kert0n.medapp.fixture.FIRST_PLANNED_AT
+import com.kert0n.medapp.fixture.FIRST_SCHEDULED_ON
 import com.kert0n.medapp.fixture.activeCourse
+import com.kert0n.medapp.fixture.courseRecord
+import com.kert0n.medapp.fixture.courseRepository
+import com.kert0n.medapp.fixture.plannedIntake
 import com.kert0n.medapp.fixture.medKit
 import com.kert0n.medapp.fixture.pack
 import com.kert0n.medapp.fixture.source
@@ -24,10 +29,8 @@ import com.kert0n.medapp.storage.course.toTimeStorageEntities
 import com.kert0n.medapp.storage.database.MedAppDatabase
 import com.kert0n.medapp.storage.medkit.toStorageEntity as toMedKitStorageEntity
 import com.kert0n.medapp.fixture.save
-import com.kert0n.medapp.storage.stock.toStorageEntity as toMovementStorageEntity
+import com.kert0n.medapp.storage.intake.toStorageEntity as toIntakeStorageEntity
 import com.kert0n.medapp.storage.value.toStorageEntity
-import java.time.Instant
-import java.util.concurrent.Executors
 import kotlin.uuid.Uuid
 import kotlinx.coroutines.test.runTest
 import org.junit.After
@@ -52,7 +55,9 @@ class ObjectReferencesTest {
     fun openDatabase() = runTest {
         val context = InstrumentationRegistry.getInstrumentation().targetContext
         database = Room.inMemoryDatabaseBuilder(context, MedAppDatabase::class.java)
-            .setQueryCallback({ sql, _ -> synchronized(queries) { queries += sql } }, Executors.newSingleThreadExecutor())
+            // Колбэк — в том же потоке, что запрос: иначе подсчёт мог бы прочитать список раньше,
+            // чем в него дописаны чтения, и пустой счёт прошёл бы проверку.
+            .setQueryCallback({ sql, _ -> synchronized(queries) { queries += sql } }, { command -> command.run() })
             .build()
         database.vocabulary().save(
             units = listOf(TABLETS, MILLILITRES).map { it.toStorageEntity() },
@@ -97,32 +102,33 @@ class ObjectReferencesTest {
     }
 
     @Test
-    fun aHundredMovementsLoadTheirPackagesInOneQuery() = runTest {
+    fun aHundredIntakesLoadTheirPackageRecordsInOneQuery() = runTest {
         val paracetamol = pack(id = PACK)
         database.packages().save(paracetamol)
+        val plan = activeCourse(sources = listOf(source(PACK, 5)))
+        database.courseRepository().activate(CourseDraft.Activation(plan, courseRecord(prescription = plan.prescription)))
         for (i in 0 until 100) {
-            val movement = StockMovement.Recount(
+            val slot = FIRST_SCHEDULED_ON.plusDays(i.toLong())
+            val intake = plannedIntake(
                 id = Uuid.parse("00000000-0000-4000-8000-%012x".format(0x1000 + i)),
-                pkg = paracetamol.ref,
-                before = tablets("20"),
-                after = tablets("19"),
-                occurredAt = Instant.EPOCH.plusSeconds(i.toLong()),
-                observedAt = LATER.plusSeconds(i.toLong())
+                plannedPackage = paracetamol.ref,
+                scheduledOn = slot,
+                plannedAt = FIRST_PLANNED_AT.plusSeconds(86_400L * i)
             )
-            database.stockMovements().insert(movement.toMovementStorageEntity())
+            database.intakes().upsert(intake.toIntakeStorageEntity())
         }
         synchronized(queries) { queries.clear() }
 
-        val history = database.stockMovements().ofPackage(PACK).map { it.toDomain(VOCABULARY) }
+        val history = database.intakes().ofCourse(COURSE).map { it.toDomain(VOCABULARY) as CourseIntake }
 
         assertEquals(100, history.size)
-        assertTrue(history.all { it.pkg.id == PACK && it.pkg.name == "Парацетамол" })
-        // Room грузит связь одним `IN`-запросом на всю выборку (и повторяет его для вложенных
-        // связей пачки), а не по запросу на строку: сто строк — не сто чтений.
-        val packageReads = synchronized(queries) {
-            queries.filter { it.trimStart().startsWith("SELECT", ignoreCase = true) && it.contains("FROM `packages`") }
+        assertTrue(history.all { it.plannedPackage?.id == PACK && it.plannedPackage?.name == "Парацетамол" })
+        // Room грузит связь одним `IN`-запросом на всю выборку (по одному на каждую из двух ссылок
+        // приёма), а не по запросу на строку: сто строк — не сто чтений.
+        val recordReads = synchronized(queries) {
+            queries.filter { it.trimStart().startsWith("SELECT", ignoreCase = true) && it.contains("FROM `package_records`") }
         }
-        assertTrue("чтений packages: ${packageReads.size}", packageReads.size <= 2)
-        assertTrue(packageReads.all { it.contains("WHERE `id` IN (") })
+        assertTrue("чтений package_records: ${recordReads.size}", recordReads.size in 1..2)
+        assertTrue(recordReads.all { it.contains("WHERE `id` IN (") })
     }
 }

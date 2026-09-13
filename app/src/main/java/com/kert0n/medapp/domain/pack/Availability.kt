@@ -24,6 +24,13 @@ class Availability(availableToMe: Map<Uuid, Quantity>) {
     /** Сколько целых доз даёт пачка. */
     fun dosesOf(pkg: PackageRef, dose: Dose): Doses = of(pkg).dosesIn(dose)
 
+    /**
+     * Тот же расклад, где у [pkg] — [quantity]: так курс зажимается под число, которое станет
+     * доступным после действия человека, ещё не записанного или ещё не подтверждённого полкой.
+     */
+    fun with(pkg: PackageRef, quantity: Quantity): Availability =
+        Availability(availableToMe + (pkg.id to quantity))
+
     companion object {
 
         /** Расклад из посчитанной доступности. */

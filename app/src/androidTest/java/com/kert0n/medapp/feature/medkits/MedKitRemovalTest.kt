@@ -6,7 +6,6 @@ import com.kert0n.medapp.domain.medkit.MedKit
 import com.kert0n.medapp.domain.medkit.MedKitStatus
 import com.kert0n.medapp.domain.pack.PackageStatus
 import com.kert0n.medapp.queue.RefusalReason
-import com.kert0n.medapp.domain.stock.StockMovement
 import com.kert0n.medapp.fixture.COURSE
 import com.kert0n.medapp.fixture.HOME_KIT
 import com.kert0n.medapp.fixture.INTAKE
@@ -39,7 +38,6 @@ import com.kert0n.medapp.queue.pack.PackageSyncCommand
 import com.kert0n.medapp.storage.database.MedAppDatabase
 import com.kert0n.medapp.storage.intake.toStorageEntity as toIntakeStorageEntity
 import com.kert0n.medapp.storage.medkit.toStorageEntity as toMedKitStorageEntity
-import com.kert0n.medapp.storage.stock.toStorageEntity as toMovementStorageEntity
 import java.time.Instant
 import kotlin.uuid.Uuid
 import kotlinx.coroutines.test.runTest
@@ -64,7 +62,6 @@ class MedKitRemovalTest {
     private lateinit var database: MedAppDatabase
     private lateinit var removal: MedKitRemoval
 
-    private val movementId: Uuid = Uuid.parse("00000000-0000-4000-8000-000000000081")
 
     @Before
     fun setUp() = runTest {
@@ -72,10 +69,6 @@ class MedKitRemovalTest {
         removal = Scenarios(database, LATER).medKitRemoval
         database.packageRepository().add(pack(id = PACK, quantity = tablets("20"), form = TABLET_FORM))
         database.packageRepository().add(pack(id = OTHER_PACK, quantity = tablets("1")))
-        database.stockMovements().insert(
-            StockMovement.Receipt(movementId, pack(id = PACK).ref, tablets("20"), Instant.EPOCH, LATER)
-                .toMovementStorageEntity()
-        )
         // Курс держит PACK источником: разбор полки решает и его судьбу.
         val plan = activeCourse(sources = listOf(source(PACK, 5)))
         database.courseRepository().activate(CourseDraft.Activation(plan, courseRecord(prescription = plan.prescription)))
@@ -192,14 +185,13 @@ class MedKitRemovalTest {
         assertEquals(SHARED_KIT, database.packageRepository().find(PACK)?.medKit?.id)
         assertEquals(SHARED_KIT, database.packageRepository().find(OTHER_PACK)?.medKit?.id)
         assertEquals(listOf(PACK), sourcesOfCourse())
-        assertEquals(1, database.stockMovements().ofPackage(PACK).size)
         assertEquals(emptyList<SyncCommand>(), commands())
     }
 
     /**
      * «Выбросил вместе с лекарствами» (ТЗ 4.1.1.2.3.1): коробок не остаётся, курс теряет источник
-     * своим переходом, а история — запись эпизода, приём и движения — переживает: она держится за
-     * записи о коробках (PLAN D3, D6).
+     * своим переходом, а история — запись эпизода и приём — переживает: она держится за записи о
+     * коробках (PLAN D3, D6).
      *
      * Красная проверка: посадить ключ приёма на живую строку — аптечку, из которой хоть раз
      * принимали, выбросить станет нельзя, и случай краснеет.
@@ -213,10 +205,6 @@ class MedKitRemovalTest {
         assertNull(database.packageRepository().find(PACK))
         assertNull(database.packageRepository().find(OTHER_PACK))
         assertEquals(emptyList<Uuid>(), sourcesOfCourse())
-        // Выброшенное объясняет себя: к приходу добавляется утилизация всего остатка (PLAN H6).
-        val history = database.stockMovements().ofPackage(PACK).map { it.toDomain(VOCABULARY) }
-        assertEquals(2, history.size)
-        assertEquals(tablets("20"), history.filterIsInstance<StockMovement.Disposal>().single().amount)
 
         assertNotNull(database.courses().findRecord(COURSE))
         val intake = requireNotNull(database.intakes().find(INTAKE)).toDomain(VOCABULARY)
@@ -334,12 +322,11 @@ class MedKitRemovalTest {
         assertNotNull(database.medKits().find(HOME_KIT))
         assertNotNull(database.packageRepository().find(PACK))
         assertEquals(listOf(PACK), sourcesOfCourse())
-        assertEquals(1, database.stockMovements().ofPackage(PACK).size)
         assertEquals(listOf(MedKitSyncCommand.Delete(HOME_KIT)), commands())
         assertEquals(PackageStatus.REMOVING, database.packageRepository().find(PACK)?.status)
     }
 
-    /** Сервер согласился — коробок не остаётся, след есть, лечение цело. */
+    /** Сервер согласился — коробок не остаётся, лечение цело. */
     @Test
     fun theServerAgreeingThrowsTheSharedShelfOutWithItsDrugs() = runTest {
         publish(HOME_KIT)
@@ -351,10 +338,6 @@ class MedKitRemovalTest {
         assertNull(database.packageRepository().find(PACK))
         assertEquals(emptyList<Uuid>(), sourcesOfCourse())
         assertNotNull(database.courses().findRecord(COURSE))
-        // Выброшенное объясняет себя: к приходу добавляется утилизация всего остатка (PLAN H6).
-        val history = database.stockMovements().ofPackage(PACK).map { it.toDomain(VOCABULARY) }
-        assertEquals(2, history.size)
-        assertEquals(tablets("20"), history.filterIsInstance<StockMovement.Disposal>().single().amount)
         assertEquals("Парацетамол", requireNotNull(database.intakes().find(INTAKE)).toDomain(VOCABULARY).taken?.pkg?.name)
     }
 

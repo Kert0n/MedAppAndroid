@@ -86,7 +86,7 @@ class PackageDaoTest {
     fun repeatedServerSnapshotKeepsLocalDetails() = runTest {
         packages.save(local)
 
-        val fromServer = local.correctTo(tablets("12"), Uuid.random(), Instant.EPOCH).left().describe(
+        val fromServer = local.correctTo(tablets("12")).left().describe(
             local.facts.copy(shared = local.facts.shared.copy(name = "Paracetamol"))
         )
         packages.applySnapshot(

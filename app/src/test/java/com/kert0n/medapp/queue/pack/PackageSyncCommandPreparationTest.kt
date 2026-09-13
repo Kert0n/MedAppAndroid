@@ -29,8 +29,10 @@ class PackageSyncCommandPreparationTest {
 
     private val sync = PackageSyncState(PACK, version = ResourceVersion(3), claimsVersion = ResourceVersion(5))
 
-    private fun PackageSyncCommand.prepared(mine: com.kert0n.medapp.domain.value.Quantity? = null) =
-        toPreparedRequest(INTAKE, sync, confirmed = tablets("20"), mine = mine, at = EARLIER)
+    private fun PackageSyncCommand.prepared(
+        mine: com.kert0n.medapp.domain.value.Quantity? = null,
+        known: PackageSharedFacts? = null
+    ) = toPreparedRequest(INTAKE, sync, confirmed = tablets("20"), mine = mine, at = EARLIER, known = known)
 
     /** Внеплановый расход — тот же `sync` без блока брони: номер есть, повтор сервер применит один раз. */
     @Test
@@ -60,10 +62,8 @@ class PackageSyncCommandPreparationTest {
         )
         assertEquals(
             Preparation.Refuse(RefusalReason.UNIT_CHANGED),
-            PackageSyncCommand.CorrectStock(PACK, tablets("17")).prepare(INTAKE, syrup, sync, EARLIER)
+            PackageSyncCommand.CorrectStock(PACK, tablets("20"), tablets("17")).prepare(INTAKE, syrup, sync, EARLIER)
         )
-        // Ноль пересчёта — удаление: ноль в любой единице ноль.
-        assertTrue(PackageSyncCommand.CorrectStock(PACK, tablets("0")).prepare(INTAKE, syrup, sync, EARLIER) is Preparation.Request)
         val claimed = pack(quantity = tablets("20"), claims = Claims(BigDecimal("6"), BigDecimal("6")))
         assertEquals(Preparation.AlreadyApplied, PackageSyncCommand.SetClaim(PACK, tablets("6")).prepare(INTAKE, claimed, sync, EARLIER))
         assertTrue(PackageSyncCommand.SetClaim(PACK, tablets("7")).prepare(INTAKE, claimed, sync, EARLIER) is Preparation.Request)
@@ -87,12 +87,52 @@ class PackageSyncCommandPreparationTest {
         assertFalse(request.body!!.contains("reservation"))
     }
 
+    /**
+     * Пересчёт кладёт разницу поверх прочитанного числа (C1): видел 20, назвал 17, а прочитано 20
+     * — уходит 17; прочитано 10 — уходит 7; прочитано 3 — итог ноль, и это удаление; прочитано 2 —
+     * ниже нуля, соотнести нельзя, подготовка отказывает.
+     */
     @Test
-    fun zeroRecountIsADelete() {
-        val request = PackageSyncCommand.CorrectStock(PACK, tablets("0")).prepared()
-        assertEquals("DELETE", request.method)
-        assertEquals(mapOf("version" to "3"), request.query)
-        assertNull(request.body)
+    fun recountLaysItsDifferenceOverTheFreshNumber() {
+        val recount = PackageSyncCommand.CorrectStock(PACK, seen = tablets("20"), actual = tablets("17"))
+        val asRead = recount.prepared()
+        assertEquals("PATCH", asRead.method)
+        assertTrue(asRead.body!!.contains("\"quantity\":\"17"))
+        val overTen = recount.toPreparedRequest(INTAKE, sync, confirmed = tablets("10"), mine = null, at = EARLIER)
+        assertTrue(overTen.body!!.contains("\"quantity\":\"7"))
+        assertEquals(tablets("10"), overTen.quantityBefore)
+        val toZero = recount.toPreparedRequest(INTAKE, sync, confirmed = tablets("3"), mine = null, at = EARLIER)
+        assertEquals("DELETE", toZero.method)
+        assertEquals(mapOf("version" to "3"), toZero.query)
+        assertNull(toZero.body)
+        assertEquals(
+            Preparation.Refuse(RefusalReason.CONFLICT),
+            recount.prepare(INTAKE, pack(quantity = tablets("2")), sync, EARLIER)
+        )
+        assertTrue(recount.prepare(INTAKE, pack(quantity = tablets("3")), sync, EARLIER) is Preparation.Request)
+    }
+
+    /**
+     * Правка сведений везёт только свои поля поверх прочитанных (C1): переименованное соседом имя
+     * остаётся его, категория человека ложится; сосед сделал то же — посылать нечего; то же поле
+     * изменено соседом иначе — соотнести нельзя.
+     */
+    @Test
+    fun describingSendsOnlyItsOwnFieldsOverWhatWasRead() {
+        val facts = PackageSharedFacts("Парацетамол", TABLET_FORM)
+        val describe = PackageSyncCommand.Describe(PACK, facts, facts.copy(category = "жар"))
+        val renamed = pack(name = "Панадол", form = TABLET_FORM)
+        val preparation = describe.prepare(INTAKE, renamed, sync, EARLIER) as Preparation.Request
+        assertTrue(preparation.request.body!!.contains("\"category\":\"жар\""))
+        assertFalse(preparation.request.body!!.contains("name"))
+        assertEquals(
+            Preparation.AlreadyApplied,
+            describe.prepare(INTAKE, pack(category = "жар", form = TABLET_FORM), sync, EARLIER)
+        )
+        assertEquals(
+            Preparation.Refuse(RefusalReason.CONFLICT),
+            describe.prepare(INTAKE, pack(category = "боль", form = TABLET_FORM), sync, EARLIER)
+        )
     }
 
     @Test
@@ -118,18 +158,17 @@ class PackageSyncCommandPreparationTest {
         val facts = PackageSharedFacts("Парацетамол", TABLET_FORM)
         val create = PackageSyncCommand.Create(PACK, HOME_KIT, tablets("20"), facts).prepared()
         assertEquals("POST /v1/med-kits/$HOME_KIT/drugs", "${create.method} ${create.path}")
-        val describe = PackageSyncCommand.Describe(PACK, facts, facts.copy(category = "жар")).prepared()
+        val describe = PackageSyncCommand.Describe(PACK, facts, facts.copy(category = "жар")).prepared(known = facts)
         assertEquals("PATCH", describe.method)
         assertTrue(describe.body!!.contains("\"category\":\"жар\""))
         assertFalse(describe.body!!.contains("name"))
     }
 
-    /** Форма ответа — по контракту операции, и «пачки нет» ждёт только расход (PLAN B4, B5). */
+    /** Форма ответа — по контракту операции; «пачки нет» ждут расход и пересчёт, дошедшие до нуля (PLAN B4, B5). */
     @Test
     fun eachCommandNamesTheShapeOfItsAnswer() {
         assertEquals(Expected.SNAPSHOT_OR_GONE, PackageSyncCommand.Consume(PACK, dose("3"), INTAKE).expects)
-        assertEquals(Expected.SNAPSHOT, PackageSyncCommand.CorrectStock(PACK, tablets("5")).expects)
-        assertEquals(Expected.NOTHING, PackageSyncCommand.CorrectStock(PACK, tablets("0")).expects)
+        assertEquals(Expected.SNAPSHOT_OR_GONE, PackageSyncCommand.CorrectStock(PACK, tablets("20"), tablets("5")).expects)
         assertEquals(Expected.CLAIM, PackageSyncCommand.SetClaim(PACK, tablets("6")).expects)
         assertEquals(Expected.NOTHING, PackageSyncCommand.Delete(PACK).expects)
         assertEquals(Expected.SNAPSHOT, PackageSyncCommand.Create(PACK, HOME_KIT, tablets("5"), PackageSharedFacts("Парацетамол", TABLET_FORM)).expects)

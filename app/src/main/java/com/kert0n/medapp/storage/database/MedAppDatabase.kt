@@ -26,8 +26,8 @@ import com.kert0n.medapp.storage.server.NotificationLogStorageEntity
 import com.kert0n.medapp.storage.server.SyncOperationDao
 import com.kert0n.medapp.storage.server.SyncOperationDependencyStorageEntity
 import com.kert0n.medapp.storage.server.SyncOperationStorageEntity
-import com.kert0n.medapp.storage.stock.StockMovementDao
-import com.kert0n.medapp.storage.stock.StockMovementStorageEntity
+import com.kert0n.medapp.storage.template.PackageTemplateDao
+import com.kert0n.medapp.storage.template.PackageTemplateStorageEntity
 import com.kert0n.medapp.storage.value.DosageFormStorageEntity
 import com.kert0n.medapp.storage.value.QuantityUnitStorageEntity
 import com.kert0n.medapp.storage.value.VocabularyDao
@@ -41,6 +41,7 @@ import com.kert0n.medapp.storage.value.VocabularyDao
     entities = [
         QuantityUnitStorageEntity::class,
         DosageFormStorageEntity::class,
+        PackageTemplateStorageEntity::class,
         MedKitStorageEntity::class,
         PackageRecordStorageEntity::class,
         PackageStorageEntity::class,
@@ -52,7 +53,6 @@ import com.kert0n.medapp.storage.value.VocabularyDao
         CourseSourceStorageEntity::class,
         ActivePackageAssignmentStorageEntity::class,
         IntakeStorageEntity::class,
-        StockMovementStorageEntity::class,
         SyncOperationStorageEntity::class,
         SyncOperationDependencyStorageEntity::class,
         NotificationLogStorageEntity::class
@@ -71,13 +71,13 @@ abstract class MedAppDatabase : RoomDatabase() {
 
     abstract fun intakes(): IntakeDao
 
-    abstract fun stockMovements(): StockMovementDao
-
     abstract fun syncOperations(): SyncOperationDao
 
     abstract fun notificationLog(): NotificationLogDao
 
     abstract fun vocabulary(): VocabularyDao
+
+    abstract fun templates(): PackageTemplateDao
 
     companion object {
         const val VERSION = 3
@@ -99,10 +99,10 @@ abstract class MedAppDatabase : RoomDatabase() {
          *   утраченные, с `added_at` из деталей;
          * - у `packages` нет `lifecycle` и `access`, а сама строка держится за запись: кончившаяся
          *   и утраченная коробка строки не имеют — такие строки не переезжают;
-         * - приёмы и движения держатся за запись (`RESTRICT`); части живой коробки — сведения и
-         *   брони — уходят вместе с ней (`CASCADE`), а связи с лечением снимает домен, и схема их
-         *   держит (`RESTRICT`): состав курса не меняется мимо самого курса;
-         * - движение стало записью о пачке: колонок аптечек нет, переносов как вида нет (D7);
+         * - приёмы держатся за запись (`RESTRICT`); части живой коробки — сведения и брони — уходят
+         *   вместе с ней (`CASCADE`), а связи с лечением снимает домен, и схема их держит
+         *   (`RESTRICT`): состав курса не меняется мимо самого курса;
+         * - истории коробки нет: таблица движений `stock_adjustments` уходит (D7);
          * - у коробки и аптечки появился статус — неподтверждённое решение о них (E1, E6). До версии
          *   3 решений в пути не было, поэтому все переезжают обычными.
          *
@@ -112,6 +112,27 @@ abstract class MedAppDatabase : RoomDatabase() {
          */
         val MIGRATION_2_3: Migration = object : Migration(2, 3) {
             override fun migrate(connection: SQLiteConnection) {
+                // Найденное в справочнике остаётся доступным без сети (PLAN F1, H5).
+                connection.execSQL(
+                    """
+                    CREATE TABLE IF NOT EXISTS `drug_templates` (
+                        `id` TEXT NOT NULL, `name` TEXT NOT NULL, `name_lat` TEXT,
+                        `active_substance` TEXT, `form_id` TEXT, `category` TEXT,
+                        `quantity_unit_id` TEXT, `manufacturer` TEXT, `country` TEXT,
+                        `description` TEXT, `search_text` TEXT NOT NULL, `cached_at` INTEGER NOT NULL,
+                        PRIMARY KEY(`id`),
+                        FOREIGN KEY(`quantity_unit_id`) REFERENCES `quantity_units`(`id`)
+                            ON UPDATE NO ACTION ON DELETE RESTRICT ,
+                        FOREIGN KEY(`form_id`) REFERENCES `form_types`(`id`)
+                            ON UPDATE NO ACTION ON DELETE RESTRICT
+                    )
+                    """.trimIndent()
+                )
+                connection.execSQL(
+                    "CREATE INDEX IF NOT EXISTS `index_drug_templates_quantity_unit_id` ON `drug_templates` (`quantity_unit_id`)"
+                )
+                connection.execSQL("CREATE INDEX IF NOT EXISTS `index_drug_templates_form_id` ON `drug_templates` (`form_id`)")
+                connection.execSQL("CREATE INDEX IF NOT EXISTS `index_drug_templates_cached_at` ON `drug_templates` (`cached_at`)")
                 // Неподтверждённое решение об аптечке лежит на ней самой (PLAN E5, E6).
                 connection.execSQL(
                     "ALTER TABLE `med_kits` ADD COLUMN `status` TEXT NOT NULL DEFAULT 'ACTIVE'"
@@ -177,32 +198,8 @@ abstract class MedAppDatabase : RoomDatabase() {
                     "CREATE INDEX IF NOT EXISTS `index_packages_quantity_unit_id` ON `packages` (`quantity_unit_id`)",
                     "CREATE INDEX IF NOT EXISTS `index_packages_form_id` ON `packages` (`form_id`)"
                 )
-                connection.rebuild(
-                    table = "stock_adjustments",
-                    createNew = """
-                        CREATE TABLE IF NOT EXISTS `stock_adjustments_new` (
-                            `id` TEXT NOT NULL, `package_id` TEXT NOT NULL, `kind` TEXT NOT NULL,
-                            `unit_id` TEXT NOT NULL, `observed_at` INTEGER NOT NULL,
-                            `occurred_at` INTEGER, `amount` TEXT, `before_amount` TEXT,
-                            `after_amount` TEXT, `delta` TEXT, `reason` TEXT, `note` TEXT,
-                            PRIMARY KEY(`id`),
-                            FOREIGN KEY(`package_id`) REFERENCES `package_records`(`id`)
-                                ON UPDATE NO ACTION ON DELETE RESTRICT
-                        )
-                    """.trimIndent(),
-                    // Переносы не переезжают: они говорили только о местах, а место у пачки одно
-                    // и известно ей самой.
-                    copy = """
-                        INSERT INTO `stock_adjustments_new`
-                            (`id`, `package_id`, `kind`, `unit_id`, `observed_at`, `occurred_at`,
-                             `amount`, `before_amount`, `after_amount`, `delta`, `reason`, `note`)
-                        SELECT `id`, `package_id`, `kind`, `unit_id`, `observed_at`, `occurred_at`,
-                               `amount`, `before_amount`, `after_amount`, `delta`, `reason`, `note`
-                        FROM `stock_adjustments` WHERE `kind` != 'TRANSFER'
-                    """.trimIndent(),
-                    "CREATE INDEX IF NOT EXISTS `index_stock_adjustments_package_id_observed_at` " +
-                        "ON `stock_adjustments` (`package_id`, `observed_at`)"
-                )
+                // Движения ничего не объясняют никому: ни экран, ни отчёт их не читают (D7).
+                connection.execSQL("DROP TABLE `stock_adjustments`")
                 connection.rebuild(
                     table = "intakes",
                     createNew = """
@@ -240,7 +237,10 @@ abstract class MedAppDatabase : RoomDatabase() {
                     "CREATE INDEX IF NOT EXISTS `index_intakes_taken_package_id` " +
                         "ON `intakes` (`taken_package_id`)",
                     "CREATE INDEX IF NOT EXISTS `index_intakes_operation_id` " +
-                        "ON `intakes` (`operation_id`)"
+                        "ON `intakes` (`operation_id`)",
+                    // Истраченное за год читается по моменту ответа, а не перебором (PLAN H6).
+                    "CREATE INDEX IF NOT EXISTS `index_intakes_answered_at` " +
+                        "ON `intakes` (`answered_at`)"
                 )
                 connection.rebuild(
                     table = "package_details",

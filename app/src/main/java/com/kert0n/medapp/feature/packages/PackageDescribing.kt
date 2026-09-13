@@ -1,0 +1,60 @@
+package com.kert0n.medapp.feature.packages
+
+import com.kert0n.medapp.domain.pack.PackageFacts
+import com.kert0n.medapp.domain.pack.PackageStatus
+import com.kert0n.medapp.queue.QueueService
+import com.kert0n.medapp.queue.QueuedCommand
+import com.kert0n.medapp.queue.Transactions
+import com.kert0n.medapp.queue.pack.PackageSyncCommand
+import com.kert0n.medapp.storage.pack.PackageStorageRepository
+import java.time.Clock
+import javax.inject.Inject
+import kotlin.uuid.Uuid
+
+/**
+ * Человек правит сведения о коробке (ТЗ 4.1.1.3.3; PLAN D3). Редактор загружает `PackageFacts`
+ * целиком и сохраняет целиком: `null` в поле — сведения нет. Личное — срок, заметка, цена, даты,
+ * подсказка дозы — остаётся на устройстве всегда (C0). Общее — описание препарата — на полке,
+ * отвечающей серверу, уезжает командой `Describe(before, after)`: своими полями поверх того, что у
+ * сервера окажется к отправке (C1 «Действие над общей пачкой — разница»), а коробка до ответа
+ * помечена `CHANGING`. Правка, не вышедшая за границу публикации, команды не ставит:
+ * `before.shared == after.shared` — и на провод нечего везти.
+ *
+ * Переход применяется к коробке, прочитанной той же транзакцией (F5): остаток, брони и обвязку
+ * синхронизации правка не трогает. Единица неизменна (C1) и в сведения не входит.
+ *
+ * Очистить форму у серверной коробки нельзя: `null` на проводе значит «не трогать», а `""` не
+ * UUID (D3). Такая правка отвергается целиком, и экран объясняет ограничение — иначе неудалённая
+ * серверная форма выдавалась бы за очищенную.
+ */
+class PackageDescribing @Inject constructor(
+    private val packages: PackageStorageRepository,
+    private val queue: QueueService,
+    private val transactions: Transactions,
+    private val clock: Clock
+) {
+
+    suspend fun describe(packageId: Uuid, facts: PackageFacts): Outcome = transactions.run {
+        val pkg = packages.find(packageId) ?: return@run Outcome.GONE
+        if (!pkg.status.allowsUse) return@run Outcome.UNUSABLE
+        val before = pkg.facts.shared
+        val after = facts.shared
+        val announced = pkg.medKit.answersToServer && before != after
+        if (announced && before.form != null && after.form == null) return@run Outcome.FORM_CLEAR_UNSUPPORTED
+        val now = clock.instant()
+        val commands = if (announced) listOf(QueuedCommand(Uuid.random(), PackageSyncCommand.Describe(pkg.id, before, after))) else emptyList()
+        queue.change(pkg.medKit, commands, now) {
+            check(packages.describe(pkg.id, facts)) { "пачка прочитана этой же транзакцией" }
+            if (announced) check(packages.mark(pkg.id, PackageStatus.CHANGING)) { "пачка прочитана этой же транзакцией" }
+            true
+        }
+        Outcome.SAVED
+    }
+
+    /**
+     * Чем кончилось. Записано — экран закрывает редактор; коробки нет — закрывает молча; коробка
+     * ждёт удаления или выхода — трогать её нельзя; форму серверной коробки очистить нечем —
+     * экран объясняет ограничение, и правка не записана (PLAN D3, E1).
+     */
+    enum class Outcome { SAVED, GONE, UNUSABLE, FORM_CLEAR_UNSUPPORTED }
+}

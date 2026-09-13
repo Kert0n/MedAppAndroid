@@ -31,10 +31,15 @@ import kotlinx.serialization.json.jsonPrimitive
 object SyncCommandStorageConverter {
 
     /**
-     * Версия формата payload. Незавершённые операции переживают обновление приложения:
-     * неизвестную версию работник пропускает и называет, а не роняет процесс (PLAN F4).
+     * Версия формата payload, которой пишутся новые строки. Незавершённые операции переживают
+     * обновление приложения: неизвестную версию работник пропускает и называет, а не роняет
+     * процесс (PLAN F4). Версия 2 — пересчёт стал разницей `seen → actual` (C1); прежний нёс одно
+     * абсолютное число, и увиденного человеком из него не восстановить.
      */
-    const val PAYLOAD_VERSION = 1
+    const val PAYLOAD_VERSION = 2
+
+    /** С какой версии вид пишется нынешним форматом; остальные виды с версии 1 не менялись. */
+    private fun currentSince(kind: String): Int = if (kind == PACKAGE_CORRECT_STOCK) 2 else 1
 
     fun kindOf(command: SyncCommand): String = when (command) {
         is PackageSyncCommand -> when (command) {
@@ -96,7 +101,7 @@ object SyncCommandStorageConverter {
         payloadVersion: Int,
         vocabulary: Vocabulary
     ): SyncCommand? {
-        if (payloadVersion != PAYLOAD_VERSION) return null
+        if (payloadVersion !in currentSince(kind)..PAYLOAD_VERSION) return null
         val fields = runCatching { json.parseToJsonElement(payload) as JsonObject }.getOrNull()
             ?: throw IllegalArgumentException("payload команды «$kind» не разбирается")
         return try {
@@ -123,6 +128,7 @@ object SyncCommandStorageConverter {
         )
         PACKAGE_CORRECT_STOCK -> PackageSyncCommand.CorrectStock(
             packageId = fields.uuid("packageId"),
+            seen = fields.quantity("seen", vocabulary),
             actual = fields.quantity("actual", vocabulary)
         )
         PACKAGE_MOVE -> PackageSyncCommand.Move(
@@ -171,7 +177,10 @@ object SyncCommandStorageConverter {
                 put("before", factsObject(command.before))
                 put("after", factsObject(command.after))
             }
-            is PackageSyncCommand.CorrectStock -> putQuantity("actual", command.actual)
+            is PackageSyncCommand.CorrectStock -> {
+                putQuantity("seen", command.seen)
+                putQuantity("actual", command.actual)
+            }
             is PackageSyncCommand.Move ->
                 put("targetMedKitId", JsonPrimitive(command.targetMedKitId.toString()))
             is PackageSyncCommand.Delete -> Unit

@@ -15,6 +15,7 @@ import androidx.work.testing.WorkManagerTestInitHelper
 import androidx.work.workDataOf
 import com.kert0n.medapp.fixture.INTAKE
 import com.kert0n.medapp.fixture.PACK
+import com.kert0n.medapp.fixture.Scenarios
 import com.kert0n.medapp.fixture.dose
 import com.kert0n.medapp.fixture.inMemoryDatabase
 import com.kert0n.medapp.fixture.queueStorage
@@ -107,7 +108,7 @@ class SyncBackgroundTest {
             .setInputData(workDataOf(SyncWorker.COME_BACK to comeBack))
             .setWorkerFactory(object : WorkerFactory() {
                 override fun createWorker(appContext: Context, workerClassName: String, workerParameters: WorkerParameters): ListenableWorker =
-                    SyncWorker(appContext, workerParameters, synchronization, clock)
+                    SyncWorker(appContext, workerParameters, synchronization, Scenarios(database, now).courseUpkeep, clock)
             })
             .build()
 

@@ -13,8 +13,8 @@ import kotlin.uuid.Uuid
  *
  * Сущность, тождество — [id] **эпизода**, общее с планом: ссылка приёма на него не повисает и
  * после того, как план уничтожен, а значит «что принималось по этому поводу» отвечается ею одной.
- * [prescription] — снимок: пока план жив, оно то же самое в обоих; единственное, что в нём
- * правится, — число доз, и переписывает его та же транзакция, что и у плана (PLAN F5). Состав
+ * [prescription] — снимок: пока план жив, оно то же самое в обоих; изменение лечения переписывает
+ * его той же транзакцией, что и план (PLAN F5). Состав
  * пачек уходит с планом: из какой пачки приняли, записано в приёме.
  */
 class CourseRecord(
@@ -51,12 +51,10 @@ class CourseRecord(
     fun rename(title: String, note: String?): CourseRecord =
         CourseRecord(id, title, note, prescription, startedAt, outcome, closedAt)
 
-    /** Снимок назначения идёт за планом: число доз поправили — запись говорит то же самое. */
-    fun withTotalDoses(totalDoses: Doses): CourseRecord {
-        check(isOpen) { "у законченного лечения число доз не правится" }
-        return CourseRecord(
-            id, title, note, prescription.withTotalDoses(totalDoses), startedAt, outcome, closedAt
-        )
+    /** Снимок назначения идёт за планом: лечение изменили — запись говорит то же самое (PLAN D5). */
+    fun withPrescription(prescription: Prescription): CourseRecord {
+        check(isOpen) { "у законченного лечения назначение не правится" }
+        return CourseRecord(id, title, note, prescription, startedAt, outcome, closedAt)
     }
 
     /**
@@ -82,7 +80,7 @@ class CourseRecord(
         /** Календарь закончился, неотвеченных пунктов не осталось. */
         COMPLETED,
 
-        /** Человек отменил — в том числе как половину замены лечения (PLAN D5). */
+        /** Человек отменил лечение (PLAN D5). Изменение лечения эпизод не закрывает. */
         CANCELLED
     }
 

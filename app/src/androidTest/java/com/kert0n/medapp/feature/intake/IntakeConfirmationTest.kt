@@ -8,6 +8,7 @@ import com.kert0n.medapp.domain.intake.IntakeRejected
 import com.kert0n.medapp.domain.intake.IntakeStatus
 import com.kert0n.medapp.domain.medkit.MedKit
 import com.kert0n.medapp.domain.value.Doses
+import com.kert0n.medapp.feature.course.CourseCalendar
 import com.kert0n.medapp.feature.course.CourseClosing
 import com.kert0n.medapp.fixture.COURSE
 import com.kert0n.medapp.fixture.FIRST_PLANNED_AT
@@ -85,7 +86,7 @@ class IntakeConfirmationTest {
         val transactions = database.transactions()
         val clock = Clock.fixed(now, ZoneOffset.UTC)
         val service = QueueService(transactions, database.queueStorage())
-        confirmation = IntakeConfirmation(intakes, courses, packages, transactions, service, CourseClosing(courses, packages, service), clock)
+        confirmation = IntakeConfirmation(intakes, courses, packages, transactions, service, CourseClosing(courses, packages, service), CourseCalendar(intakes, packages), clock)
         packages.add(pack(quantity = tablets("20")))
     }
 
@@ -135,7 +136,7 @@ class IntakeConfirmationTest {
     fun anIntakeThatEmptiesTheLocalPackageEndsItAndDetachesTheSource() = runTest {
         activate()
         // Пачка на две таблетки: одна доза — и она кончилась.
-        packages.adjust(PackageAdjustment.Recount(PACK, tablets("2"), Uuid.random()), at = FIRST_PLANNED_AT)
+        packages.adjust(PackageAdjustment.Recount(PACK, tablets("2")), at = FIRST_PLANNED_AT)
 
         val confirmed = confirmation.confirm(INTAKE, PACK, dose("2"), FIRST_PLANNED_AT).getOrThrow()
 
@@ -160,7 +161,7 @@ class IntakeConfirmationTest {
     @Test
     fun anAnswerAboutThePastDoesNotMoveTheCourseBackwards() = runTest {
         activate()
-        packages.adjust(PackageAdjustment.Recount(PACK, tablets("2"), Uuid.random()), at = now)
+        packages.adjust(PackageAdjustment.Recount(PACK, tablets("2")), at = now)
 
         confirmation.confirm(INTAKE, PACK, dose("2"), FIRST_PLANNED_AT).getOrThrow()
 
@@ -227,8 +228,14 @@ class IntakeConfirmationTest {
         val first = planned(INTAKE, slots[0])
         activate(totalDoses = 2, planned = listOf(first, planned(OTHER_INTAKE, slots[1]), planned(third, slots[2])))
         miss(first)
+        // Отвечают назавтра после пропуска: день второго пункта ещё идёт, и пропуском он не стал.
+        val service = QueueService(database.transactions(), database.queueStorage())
+        val nextMorning = IntakeConfirmation(
+            intakes, courses, packages, database.transactions(), service, CourseClosing(courses, packages, service),
+            CourseCalendar(intakes, packages), Clock.fixed(slots[1].at, ZoneOffset.UTC)
+        )
 
-        confirmation.confirm(INTAKE, PACK, dose("2"), slots[0].at).getOrThrow()
+        nextMorning.confirm(INTAKE, PACK, dose("2"), slots[0].at).getOrThrow()
 
         assertEquals(IntakeStatus.TAKEN, requireNotNull(intakes.find(INTAKE)).status)
         assertEquals(IntakeStatus.PLANNED, requireNotNull(intakes.find(OTHER_INTAKE)).status)
@@ -274,6 +281,23 @@ class IntakeConfirmationTest {
         assertEquals(IntakeRejected.Reason.UNIT_MISMATCH, (refused as IntakeRejected).reason)
         assertEquals(IntakeStatus.PLANNED, requireNotNull(intakes.find(INTAKE)).status)
         assertEquals(millilitres("100"), requireNotNull(packages.find(OTHER_PACK)).quantity)
+    }
+
+    /**
+     * Доза и пункт в таблетках, а пачку теперь считают в миллилитрах, и их меньше дозы: числа
+     * разных единиц не сравниваются — отказ по единице, а не по нехватке.
+     *
+     * Красная проверка: сравнить числа до акта по пачке — `INSUFFICIENT`.
+     */
+    @Test
+    fun aSmallPackageInAnotherUnitIsRefusedByUnitNotByShortage() = runTest {
+        activate()
+        packages.add(pack(id = OTHER_PACK, quantity = millilitres("1")))
+
+        val refused = confirmation.confirm(INTAKE, OTHER_PACK, dose("2"), FIRST_PLANNED_AT).exceptionOrNull()
+
+        assertEquals(IntakeRejected.Reason.UNIT_MISMATCH, (refused as IntakeRejected).reason)
+        assertEquals(IntakeStatus.PLANNED, requireNotNull(intakes.find(INTAKE)).status)
     }
 
     /**

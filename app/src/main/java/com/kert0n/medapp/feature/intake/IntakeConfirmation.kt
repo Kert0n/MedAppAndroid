@@ -4,7 +4,9 @@ import com.kert0n.medapp.domain.course.CourseCompletion
 import com.kert0n.medapp.domain.course.CourseProgress
 import com.kert0n.medapp.domain.pack.PackageAfter
 import com.kert0n.medapp.domain.pack.PackageAvailability
+import com.kert0n.medapp.feature.course.CourseCalendar
 import com.kert0n.medapp.feature.course.CourseClosing
+import com.kert0n.medapp.feature.course.openPlan
 import com.kert0n.medapp.domain.intake.CourseIntake
 import com.kert0n.medapp.domain.intake.IntakeProjection
 import com.kert0n.medapp.domain.intake.IntakeRejected
@@ -42,6 +44,7 @@ class IntakeConfirmation @Inject constructor(
     private val transactions: Transactions,
     private val queue: QueueService,
     private val closing: CourseClosing,
+    private val calendar: CourseCalendar,
     private val clock: Clock
 ) {
 
@@ -62,13 +65,25 @@ class IntakeConfirmation @Inject constructor(
             return Result.success(Confirmed(intake.projection(), sync.accounting, episodeClosed = !record.isOpen))
         }
         if (!record.isOpen) return rejected(IntakeRejected.Reason.EPISODE_CLOSED)
-        val course = checkNotNull(courses.findPlan(intake.courseId)) { "у идущего эпизода есть план" }
+        val course = courses.openPlan(intake.courseId)
         val pkg = packages.find(packageId) ?: return rejected(IntakeRejected.Reason.PACKAGE_UNUSABLE)
         if (amount.unit != intake.unit) return rejected(IntakeRejected.Reason.UNIT_MISMATCH)
+        // Акт по пачке — первым: он сверяет единицу коробки, а сравнивать числа разных единиц
+        // нечем. Единица источника, проверенная при подключении, могла прийти другой снимком.
+        val taken = pkg.take(amount, at).getOrElse { return Result.failure(it) }
+        // Своя коробка списывается здесь же, и списать больше, чем в ней есть, нечем; у общей
+        // истина по количеству — сервер, и нехватку отвечает он (PLAN E3).
+        if (!pkg.medKit.answersToServer && !pkg.quantity.covers(amount)) {
+            return rejected(IntakeRejected.Reason.INSUFFICIENT)
+        }
         // Пункт курса принимают из пачки курса; из любой другой это внеплановый факт, и пункт им
-        // не закрывается (PLAN D5). Отказ — до `take`: не записано ничего.
+        // не закрывается (PLAN D5).
         if (!course.isSource(pkg.ref)) return rejected(IntakeRejected.Reason.PACKAGE_NOT_A_SOURCE)
-        val confirmed = intake.confirm(pkg.take(amount, at).getOrElse { return Result.failure(it) })
+        // Прошлое до ответа, но после всех отказов — отказ не пишет ничего: неответ, чей день
+        // кончился, — пропуск. Иначе конец лечения этим приёмом отменил бы такие пункты, а
+        // отменённый пропуском уже не станет (PLAN D6).
+        calendar.missOverdue(course, now)
+        val confirmed = intake.confirm(taken)
 
         val others = intakes.ofCourse(course.id).filterIsInstance<CourseIntake>().filter { it != intake }
         val progress = CourseProgress(
@@ -117,7 +132,7 @@ class IntakeConfirmation @Inject constructor(
             // Снятие брони с этой пачки уже уехало зависимым от расхода — второй раз не ставится.
             closing.close(course, completion.close(record, intakes.ofCourse(course.id).filterIsInstance<CourseIntake>(), now), now, except = pkg.ref)
         } else {
-            intakes.prunePlanned(course.id, course.remainingOccurrences(progress).toSet())
+            calendar.prune(course, course.remainingOccurrences(progress).toSet(), now)
         }
         return Result.success(Confirmed(confirmed.projection(), sync.accounting, episodeClosed = finished))
     }

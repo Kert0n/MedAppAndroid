@@ -1,9 +1,7 @@
 package com.kert0n.medapp.domain.pack
 
 import com.kert0n.medapp.domain.value.Quantity
-import java.time.Instant
 import java.time.LocalDate
-import java.time.ZoneId
 import kotlin.uuid.Uuid
 
 /**
@@ -51,38 +49,6 @@ data class PackageAvailability(
      * серверная бронь отстаёт от локального выделения на то, что ещё не уехало (D4).
      */
     val freeForAnyone: Quantity get() = availableToMe.minusOrZero(myAllocation)
-
-    /**
-     * Что останется к концу [date] в зоне отчёта, если до этого момента из пачки уйдёт [spent].
-     *
-     * Сколько уйдёт — считают курсы: сколько приёмов впереди и чем они обеспечены, знают они, а
-     * пачке остаётся вычесть названное число. Дата **включительна**: момент прогноза — начало
-     * следующих суток в зоне отчёта, и приёмы этого дня уже вычтены.
-     *
-     * Горизонт — не дальше трёх календарных месяцев (ТЗ 4.1.1.10): дальше расписание и остатки
-     * значат слишком мало, чтобы обещать число.
-     */
-    fun forecastOn(
-        date: LocalDate,
-        reportZone: ZoneId,
-        now: Instant,
-        spent: Quantity = Quantity.zero(effective.unit)
-    ): PackageForecast {
-        // `atZone().toLocalDate()`: `LocalDate.ofInstant` требует API 34 при нижней границе 29.
-        val todayThere = now.atZone(reportZone).toLocalDate()
-        require(!date.isBefore(todayThere)) { "прогноз считается вперёд, а не назад: $date" }
-        require(!date.isAfter(todayThere.plusMonths(PackageForecast.MAX_MONTHS))) {
-            "горизонт прогноза — ${PackageForecast.MAX_MONTHS} календарных месяца, запрошено $date"
-        }
-        return PackageForecast(
-            packageId = packageId,
-            at = date.plusDays(1).atStartOfDay(reportZone).toInstant(),
-            remaining = effective.minusOrZero(spent),
-            reservedByOthers = reservedByOthers,
-            // Просрочка помечается на дату отчёта: к третьему месяцу годной пачка быть перестанет.
-            expired = isExpiredOn(date)
-        )
-    }
 
     /** Просрочка только помечает: количество не списывается, пачка остаётся источником. */
     fun isExpiredOn(date: LocalDate): Boolean = expiresOn?.isExpiredOn(date) == true

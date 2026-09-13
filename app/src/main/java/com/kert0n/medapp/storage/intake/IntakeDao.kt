@@ -9,6 +9,7 @@ import androidx.room.Upsert
 import com.kert0n.medapp.domain.intake.IntakeStatus
 import com.kert0n.medapp.queue.intake.IntakeAccounting
 import java.time.Instant
+import java.time.LocalDate
 import kotlin.uuid.Uuid
 import kotlinx.coroutines.flow.Flow
 
@@ -25,10 +26,6 @@ interface IntakeDao {
 
     @Transaction
     @Query("SELECT * FROM intakes WHERE course_id = :courseId ORDER BY scheduled_at")
-    fun observeOfCourse(courseId: Uuid): Flow<List<IntakeStorageRow>>
-
-    @Transaction
-    @Query("SELECT * FROM intakes WHERE course_id = :courseId ORDER BY scheduled_at")
     suspend fun ofCourse(courseId: Uuid): List<IntakeStorageRow>
 
     @Transaction
@@ -37,6 +34,33 @@ interface IntakeDao {
             "ORDER BY scheduled_at"
     )
     suspend fun plannedBefore(until: Instant): List<IntakeStorageRow>
+
+    /**
+     * Мои состоявшиеся приёмы с моментом в полуинтервале [from, until) — курсовые и разовые, со
+     * ссылками на записи о коробках (PLAN H6). Пропуск и отмена — не приём, и условие по
+     * `TAKEN`, а не «не план».
+     */
+    @Transaction
+    @Query(
+        "SELECT * FROM intakes WHERE status = 'TAKEN' AND answered_at >= :from AND answered_at < :until " +
+            "ORDER BY answered_at"
+    )
+    suspend fun takenBetween(from: Instant, until: Instant): List<IntakeStorageRow>
+
+    /** Записанные календарём пункты всех курсов на день [date] — день курса в его зоне (PLAN H6). */
+    @Transaction
+    @Query("SELECT * FROM intakes WHERE course_id IS NOT NULL AND scheduled_on = :date ORDER BY scheduled_at")
+    suspend fun scheduledOn(date: LocalDate): List<IntakeStorageRow>
+
+    /** Разовые приёмы с моментом в полуинтервале [from, until). */
+    @Transaction
+    @Query("SELECT * FROM intakes WHERE course_id IS NULL AND answered_at >= :from AND answered_at < :until ORDER BY answered_at")
+    suspend fun unplannedBetween(from: Instant, until: Instant): List<IntakeStorageRow>
+
+    /** Пункты нескольких курсов — порцией, которую называет вызывающий (`chunkedForQuery`). */
+    @Transaction
+    @Query("SELECT * FROM intakes WHERE course_id IN (:courseIds) ORDER BY scheduled_at")
+    suspend fun ofCourses(courseIds: List<Uuid>): List<IntakeStorageRow>
 
     @Upsert
     suspend fun upsert(intake: IntakeStorageEntity)

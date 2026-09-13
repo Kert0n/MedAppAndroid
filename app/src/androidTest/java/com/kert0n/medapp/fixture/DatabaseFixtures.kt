@@ -70,7 +70,7 @@ suspend fun rejectedByDatabase(block: suspend () -> Unit): Throwable =
  * владельцев несколько DAO; собирать их в каждом тесте заново значило бы повторять граф руками.
  */
 fun MedAppDatabase.packageRepository() = com.kert0n.medapp.storage.pack.PackageRoomRepository(
-    this, packages(), courses(), stockMovements(), syncOperations(), vocabulary()
+    this, packages(), courses(), syncOperations(), vocabulary()
 )
 
 fun MedAppDatabase.courseRepository() = com.kert0n.medapp.storage.course.CourseRoomRepository(
@@ -78,7 +78,7 @@ fun MedAppDatabase.courseRepository() = com.kert0n.medapp.storage.course.CourseR
 )
 
 fun MedAppDatabase.intakeRepository() = com.kert0n.medapp.storage.intake.IntakeRoomRepository(
-    this, intakes(), packages(), courses(), stockMovements(), vocabulary()
+    this, intakes(), packages(), courses(), vocabulary()
 )
 
 fun MedAppDatabase.medKitRepository() = com.kert0n.medapp.storage.medkit.MedKitRoomRepository(
@@ -89,17 +89,22 @@ fun MedAppDatabase.queueRepository() = com.kert0n.medapp.storage.server.SyncOper
     syncOperations(), vocabulary()
 )
 
+/** Отчёты личного кабинета — одним снимком базы (PLAN H6). */
+fun MedAppDatabase.reportRepository() = com.kert0n.medapp.storage.report.ReportRoomRepository(
+    this, intakes(), packages(), courses(), vocabulary()
+)
+
 /** «Одна транзакция» — узкий порт поверх той же базы (PLAN F5). */
 fun MedAppDatabase.transactions() = com.kert0n.medapp.storage.database.RoomTransactions(this)
 
 /** Порт очереди для работника — транзакции взятия и применения исхода. */
 fun MedAppDatabase.queueStorage() = com.kert0n.medapp.storage.server.QueueRoomStorage(
-    this, syncOperations(), packages(), intakes(), medKits(), courses(), stockMovements(), vocabulary()
+    this, syncOperations(), packages(), intakes(), medKits(), courses(), vocabulary()
 )
 
 /** Порт полного снимка — укладка целиком одной транзакцией; полка с сервера зовётся как в ресурсах. */
 fun MedAppDatabase.snapshotStorage() = com.kert0n.medapp.storage.server.SnapshotRoomStorage(
-    this, medKits(), packages(), courses(), stockMovements(), vocabulary(), syncOperations(),
+    this, medKits(), packages(), courses(), vocabulary(), syncOperations(),
     arrivedName = "Общая аптечка"
 )
 
@@ -131,16 +136,51 @@ class Scenarios(database: MedAppDatabase, now: java.time.Instant) {
     private val queue = database.queueService()
     private val transactions = database.transactions()
 
+    val packageAdding = com.kert0n.medapp.feature.packages.PackageAdding(packages, medKits, queue, transactions, clock)
+    val packageDescribing = com.kert0n.medapp.feature.packages.PackageDescribing(packages, queue, transactions, clock)
     val packageRemoval = com.kert0n.medapp.feature.packages.PackageRemoval(
         packages, queue, transactions, clock
     )
     val packageRelocation = com.kert0n.medapp.feature.packages.PackageRelocation(
         packages, medKits, courses, queue, transactions, clock
     )
+    val medKitKeeping = com.kert0n.medapp.feature.medkits.MedKitKeeping(medKits, transactions, clock)
     val medKitRemoval = com.kert0n.medapp.feature.medkits.MedKitRemoval(
         medKits, packages, packageRemoval, packageRelocation, queue, transactions, clock
     )
     val medKitPublishing = com.kert0n.medapp.feature.medkits.MedKitPublishing(
         medKits, packages, packageRelocation, queue, transactions, clock
+    )
+    val courseDrafting = com.kert0n.medapp.feature.course.CourseDrafting(courses, packages, transactions, clock)
+    val courseCalendar = com.kert0n.medapp.feature.course.CourseCalendar(database.intakeRepository(), packages)
+    val courseClamping = com.kert0n.medapp.feature.course.CourseClamping(
+        courses, database.intakeRepository(), packages, courseCalendar, queue
+    )
+    val packageAdjusting = com.kert0n.medapp.feature.packages.PackageAdjusting(packages, courseClamping, queue, transactions, clock)
+    val unplannedIntakeRecording = com.kert0n.medapp.feature.intake.UnplannedIntakeRecording(
+        database.intakeRepository(), courses, packages, courseClamping, queue, transactions, clock
+    )
+    val courseUpkeep = com.kert0n.medapp.feature.course.CourseUpkeep(courses, courseCalendar, transactions, clock)
+    val courseActivation = com.kert0n.medapp.feature.course.CourseActivation(
+        courses, packages, courseCalendar, queue, transactions, clock
+    )
+    val courseClosing = com.kert0n.medapp.feature.course.CourseClosing(courses, packages, queue)
+    val courseCancellation = com.kert0n.medapp.feature.course.CourseCancellation(
+        courses, database.intakeRepository(), courseCalendar, courseClosing, transactions, clock
+    )
+    val courseAmendment = com.kert0n.medapp.feature.course.CourseAmendment(
+        courses, database.intakeRepository(), packages, courseCalendar, courseClosing, queue, transactions, clock
+    )
+    val sourceEditing = com.kert0n.medapp.feature.course.SourceEditing(
+        courses, database.intakeRepository(), packages, courseCalendar, queue, transactions, clock
+    )
+    val intakeDeclining = com.kert0n.medapp.feature.intake.IntakeDeclining(
+        database.intakeRepository(), courses, courseCalendar, transactions, clock
+    )
+    val courseOffPlanCounting = com.kert0n.medapp.feature.course.CourseOffPlanCounting(
+        courses, database.intakeRepository(), courseCalendar, courseClamping, courseClosing, transactions, clock
+    )
+    val intakeConfirmation = com.kert0n.medapp.feature.intake.IntakeConfirmation(
+        database.intakeRepository(), courses, packages, transactions, queue, courseClosing, courseCalendar, clock
     )
 }

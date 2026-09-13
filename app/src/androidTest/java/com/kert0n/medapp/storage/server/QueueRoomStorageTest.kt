@@ -43,7 +43,6 @@ import com.kert0n.medapp.fixture.activeCourse
 import com.kert0n.medapp.fixture.save
 import com.kert0n.medapp.fixture.source
 import com.kert0n.medapp.domain.course.Revision
-import com.kert0n.medapp.domain.stock.StockMovement
 import com.kert0n.medapp.storage.course.ActivePackageAssignmentStorageEntity
 import com.kert0n.medapp.storage.course.toSourceStorageEntities
 import com.kert0n.medapp.storage.course.toStorageEntity as toCourseStorageEntity
@@ -143,14 +142,7 @@ class QueueRoomStorageTest {
         assertEquals(tablets("17"), request.quantityBefore)
         assertEquals(tablets("4"), request.mineBefore)
         assertEquals(tablets("17"), requireNotNull(database.packageRepository().find(PACK)).quantity)
-        // Команда ещё не уходила — разницу между 20 и 17 объяснить нам нечем: это чужое (PLAN D7).
-        assertEquals(listOf(BigDecimal("-3")), remoteChanges())
     }
-
-    /** Чужие изменения пачки в истории — как их записала дверь снимка. */
-    private suspend fun remoteChanges(): List<BigDecimal> =
-        database.stockMovements().ofPackage(PACK).map { it.toDomain(VOCABULARY) }
-            .filterIsInstance<StockMovement.RemoteChange>().map { it.delta.stripTrailingZeros() }
 
     @Test
     fun takingAgainDoesNotRebuildTheRequest() = runTest {
@@ -196,25 +188,6 @@ class QueueRoomStorageTest {
         assertEquals(IntakeAccounting.REMOTE_APPLIED, requireNotNull(database.intakes().findEntity(INTAKE)).accounting)
         assertEquals(IntakeStatus.TAKEN, requireNotNull(database.intakes().findEntity(INTAKE)).status)
         assertTrue(storage.ready(at.plusSeconds(600)).isEmpty())
-        // 20 − 3 = 17: всю разницу объясняет наш расход, и чужого изменения в истории нет — иначе
-        // он попал бы туда дважды, приёмом и разницей (PLAN D7).
-        assertEquals(emptyList<BigDecimal>(), remoteChanges())
-    }
-
-    /** Ответ на наш расход увидел ещё и соседа: в историю идёт только то, чего мы не объясняем. */
-    @Test
-    fun anAnswerThatSawANeighbourWritesOnlyTheUnexplainedRemainder() = runTest {
-        database.syncOperations().enqueue(operation, PackageSyncCommand.Consume(PACK, dose("3"), INTAKE), at)
-        storage.take(operation, null, at)
-
-        storage.settle(
-            operation,
-            Delivery.Applied(PackageState.Present(resolved(snapshotJson.replace("17.000000", "15.000000")))),
-            at.plusSeconds(1)
-        )
-
-        assertEquals(tablets("15"), requireNotNull(database.packageRepository().find(PACK)).quantity)
-        assertEquals(listOf(BigDecimal("-2")), remoteChanges())
     }
 
     @Test
@@ -230,7 +203,7 @@ class QueueRoomStorageTest {
         assertEquals(tablets("20"), requireNotNull(database.packages().find(PACK)).toDomain(VOCABULARY).quantity)
     }
 
-    /** На сервере пачки нет по нашей же причине: коробки нет, движения нет, курс без источника (D3, D7). */
+    /** На сервере пачки нет по нашей же причине: коробки нет, курс без источника (D3). */
     @Test
     fun packageGoneFromTheServerIsGoneLocally() = runTest {
         holdByACourse()
@@ -240,14 +213,13 @@ class QueueRoomStorageTest {
         storage.settle(operation, Delivery.Applied(PackageState.Gone), at.plusSeconds(1))
 
         assertNull(database.packages().find(PACK))
-        assertTrue(database.stockMovements().ofPackage(PACK).isEmpty())
         assertEquals(emptyList<Uuid>(), database.courses().sourcePackagesOf(COURSE))
         assertEquals(Revision(2), requireNotNull(database.courses().findPlan(COURSE)).toPlan(VOCABULARY).revision)
     }
 
-    /** Доступ утрачен: последний виденный остаток уходит в историю, коробки и источника нет. */
+    /** Доступ утрачен: коробки и источника нет. */
     @Test
-    fun accessLostRemovesThePackageAndWritesTheLossDown() = runTest {
+    fun accessLostRemovesThePackage() = runTest {
         holdByACourse()
         database.syncOperations().enqueue(operation, PackageSyncCommand.Consume(PACK, dose("3"), INTAKE), at)
         storage.take(operation, null, at)
@@ -255,9 +227,6 @@ class QueueRoomStorageTest {
         storage.settle(operation, Delivery.AccessLost, at.plusSeconds(1))
 
         assertNull(database.packages().find(PACK))
-        val loss = database.stockMovements().ofPackage(PACK).single().toDomain(VOCABULARY) as StockMovement.AccessLoss
-        assertEquals(tablets("20"), loss.amount)
-        assertEquals(at.plusSeconds(1), loss.observedAt)
         assertEquals(emptyList<Uuid>(), database.courses().sourcePackagesOf(COURSE))
         assertTrue(storage.ready(at.plusSeconds(600)).isEmpty())
     }
