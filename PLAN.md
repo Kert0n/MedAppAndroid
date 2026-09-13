@@ -715,8 +715,17 @@ data class PackageFacts(
 пачка; переименованная аптечка — та же аптечка. Тождество — `id`, равенство по нему, `data class`
 здесь неверен: он утверждает, что смена поля даёт другой объект. Отсюда и отсутствие публичного
 `copy()`: состояние меняют переходы, а публичный конструктор всегда проверяет инварианты. Поэтому
-и новый объект, и восстановленный из базы не могут представить пустую пачку; сценарий добавления
-отдельно требует положительный начальный остаток.
+и новый объект, и восстановленный из базы не могут представить пустую пачку — и сценарию
+добавления повторять это нечем и незачем.
+
+**Коробка заводится целым действием — `feature/packages/PackageAdding`.** Человек кладёт
+купленную коробку на полку: сведения (`PackageFacts`), остаток в единице, полка, карточка
+справочника, из которой заполнили (`templateId`). Коробка существует с момента записи: запись о
+ней, живая строка и детали ложатся одной транзакцией (F1), `addedAt` — этот момент. На полку,
+помеченную уборкой, не кладут (`allowsUse`). Если полка отвечает серверу (D2), коробку узнают и
+остальные: следом в той же транзакции встаёт `Create`, а коробка помечена `CHANGING` до ответа —
+пользоваться ею можно, а первое подтверждённое число принесёт ответ на её создание (E1). Броней
+у новой коробки нет: курс её ещё не держит.
 
 **Коробка — живая пачка и вечная запись** (решение владельца 2026-09-12, зеркало лечения D5).
 Строка `packages` играла две роли: «коробка, которая у меня есть» и «то, за что держатся приёмы».
@@ -2437,6 +2446,7 @@ sealed interface MedKitSyncCommand {
 | исход операции (`QueueStorage.settle`)| статус операции, снимок пачки и брони — каждая половина по своей версии, — учёт факта (`REMOTE_APPLIED`/`REMOTE_REFUSED`), каскад зависимых; ответ записан раньше (`answered`)                                 |
 | взятие в отправку (`QueueStorage.take`)| применение прочитанного состояния, подготовка запроса по нему и `SENDING`                                                                                   |
 | снимок                                | серверные поля, только создание недостающих деталей, отключение недоступных источников, пересчёт обеспечения                          |
+| добавление коробки (`PackageAdding`)  | запись о коробке, живая строка и детали; на полке, отвечающей серверу, — `Create` и пометка `CHANGING`; полка помечена уборкой — отказ (D3)         |
 | черновик (`CourseDrafting`)           | переход к черновику, прочитанному той же транзакцией, условно по редакции; черновик, ставший лечением, не затирается; пачек не занимает, команд не ставит |
 | правка источников (`SourceEditing`)   | состав, порядок и выделения, назначения пачек, будущие плановые пункты и команды броней разницей — условно по редакции                   |
 | изменение лечения (`CourseAmendment`) | прошедшие неотвеченные — `MISSED`, план и снимок записи вместе условно по редакции, зажим выделений, перестроенные будущие пункты, брони |
@@ -2606,7 +2616,7 @@ com.kert0n.medapp
 ├─ platform/   notifications/, scanner/, credentials/, connectivity/ (SyncTriggers), clipboard/,
 │              background/ (SyncWorker, WorkManagerSyncSchedule)
 └─ feature/    bootstrap/ (AppStart, AppStartState, AppStartViewModel, SetupScreen),
-               medkits/ (MedKitKeeping, MedKitRemoval, MedKitPublishing, MedKitJoining, MedKitInvitation), packages/ (PackageRemoval, PackageRelocation),
+               medkits/ (MedKitKeeping, MedKitRemoval, MedKitPublishing, MedKitJoining, MedKitInvitation), packages/ (PackageAdding, PackageRemoval, PackageRelocation),
                course/ (CourseClosing, CourseDrafting, CourseCalendar, CourseUpkeep, CourseActivation,
                CourseCancellation, CourseAmendment, SourceEditing), schedule/, intake/ (IntakeConfirmation), sharing/, analytics/,
                scanner/, settings/, syncstatus/
@@ -3140,7 +3150,7 @@ data class PackageQuery(
 | 2 | `PLAN: истории коробки нет, а действие над общей пачкой — разница` | **сделан**: C1, D7, E3, I2 |
 | 3 | `У коробки нет истории — есть запись и приёмы` | **сделан**: ушли `StockMovement`, `stock_adjustments` (версия 3 не выпущена — `3.json` и 2→3 правятся на месте), след у `PackageEnding`, `Package.changedElsewhere`, разница в `PackageDao.applySnapshot` и `LayDown.includes`, `StockMovementStorageRepository`; четыре конца коробки — один `Package.ended()`; D3, E1, E4, F1, F2, F4, F5, H1 |
 | 4 | `Полка заводится и переименовывается названными полями` | **сделан**: `feature/medkits/MedKitKeeping` — `create`, `describe` названными полями к прочитанному; порт — `add` и `describe` вместо `save`, долг в `WriteContractTest` закрыт; D2, F5, H1 |
-| 5 | `Пачка заводится целиком` | `feature/packages/PackageAdding`: запись, живая строка, детали; на общей полке — `Create`, пометка `CHANGING`; `templateId` из справочника |
+| 5 | `Пачка заводится целиком` | **сделан**: `feature/packages/PackageAdding` — запись, живая строка, детали одной транзакцией; на полке, отвечающей серверу, — `Create` и `CHANGING`, ответ кладёт первое число и снимает пометку; `templateId` из справочника; D3, F5, H1 |
 | 6 | `Чужая правка не сбрасывает мою` | команды — разница: `CorrectStock(seen, actual)` и утилизация поверх свежего числа, `Describe` — своими полями, `Move`/`Delete` — переподготовка; `onStale` переподготовки, `CONFLICT` — где соотнести нельзя (E3) |
 | 7 | `Сведения пачки правятся, общее уезжает командой` | `feature/packages/PackageDescribing`: личное локально, общее — `Describe(before, after)` |
 | 8 | `Пересчёт и утилизация меняют число` | `feature/packages/PackageAdjusting`: в ноль — конец коробки; зажим выделений курсов, брони разницей; на общей полке — `CorrectStock` |

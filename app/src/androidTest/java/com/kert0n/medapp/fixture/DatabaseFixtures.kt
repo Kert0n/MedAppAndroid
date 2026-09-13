@@ -131,6 +131,7 @@ class Scenarios(database: MedAppDatabase, now: java.time.Instant) {
     private val queue = database.queueService()
     private val transactions = database.transactions()
 
+    val packageAdding = com.kert0n.medapp.feature.packages.PackageAdding(packages, medKits, queue, transactions, clock)
     val packageRemoval = com.kert0n.medapp.feature.packages.PackageRemoval(
         packages, queue, transactions, clock
     )
