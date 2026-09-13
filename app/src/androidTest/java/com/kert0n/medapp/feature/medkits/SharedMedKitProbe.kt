@@ -108,9 +108,16 @@ class SharedMedKitProbe {
     @After
     fun close(): Unit = runBlocking {
         if (ProbeAccounts.skipReason != null) return@runBlocking
+        // Полку, из которой Анна вышла, она удалить не может: сервер отвечает ей «нет такой», а у
+        // Бориса полка жива. Поэтому убирают за собой оба, и верит проба не отказу на удаление —
+        // `NotFound` не говорит, нет полки или нет доступа, — а тому, что полки не видит никто.
         val left = shelves.filter { shelf ->
-            val result = anna.api.deleteMedKit(shelf)
-            result is ApiResult.Failure && result.failure != ApiFailure.NotFound
+            anna.api.deleteMedKit(shelf)
+            boris.api.deleteMedKit(shelf)
+            listOf(anna, boris).any { device ->
+                val seen = device.api.medKit(shelf)
+                seen !is ApiResult.Failure || seen.failure != ApiFailure.NotFound
+            }
         }
         anna.database.close()
         boris.database.close()
