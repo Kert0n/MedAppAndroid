@@ -190,7 +190,7 @@ class UnplannedIntakeRecordingTest {
     @Test
     fun aBoxWaitingForItsRemovalTakesNoIntake() = runTest {
         local()
-        database.packageRepository().mark(PACK, PackageStatus.REMOVING)
+        database.packageRepository().mark(PACK, PackageStatus.REMOVING, by = Uuid.random())
 
         assertEquals(
             UnplannedIntakeRecording.Outcome.Rejected(IntakeRejected.Reason.PACKAGE_UNUSABLE),

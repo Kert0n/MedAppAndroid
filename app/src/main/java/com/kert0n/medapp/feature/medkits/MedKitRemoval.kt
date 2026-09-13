@@ -58,9 +58,12 @@ class MedKitRemoval @Inject constructor(
             val leave = QueuedCommand(Uuid.random(), MedKitSyncCommand.Leave(medKitId))
             queue.change(medKit.ref, listOf(leave), now) {
                 // Коробки остаются остальным, а у нас до ответа только видны. Ждущую своего решения
-                // не трогаем — её отпустит её же команда (PLAN E1, E6).
+                // не трогаем — её отпустит её же команда (PLAN E1, E6). Пометки, поставленные
+                // здесь, принадлежат выходу: снимет их его ответ, а не первая доехавшая команда.
                 for (pkg in packages.contentsOf(medKitId)) {
-                    if (pkg.status.allowsUse) check(packages.mark(pkg.id, PackageStatus.LOST)) { "пачка прочитана этой же транзакцией" }
+                    if (pkg.status.allowsUse) {
+                        check(packages.mark(pkg.id, PackageStatus.LOST, by = leave.id)) { "пачка прочитана этой же транзакцией" }
+                    }
                 }
                 medKits.mark(medKitId, MedKitStatus.REMOVING)
             }
@@ -83,7 +86,7 @@ class MedKitRemoval @Inject constructor(
                 dependsOn = withdrawals.values.mapTo(HashSet()) { it.id }
             )
             queue.change(medKit.ref, withdrawals.values + delete, now) {
-                for (pkg in withdrawals.keys) relocation.carryHome(pkg, target.ref, now)
+                for ((pkg, withdrawal) in withdrawals) relocation.carryHome(pkg, target.ref, now, by = withdrawal.id)
                 medKits.mark(medKitId, MedKitStatus.REMOVING)
             }
             return@run Outcome.MARKED
@@ -96,7 +99,9 @@ class MedKitRemoval @Inject constructor(
             val fate = if (target == null) PackageStatus.REMOVING else PackageStatus.CHANGING
             queue.change(medKit.ref, listOf(delete), now) {
                 for (pkg in packages.contentsOf(medKitId)) {
-                    if (pkg.status.allowsUse) check(packages.mark(pkg.id, fate)) { "пачка прочитана этой же транзакцией" }
+                    if (pkg.status.allowsUse) {
+                        check(packages.mark(pkg.id, fate, by = delete.id)) { "пачка прочитана этой же транзакцией" }
+                    }
                 }
                 medKits.mark(medKitId, MedKitStatus.REMOVING)
             }

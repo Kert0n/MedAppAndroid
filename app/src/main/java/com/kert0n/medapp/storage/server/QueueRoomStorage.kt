@@ -3,7 +3,6 @@ package com.kert0n.medapp.storage.server
 import androidx.room.withTransaction
 import com.kert0n.medapp.domain.medkit.MedKitRef
 import com.kert0n.medapp.domain.medkit.MedKitStatus
-import com.kert0n.medapp.domain.pack.PackageStatus
 import com.kert0n.medapp.storage.medkit.toStorageEntity as toMedKitStorageEntity
 import com.kert0n.medapp.domain.pack.PackageAfter
 import com.kert0n.medapp.domain.value.Quantity
@@ -237,14 +236,14 @@ class QueueRoomStorage @Inject constructor(
     }
 
     /**
-     * Команда закрыта: каждая вещь, которой она касалась, отпускается, если других незакрытых
-     * команд у неё не осталось (PLAN E1). Касается команда двоих — коробки, если она о коробке, и
-     * полки, на которой команда действовала. Кончившейся вещи нет — отпускать нечего.
+     * Команда закрыта — и снимает ровно те пометки, которые сама поставила (PLAN E1). Их может быть
+     * несколько: решение полки метит всё её содержимое одной командой. Чужих пометок закрытие не
+     * касается: расход не отпускает коробку, которую решили выбросить. Кончившейся вещи нет —
+     * отпускать нечего, и запрос просто не найдёт её строки.
      */
     private suspend fun settled(id: Uuid) {
-        val operation = queue.find(id)?.operation ?: return
-        operation.packageId?.let { release(it) }
-        operation.medKitId?.let { releaseShelf(it) }
+        release(id)
+        queue.find(id)?.operation?.medKitId?.let { releaseShelf(it) }
     }
 
     /**
@@ -256,6 +255,9 @@ class QueueRoomStorage @Inject constructor(
      * собственных команд: их ставило то же решение.
      *
      * Непомеченную полку спрашивать не о чем — это обычный путь, и он ничего не стоит.
+     *
+     * Пометки своих коробок полка при этом не трогает: их поставила команда, и снимает их она же
+     * ([release]). Полка отвечает за себя.
      */
     private suspend fun releaseShelf(medKitId: Uuid) {
         val shelf = medKits.find(medKitId) ?: return
@@ -267,7 +269,6 @@ class QueueRoomStorage @Inject constructor(
         }
         if (unclosed > 0) return
         medKits.upsert(kit.settled().toMedKitStorageEntity(shelf.syncedAt))
-        for (row in packages.ofMedKit(medKitId)) release(row.pack.id)
     }
 
     /**
@@ -280,12 +281,17 @@ class QueueRoomStorage @Inject constructor(
         medKits.upsert(shelf.toDomain().published().toMedKitStorageEntity(syncedAt = at))
     }
 
-    /** Коробка без незакрытых команд возвращается в оборот; ждущая — нет: ответит её команда. */
-    private suspend fun release(packageId: Uuid) {
-        if (queue.unclosedOfPackages(listOf(packageId)).isNotEmpty()) return
-        val row = packages.find(packageId) ?: return
-        val pkg = row.toDomain(vocabulary.snapshot())
-        if (pkg.status != PackageStatus.ACTIVE) packages.save(pkg.settled(), row.pack.syncState())
+    /**
+     * Закрытая команда отпускает коробки, чью пометку поставила она сама, — и только их (PLAN E1).
+     * Решение живёт, пока не отвечено оно само: старая бронь, доехавшая позже, не возвращает в
+     * оборот коробку, которую полка уже решила выбросить.
+     */
+    private suspend fun release(operationId: Uuid) {
+        val words = vocabulary.snapshot()
+        for (row in packages.decidedBy(operationId)) {
+            val pkg = row.toDomain(words)
+            packages.save(pkg.settledBy(operationId), row.pack.syncState())
+        }
     }
 
     /**
@@ -313,10 +319,11 @@ class QueueRoomStorage @Inject constructor(
             val pkg = row.toDomain(words)
             when {
                 transferTo == null -> packages.end(pkg.ended(), courses, words, at)
-                // Переехавшая коробка отпускается ответом полки — там, куда её поставили: на прежней
-                // полке её уже не найти (PLAN E1). Едет она вместе с полкой, а не по своему
-                // решению, поэтому ждущая собственного ответа коробка переезжает наравне со всеми.
-                target != null -> packages.save(pkg.movedByAnswer(target), row.pack.syncState()).also { release(pkg.id) }
+                // Едет коробка вместе с полкой, а не по своему решению, поэтому ждущая
+                // собственного ответа переезжает наравне со всеми. Пометку снимет та команда,
+                // которая её поставила: у переехавших это как раз закрываемая сейчас команда
+                // полки, и снимет она их сама (PLAN E1).
+                target != null -> packages.save(pkg.movedByAnswer(target), row.pack.syncState())
                 else -> packages.end(pkg.ended(), courses, words, at)
             }
         }

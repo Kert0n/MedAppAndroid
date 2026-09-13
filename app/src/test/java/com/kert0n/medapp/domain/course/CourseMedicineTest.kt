@@ -16,6 +16,7 @@ import com.kert0n.medapp.fixture.schedule
 import com.kert0n.medapp.fixture.source
 import com.kert0n.medapp.fixture.tablets
 import java.math.BigDecimal
+import kotlin.uuid.Uuid
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertThrows
@@ -36,7 +37,7 @@ class CourseMedicineTest {
     @Test
     fun aBoxMarkedToGoIsNotAttached() {
         // Помеченной к уходу коробкой не пользуются — и лечение на неё не опирается (PLAN E1).
-        val attached = draftWithDose().attach(home.markRemoving(), doses = 5.doses, at = LATER)
+        val attached = draftWithDose().attach(home.markRemoving(Uuid.random()), doses = 5.doses, at = LATER)
         assertEquals(CourseRejected.Reason.PACKAGE_UNUSABLE, attached.rejection())
     }
 

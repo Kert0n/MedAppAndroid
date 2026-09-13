@@ -68,11 +68,12 @@ interface PackageStorageRepository {
     suspend fun end(ending: PackageEnding, at: Instant): Boolean
 
     /**
-     * Решение по коробке принято, а полка ещё не ответила: коробка получает пометку [status]
-     * своим переходом (PLAN E1). Снимает пометку не сценарий, а закрытие команды в очереди, поэтому
-     * `ACTIVE` сюда не передают. `false` — пачки больше нет.
+     * Решение по коробке принято, а полка ещё не ответила: коробка получает пометку [status] своим
+     * переходом и запоминает команду [by], которая решение везёт (PLAN E1). Снимает пометку не
+     * сценарий, а закрытие **этой** команды в очереди, поэтому `ACTIVE` сюда не передают.
+     * `false` — пачки больше нет.
      */
-    suspend fun mark(packageId: Uuid, status: PackageStatus): Boolean
+    suspend fun mark(packageId: Uuid, status: PackageStatus, by: Uuid): Boolean
 
     /**
      * Живые пачки аптечки — сущности для сценария, который разбирает её по коробкам в своей

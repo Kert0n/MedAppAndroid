@@ -73,7 +73,7 @@ class WriteContractTest {
         "PackageStorageRepository.add" to (Shape.CREATION by "(Package, PackageSyncState): Unit"),
         "PackageStorageRepository.describe" to (Shape.NAMED_FIELDS by "(Uuid, PackageFacts): Boolean"),
         "PackageStorageRepository.saveClaims" to (Shape.NAMED_FIELDS by "(Uuid, Claims): Unit"),
-        "PackageStorageRepository.mark" to (Shape.NAMED_FIELDS by "(Uuid, PackageStatus): Boolean"),
+        "PackageStorageRepository.mark" to (Shape.NAMED_FIELDS by "(Uuid, PackageStatus, Uuid): Boolean"),
         "PackageStorageRepository.end" to (Shape.ACTION by "(PackageEnding, Instant): Boolean"),
         "PackageStorageRepository.adjust" to (Shape.ACTION by "(PackageAdjustment, CourseReallocation, Instant): Boolean"),
         "PackageStorageRepository.applySnapshot" to (Shape.SNAPSHOT by "(PackageSnapshot, Instant): SnapshotApplied"),

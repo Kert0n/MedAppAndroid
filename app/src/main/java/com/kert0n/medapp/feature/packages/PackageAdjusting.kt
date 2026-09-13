@@ -73,8 +73,9 @@ class PackageAdjusting @Inject constructor(
             is Action.Recount -> PackageSyncCommand.CorrectStock(pkg.id, seen = action.seen, actual = action.actual)
             is Action.Dispose -> PackageSyncCommand.CorrectStock(pkg.id, seen = action.seen, actual = action.seen.minusOrZero(action.amount))
         }
-        queue.change(pkg.medKit, listOf(QueuedCommand(Uuid.random(), command)), now) {
-            check(packages.mark(pkg.id, PackageStatus.CHANGING)) { "пачка прочитана этой же транзакцией" }
+        val announced = QueuedCommand(Uuid.random(), command)
+        queue.change(pkg.medKit, listOf(announced), now) {
+            check(packages.mark(pkg.id, PackageStatus.CHANGING, by = announced.id)) { "пачка прочитана этой же транзакцией" }
             true
         }
         return checkNotNull(packages.projection(pkg.id)) { "пачка прочитана этой же транзакцией" }.availability.effective

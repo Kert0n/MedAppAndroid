@@ -64,12 +64,12 @@ class PackageRoomRepository @Inject constructor(
     override suspend fun describe(packageId: Uuid, facts: PackageFacts): Boolean =
         change(packageId) { it.describe(facts) }
 
-    override suspend fun mark(packageId: Uuid, status: PackageStatus): Boolean =
+    override suspend fun mark(packageId: Uuid, status: PackageStatus, by: Uuid): Boolean =
         change(packageId) {
             when (status) {
-                PackageStatus.CHANGING -> it.markChanging()
-                PackageStatus.REMOVING -> it.markRemoving()
-                PackageStatus.LOST -> it.markLost()
+                PackageStatus.CHANGING -> it.markChanging(by)
+                PackageStatus.REMOVING -> it.markRemoving(by)
+                PackageStatus.LOST -> it.markLost(by)
                 PackageStatus.ACTIVE -> throw IllegalArgumentException("пометку снимает ответ полки, а не решение")
             }
         }

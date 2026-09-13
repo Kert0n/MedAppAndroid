@@ -44,11 +44,11 @@ class PackageAdding @Inject constructor(
                 addedAt = now,
                 templateId = templateId
             )
-            val announced = if (medKit.answersToServer) pkg.markChanging() else pkg
             val create = QueuedCommand(
                 Uuid.random(),
                 PackageSyncCommand.Create(pkg.id, medKit.id, pkg.quantity, pkg.facts.shared)
             )
+            val announced = if (medKit.answersToServer) pkg.markChanging(create.id) else pkg
             queue.change(medKit.ref, listOf(create), now) {
                 packages.add(announced)
                 true

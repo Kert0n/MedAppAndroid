@@ -137,7 +137,7 @@ class PackageDescribingTest {
     @Test
     fun aBoxWaitingForItsRemovalIsNotDescribed() = runTest {
         shared()
-        database.packageRepository().mark(PACK, PackageStatus.REMOVING)
+        database.packageRepository().mark(PACK, PackageStatus.REMOVING, by = Uuid.random())
 
         val outcome = describing.describe(PACK, factsOf(pack(form = TABLET_FORM)).withShared(name = "Панадол"))
 

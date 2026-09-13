@@ -163,7 +163,7 @@ class SnapshotRoomStorageTest {
     @Test
     fun whatTheServerKnowsLeavesOutTheUnsentAndTheUndecided() = runTest {
         storage.lay(serverSnapshot(mapOf(HOME_KIT to 2L), listOf(snapshot(PACK), snapshot(OTHER_PACK))), at)
-        database.packages().setStatus(OTHER_PACK, PackageStatus.REMOVING)
+        database.packages().setDecision(OTHER_PACK, PackageStatus.REMOVING, decidedBy = Uuid.random())
         database.packageRepository().add(pack(id = third, quantity = tablets("5")))
 
         val knew = storage.serverKnows()

@@ -46,10 +46,16 @@ class MedKitPublishing @Inject constructor(
         // Полка публикуемая уже отвечает серверу, поэтому команды её содержимого ставятся так же,
         // как у общей: адресат у них — она сама (PLAN E1).
         val contents = packages.contentsOf(medKitId)
-        val announcements = contents.flatMap { relocation.announcement(it, publishing.ref, after = setOf(publish.id)) }
-        queue.change(publishing.ref, listOf(publish) + announcements, now) {
+        val announcements = contents.associateWith { relocation.announcement(it, publishing.ref, after = setOf(publish.id)) }
+        queue.change(publishing.ref, listOf(publish) + announcements.values.flatMap { it.commands }, now) {
             check(medKits.mark(medKitId, MedKitStatus.PUBLISHING)) { "аптечка прочитана этой же транзакцией" }
-            for (pkg in contents) check(packages.mark(pkg.id, PackageStatus.CHANGING)) { "пачка прочитана этой же транзакцией" }
+            // Пометку каждой коробки держит её собственное создание: полка отвечает за себя, а
+            // коробка — за то, чем она станет известна серверу (PLAN E1, E5).
+            for ((pkg, announcement) in announcements) {
+                check(packages.mark(pkg.id, PackageStatus.CHANGING, by = announcement.create.id)) {
+                    "пачка прочитана этой же транзакцией"
+                }
+            }
             true
         }
         Outcome.PUBLISHING

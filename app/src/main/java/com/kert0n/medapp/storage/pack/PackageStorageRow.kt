@@ -59,6 +59,7 @@ class PackageStorageRow(
         addedAt = record.addedAt,
         templateId = details.templateId,
         claims = claims?.toDomain(),
-        status = pack.status
+        status = pack.status,
+        decidedBy = pack.decidedBy
     )
 }
