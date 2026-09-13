@@ -11,6 +11,7 @@ import com.kert0n.medapp.storage.medkit.MedKitDao
 import com.kert0n.medapp.storage.pack.PackageDao
 import com.kert0n.medapp.storage.server.NotificationLogDao
 import com.kert0n.medapp.storage.server.SyncOperationDao
+import com.kert0n.medapp.storage.template.PackageTemplateDao
 import com.kert0n.medapp.storage.value.VocabularyDao
 import dagger.Module
 import dagger.Provides
@@ -55,6 +56,9 @@ object DatabaseModule {
 
     @Provides
     fun vocabularyDao(database: MedAppDatabase): VocabularyDao = database.vocabulary()
+
+    @Provides
+    fun templateDao(database: MedAppDatabase): PackageTemplateDao = database.templates()
 
     @Provides
     fun medKitDao(database: MedAppDatabase): MedKitDao = database.medKits()

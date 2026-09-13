@@ -89,6 +89,11 @@ fun MedAppDatabase.queueRepository() = com.kert0n.medapp.storage.server.SyncOper
     syncOperations(), vocabulary()
 )
 
+/** Отчёты личного кабинета — одним снимком базы (PLAN H6). */
+fun MedAppDatabase.reportRepository() = com.kert0n.medapp.storage.report.ReportRoomRepository(
+    this, intakes(), packages(), courses(), vocabulary()
+)
+
 /** «Одна транзакция» — узкий порт поверх той же базы (PLAN F5). */
 fun MedAppDatabase.transactions() = com.kert0n.medapp.storage.database.RoomTransactions(this)
 

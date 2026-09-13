@@ -41,6 +41,8 @@ class ForeignKeysTest {
         // Запись о коробке держит словарь; живая коробка держится за запись, аптечку и словарь.
         "package_records.unit_id → quantity_units" to Relation.UNREMOVABLE,
         "package_records.form_id → form_types" to Relation.UNREMOVABLE,
+        "drug_templates.quantity_unit_id → quantity_units" to Relation.UNREMOVABLE,
+        "drug_templates.form_id → form_types" to Relation.UNREMOVABLE,
         "packages.id → package_records" to Relation.UNREMOVABLE,
         "packages.med_kit_id → med_kits" to Relation.UNREMOVABLE,
         "packages.quantity_unit_id → quantity_units" to Relation.UNREMOVABLE,

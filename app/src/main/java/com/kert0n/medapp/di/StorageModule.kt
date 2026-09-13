@@ -19,6 +19,10 @@ import com.kert0n.medapp.queue.QueueStorage
 import com.kert0n.medapp.queue.SnapshotStorage
 import com.kert0n.medapp.queue.Transactions
 import com.kert0n.medapp.storage.database.RoomTransactions
+import com.kert0n.medapp.storage.report.ReportRoomRepository
+import com.kert0n.medapp.storage.report.ReportStorageRepository
+import com.kert0n.medapp.storage.template.PackageTemplateRoomRepository
+import com.kert0n.medapp.storage.template.PackageTemplateStorageRepository
 import com.kert0n.medapp.storage.value.VocabularyRoomRepository
 import com.kert0n.medapp.storage.value.VocabularyStorageRepository
 import dagger.Binds
@@ -60,6 +64,14 @@ abstract class StorageModule {
     @Binds
     @Singleton
     abstract fun vocabulary(implementation: VocabularyRoomRepository): VocabularyStorageRepository
+
+    @Binds
+    @Singleton
+    abstract fun reports(implementation: ReportRoomRepository): ReportStorageRepository
+
+    @Binds
+    @Singleton
+    abstract fun templates(implementation: PackageTemplateRoomRepository): PackageTemplateStorageRepository
 
     /** «Одна транзакция» — узкий порт: сценарию незачем видеть порт работника очереди (PLAN F5). */
     @Binds

@@ -1,5 +1,6 @@
 package com.kert0n.medapp.feature.course
 
+import com.kert0n.medapp.domain.course.CourseProgress
 import com.kert0n.medapp.domain.course.CourseCompletion
 import com.kert0n.medapp.domain.course.CourseProjection
 import com.kert0n.medapp.domain.course.CourseRecord
@@ -47,7 +48,7 @@ class CourseOffPlanCounting @Inject constructor(
         clamping.announceClaims(before, course, now)
 
         val ofCourse = intakes.ofCourse(courseId).filterIsInstance<CourseIntake>()
-        val progress = CourseCalendar.progressOf(ofCourse)
+        val progress = CourseProgress.of(ofCourse)
         val completion = CourseCompletion(course, progress)
         if (completion.reached) {
             val amended = checkNotNull(courses.findRecord(courseId)) { "запись эпизода прочитана этой же транзакцией" }

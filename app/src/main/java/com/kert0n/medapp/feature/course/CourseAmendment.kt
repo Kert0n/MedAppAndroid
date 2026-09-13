@@ -1,5 +1,6 @@
 package com.kert0n.medapp.feature.course
 
+import com.kert0n.medapp.domain.course.CourseProgress
 import com.kert0n.medapp.domain.course.CourseCompletion
 import com.kert0n.medapp.domain.course.CourseProjection
 import com.kert0n.medapp.domain.course.CourseRecord
@@ -63,7 +64,7 @@ class CourseAmendment @Inject constructor(
 
         // Прошлое до изменения: неответ, чей день кончился, — пропуск по прежнему плану.
         calendar.missOverdue(before, now)
-        val progress = CourseCalendar.progressOf(intakes.ofCourse(id).filterIsInstance<CourseIntake>())
+        val progress = CourseProgress.of(intakes.ofCourse(id).filterIsInstance<CourseIntake>())
         val completion = CourseCompletion(changed, progress)
         val course = if (completion.reached) {
             changed

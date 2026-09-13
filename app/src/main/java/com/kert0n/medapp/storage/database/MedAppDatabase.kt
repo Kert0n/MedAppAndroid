@@ -26,6 +26,8 @@ import com.kert0n.medapp.storage.server.NotificationLogStorageEntity
 import com.kert0n.medapp.storage.server.SyncOperationDao
 import com.kert0n.medapp.storage.server.SyncOperationDependencyStorageEntity
 import com.kert0n.medapp.storage.server.SyncOperationStorageEntity
+import com.kert0n.medapp.storage.template.PackageTemplateDao
+import com.kert0n.medapp.storage.template.PackageTemplateStorageEntity
 import com.kert0n.medapp.storage.value.DosageFormStorageEntity
 import com.kert0n.medapp.storage.value.QuantityUnitStorageEntity
 import com.kert0n.medapp.storage.value.VocabularyDao
@@ -39,6 +41,7 @@ import com.kert0n.medapp.storage.value.VocabularyDao
     entities = [
         QuantityUnitStorageEntity::class,
         DosageFormStorageEntity::class,
+        PackageTemplateStorageEntity::class,
         MedKitStorageEntity::class,
         PackageRecordStorageEntity::class,
         PackageStorageEntity::class,
@@ -74,6 +77,8 @@ abstract class MedAppDatabase : RoomDatabase() {
 
     abstract fun vocabulary(): VocabularyDao
 
+    abstract fun templates(): PackageTemplateDao
+
     companion object {
         const val VERSION = 3
         const val NAME = "medapp.db"
@@ -107,6 +112,27 @@ abstract class MedAppDatabase : RoomDatabase() {
          */
         val MIGRATION_2_3: Migration = object : Migration(2, 3) {
             override fun migrate(connection: SQLiteConnection) {
+                // Найденное в справочнике остаётся доступным без сети (PLAN F1, H5).
+                connection.execSQL(
+                    """
+                    CREATE TABLE IF NOT EXISTS `drug_templates` (
+                        `id` TEXT NOT NULL, `name` TEXT NOT NULL, `name_lat` TEXT,
+                        `active_substance` TEXT, `form_id` TEXT, `category` TEXT,
+                        `quantity_unit_id` TEXT, `manufacturer` TEXT, `country` TEXT,
+                        `description` TEXT, `search_text` TEXT NOT NULL, `cached_at` INTEGER NOT NULL,
+                        PRIMARY KEY(`id`),
+                        FOREIGN KEY(`quantity_unit_id`) REFERENCES `quantity_units`(`id`)
+                            ON UPDATE NO ACTION ON DELETE RESTRICT ,
+                        FOREIGN KEY(`form_id`) REFERENCES `form_types`(`id`)
+                            ON UPDATE NO ACTION ON DELETE RESTRICT
+                    )
+                    """.trimIndent()
+                )
+                connection.execSQL(
+                    "CREATE INDEX IF NOT EXISTS `index_drug_templates_quantity_unit_id` ON `drug_templates` (`quantity_unit_id`)"
+                )
+                connection.execSQL("CREATE INDEX IF NOT EXISTS `index_drug_templates_form_id` ON `drug_templates` (`form_id`)")
+                connection.execSQL("CREATE INDEX IF NOT EXISTS `index_drug_templates_cached_at` ON `drug_templates` (`cached_at`)")
                 // Неподтверждённое решение об аптечке лежит на ней самой (PLAN E5, E6).
                 connection.execSQL(
                     "ALTER TABLE `med_kits` ADD COLUMN `status` TEXT NOT NULL DEFAULT 'ACTIVE'"
@@ -211,7 +237,10 @@ abstract class MedAppDatabase : RoomDatabase() {
                     "CREATE INDEX IF NOT EXISTS `index_intakes_taken_package_id` " +
                         "ON `intakes` (`taken_package_id`)",
                     "CREATE INDEX IF NOT EXISTS `index_intakes_operation_id` " +
-                        "ON `intakes` (`operation_id`)"
+                        "ON `intakes` (`operation_id`)",
+                    // Истраченное за год читается по моменту ответа, а не перебором (PLAN H6).
+                    "CREATE INDEX IF NOT EXISTS `index_intakes_answered_at` " +
+                        "ON `intakes` (`answered_at`)"
                 )
                 connection.rebuild(
                     table = "package_details",

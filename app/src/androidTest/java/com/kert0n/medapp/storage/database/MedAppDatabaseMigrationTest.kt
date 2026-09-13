@@ -168,6 +168,11 @@ class MedAppDatabaseMigrationTest {
         )
         // Движений версии 2 — прихода, переноса — после миграции нет вместе с таблицей.
         assertEquals(emptyList<List<String?>>(), rows("SELECT name FROM sqlite_master WHERE type = 'table' AND name = 'stock_adjustments'"))
+        // Истраченное за год читается по моменту ответа, а не перебором (PLAN H6).
+        assertEquals(
+            listOf(listOf("index_intakes_answered_at")),
+            rows("SELECT name FROM sqlite_master WHERE type = 'index' AND name = 'index_intakes_answered_at'")
+        )
         v3.close()
     }
 
