@@ -33,6 +33,7 @@ import com.kert0n.medapp.storage.course.CourseDao
 import com.kert0n.medapp.storage.database.MedAppDatabase
 import com.kert0n.medapp.storage.intake.IntakeDao
 import com.kert0n.medapp.storage.medkit.MedKitDao
+import com.kert0n.medapp.storage.medkit.loseAccess
 import com.kert0n.medapp.storage.pack.PackageDao
 import com.kert0n.medapp.storage.pack.applySnapshot
 import com.kert0n.medapp.storage.pack.end
@@ -340,13 +341,8 @@ class QueueRoomStorage @Inject constructor(
      * Из полки вышли: коробки целы, но не у нас — последний виденный остаток каждой уходит из
      * учёта записью в историю, и строка полки уходит следом. Курс и его история остаются (E6).
      */
-    private suspend fun left(medKitId: Uuid, at: Instant) {
-        val words = vocabulary.snapshot()
-        for (row in packages.ofMedKit(medKitId)) {
-            packages.end(row.toDomain(words).lost(Uuid.random(), at), courses, movements, words, at)
-        }
-        medKits.delete(medKitId)
-    }
+    private suspend fun left(medKitId: Uuid, at: Instant) =
+        medKits.loseAccess(medKitId, packages, courses, movements, vocabulary.snapshot(), at)
 
     /**
      * Разрешённый снимок поверх подтверждённого остатка и броней; разрешать здесь нечего. Коробка,

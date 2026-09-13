@@ -36,6 +36,8 @@ class SnapshotApplier @Inject constructor(
 
     suspend fun refresh(): Outcome {
         val at = clock.instant()
+        // Спрашивается до сети: что человек заведёт, пока снимок летит, в ответ попасть не могло.
+        val knew = storage.serverKnows()
         val read = when (val answer = api.snapshot()) {
             is ApiResult.Success -> answer.value
             is ApiResult.Failure -> return Outcome.Refused(answer.failure.asUnavailability())
@@ -62,7 +64,16 @@ class SnapshotApplier @Inject constructor(
                 }
             }
         }
-        storage.lay(participants, resolved, at)
+        // Чего в снимке нет, к тому доступа больше нет. Считается это по названным номерам, а не
+        // по разрешённым: коробка, которую не удалось разрешить, названа сервером и не пропала.
+        val named = read.medKits.flatMapTo(HashSet()) { medKit -> medKit.packages.map { it.pack.id } }
+        val snapshot = ServerSnapshot(
+            participants = participants,
+            packages = resolved,
+            goneMedKits = knew.medKits - participants.keys,
+            gonePackages = knew.packages - named
+        )
+        storage.lay(snapshot, at)
         return Outcome.Applied(medKits = participants.size, packages = resolved.size, skipped = skipped)
     }
 

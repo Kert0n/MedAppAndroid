@@ -1,6 +1,5 @@
 package com.kert0n.medapp.queue
 
-import com.kert0n.medapp.network.pack.PackageSnapshot
 import java.time.Instant
 import kotlin.uuid.Uuid
 
@@ -14,11 +13,24 @@ import kotlin.uuid.Uuid
 interface SnapshotStorage {
 
     /**
-     * Снимок в базу: число участников у каждой названной полки и серверная часть каждой её
-     * коробки. Что из этого ляжет, решают версии — запоздалая половина не откатывает свежую
-     * (PLAN E1), — и решает это одна дверь `PackageDao.applySnapshot`.
+     * О чём сервер знает к началу чтения: полки и коробки, у которых есть серверная обвязка и нет
+     * непринятого решения. Спрашивается **до** сети: что человек заведёт, пока снимок летит, в
+     * ответ попасть не могло, и пропажей это не считается.
+     */
+    suspend fun serverKnows(): ServerKnowledge
+
+    /**
+     * Снимок в базу. Что из названного ляжет, решают версии — запоздалая половина не откатывает
+     * свежую (PLAN E1), — и решает это одна дверь `PackageDao.applySnapshot`. Пропавшее уходит
+     * утратой доступа: коробка — своим концом со следом, полка — вместе со своим содержимым.
      *
      * [at] — момент наблюдения: им датируется первое знакомство с чужой коробкой.
      */
-    suspend fun lay(participants: Map<Uuid, Long>, packages: List<PackageSnapshot>, at: Instant)
+    suspend fun lay(snapshot: ServerSnapshot, at: Instant)
+}
+
+/** Полки и коробки, о которых сервер знал к началу чтения. */
+class ServerKnowledge(medKits: Set<Uuid>, packages: Set<Uuid>) {
+    val medKits: Set<Uuid> = medKits.toSet()
+    val packages: Set<Uuid> = packages.toSet()
 }

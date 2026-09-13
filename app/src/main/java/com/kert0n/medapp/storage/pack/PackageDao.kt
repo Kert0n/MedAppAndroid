@@ -242,6 +242,17 @@ interface PackageDao {
     @Query("DELETE FROM packages WHERE id = :id")
     suspend fun delete(id: Uuid): Int
 
+    /**
+     * Коробки, о которых сервер знает и по которым нечего ждать: без серверной версии он о коробке
+     * ещё не слышал, а помеченная ждёт ответа на своё решение — её отсутствие в снимке объяснит
+     * он, а не снимок (PLAN E4).
+     */
+    @Query(
+        "SELECT p.id FROM packages p JOIN med_kits k ON k.id = p.med_kit_id " +
+            "WHERE k.publication = 'PUBLISHED' AND p.version IS NOT NULL AND p.status = 'ACTIVE'"
+    )
+    suspend fun knownToServer(): List<Uuid>
+
     @Transaction
     @Query("SELECT * FROM packages WHERE med_kit_id = :medKitId ORDER BY name")
     suspend fun ofMedKit(medKitId: Uuid): List<PackageStorageRow>
