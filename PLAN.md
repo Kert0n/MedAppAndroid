@@ -796,6 +796,17 @@ nullable-типы Kotlin, отдельный трёхвариантный тип
 подтверждением смены идентичности описания. **Единица неизменна** (C1): ошибся — удалить пачку и
 завести заново; в сведения она не входит.
 
+**Пересчёт и утилизация — `feature/packages/PackageAdjusting`.** Человек видел на экране `seen`
+и назвал `actual` либо выбросил `amount`. На своей полке число человека и есть истина: переход
+`correctTo`/`dispose` к коробке, прочитанной той же транзакцией, дошедшая до нуля кончается своей
+дверью. На полке, отвечающей серверу, подтверждённое число не трогается (E1): уезжает
+`CorrectStock(seen, actual)` — разница относительно увиденного (C1), — коробка помечена `CHANGING`,
+а число показывает проекция; утилизация там — тот же пересчёт с `actual = seen − amount`. Лечение,
+державшее коробку, зажимается под новую доступность (`Course.clamped`, D5) — под названное число
+или под проекцию, — и изменившаяся бронь уезжает `SetClaim`/`ReleaseClaim`; прошлое отмечается
+раньше (F4). Коробку, которая кончилась или кончится по ответу, не зажимают: лечение теряет её
+источником в двери конца.
+
 **Сведения правятся целым действием — `feature/packages/PackageDescribing`.** Редактор сохраняет
 `PackageFacts` целиком к коробке, прочитанной той же транзакцией (F5). Личное остаётся на
 устройстве всегда; общее на полке, отвечающей серверу, уезжает `Describe(before, after)` — своими
@@ -2468,6 +2479,7 @@ sealed interface MedKitSyncCommand {
 | снимок                                | серверные поля, только создание недостающих деталей, отключение недоступных источников, пересчёт обеспечения                          |
 | добавление коробки (`PackageAdding`)  | запись о коробке, живая строка и детали; на полке, отвечающей серверу, — `Create` и пометка `CHANGING`; полка помечена уборкой — отказ (D3)         |
 | правка сведений (`PackageDescribing`) | `describe` к прочитанному состоянию; общее изменилось на полке, отвечающей серверу, — `Describe(before, after)` и `CHANGING`; очистка формы у серверной коробки — отказ (D3) |
+| пересчёт и утилизация (`PackageAdjusting`) | своя полка — переход к прочитанному, ноль кончает коробку; отвечающая серверу — `CorrectStock(seen, actual)` и `CHANGING`, число не трогается; курс зажат под новую доступность, брони разницей (D3, D5) |
 | черновик (`CourseDrafting`)           | переход к черновику, прочитанному той же транзакцией, условно по редакции; черновик, ставший лечением, не затирается; пачек не занимает, команд не ставит |
 | правка источников (`SourceEditing`)   | состав, порядок и выделения, назначения пачек, будущие плановые пункты и команды броней разницей — условно по редакции                   |
 | изменение лечения (`CourseAmendment`) | прошедшие неотвеченные — `MISSED`, план и снимок записи вместе условно по редакции, зажим выделений, перестроенные будущие пункты, брони |
@@ -2637,7 +2649,7 @@ com.kert0n.medapp
 ├─ platform/   notifications/, scanner/, credentials/, connectivity/ (SyncTriggers), clipboard/,
 │              background/ (SyncWorker, WorkManagerSyncSchedule)
 └─ feature/    bootstrap/ (AppStart, AppStartState, AppStartViewModel, SetupScreen),
-               medkits/ (MedKitKeeping, MedKitRemoval, MedKitPublishing, MedKitJoining, MedKitInvitation), packages/ (PackageAdding, PackageDescribing, PackageRemoval, PackageRelocation),
+               medkits/ (MedKitKeeping, MedKitRemoval, MedKitPublishing, MedKitJoining, MedKitInvitation), packages/ (PackageAdding, PackageDescribing, PackageAdjusting, PackageRemoval, PackageRelocation),
                course/ (CourseClosing, CourseDrafting, CourseCalendar, CourseUpkeep, CourseActivation,
                CourseCancellation, CourseAmendment, SourceEditing), schedule/, intake/ (IntakeConfirmation), sharing/, analytics/,
                scanner/, settings/, syncstatus/
@@ -3174,7 +3186,7 @@ data class PackageQuery(
 | 5 | `Пачка заводится целиком` | **сделан**: `feature/packages/PackageAdding` — запись, живая строка, детали одной транзакцией; на полке, отвечающей серверу, — `Create` и `CHANGING`, ответ кладёт первое число и снимает пометку; `templateId` из справочника; D3, F5, H1 |
 | 6 | `Чужая правка не сбрасывает мою` | **сделан**: `CorrectStock(seen, actual)` — разница поверх свежего числа, утилизация на общей полке — тот же пересчёт; `Describe.onto` — свои поля поверх прочитанных; 412 у любой команды пачки — переподготовка, `StalePolicy` ушёл; `Refuse(CONFLICT)` решает подготовка: итог ниже нуля, то же поле изменено соседом иначе; E2, E3 |
 | 7 | `Сведения пачки правятся, общее уезжает командой` | **сделан**: `feature/packages/PackageDescribing` — личное локально, общее — `Describe(before, after)` и `CHANGING`; очистка формы у серверной коробки отвергается; D3, F5, H1 |
-| 8 | `Пересчёт и утилизация меняют число` | `feature/packages/PackageAdjusting`: в ноль — конец коробки; зажим выделений курсов, брони разницей; на общей полке — `CorrectStock` |
+| 8 | `Пересчёт и утилизация меняют число` | **сделан**: `feature/packages/PackageAdjusting` — своя полка: переход к прочитанному, ноль кончает коробку; отвечающая серверу: `CorrectStock(seen, actual)` и `CHANGING`, число не трогается; курс зажат под новую доступность (`Availability.with`), брони разницей; D3, F5, H1 |
 | 9 | `Разовый приём — факт и расход` | `feature/intake/UnplannedIntakeRecording`: исход «заденет занятое» без записи, подтверждение — запись; `Consume` без брони; зажим моего курса |
 | 10 | `Отказ от приёма и доза мимо плана` | `MISSED` по решению человека; `Course.setTakenOffPlan` с `reallocate` и бронями, конец лечения через `CourseClosing` |
 | 11 | `PLAN отражает учёт пачек и полок` | I, J4 |
