@@ -207,10 +207,8 @@ class QueueWorkerTest {
             val state = effects.firstNotNullOfOrNull {
                 when (it) {
                     is Settlement.Effect.LayDown -> PackageState.Present(it.snapshot)
-                    is Settlement.Effect.PackageEnded ->
-                        if (it.ending == Settlement.Effect.Ending.ACCESS_LOST && transition is Settlement.Transition.Close &&
-                            (transition as Settlement.Transition.Close).status == SyncOperationStatus.APPLIED
-                        ) PackageState.Elsewhere else PackageState.Gone
+                    // «Ушла туда, где нас нет» и «её нет» для базы одно и то же: коробка кончается.
+                    is Settlement.Effect.PackageEnded -> PackageState.Gone
                     else -> null
                 }
             } ?: PackageState.None
@@ -948,7 +946,7 @@ class QueueWorkerTest {
 
         assertEquals(2, report.settled)
         assertEquals(SyncOperationStatus.APPLIED, storage.operations.getValue(INTAKE).status)
-        assertEquals(Delivery.Applied(PackageState.Elsewhere), storage.settled.first { it.first == INTAKE }.second)
+        assertEquals(Delivery.Applied(PackageState.Gone), storage.settled.first { it.first == INTAKE }.second)
         assertTrue(storage.deferred.isEmpty())
         assertEquals(SyncOperationStatus.APPLIED, storage.operations.getValue(OTHER_PACK).status)
         assertEquals(0, store.refreshed)

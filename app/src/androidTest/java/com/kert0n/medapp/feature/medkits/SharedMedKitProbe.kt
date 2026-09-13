@@ -3,7 +3,6 @@ package com.kert0n.medapp.feature.medkits
 import com.kert0n.medapp.domain.medkit.InvitationKey
 import com.kert0n.medapp.domain.medkit.MedKit
 import com.kert0n.medapp.domain.pack.PackageStatus
-import com.kert0n.medapp.domain.stock.StockMovement
 import com.kert0n.medapp.domain.intake.CourseIntake
 import com.kert0n.medapp.domain.value.DosageForm
 import com.kert0n.medapp.domain.value.Dose
@@ -347,11 +346,6 @@ class SharedMedKitProbe {
         assertEquals(listOf(SyncOperationStatus.APPLIED), anna.statuses().distinct())
         assertNull(anna.packages.find(shared.box))
         assertEquals(ApiFailure.NotFound, failure(anna.api.packageSnapshot(shared.box)))
-        val words = anna.vocabulary.snapshot()
-        assertTrue(
-            "след утилизации остался",
-            anna.database.stockMovements().ofPackage(shared.box).any { it.toDomain(words) is StockMovement.Disposal }
-        )
 
         boris.confirm(shared.intakes[1], shared.box)
         boris.drain()
@@ -378,11 +372,6 @@ class SharedMedKitProbe {
         assertEquals(listOf(SyncOperationStatus.APPLIED), anna.statuses().distinct())
         assertNull(anna.database.medKits().find(shared.shelf))
         assertNull(anna.packages.find(shared.box))
-        val words = anna.vocabulary.snapshot()
-        assertTrue(
-            "утрата доступа записана",
-            anna.database.stockMovements().ofPackage(shared.box).any { it.toDomain(words) is StockMovement.AccessLoss }
-        )
 
         boris.confirm(shared.intakes[1], shared.box)
         boris.drain()
@@ -413,11 +402,6 @@ class SharedMedKitProbe {
         assertNull(anna.database.medKits().find(shared.shelf))
         assertNull(anna.packages.find(shared.box))
         assertEquals(ApiFailure.NotFound, failure(anna.api.medKit(shared.shelf)))
-        val words = anna.vocabulary.snapshot()
-        assertTrue(
-            "след утилизации остался",
-            anna.database.stockMovements().ofPackage(shared.box).any { it.toDomain(words) is StockMovement.Disposal }
-        )
 
         boris.confirm(shared.intakes[1], shared.box)
         boris.drain()
@@ -521,11 +505,9 @@ class SharedMedKitProbe {
         assertEquals(dacha, requireNotNull(boris.packages.find(shared.box)).medKit.id)
     }
 
-    /** Коробки у Бориса нет, остаток ушёл в историю утратой доступа, лечение без источника, но идёт. */
+    /** Коробки у Бориса нет, лечение без источника, но идёт. */
     private suspend fun assertBorisLostTheBox(box: Uuid) {
         assertNull(boris.packages.find(box))
-        val words = boris.vocabulary.snapshot()
-        assertTrue(boris.database.stockMovements().ofPackage(box).any { it.toDomain(words) is StockMovement.AccessLoss })
         assertEquals(emptyList<Uuid>(), boris.database.courses().sourcePackagesOf(boris.course))
         assertNotNull(boris.database.courses().findRecord(boris.course))
     }

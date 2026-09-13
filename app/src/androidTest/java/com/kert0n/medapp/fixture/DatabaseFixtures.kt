@@ -70,7 +70,7 @@ suspend fun rejectedByDatabase(block: suspend () -> Unit): Throwable =
  * владельцев несколько DAO; собирать их в каждом тесте заново значило бы повторять граф руками.
  */
 fun MedAppDatabase.packageRepository() = com.kert0n.medapp.storage.pack.PackageRoomRepository(
-    this, packages(), courses(), stockMovements(), syncOperations(), vocabulary()
+    this, packages(), courses(), syncOperations(), vocabulary()
 )
 
 fun MedAppDatabase.courseRepository() = com.kert0n.medapp.storage.course.CourseRoomRepository(
@@ -78,7 +78,7 @@ fun MedAppDatabase.courseRepository() = com.kert0n.medapp.storage.course.CourseR
 )
 
 fun MedAppDatabase.intakeRepository() = com.kert0n.medapp.storage.intake.IntakeRoomRepository(
-    this, intakes(), packages(), courses(), stockMovements(), vocabulary()
+    this, intakes(), packages(), courses(), vocabulary()
 )
 
 fun MedAppDatabase.medKitRepository() = com.kert0n.medapp.storage.medkit.MedKitRoomRepository(
@@ -94,12 +94,12 @@ fun MedAppDatabase.transactions() = com.kert0n.medapp.storage.database.RoomTrans
 
 /** Порт очереди для работника — транзакции взятия и применения исхода. */
 fun MedAppDatabase.queueStorage() = com.kert0n.medapp.storage.server.QueueRoomStorage(
-    this, syncOperations(), packages(), intakes(), medKits(), courses(), stockMovements(), vocabulary()
+    this, syncOperations(), packages(), intakes(), medKits(), courses(), vocabulary()
 )
 
 /** Порт полного снимка — укладка целиком одной транзакцией; полка с сервера зовётся как в ресурсах. */
 fun MedAppDatabase.snapshotStorage() = com.kert0n.medapp.storage.server.SnapshotRoomStorage(
-    this, medKits(), packages(), courses(), stockMovements(), vocabulary(), syncOperations(),
+    this, medKits(), packages(), courses(), vocabulary(), syncOperations(),
     arrivedName = "Общая аптечка"
 )
 

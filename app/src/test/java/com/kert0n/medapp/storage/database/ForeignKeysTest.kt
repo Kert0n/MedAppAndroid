@@ -54,11 +54,10 @@ class ForeignKeysTest {
         // Состав уходит вместе с планом, но не молча: его снимает транзакция конца лечения (F5).
         "course_sources.course_id → courses" to Relation.UNREMOVABLE,
         "active_package_assignments.course_id → courses" to Relation.UNREMOVABLE,
-        // История держится за записи — о коробке и об эпизоде (D6, D7).
+        // История — приёмы — держится за записи: о коробке и об эпизоде (D6).
         "intakes.course_id → course_records" to Relation.HISTORY,
         "intakes.planned_package_id → package_records" to Relation.HISTORY,
         "intakes.taken_package_id → package_records" to Relation.HISTORY,
-        "stock_adjustments.package_id → package_records" to Relation.HISTORY,
         // Зависимости очереди: операцию с зависимыми не удаляют.
         "sync_operation_dependencies.operation_id → sync_operations" to Relation.UNREMOVABLE,
         "sync_operation_dependencies.depends_on_id → sync_operations" to Relation.UNREMOVABLE

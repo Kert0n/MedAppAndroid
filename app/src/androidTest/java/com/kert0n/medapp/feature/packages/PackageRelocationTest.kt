@@ -80,7 +80,6 @@ class PackageRelocationTest {
     private suspend fun assertMovedAndStillASource() {
         assertEquals(SHARED_KIT, database.packageRepository().find(PACK)?.medKit?.id)
         assertEquals(listOf(PACK), database.courses().sourcePackagesOf(COURSE))
-        assertTrue(database.stockMovements().ofPackage(PACK).isEmpty())
     }
 
     @Test

@@ -10,7 +10,6 @@ import com.kert0n.medapp.domain.value.Vocabulary
 import com.kert0n.medapp.storage.course.CourseDao
 import com.kert0n.medapp.storage.pack.PackageDao
 import com.kert0n.medapp.storage.pack.end
-import com.kert0n.medapp.storage.stock.StockMovementDao
 import kotlin.uuid.Uuid
 import kotlinx.coroutines.flow.Flow
 
@@ -69,12 +68,11 @@ suspend fun MedKitDao.loseAccess(
     medKitId: Uuid,
     packages: PackageDao,
     courses: CourseDao,
-    movements: StockMovementDao,
     vocabulary: Vocabulary,
     at: Instant
 ) {
     for (row in packages.ofMedKit(medKitId)) {
-        packages.end(row.toDomain(vocabulary).lost(Uuid.random(), at), courses, movements, vocabulary, at)
+        packages.end(row.toDomain(vocabulary).ended(), courses, vocabulary, at)
     }
     delete(medKitId)
 }

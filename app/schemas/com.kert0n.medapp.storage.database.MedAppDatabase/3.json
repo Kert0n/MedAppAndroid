@@ -2,7 +2,7 @@
   "formatVersion": 1,
   "database": {
     "version": 3,
-    "identityHash": "040dfb9e5bdac9b8cd853b485dd137bc",
+    "identityHash": "e50cf979e3bdf0d360d484cf791c55ac",
     "entities": [
       {
         "tableName": "quantity_units",
@@ -1005,108 +1005,6 @@
         ]
       },
       {
-        "tableName": "stock_adjustments",
-        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`id` TEXT NOT NULL, `package_id` TEXT NOT NULL, `kind` TEXT NOT NULL, `unit_id` TEXT NOT NULL, `observed_at` INTEGER NOT NULL, `occurred_at` INTEGER, `amount` TEXT, `before_amount` TEXT, `after_amount` TEXT, `delta` TEXT, `reason` TEXT, `note` TEXT, PRIMARY KEY(`id`), FOREIGN KEY(`package_id`) REFERENCES `package_records`(`id`) ON UPDATE NO ACTION ON DELETE RESTRICT )",
-        "fields": [
-          {
-            "fieldPath": "id",
-            "columnName": "id",
-            "affinity": "TEXT",
-            "notNull": true
-          },
-          {
-            "fieldPath": "packageId",
-            "columnName": "package_id",
-            "affinity": "TEXT",
-            "notNull": true
-          },
-          {
-            "fieldPath": "kind",
-            "columnName": "kind",
-            "affinity": "TEXT",
-            "notNull": true
-          },
-          {
-            "fieldPath": "unitId",
-            "columnName": "unit_id",
-            "affinity": "TEXT",
-            "notNull": true
-          },
-          {
-            "fieldPath": "observedAt",
-            "columnName": "observed_at",
-            "affinity": "INTEGER",
-            "notNull": true
-          },
-          {
-            "fieldPath": "occurredAt",
-            "columnName": "occurred_at",
-            "affinity": "INTEGER"
-          },
-          {
-            "fieldPath": "amount",
-            "columnName": "amount",
-            "affinity": "TEXT"
-          },
-          {
-            "fieldPath": "beforeAmount",
-            "columnName": "before_amount",
-            "affinity": "TEXT"
-          },
-          {
-            "fieldPath": "afterAmount",
-            "columnName": "after_amount",
-            "affinity": "TEXT"
-          },
-          {
-            "fieldPath": "delta",
-            "columnName": "delta",
-            "affinity": "TEXT"
-          },
-          {
-            "fieldPath": "reason",
-            "columnName": "reason",
-            "affinity": "TEXT"
-          },
-          {
-            "fieldPath": "note",
-            "columnName": "note",
-            "affinity": "TEXT"
-          }
-        ],
-        "primaryKey": {
-          "autoGenerate": false,
-          "columnNames": [
-            "id"
-          ]
-        },
-        "indices": [
-          {
-            "name": "index_stock_adjustments_package_id_observed_at",
-            "unique": false,
-            "columnNames": [
-              "package_id",
-              "observed_at"
-            ],
-            "orders": [],
-            "createSql": "CREATE INDEX IF NOT EXISTS `index_stock_adjustments_package_id_observed_at` ON `${TABLE_NAME}` (`package_id`, `observed_at`)"
-          }
-        ],
-        "foreignKeys": [
-          {
-            "table": "package_records",
-            "onDelete": "RESTRICT",
-            "onUpdate": "NO ACTION",
-            "columns": [
-              "package_id"
-            ],
-            "referencedColumns": [
-              "id"
-            ]
-          }
-        ]
-      },
-      {
         "tableName": "sync_operations",
         "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`id` TEXT NOT NULL, `kind` TEXT NOT NULL, `payload` TEXT NOT NULL, `payload_version` INTEGER NOT NULL, `sequence` INTEGER NOT NULL, `status` TEXT NOT NULL, `attempts` INTEGER NOT NULL, `created_at` INTEGER NOT NULL, `package_id` TEXT, `med_kit_id` TEXT, `group_id` TEXT, `last_error` TEXT, `last_tried_at` INTEGER, `answer_status` INTEGER, `answer_body` TEXT, `not_before` INTEGER, `outcome_unknown` INTEGER NOT NULL DEFAULT 0, `prepared_method` TEXT, `prepared_path` TEXT, `prepared_query` TEXT, `prepared_body` TEXT, `prepared_drug_version` INTEGER, `prepared_claims_version` INTEGER, `prepared_quantity_before` TEXT, `prepared_mine_before` TEXT, `prepared_unit_id` TEXT, `prepared_at` INTEGER, PRIMARY KEY(`id`))",
         "fields": [
@@ -1413,7 +1311,7 @@
     ],
     "setupQueries": [
       "CREATE TABLE IF NOT EXISTS room_master_table (id INTEGER PRIMARY KEY,identity_hash TEXT)",
-      "INSERT OR REPLACE INTO room_master_table (id,identity_hash) VALUES(42, '040dfb9e5bdac9b8cd853b485dd137bc')"
+      "INSERT OR REPLACE INTO room_master_table (id,identity_hash) VALUES(42, 'e50cf979e3bdf0d360d484cf791c55ac')"
     ]
   }
 }

@@ -3,7 +3,6 @@ package com.kert0n.medapp.domain.pack
 import com.kert0n.medapp.domain.intake.IntakeRejected
 import com.kert0n.medapp.domain.intake.TakenDose
 import com.kert0n.medapp.domain.medkit.MedKitRef
-import com.kert0n.medapp.domain.stock.StockMovement
 import com.kert0n.medapp.domain.value.Dose
 import com.kert0n.medapp.domain.value.Quantity
 import java.time.Instant
@@ -19,9 +18,9 @@ import kotlin.uuid.Uuid
  * Состояний жизни у коробки нет: она либо есть, либо её нет; [status] говорит только о решении,
  * которое ещё не подтвердила полка, и о том, чем пока можно пользоваться. Пустой коробки не бывает — кончившаяся
  * (расход, утилизация, пересчёт в ноль) перестаёт существовать так же, как выброшенная, и переходы
- * отвечают на это [PackageAfter.Ended] с [PackageEnding] внутри: у конца есть след, объясняющий,
- * куда делся остаток, и выбирает его переход, а не тот, кто записывает (PLAN D3, H6). Что от
- * коробки остаётся навсегда — [record]: за неё держатся приёмы и движения (D6, D7).
+ * отвечают на это [PackageAfter.Ended] с [PackageEnding] внутри. Истории у коробки нет: действия
+ * меняют число или убирают коробку, записи «как было» не остаётся (PLAN D3, D7). Что от коробки
+ * остаётся навсегда — [record]: за неё держатся приёмы (D6).
  *
  * Объект действителен в пределах транзакции, которая его прочитала: пачка на руках после
  * первого же приёма — пачка с прежним остатком, если её не перечитать.
@@ -74,7 +73,7 @@ class Package(
     val record: PackageRecord
         get() = PackageRecord(id = id, name = facts.name, unit = quantity.unit, form = facts.form, addedAt = addedAt)
 
-    /** Как пачку видит чужой агрегат — курс, приём, движение: ссылка на запись, без переходов. */
+    /** Как пачку видит чужой агрегат — курс, приём: ссылка на запись, без переходов. */
     val ref: PackageRef get() = record.ref
 
     fun isExpiredOn(date: LocalDate): Boolean = facts.isExpiredOn(date)
@@ -95,78 +94,48 @@ class Package(
     }
 
     /**
-     * Расход — приём, плановый или разовый. В минус не списывает (PLAN D5). Следа в истории
-     * расход не оставляет: приём и есть учётная запись о нём (PLAN D7, H6).
+     * Расход — приём, плановый или разовый. В минус не списывает (PLAN D5). Учётная запись о нём —
+     * сам приём (PLAN D6, H6).
      */
-    fun consume(amount: Dose): PackageAfter = after(quantity - amount.quantity, trace = null)
+    fun consume(amount: Dose): PackageAfter = after(quantity - amount.quantity)
 
     /**
      * Изменение остатка, отсчитанное от [from], переносится на [onto]: остаток становится
      * `onto + (quantity − from)`. Так сходятся два счёта одной коробки, которую унесли домой, пока
      * полка жила дальше: подтверждённое полкой и сделанное человеком дома после решения (PLAN E6).
-     * Чужой расход, доставленный раньше, учтён, свой домашний — тоже. Следа нет: оба изменения уже
-     * объяснены своими приёмами; ушедшая в ноль коробка кончается. Счёт в другой единице не сводится.
+     * Чужой расход, доставленный раньше, учтён, свой домашний — тоже; ушедшая в ноль коробка
+     * кончается. Счёт в другой единице не сводится.
      */
     fun rebased(from: Quantity, onto: Quantity): PackageAfter {
         require(from.unit == quantity.unit && onto.unit == quantity.unit) { "счета одной коробки сводятся в её единице" }
-        return after((quantity + onto).minusOrZero(from), trace = null)
+        return after((quantity + onto).minusOrZero(from))
     }
 
     /**
-     * Утилизация: выбросили [amount] — просроченное, испорченное. В минус пачка не уходит, поэтому
-     * «выбросил больше, чем было» списывает остаток целиком, а в историю идёт то, что **ушло на
-     * самом деле** — разница остатков до и после (PLAN D7).
+     * Утилизация: выбросили [amount] — просроченное, испорченное. В минус пачка не уходит:
+     * «выбросил больше, чем было» списывает остаток целиком, и коробка кончается.
      */
-    fun dispose(
-        amount: Quantity,
-        movementId: Uuid,
-        at: Instant,
-        reason: StockMovement.Disposal.Reason = StockMovement.Disposal.Reason.OTHER,
-        note: String? = null
-    ): PackageAfter {
+    fun dispose(amount: Quantity): PackageAfter {
         requireUsable()
-        return disposed(amount, movementId, at, reason, note)
+        return after(quantity.minusOrZero(amount))
     }
 
     /**
      * Пересчёт: «пересчитал и увидел столько» — замена значения, а не дельта (E1). Единица та же:
-     * смена единицы — отдельный сценарий (D3).
+     * она у пачки неизменна (C1). Ноль — коробки не осталось.
      */
-    fun correctTo(actual: Quantity, movementId: Uuid, at: Instant, note: String? = null): PackageAfter {
+    fun correctTo(actual: Quantity): PackageAfter {
         requireUsable()
-        return corrected(actual, movementId, at, note)
+        require(actual.unit == quantity.unit) { "единица пачки неизменна: пересчёт её не меняет" }
+        return after(actual)
     }
 
     /**
-     * Человек выбросил коробку целиком (ТЗ 4.1.1.3.5). Это утилизация всего остатка, и объясняется
-     * она так же: без её следа «истрачено за период» не сошлось бы — остаток исчез бы, никем не
-     * принятый и ничем не объяснённый (PLAN H6).
+     * Коробки больше нет — выбросили целиком, полка ответила «её нет», доступ утрачен. Чем это
+     * вызвано, поведение не различает: остаётся запись, уходит строка (PLAN D3). Пометку конец не
+     * спрашивает: он и есть доведение решения, которое её поставило (E1).
      */
-    fun thrownOut(
-        movementId: Uuid,
-        at: Instant,
-        reason: StockMovement.Disposal.Reason = StockMovement.Disposal.Reason.OTHER,
-        note: String? = null
-    ): PackageEnding = when (val after = disposed(quantity, movementId, at, reason, note)) {
-        is PackageAfter.Ended -> after.ending
-        is PackageAfter.Left -> error("выброшенная целиком коробка не остаётся: ${after.pkg}")
-    }
-
-    /**
-     * Пересчитали и увидели ноль: коробки не осталось, а «было столько» объясняет пересчёт — без
-     * него остаток пропал бы из учёта без объяснения (PLAN D7, H6).
-     */
-    fun recountedToZero(movementId: Uuid, at: Instant, note: String? = null): PackageEnding =
-        when (val after = corrected(Quantity.zero(quantity.unit), movementId, at, note)) {
-            is PackageAfter.Ended -> after.ending
-            is PackageAfter.Left -> error("пересчитанная в ноль коробка не остаётся: ${after.pkg}")
-        }
-
-    /**
-     * Пачки нет на сервере, и нет по нашей же причине — мы сами её туда и отправили удалять либо
-     * израсходовали до конца. О количестве это не говорит ничего, поэтому следа нет (PLAN D7).
-     */
-    fun goneOnServer(): PackageEnding = PackageEnding(this, trace = null)
+    fun ended(): PackageEnding = PackageEnding(this)
 
     /** Заменяет описательные сведения целиком — и серверные поля, и локальные (PLAN D3). */
     fun describe(facts: PackageFacts): Package {
@@ -206,26 +175,6 @@ class Package(
     }
 
     /**
-     * Доступ утрачен: вышли из аптечки, её унесли или удалили. Коробка цела, но не у нас, и
-     * последний виденный остаток уходит из учёта записью в историю (PLAN D7); самой пачки после
-     * этого не остаётся. Тождество записи называет вызывающий: повтор не заводит вторую.
-     */
-    fun lost(movementId: Uuid, at: Instant): PackageEnding =
-        PackageEnding(this, StockMovement.AccessLoss(movementId, ref, quantity, observedAt = at))
-
-    /**
-     * Сервер назвал остаток [server], а наши установленные изменения объясняют [explained] — наш
-     * подтверждённый остаток с тем, что сделали мы сами. Необъяснённая разница — чужое изменение, и
-     * причина его не выдумывается (PLAN D7): иначе наш расход попал бы в историю дважды — приёмом и
-     * разницей. Нет разницы — нет и записи, поэтому повтор того же снимка движений не плодит. В
-     * разных единицах разницы не существует: сосед сменил единицу, и сравнивать нечего.
-     */
-    fun changedElsewhere(server: Quantity, explained: Quantity, movementId: Uuid, at: Instant): StockMovement.RemoteChange? {
-        if (server.unit != explained.unit || server == explained) return null
-        return StockMovement.RemoteChange(movementId, ref, server.amount - explained.amount, server.unit, observedAt = at)
-    }
-
-    /**
      * Изменение ушло к полке и ждёт её согласия. Пометка не мешает пользоваться коробкой: полка
      * ответит за каждое изменение по порядку (PLAN E1).
      */
@@ -259,34 +208,10 @@ class Package(
         check(status.allowsUse) { "коробка помечена ($status): ею не пользуются до ответа полки" }
     }
 
-    /** Утилизация без проверки пометки — шаг и пользования, и конца. */
-    private fun disposed(
-        amount: Quantity,
-        movementId: Uuid,
-        at: Instant,
-        reason: StockMovement.Disposal.Reason,
-        note: String?
-    ): PackageAfter {
-        val left = quantity.minusOrZero(amount)
-        return after(left, StockMovement.Disposal(movementId, ref, quantity - left, reason, at, at, note))
-    }
-
-    /** Пересчёт без проверки пометки — шаг и пользования, и конца. */
-    private fun corrected(actual: Quantity, movementId: Uuid, at: Instant, note: String?): PackageAfter {
-        require(actual.unit == quantity.unit) {
-            "пересчёт не меняет единицу: это отдельный сценарий"
-        }
-        return after(actual, StockMovement.Recount(movementId, ref, quantity, actual, at, at, note))
-    }
-
-    /**
-     * Чем кончился переход: пустой коробки не бывает, поэтому ушедшая в ноль кончается, а [trace]
-     * объясняет, куда делся её остаток. У оставшейся след тот же — он о том, что произошло, а не о
-     * том, чем это кончилось.
-     */
-    private fun after(left: Quantity, trace: StockMovement?): PackageAfter =
-        if (left.isZero) PackageAfter.Ended(PackageEnding(this, trace))
-        else PackageAfter.Left(changed(quantity = left), trace)
+    /** Чем кончился переход: пустой коробки не бывает, поэтому ушедшая в ноль кончается. */
+    private fun after(left: Quantity): PackageAfter =
+        if (left.isZero) PackageAfter.Ended(PackageEnding(this))
+        else PackageAfter.Left(changed(quantity = left))
 
     /**
      * Изменённый экземпляр; [id] и [addedAt] не меняются. Явный `claims = null` очищает брони,

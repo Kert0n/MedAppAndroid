@@ -4,7 +4,6 @@ import com.kert0n.medapp.storage.course.CourseStorageRepository
 import com.kert0n.medapp.storage.intake.IntakeStorageRepository
 import com.kert0n.medapp.storage.medkit.MedKitStorageRepository
 import com.kert0n.medapp.storage.pack.PackageStorageRepository
-import com.kert0n.medapp.storage.stock.StockMovementStorageRepository
 import java.lang.reflect.Method
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
@@ -119,12 +118,7 @@ class WriteContractTest {
         "IntakeStorageRepository.save" to (Shape.ACTION by "(RecordedIntake): Unit"),
         "IntakeStorageRepository.record" to (Shape.ACTION by "(IntakeOutcome): Boolean"),
         "IntakeStorageRepository.materialise" to (Shape.CREATION by "(List<CourseIntake>): Integer"),
-        "IntakeStorageRepository.prunePlanned" to (Shape.NAMED_FIELDS by "(Uuid, Set<ScheduledOccurrence>): Integer"),
-        // История остатка — только дописывается.
-        "StockMovementStorageRepository.observeOfPackage" to (Shape.READ by "(Uuid): Flow<List<StockMovement>>"),
-        "StockMovementStorageRepository.ofPackage" to (Shape.READ by "(Uuid): List<? extends StockMovement>"),
-        "StockMovementStorageRepository.observedBetween" to (Shape.READ by "(Instant, Instant): List<? extends StockMovement>"),
-        "StockMovementStorageRepository.record" to (Shape.CREATION by "(StockMovement): Unit")
+        "IntakeStorageRepository.prunePlanned" to (Shape.NAMED_FIELDS by "(Uuid, Set<ScheduledOccurrence>): Integer")
     )
 
     /**
@@ -139,8 +133,7 @@ class WriteContractTest {
         PackageStorageRepository::class.java,
         CourseStorageRepository::class.java,
         MedKitStorageRepository::class.java,
-        IntakeStorageRepository::class.java,
-        StockMovementStorageRepository::class.java
+        IntakeStorageRepository::class.java
     )
 
     /**

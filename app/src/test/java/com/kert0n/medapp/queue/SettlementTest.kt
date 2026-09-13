@@ -36,24 +36,20 @@ class SettlementTest {
     )
     private val later: Instant = Instant.parse("2026-09-12T12:00:00Z")
 
-    /**
-     * Снимок применённой команды содержит её саму: наш расход объясняет часть разницы, и в историю
-     * чужим изменением идёт только остаток (PLAN D7).
-     */
     @Test
     fun appliedWithASnapshotClosesLaysItDownAndAccountsTheIntake() {
         val settlement = Delivery.Applied(PackageState.Present(snapshot)).settlement(consume)
         assertEquals(Transition.Close(SyncOperationStatus.APPLIED), settlement.transition)
         assertEquals(
-            listOf(Effect.Account(IntakeAccounting.REMOTE_APPLIED), Effect.LayDown(snapshot, includes = consume), Effect.Settled),
+            listOf(Effect.Account(IntakeAccounting.REMOTE_APPLIED), Effect.LayDown(snapshot), Effect.Settled),
             settlement.effects
         )
     }
 
     @Test
-    fun appliedWithThePackageGoneEndsItWithoutATrace() {
+    fun appliedWithThePackageGoneEndsIt() {
         val settlement = Delivery.Applied(PackageState.Gone).settlement(consume)
-        assertEquals(listOf(Effect.Account(IntakeAccounting.REMOTE_APPLIED), Effect.PackageEnded(PACK, Effect.Ending.CONSUMED), Effect.Settled), settlement.effects)
+        assertEquals(listOf(Effect.Account(IntakeAccounting.REMOTE_APPLIED), Effect.PackageEnded(PACK), Effect.Settled), settlement.effects)
     }
 
     @Test
@@ -83,16 +79,13 @@ class SettlementTest {
         )
     }
 
-    /**
-     * «Пачки нет» после нашего же `Delete` — это выброшенная коробка, и она обязана объяснить, куда
-     * делся остаток; после расхода объяснение уже есть — сам приём (PLAN D7, H6).
-     */
+    /** «Пачки нет» после нашего же `Delete` — конец коробки; чем вызван, база не различает (D7). */
     @Test
-    fun theEndingNamesWhyTheBoxIsGone() {
+    fun theBoxGoneAfterOurDeleteEnds() {
         assertEquals(
             listOf<Effect>(
                 Effect.Account(IntakeAccounting.REMOTE_APPLIED),
-                Effect.PackageEnded(PACK, Effect.Ending.THROWN_OUT),
+                Effect.PackageEnded(PACK),
                 Effect.Settled
             ),
             Delivery.Applied(PackageState.Gone).settlement(PackageSyncCommand.Delete(PACK)).effects
@@ -140,7 +133,7 @@ class SettlementTest {
         assertEquals(
             listOf(
                 Effect.Account(IntakeAccounting.REMOTE_APPLIED),
-                Effect.PackageEnded(PACK, Effect.Ending.ACCESS_LOST),
+                Effect.PackageEnded(PACK),
                 Effect.Settled
             ),
             Delivery.Applied(PackageState.Elsewhere).settlement(consume).effects
@@ -183,7 +176,7 @@ class SettlementTest {
         assertEquals(
             listOf(
                 Effect.Account(IntakeAccounting.REMOTE_REFUSED),
-                Effect.PackageEnded(PACK, Effect.Ending.ACCESS_LOST),
+                Effect.PackageEnded(PACK),
                 Effect.Cascade(SyncOperationStatus.ACCESS_LOST, IntakeAccounting.REMOTE_REFUSED),
                 Effect.Settled
             ),

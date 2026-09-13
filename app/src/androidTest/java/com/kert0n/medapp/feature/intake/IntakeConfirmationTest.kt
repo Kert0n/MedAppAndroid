@@ -136,7 +136,7 @@ class IntakeConfirmationTest {
     fun anIntakeThatEmptiesTheLocalPackageEndsItAndDetachesTheSource() = runTest {
         activate()
         // Пачка на две таблетки: одна доза — и она кончилась.
-        packages.adjust(PackageAdjustment.Recount(PACK, tablets("2"), Uuid.random()), at = FIRST_PLANNED_AT)
+        packages.adjust(PackageAdjustment.Recount(PACK, tablets("2")), at = FIRST_PLANNED_AT)
 
         val confirmed = confirmation.confirm(INTAKE, PACK, dose("2"), FIRST_PLANNED_AT).getOrThrow()
 
@@ -161,7 +161,7 @@ class IntakeConfirmationTest {
     @Test
     fun anAnswerAboutThePastDoesNotMoveTheCourseBackwards() = runTest {
         activate()
-        packages.adjust(PackageAdjustment.Recount(PACK, tablets("2"), Uuid.random()), at = now)
+        packages.adjust(PackageAdjustment.Recount(PACK, tablets("2")), at = now)
 
         confirmation.confirm(INTAKE, PACK, dose("2"), FIRST_PLANNED_AT).getOrThrow()
 

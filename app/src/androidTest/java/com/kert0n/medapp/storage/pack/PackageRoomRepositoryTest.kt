@@ -265,7 +265,7 @@ class PackageRoomRepositoryTest {
     @Test
     fun describingDoesNotWriteBackAStaleAmount() = runTest {
         val sync = PackageSyncState(PACK, version = ResourceVersion(5), syncedAt = at)
-        repository.applySnapshot(PackageSnapshot(paracetamol.correctTo(tablets("11"), Uuid.random(), at).left(), sync), at)
+        repository.applySnapshot(PackageSnapshot(paracetamol.correctTo(tablets("11")).left(), sync), at)
 
         val renamed = paracetamol.facts.let { it.copy(shared = it.shared.copy(name = "Панадол")) }
 

@@ -1,7 +1,6 @@
 package com.kert0n.medapp.domain.pack
 
 import com.kert0n.medapp.domain.medkit.MedKitStatus
-import com.kert0n.medapp.domain.stock.StockMovement
 import com.kert0n.medapp.domain.value.Dose
 import com.kert0n.medapp.domain.value.Money
 
@@ -105,15 +104,6 @@ class PackageStateTransitionsTest {
         pack(medKit = medKit(id = HOME_KIT).ref).movedByAnswer(medKit(id = HOME_KIT).ref)
     }
 
-    @Test
-    fun losingAccessWritesWhatWasLeftIntoTheHistory() {
-        // Коробка цела, но не у нас: последний виденный остаток уходит из учёта записью, и
-        // она держится за ссылку на пачку, а не за саму пачку — той больше не будет.
-        val movementId = Uuid.random()
-        val lost = pack(quantity = tablets("7")).lost(movementId, LATER)
-        assertEquals(StockMovement.AccessLoss(movementId, pack().ref, tablets("7"), observedAt = LATER), lost.trace)
-    }
-
     /**
      * Унесли при 20, дома выпили одну — у нас 19; полка к снятию подтвердила 17: сосед выпил три.
      * Коробка хранит оба изменения — 16 (PLAN E6).
@@ -129,8 +119,8 @@ class PackageStateTransitionsTest {
     fun aBoxMarkedToGoIsReadOnly() {
         for (marked in listOf(pack().markRemoving(), pack().markLost())) {
             assertTrue(marked.take(Dose(tablets("1")), LATER).isFailure)
-            assertThrows(IllegalStateException::class.java) { marked.dispose(tablets("1"), Uuid.random(), LATER) }
-            assertThrows(IllegalStateException::class.java) { marked.correctTo(tablets("5"), Uuid.random(), LATER) }
+            assertThrows(IllegalStateException::class.java) { marked.dispose(tablets("1")) }
+            assertThrows(IllegalStateException::class.java) { marked.correctTo(tablets("5")) }
             assertThrows(IllegalStateException::class.java) { marked.describe(factsOf(marked)) }
             assertThrows(IllegalStateException::class.java) { marked.moveTo(medKit(id = SHARED_KIT).ref) }
         }
@@ -147,6 +137,7 @@ class PackageStateTransitionsTest {
     @Test
     fun theEndOfAMarkedBoxIsNotRefused() {
         // Конец — ответ на решение, а не пользование: помеченная коробка обязана уметь кончиться.
-        assertEquals(pack().id, pack().markRemoving().thrownOut(Uuid.random(), LATER).record.id)
+        assertEquals(pack().id, pack().markRemoving().ended().record.id)
+        assertEquals(pack().id, pack().markLost().ended().record.id)
     }
 }

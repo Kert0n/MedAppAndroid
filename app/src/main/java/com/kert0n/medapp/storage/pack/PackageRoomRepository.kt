@@ -25,8 +25,6 @@ import com.kert0n.medapp.storage.database.chunkedForQuery
 import com.kert0n.medapp.queue.StoredSyncOperation
 import com.kert0n.medapp.storage.server.SyncOperationDao
 import com.kert0n.medapp.storage.server.SyncOperationStorageRow
-import com.kert0n.medapp.storage.stock.StockMovementDao
-import com.kert0n.medapp.storage.stock.toStorageEntity as toMovementStorageEntity
 import com.kert0n.medapp.storage.value.VocabularyDao
 import java.time.Instant
 import java.time.LocalDate
@@ -39,7 +37,6 @@ class PackageRoomRepository @Inject constructor(
     private val database: MedAppDatabase,
     private val packages: PackageDao,
     private val courses: CourseDao,
-    private val movements: StockMovementDao,
     private val queue: SyncOperationDao,
     private val vocabulary: VocabularyDao
 ) : PackageStorageRepository {
@@ -81,7 +78,7 @@ class PackageRoomRepository @Inject constructor(
     }
 
     private suspend fun finish(ending: PackageEnding, at: Instant) =
-        packages.end(ending, courses, movements, vocabulary.snapshot(), at)
+        packages.end(ending, courses, vocabulary.snapshot(), at)
 
     override suspend fun contentsOf(medKitId: Uuid): List<Package> = database.withTransaction {
         val words = vocabulary.snapshot()
@@ -101,9 +98,7 @@ class PackageRoomRepository @Inject constructor(
         }
 
     override suspend fun applySnapshot(snapshot: PackageSnapshot, observedAt: Instant): SnapshotApplied =
-        // Прочитанный остаток, укладка и разница — одной транзакцией: иначе запись между ними
-        // сделала бы «было» устаревшим, и в историю ушла бы неверная разница (PLAN D7, F5).
-        database.withTransaction { packages.applySnapshot(snapshot, observedAt, movements, vocabulary.snapshot()) }
+        database.withTransaction { packages.applySnapshot(snapshot, observedAt) }
 
     override suspend fun saveClaims(packageId: Uuid, claims: Claims?) {
         if (claims == null) packages.deleteClaims(packageId)
@@ -116,9 +111,8 @@ class PackageRoomRepository @Inject constructor(
         at: Instant
     ): Boolean = database.withTransaction {
         val stored = packages.find(adjustment.packageId) ?: return@withTransaction false
-        when (val after = adjustment.applyTo(stored.toDomain(vocabulary.snapshot()), at)) {
+        when (val after = adjustment.applyTo(stored.toDomain(vocabulary.snapshot()))) {
             is PackageAfter.Left -> {
-                after.trace?.let { movements.insert(it.toMovementStorageEntity()) }
                 // Версии и время сверки остаются те, что записал снимок сервера: их двигает сеть (E4).
                 save(after.pkg, stored.pack.syncState())
                 // Пересчитанное обеспечение относится к пережившей переход коробке. У кончившейся

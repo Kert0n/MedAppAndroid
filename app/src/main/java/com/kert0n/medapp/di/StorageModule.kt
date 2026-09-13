@@ -13,8 +13,6 @@ import com.kert0n.medapp.storage.server.QueueRoomStorage
 import com.kert0n.medapp.storage.server.SnapshotRoomStorage
 import com.kert0n.medapp.storage.server.SyncOperationRoomRepository
 import com.kert0n.medapp.storage.server.SyncOperationStorageRepository
-import com.kert0n.medapp.storage.stock.StockMovementRoomRepository
-import com.kert0n.medapp.storage.stock.StockMovementStorageRepository
 import com.kert0n.medapp.network.value.VocabularyStore
 import com.kert0n.medapp.queue.QueueBacklog
 import com.kert0n.medapp.queue.QueueStorage
@@ -52,12 +50,6 @@ abstract class StorageModule {
     @Binds
     @Singleton
     abstract fun intakes(implementation: IntakeRoomRepository): IntakeStorageRepository
-
-    @Binds
-    @Singleton
-    abstract fun stockMovements(
-        implementation: StockMovementRoomRepository
-    ): StockMovementStorageRepository
 
     @Binds
     @Singleton
