@@ -56,7 +56,7 @@ class CourseAmendment @Inject constructor(
                 is Change.SetDose -> changed.changeDose(change.dose, now)
                 is Change.SetForm -> changed.changeForm(change.form, now)
                 is Change.SetSchedule -> changed.changeSchedule(change.schedule, now)
-                is Change.SetTotalDoses -> Result.success(changed.setTotalDoses(change.totalDoses, now))
+                is Change.SetTotalDoses -> changed.setTotalDoses(change.totalDoses, now)
             }.getOrElse { failure -> return@run Outcome.Rejected((failure as? CourseRejected ?: throw failure).reason) }
         }
         if (changed === before) return@run Outcome.Amended(before.projection())

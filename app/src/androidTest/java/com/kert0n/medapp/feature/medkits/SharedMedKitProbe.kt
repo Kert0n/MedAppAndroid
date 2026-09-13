@@ -9,6 +9,7 @@ import com.kert0n.medapp.domain.value.DosageForm
 import com.kert0n.medapp.domain.value.Dose
 import com.kert0n.medapp.domain.value.Doses
 import com.kert0n.medapp.feature.course.CourseActivation
+import com.kert0n.medapp.feature.course.CourseCalendar
 import com.kert0n.medapp.feature.course.CourseDrafting
 import com.kert0n.medapp.domain.value.Quantity
 import com.kert0n.medapp.domain.value.QuantityUnit
@@ -552,7 +553,8 @@ class SharedMedKitProbe {
         private val relocation = PackageRelocation(packages, medKits, courses, queue, transactions, clock)
         private val publishing = MedKitPublishing(medKits, packages, relocation, queue, transactions, clock)
         private val confirmation = IntakeConfirmation(
-            database.intakeRepository(), courses, packages, transactions, queue, CourseClosing(courses, packages, queue), clock
+            database.intakeRepository(), courses, packages, transactions, queue, CourseClosing(courses, packages, queue),
+            CourseCalendar(database.intakeRepository(), packages), clock
         )
 
         fun scenarios() = Scenarios(database, clock.instant())

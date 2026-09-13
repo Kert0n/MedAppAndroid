@@ -197,7 +197,7 @@ class CourseDaoTest {
         val plan = activeCourse()
         courses.saveCourse(plan.toStorageEntity(), plan.schedule.toTimeStorageEntities(COURSE), emptyList())
         courses.upsertRecord(courseRecord(prescription = plan.prescription).toStorageEntity())
-        val shortened = plan.setTotalDoses(3.doses, LATER)
+        val shortened = plan.setTotalDoses(3.doses, LATER).getOrThrow()
         val repository = database.courseRepository()
 
         assertTrue(repository.amend(shortened, expected = plan.revision))
@@ -206,7 +206,7 @@ class CourseDaoTest {
         assertEquals(3.doses, requireNotNull(repository.findRecord(COURSE)).prescription.totalDoses)
 
         // Правка из устаревшей редакции не ложится ни в план, ни в запись.
-        assertEquals(false, repository.amend(shortened.setTotalDoses(5.doses, LATER), expected = plan.revision))
+        assertEquals(false, repository.amend(shortened.setTotalDoses(5.doses, LATER).getOrThrow(), expected = plan.revision))
         assertEquals(3.doses, requireNotNull(repository.findRecord(COURSE)).prescription.totalDoses)
     }
 

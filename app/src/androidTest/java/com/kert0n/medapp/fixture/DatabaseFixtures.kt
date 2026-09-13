@@ -151,7 +151,7 @@ class Scenarios(database: MedAppDatabase, now: java.time.Instant) {
     )
     val courseClosing = com.kert0n.medapp.feature.course.CourseClosing(courses, packages, queue)
     val courseCancellation = com.kert0n.medapp.feature.course.CourseCancellation(
-        courses, database.intakeRepository(), courseClosing, transactions, clock
+        courses, database.intakeRepository(), courseCalendar, courseClosing, transactions, clock
     )
     val courseAmendment = com.kert0n.medapp.feature.course.CourseAmendment(
         courses, database.intakeRepository(), packages, courseCalendar, courseClosing, queue, transactions, clock
@@ -160,6 +160,6 @@ class Scenarios(database: MedAppDatabase, now: java.time.Instant) {
         courses, database.intakeRepository(), packages, courseCalendar, queue, transactions, clock
     )
     val intakeConfirmation = com.kert0n.medapp.feature.intake.IntakeConfirmation(
-        database.intakeRepository(), courses, packages, transactions, queue, courseClosing, clock
+        database.intakeRepository(), courses, packages, transactions, queue, courseClosing, courseCalendar, clock
     )
 }

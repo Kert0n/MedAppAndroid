@@ -100,16 +100,18 @@ class CourseCalendarTest {
         assertEquals(IntakeStatus.MISSED, intakes().first().status)
     }
 
-    /** Пропуск не сокращает лечение: доза уезжает вперёд, и в конце появляется ещё один пункт (PLAN D5). */
+    /**
+     * Пропуск не сокращает лечение: доза уезжает вперёд, и в конце появляется ещё один пункт
+     * (PLAN D5). Лечение начато задним числом, а один проход доводит календарь до конца: пункты
+     * прошедших дней сразу пропуски, а замена им уже впереди.
+     */
     @Test
     fun aMissedDoseMovesTheEndForward() = runTest {
         started(LocalDate.of(2027, 3, 8), totalDoses = 3)
-        val upkeep = Scenarios(database, now).courseUpkeep
 
-        upkeep.keepUp()
-        assertEquals((8..10).map { LocalDate.of(2027, 3, it) }, intakes().map { it.slot.localDate })
+        val done = Scenarios(database, now).courseUpkeep.keepUp()
 
-        upkeep.keepUp()
+        assertEquals(2, done.missed)
 
         val items = intakes()
         assertEquals((8..12).map { LocalDate.of(2027, 3, it) }, items.map { it.slot.localDate })

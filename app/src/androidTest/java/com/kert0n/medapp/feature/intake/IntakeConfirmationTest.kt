@@ -8,6 +8,7 @@ import com.kert0n.medapp.domain.intake.IntakeRejected
 import com.kert0n.medapp.domain.intake.IntakeStatus
 import com.kert0n.medapp.domain.medkit.MedKit
 import com.kert0n.medapp.domain.value.Doses
+import com.kert0n.medapp.feature.course.CourseCalendar
 import com.kert0n.medapp.feature.course.CourseClosing
 import com.kert0n.medapp.fixture.COURSE
 import com.kert0n.medapp.fixture.FIRST_PLANNED_AT
@@ -85,7 +86,7 @@ class IntakeConfirmationTest {
         val transactions = database.transactions()
         val clock = Clock.fixed(now, ZoneOffset.UTC)
         val service = QueueService(transactions, database.queueStorage())
-        confirmation = IntakeConfirmation(intakes, courses, packages, transactions, service, CourseClosing(courses, packages, service), clock)
+        confirmation = IntakeConfirmation(intakes, courses, packages, transactions, service, CourseClosing(courses, packages, service), CourseCalendar(intakes, packages), clock)
         packages.add(pack(quantity = tablets("20")))
     }
 
@@ -227,8 +228,14 @@ class IntakeConfirmationTest {
         val first = planned(INTAKE, slots[0])
         activate(totalDoses = 2, planned = listOf(first, planned(OTHER_INTAKE, slots[1]), planned(third, slots[2])))
         miss(first)
+        // Отвечают назавтра после пропуска: день второго пункта ещё идёт, и пропуском он не стал.
+        val service = QueueService(database.transactions(), database.queueStorage())
+        val nextMorning = IntakeConfirmation(
+            intakes, courses, packages, database.transactions(), service, CourseClosing(courses, packages, service),
+            CourseCalendar(intakes, packages), Clock.fixed(slots[1].at, ZoneOffset.UTC)
+        )
 
-        confirmation.confirm(INTAKE, PACK, dose("2"), slots[0].at).getOrThrow()
+        nextMorning.confirm(INTAKE, PACK, dose("2"), slots[0].at).getOrThrow()
 
         assertEquals(IntakeStatus.TAKEN, requireNotNull(intakes.find(INTAKE)).status)
         assertEquals(IntakeStatus.PLANNED, requireNotNull(intakes.find(OTHER_INTAKE)).status)

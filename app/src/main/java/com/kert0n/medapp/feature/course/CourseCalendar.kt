@@ -2,6 +2,7 @@ package com.kert0n.medapp.feature.course
 
 import com.kert0n.medapp.domain.course.Course
 import com.kert0n.medapp.domain.course.CourseProgress
+import com.kert0n.medapp.domain.course.ScheduledOccurrence
 import com.kert0n.medapp.domain.intake.CourseIntake
 import com.kert0n.medapp.domain.intake.IntakeStatus
 import com.kert0n.medapp.domain.pack.Availability
@@ -34,13 +35,13 @@ class CourseCalendar @Inject constructor(
     /**
      * Окно достроено по нынешнему плану: недостающие пункты до `now + WINDOW` заведены, а лишние
      * плановые — которых по прогрессу больше нет (сократили число доз, поздний ответ сдвинул конец
-     * назад) — убраны. Отвеченные пункты не трогаются никогда. Возвращает число заведённых.
+     * назад) — убраны. Отвеченные пункты не трогаются никогда, а начавшиеся — тоже (см. [prune]).
+     * Возвращает число заведённых.
      */
     suspend fun extend(course: Course, now: Instant): Int {
         val existing = intakes.ofCourse(course.id).filterIsInstance<CourseIntake>()
-        val progress = progressOf(existing)
-        val remaining = course.remainingOccurrences(progress)
-        intakes.prunePlanned(course.id, remaining.toSet())
+        val remaining = course.remainingOccurrences(progressOf(existing))
+        prune(course, remaining.toSet(), now)
         val window = remaining.filter { it.at.isBefore(now.plus(WINDOW)) }
         if (window.isEmpty()) return 0
         val order = course.spendOrder(Doses(window.size), availabilityOf(course))
@@ -55,6 +56,36 @@ class CourseCalendar @Inject constructor(
             )
         }
         return intakes.materialise(planned)
+    }
+
+    /**
+     * Лишние плановые пункты убраны: остаются [remaining] и **начавшиеся** — чей момент уже прошёл,
+     * а день ещё нет. Такой пункт ещё ждёт ответа — «в девять утра принял по прежней дозе, отвечаю
+     * в полдень», — и назначен он прежним планом: его дозу и пачку правка плана не переписывает
+     * (PLAN D5). Пропуском он станет по концу своего дня.
+     */
+    suspend fun prune(course: Course, remaining: Set<ScheduledOccurrence>, now: Instant): Int {
+        val started = intakes.ofCourse(course.id).filterIsInstance<CourseIntake>()
+            .filter { it.status == IntakeStatus.PLANNED && it.plannedAt.isBefore(now) }
+            .map { it.slot }
+        return intakes.prunePlanned(course.id, remaining + started)
+    }
+
+    /**
+     * Календарь приведён в порядок до конца: пропуски отмечены, окно достроено — и так, пока ни то
+     * ни другое ничего не меняет. Достройка может завести пункты уже прошедших дней (лечение начали
+     * задним числом, окно давно не достраивали), а их отметка сдвигает конец и требует ещё одного
+     * пункта впереди; за один проход ответа не остаётся недоделанным.
+     */
+    suspend fun catchUp(course: Course, now: Instant): CourseUpkeep.Report {
+        var missed = 0
+        var planned = 0
+        do {
+            planned += extend(course, now)
+            val marked = missOverdue(course, now)
+            missed += marked
+        } while (marked > 0)
+        return CourseUpkeep.Report(missed, planned)
     }
 
     /**
@@ -75,11 +106,11 @@ class CourseCalendar @Inject constructor(
 
     /**
      * Будущее перестроено заново: план изменился — дозой, расписанием или пачками, — и прежние
-     * плановые пункты несут прежнюю дозу и прежнюю пачку. Они не факты и уходят; отвеченные
-     * остаются как были (PLAN D5).
+     * плановые пункты несут прежнюю дозу и прежнюю пачку. Будущие не факты и уходят; отвеченные и
+     * начавшиеся остаются как были (PLAN D5).
      */
     suspend fun replan(course: Course, now: Instant): Int {
-        intakes.prunePlanned(course.id, keep = emptySet())
+        prune(course, remaining = emptySet(), now = now)
         return extend(course, now)
     }
 

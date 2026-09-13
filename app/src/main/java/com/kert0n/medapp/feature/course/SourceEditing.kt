@@ -75,6 +75,8 @@ class SourceEditing @Inject constructor(
         }
         if (course === before) return@run Outcome.Saved(before.projection())
 
+        // Прошлое до правки: неответ, чей день кончился, — пропуск, иначе перестройка вернула бы его в план.
+        calendar.missOverdue(before, now)
         val progress = CourseCalendar.progressOf(intakes.ofCourse(id).filterIsInstance<CourseIntake>())
         val required = course.remainingDoses(progress)
         val availability = calendar.availabilityOf(course)

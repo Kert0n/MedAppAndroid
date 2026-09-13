@@ -101,9 +101,28 @@ class SourceEditingTest {
         val plan = requireNotNull(database.courseRepository().findPlan(id))
         assertEquals(listOf(OTHER_PACK, PACK), plan.sources.map { it.pkg.id })
         assertEquals(id, database.courseRepository().courseHolding(OTHER_PACK))
-        val first = database.intakeRepository().ofCourse(id).filterIsInstance<CourseIntake>().minBy { it.plannedAt }
+        // Сегодняшний пункт уже начался и остаётся со своей пачкой; первый будущий — из новой первой.
+        val first = database.intakeRepository().ofCourse(id).filterIsInstance<CourseIntake>().filter { it.plannedAt >= now }.minBy { it.plannedAt }
         assertEquals(OTHER_PACK, first.plannedPackage?.id)
         assertTrue(database.syncOperations().all().isEmpty())
+    }
+
+    /**
+     * Календарь давно не приводили в порядок, а пачки правят: прошедшие дни — пропуски, и
+     * перестройка будущего не возвращает их в план.
+     */
+    @Test
+    fun overdueDosesStayMissedThroughAnEdit() = runTest {
+        val id = treated()
+        val twoDaysLater = Instant.parse("2027-03-12T12:00:00Z")
+
+        Scenarios(database, twoDaysLater).sourceEditing.save(
+            id, revisionOf(id), listOf(SourceEditing.Source(OTHER_PACK, Doses(3)), SourceEditing.Source(PACK, Doses(5)))
+        )
+
+        val byDay = database.intakeRepository().ofCourse(id).filterIsInstance<CourseIntake>().associate { it.slot.localDate to it.status }
+        assertEquals(IntakeStatus.MISSED, byDay[LocalDate.of(2027, 3, 10)])
+        assertEquals(IntakeStatus.MISSED, byDay[LocalDate.of(2027, 3, 11)])
     }
 
     /** Общая полка: команду получает только пачка, чья бронь изменилась. */
@@ -128,7 +147,7 @@ class SourceEditingTest {
 
         assertNull(database.courseRepository().courseHolding(PACK))
         assertEquals(PackageSyncCommand.ReleaseClaim(PACK), commands().last())
-        val planned = database.intakeRepository().ofCourse(id).filterIsInstance<CourseIntake>().filter { it.status == IntakeStatus.PLANNED }
+        val planned = database.intakeRepository().ofCourse(id).filterIsInstance<CourseIntake>().filter { it.status == IntakeStatus.PLANNED && it.plannedAt >= now }
         assertTrue(planned.isNotEmpty() && planned.all { it.plannedPackage == null })
     }
 

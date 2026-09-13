@@ -91,6 +91,23 @@ class CourseCancellationTest {
         assertEquals(PackageSyncCommand.ReleaseClaim(PACK), commands.last())
     }
 
+    /**
+     * Календарь давно не приводили в порядок, а лечение отменяют: неответ прошедших дней остаётся
+     * пропуском, а не становится отменённым пунктом — отменённый пропуском уже не станет.
+     */
+    @Test
+    fun overdueDosesAreMissedNotCancelled() = runTest {
+        val id = started()
+        val twoDaysLater = Instant.parse("2027-03-12T12:00:00Z")
+
+        Scenarios(database, twoDaysLater).courseCancellation.cancel(id)
+
+        val byDay = database.intakeRepository().ofCourse(id).filterIsInstance<CourseIntake>().associate { it.slot.localDate to it.status }
+        assertEquals(IntakeStatus.MISSED, byDay[LocalDate.of(2027, 3, 10)])
+        assertEquals(IntakeStatus.MISSED, byDay[LocalDate.of(2027, 3, 11)])
+        assertEquals(IntakeStatus.CANCELLED, byDay[LocalDate.of(2027, 3, 13)])
+    }
+
     @Test
     fun aFinishedTreatmentIsNotCancelledAgain() = runTest {
         val id = started()

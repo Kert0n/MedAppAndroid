@@ -35,8 +35,9 @@ class CourseUpkeep @Inject constructor(
         for (id in courses.planIds()) {
             transactions.run {
                 val course = courses.findPlan(id) ?: return@run
-                missed += calendar.missOverdue(course, now)
-                planned += calendar.extend(course, now)
+                val done = calendar.catchUp(course, now)
+                missed += done.missed
+                planned += done.planned
             }
         }
         Report(missed, planned)

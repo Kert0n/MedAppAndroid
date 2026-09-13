@@ -52,7 +52,8 @@ class CourseActivation @Inject constructor(
         // Выделение — намерение человека, но больше, чем пачка даёт, его не бывает (PLAN D5).
         val course = started.course.let { it.clamped(it.totalDoses, calendar.availabilityOf(it), now) }
         courses.activate(CourseDraft.Activation(course, started.record))
-        calendar.extend(course, now)
+        // Лечение начали задним числом — прошедшие дни сразу пропуски, а не ждущие пункты.
+        calendar.catchUp(course, now)
         for (source in course.sources) {
             val claim = course.allocatedOf(source.pkg)?.takeUnless { it.isZero } ?: continue
             val pkg = checkNotNull(packages.find(source.pkg.id)) { "пачка прочитана этой же транзакцией" }

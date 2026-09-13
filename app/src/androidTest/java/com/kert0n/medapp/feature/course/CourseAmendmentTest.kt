@@ -160,6 +160,49 @@ class CourseAmendmentTest {
         assertEquals(revision, revisionOf(id))
     }
 
+    /**
+     * Сегодняшний пункт в 09:00 прошёл, а день ещё нет: он ждёт ответа — «принял по прежней дозе,
+     * отмечаю в полдень». Изменение лечения его не переписывает и не убирает; перестраивается только
+     * то, что впереди.
+     */
+    @Test
+    fun aStartedDoseKeepsItsPlanThroughAnAmendment() = runTest {
+        database.packageRepository().add(pack(id = PACK, quantity = tablets("20"), form = TABLET_FORM))
+        val created = scenarios.courseDrafting.create("Ибупрофен")
+        val draft = (scenarios.courseDrafting.edit(
+            created.id, created.revision,
+            listOf(
+                CourseDrafting.Edit.SetDose(dose("2")),
+                CourseDrafting.Edit.SetForm(TABLET_FORM),
+                CourseDrafting.Edit.SetSchedule(schedule(start = LocalDate.of(2027, 3, 10))),
+                CourseDrafting.Edit.SetTotalDoses(Doses(10)),
+                CourseDrafting.Edit.Attach(PACK, Doses(5))
+            )
+        ) as CourseDrafting.Outcome.Saved).draft
+        scenarios.courseActivation.activate(draft.id, draft.revision)
+        val evening = schedule(start = LocalDate.of(2027, 3, 11), times = listOf(LocalTime.of(21, 0)))
+
+        scenarios.courseAmendment.amend(
+            draft.id, revisionOf(draft.id),
+            listOf(CourseAmendment.Change.SetDose(dose("1")), CourseAmendment.Change.SetSchedule(evening))
+        )
+
+        val today = items(draft.id).single { it.slot.localDate == LocalDate.of(2027, 3, 10) }
+        assertEquals(IntakeStatus.PLANNED, today.status)
+        assertEquals(dose("2"), today.plannedAmount)
+        assertEquals(LocalTime.of(9, 0), today.slot.localTime)
+    }
+
+    /** Ноль доз — не лечение: отказ, и не записано ничего. */
+    @Test
+    fun zeroDosesAreRejected() = runTest {
+        val id = treated()
+
+        val outcome = scenarios.courseAmendment.amend(id, revisionOf(id), listOf(CourseAmendment.Change.SetTotalDoses(Doses(0))))
+
+        assertEquals(CourseAmendment.Outcome.Rejected(CourseRejected.Reason.TOTAL_DOSES_MISSING), outcome)
+    }
+
     /** Число доз сократили до уже принятого — лечение этим и закончилось. */
     @Test
     fun shorteningToWhatWasTakenFinishesTheTreatment() = runTest {

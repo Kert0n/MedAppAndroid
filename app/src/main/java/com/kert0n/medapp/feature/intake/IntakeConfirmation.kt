@@ -4,6 +4,7 @@ import com.kert0n.medapp.domain.course.CourseCompletion
 import com.kert0n.medapp.domain.course.CourseProgress
 import com.kert0n.medapp.domain.pack.PackageAfter
 import com.kert0n.medapp.domain.pack.PackageAvailability
+import com.kert0n.medapp.feature.course.CourseCalendar
 import com.kert0n.medapp.feature.course.CourseClosing
 import com.kert0n.medapp.feature.course.openPlan
 import com.kert0n.medapp.domain.intake.CourseIntake
@@ -43,6 +44,7 @@ class IntakeConfirmation @Inject constructor(
     private val transactions: Transactions,
     private val queue: QueueService,
     private val closing: CourseClosing,
+    private val calendar: CourseCalendar,
     private val clock: Clock
 ) {
 
@@ -69,6 +71,10 @@ class IntakeConfirmation @Inject constructor(
         // Пункт курса принимают из пачки курса; из любой другой это внеплановый факт, и пункт им
         // не закрывается (PLAN D5). Отказ — до `take`: не записано ничего.
         if (!course.isSource(pkg.ref)) return rejected(IntakeRejected.Reason.PACKAGE_NOT_A_SOURCE)
+        // Прошлое до ответа, но после всех отказов — отказ не пишет ничего: неответ, чей день
+        // кончился, — пропуск. Иначе конец лечения этим приёмом отменил бы такие пункты, а
+        // отменённый пропуском уже не станет (PLAN D6).
+        calendar.missOverdue(course, now)
         val confirmed = intake.confirm(pkg.take(amount, at).getOrElse { return Result.failure(it) })
 
         val others = intakes.ofCourse(course.id).filterIsInstance<CourseIntake>().filter { it != intake }
@@ -118,7 +124,7 @@ class IntakeConfirmation @Inject constructor(
             // Снятие брони с этой пачки уже уехало зависимым от расхода — второй раз не ставится.
             closing.close(course, completion.close(record, intakes.ofCourse(course.id).filterIsInstance<CourseIntake>(), now), now, except = pkg.ref)
         } else {
-            intakes.prunePlanned(course.id, course.remainingOccurrences(progress).toSet())
+            calendar.prune(course, course.remainingOccurrences(progress).toSet(), now)
         }
         return Result.success(Confirmed(confirmed.projection(), sync.accounting, episodeClosed = finished))
     }

@@ -19,6 +19,7 @@ import kotlin.uuid.Uuid
 class CourseCancellation @Inject constructor(
     private val courses: CourseStorageRepository,
     private val intakes: IntakeStorageRepository,
+    private val calendar: CourseCalendar,
     private val closing: CourseClosing,
     private val transactions: Transactions,
     private val clock: Clock
@@ -29,6 +30,8 @@ class CourseCancellation @Inject constructor(
         if (!record.isOpen) return@run Outcome.ALREADY_FINISHED
         val course = courses.openPlan(id)
         val now = clock.instant()
+        // Прошлое до отмены: неответ, чей день кончился, — пропуск, а не отменённый пункт.
+        calendar.missOverdue(course, now)
         val ofCourse = intakes.ofCourse(id).filterIsInstance<CourseIntake>()
         closing.close(course, CourseCompletion.Closing.of(record, CourseRecord.Outcome.CANCELLED, ofCourse, now), now)
         Outcome.CANCELLED
