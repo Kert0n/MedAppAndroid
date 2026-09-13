@@ -12,6 +12,7 @@ import com.kert0n.medapp.fixture.medKit
 import com.kert0n.medapp.fixture.medKitRepository
 import com.kert0n.medapp.storage.database.MedAppDatabase
 import com.kert0n.medapp.storage.medkit.toStorageEntity as toMedKitStorageEntity
+import java.time.LocalDate
 import kotlin.uuid.Uuid
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.test.runTest
@@ -33,6 +34,8 @@ class MedKitKeepingTest {
 
     private lateinit var database: MedAppDatabase
     private lateinit var keeping: MedKitKeeping
+
+    private val today: LocalDate = LocalDate.of(2026, 9, 10)
 
     @Before
     fun setUp() = runTest {
@@ -61,9 +64,9 @@ class MedKitKeepingTest {
     /** Допустимость названия — правило самой аптечки, и сценарий его не повторяет. */
     @Test
     fun aShelfWithoutANameIsNotCreated() = runTest {
-        val before = database.medKitRepository().observeAll().first()
+        val before = database.medKitRepository().observeAll(today).first()
         assertTrue(runCatching { keeping.create("   ") }.exceptionOrNull() is IllegalArgumentException)
-        assertEquals(before, database.medKitRepository().observeAll().first())
+        assertEquals(before, database.medKitRepository().observeAll(today).first())
     }
 
     /**

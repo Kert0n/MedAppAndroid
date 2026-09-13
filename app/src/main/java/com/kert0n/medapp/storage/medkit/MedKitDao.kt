@@ -6,6 +6,7 @@ import androidx.room.OnConflictStrategy
 import androidx.room.Query
 import androidx.room.Upsert
 import java.time.Instant
+import java.time.LocalDate
 import com.kert0n.medapp.domain.value.Vocabulary
 import com.kert0n.medapp.storage.course.CourseDao
 import com.kert0n.medapp.storage.pack.PackageDao
@@ -36,7 +37,27 @@ interface MedKitDao {
     fun observe(id: Uuid): Flow<MedKitStorageEntity?>
 
     @Query("SELECT * FROM med_kits ORDER BY name")
-    fun observeAll(): Flow<List<MedKitStorageEntity>>
+    suspend fun all(): List<MedKitStorageEntity>
+
+    /**
+     * Содержимое полок одним чтением: сколько живых коробок и сколько из них просрочено на
+     * [today]. Спрашивать про каждую значило бы сто запросов на список из ста (PLAN D2, REQ-055);
+     * одна полка — тот же запрос с [medKitId]: определение «просрочена» одно, и второго запроса
+     * под него не заводится. Просрочка — строго раньше [today]: «годен до» включительно, как у
+     * самой пачки (PLAN D3). Кончившейся коробки в `packages` нет, и она не считается.
+     */
+    @Query(
+        """
+        SELECT p.med_kit_id AS med_kit_id,
+               COUNT(*) AS packages,
+               SUM(CASE WHEN d.expires_on IS NOT NULL AND d.expires_on < :today THEN 1 ELSE 0 END) AS expired
+        FROM packages p
+        JOIN package_details d ON d.package_id = p.id
+        WHERE :medKitId IS NULL OR p.med_kit_id = :medKitId
+        GROUP BY p.med_kit_id
+        """
+    )
+    suspend fun contents(today: LocalDate, medKitId: Uuid?): List<MedKitContentsStorageRow>
 
     @Query("SELECT * FROM med_kits WHERE id = :id")
     suspend fun find(id: Uuid): MedKitStorageEntity?

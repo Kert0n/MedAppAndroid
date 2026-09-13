@@ -45,8 +45,11 @@ class MedKit(
     /** Как аптечку видит чужой агрегат: тождество, публикация и пометка, без переходов. */
     val ref: MedKitRef get() = MedKitRef(id, publication, status)
 
-    /** Как аптечку видит экран: величина, наружу уходит она, а не сущность. */
-    fun projection(): MedKitProjection = MedKitProjection(
+    /**
+     * Как аптечку видит экран: величина, наружу уходит она, а не сущность. Что на полке лежит,
+     * знает не она, а тот, кто читал коробки, — приносит аргументом (PLAN D2).
+     */
+    fun projection(contents: MedKitContents): MedKitProjection = MedKitProjection(
         id = id,
         name = name,
         location = location,
@@ -55,6 +58,7 @@ class MedKit(
         createdAt = createdAt,
         isShared = isShared,
         acceptsInvitations = acceptsInvitations,
+        contents = contents,
         status = status
     )
 

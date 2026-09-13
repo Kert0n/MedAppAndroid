@@ -1,6 +1,7 @@
 package com.kert0n.medapp.feature.medkits
 
 import com.kert0n.medapp.domain.medkit.MedKit
+import com.kert0n.medapp.domain.medkit.MedKitContents
 import com.kert0n.medapp.domain.medkit.MedKitProjection
 import com.kert0n.medapp.queue.Transactions
 import com.kert0n.medapp.storage.medkit.MedKitStorageRepository
@@ -35,7 +36,8 @@ class MedKitKeeping @Inject constructor(
             createdAt = clock.instant()
         )
         medKits.add(medKit)
-        medKit.projection()
+        // Новая полка пуста, и это правда о ней, а не умолчание.
+        medKit.projection(MedKitContents.EMPTY)
     }
 
     /**

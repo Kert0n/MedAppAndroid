@@ -105,8 +105,8 @@ class WriteContractTest {
         "CourseStorageRepository.saveDraft" to (Shape.GUARDED by "(CourseDraft, Revision): Boolean"),
         "CourseStorageRepository.discardDraft" to (Shape.NAMED_FIELDS by "(Uuid): Boolean"),
         // Аптечка
-        "MedKitStorageRepository.observeAll" to (Shape.READ by "(): Flow<List<MedKitProjection>>"),
-        "MedKitStorageRepository.observe" to (Shape.READ by "(Uuid): Flow<MedKitProjection>"),
+        "MedKitStorageRepository.observeAll" to (Shape.READ by "(LocalDate): Flow<List<MedKitProjection>>"),
+        "MedKitStorageRepository.observe" to (Shape.READ by "(Uuid, LocalDate): Flow<MedKitProjection>"),
         "MedKitStorageRepository.observeSyncedAt" to (Shape.READ by "(Uuid): Flow<Instant>"),
         "MedKitStorageRepository.find" to (Shape.READ by "(Uuid): MedKit"),
         "MedKitStorageRepository.delete" to (Shape.NAMED_FIELDS by "(Uuid): Boolean"),
