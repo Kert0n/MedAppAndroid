@@ -1,5 +1,6 @@
 package com.kert0n.medapp.feature.medkits
 
+import com.kert0n.medapp.fixture.confirmed
 import com.kert0n.medapp.domain.medkit.InvitationKey
 import com.kert0n.medapp.domain.medkit.MedKit
 import com.kert0n.medapp.domain.pack.PackageStatus
@@ -623,7 +624,7 @@ class SharedMedKitProbe {
         }
 
         suspend fun confirm(intake: Uuid, box: Uuid) {
-            confirmation.confirm(intake, box, twoPills(), clock.instant()).getOrThrow()
+            confirmation.confirm(intake, box, twoPills(), clock.instant()).confirmed()
         }
 
         /** Проход очереди при связи; сбой шага — провал пробы, а не тихий повтор. */

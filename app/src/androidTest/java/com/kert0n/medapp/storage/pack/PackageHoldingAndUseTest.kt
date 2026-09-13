@@ -1,5 +1,6 @@
 package com.kert0n.medapp.storage.pack
 
+import com.kert0n.medapp.fixture.confirmed
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import com.kert0n.medapp.domain.intake.CourseIntake
 import com.kert0n.medapp.domain.pack.PackageProjection
@@ -98,7 +99,7 @@ class PackageHoldingAndUseTest {
         assertEquals(earlier, projected(PACK).lastUsedAt)
 
         val first = database.intakeRepository().ofCourse(draft.id).filterIsInstance<CourseIntake>().minBy { it.plannedAt }
-        scenarios.intakeConfirmation.confirm(first.id, PACK, dose("2"), now).getOrThrow()
+        scenarios.intakeConfirmation.confirm(first.id, PACK, dose("2"), now).confirmed()
         assertEquals(now, projected(PACK).lastUsedAt)
 
         scenarios.unplannedIntakeRecording.record(PACK, dose("1"), now.minusSeconds(86_400))

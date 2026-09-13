@@ -1,5 +1,9 @@
 package com.kert0n.medapp.feature.intake
 
+import com.kert0n.medapp.domain.pack.ExpiryDate
+import com.kert0n.medapp.fixture.factsOf
+import com.kert0n.medapp.fixture.confirmed
+import com.kert0n.medapp.fixture.rejected
 import com.kert0n.medapp.domain.course.CourseDraft
 import com.kert0n.medapp.domain.course.CourseRecord
 import com.kert0n.medapp.domain.course.ScheduledOccurrence
@@ -124,7 +128,7 @@ class IntakeConfirmationTest {
     fun ownKitSpendsLocallyAndReallocatesThePackage() = runTest {
         activate()
 
-        val confirmed = confirmation.confirm(INTAKE, PACK, dose("2"), FIRST_PLANNED_AT).getOrThrow()
+        val confirmed = confirmation.confirm(INTAKE, PACK, dose("2"), FIRST_PLANNED_AT).confirmed()
 
         assertEquals(IntakeAccounting.LOCAL_APPLIED, confirmed.accounting)
         assertEquals(IntakeStatus.TAKEN, requireNotNull(intakes.find(INTAKE)).status)
@@ -145,7 +149,7 @@ class IntakeConfirmationTest {
         // Пачка на две таблетки: одна доза — и она кончилась.
         packages.adjust(PackageAdjustment.Recount(PACK, tablets("2")), at = FIRST_PLANNED_AT)
 
-        val confirmed = confirmation.confirm(INTAKE, PACK, dose("2"), FIRST_PLANNED_AT).getOrThrow()
+        val confirmed = confirmation.confirm(INTAKE, PACK, dose("2"), FIRST_PLANNED_AT).confirmed()
 
         assertEquals(IntakeAccounting.LOCAL_APPLIED, confirmed.accounting)
         assertNull(packages.find(PACK))
@@ -170,7 +174,7 @@ class IntakeConfirmationTest {
         activate()
         packages.adjust(PackageAdjustment.Recount(PACK, tablets("2")), at = now)
 
-        confirmation.confirm(INTAKE, PACK, dose("2"), FIRST_PLANNED_AT).getOrThrow()
+        confirmation.confirm(INTAKE, PACK, dose("2"), FIRST_PLANNED_AT).confirmed()
 
         val plan = requireNotNull(courses.findPlan(COURSE))
         assertEquals(now, plan.updatedAt)
@@ -182,7 +186,7 @@ class IntakeConfirmationTest {
         publishHomeKit()
         activate()
 
-        val confirmed = confirmation.confirm(INTAKE, PACK, dose("2"), FIRST_PLANNED_AT).getOrThrow()
+        val confirmed = confirmation.confirm(INTAKE, PACK, dose("2"), FIRST_PLANNED_AT).confirmed()
 
         assertEquals(IntakeAccounting.PENDING, confirmed.accounting)
         // Локально лежит подтверждённое сервером; незакрытый расход сворачивает очередь.
@@ -207,7 +211,7 @@ class IntakeConfirmationTest {
         // Уже уехавший расход на 15 таблеток: по свёртке очереди в пачке пять.
         database.syncOperations().enqueue(third, PackageSyncCommand.Consume(PACK, dose("15"), third), now)
 
-        confirmation.confirm(INTAKE, PACK, dose("2"), FIRST_PLANNED_AT).getOrThrow()
+        confirmation.confirm(INTAKE, PACK, dose("2"), FIRST_PLANNED_AT).confirmed()
 
         // Человек видел пять, принял две — осталось три, и это одна доза по две таблетки.
         assertEquals(Doses(1), requireNotNull(courses.findPlan(COURSE)).sources.single().allocatedDoses)
@@ -218,7 +222,7 @@ class IntakeConfirmationTest {
         publishHomeKit()
         activate(totalDoses = 1)
 
-        val confirmed = confirmation.confirm(INTAKE, PACK, dose("2"), FIRST_PLANNED_AT).getOrThrow()
+        val confirmed = confirmation.confirm(INTAKE, PACK, dose("2"), FIRST_PLANNED_AT).confirmed()
 
         assertTrue(confirmed.episodeClosed)
         assertEquals(CourseRecord.Outcome.COMPLETED, requireNotNull(courses.findRecord(COURSE)).outcome)
@@ -246,7 +250,7 @@ class IntakeConfirmationTest {
             CourseCalendar(intakes, packages), Clock.fixed(slots[1].at, ZoneOffset.UTC)
         )
 
-        nextMorning.confirm(INTAKE, PACK, dose("2"), slots[0].at).getOrThrow()
+        nextMorning.confirm(INTAKE, PACK, dose("2"), slots[0].at).confirmed()
 
         assertEquals(IntakeStatus.TAKEN, requireNotNull(intakes.find(INTAKE)).status)
         assertEquals(IntakeStatus.PLANNED, requireNotNull(intakes.find(OTHER_INTAKE)).status)
@@ -260,9 +264,9 @@ class IntakeConfirmationTest {
         miss(plannedIntake())
         courses.close(closing(requireNotNull(courses.findRecord(COURSE)).close(CourseRecord.Outcome.CANCELLED, LATER)))
 
-        val refused = confirmation.confirm(INTAKE, PACK, dose("2"), FIRST_PLANNED_AT).exceptionOrNull()
+        val refused = confirmation.confirm(INTAKE, PACK, dose("2"), FIRST_PLANNED_AT).rejected()
 
-        assertEquals(IntakeRejected.Reason.EPISODE_CLOSED, (refused as IntakeRejected).reason)
+        assertEquals(IntakeRejected.Reason.EPISODE_CLOSED, refused)
         assertEquals(IntakeStatus.MISSED, requireNotNull(intakes.find(INTAKE)).status)
         assertEquals(tablets("20"), requireNotNull(packages.find(PACK)).quantity)
     }
@@ -273,7 +277,7 @@ class IntakeConfirmationTest {
         activate()
         val yesterday = now.minusSeconds(24 * 60 * 60)
 
-        confirmation.confirm(INTAKE, PACK, dose("2"), yesterday).getOrThrow()
+        confirmation.confirm(INTAKE, PACK, dose("2"), yesterday).confirmed()
 
         assertEquals(yesterday, requireNotNull(intakes.find(INTAKE)?.taken).at)
     }
@@ -287,9 +291,9 @@ class IntakeConfirmationTest {
         activate()
         packages.add(pack(id = OTHER_PACK, quantity = millilitres("100")))
 
-        val refused = confirmation.confirm(INTAKE, OTHER_PACK, dose(millilitres("2")), FIRST_PLANNED_AT).exceptionOrNull()
+        val refused = confirmation.confirm(INTAKE, OTHER_PACK, dose(millilitres("2")), FIRST_PLANNED_AT).rejected()
 
-        assertEquals(IntakeRejected.Reason.UNIT_MISMATCH, (refused as IntakeRejected).reason)
+        assertEquals(IntakeRejected.Reason.UNIT_MISMATCH, refused)
         assertEquals(IntakeStatus.PLANNED, requireNotNull(intakes.find(INTAKE)).status)
         assertEquals(millilitres("100"), requireNotNull(packages.find(OTHER_PACK)).quantity)
     }
@@ -305,9 +309,9 @@ class IntakeConfirmationTest {
         activate()
         packages.add(pack(id = OTHER_PACK, quantity = millilitres("1")))
 
-        val refused = confirmation.confirm(INTAKE, OTHER_PACK, dose("2"), FIRST_PLANNED_AT).exceptionOrNull()
+        val refused = confirmation.confirm(INTAKE, OTHER_PACK, dose("2"), FIRST_PLANNED_AT).rejected()
 
-        assertEquals(IntakeRejected.Reason.UNIT_MISMATCH, (refused as IntakeRejected).reason)
+        assertEquals(IntakeRejected.Reason.UNIT_MISMATCH, refused)
         assertEquals(IntakeStatus.PLANNED, requireNotNull(intakes.find(INTAKE)).status)
     }
 
@@ -323,9 +327,9 @@ class IntakeConfirmationTest {
         activate()
         packages.add(pack(id = OTHER_PACK, quantity = tablets("30")))
 
-        val refused = confirmation.confirm(INTAKE, OTHER_PACK, dose("2"), FIRST_PLANNED_AT).exceptionOrNull()
+        val refused = confirmation.confirm(INTAKE, OTHER_PACK, dose("2"), FIRST_PLANNED_AT).rejected()
 
-        assertEquals(IntakeRejected.Reason.PACKAGE_NOT_A_SOURCE, (refused as IntakeRejected).reason)
+        assertEquals(IntakeRejected.Reason.PACKAGE_NOT_A_SOURCE, refused)
         assertEquals(IntakeStatus.PLANNED, requireNotNull(intakes.find(INTAKE)).status)
         assertEquals(tablets("30"), requireNotNull(packages.find(OTHER_PACK)).quantity)
         assertEquals(tablets("20"), requireNotNull(packages.find(PACK)).quantity)
@@ -339,7 +343,7 @@ class IntakeConfirmationTest {
         val plan = activeCourse(totalDoses = 7, sources = listOf(source(PACK, 5), source(OTHER_PACK, 2)))
         courses.activate(CourseDraft.Activation(plan, courseRecord(prescription = plan.prescription)), listOf(plannedIntake()))
 
-        val confirmed = confirmation.confirm(INTAKE, OTHER_PACK, dose("2"), FIRST_PLANNED_AT).getOrThrow()
+        val confirmed = confirmation.confirm(INTAKE, OTHER_PACK, dose("2"), FIRST_PLANNED_AT).confirmed()
 
         assertEquals(IntakeStatus.TAKEN, confirmed.intake.status)
         assertEquals(tablets("28"), requireNotNull(packages.find(OTHER_PACK)).quantity)
@@ -350,12 +354,48 @@ class IntakeConfirmationTest {
     @Test
     fun repeatingTheConfirmationSpendsOnce() = runTest {
         activate()
-        confirmation.confirm(INTAKE, PACK, dose("2"), FIRST_PLANNED_AT).getOrThrow()
+        confirmation.confirm(INTAKE, PACK, dose("2"), FIRST_PLANNED_AT).confirmed()
 
-        val repeated = confirmation.confirm(INTAKE, PACK, dose("2"), FIRST_PLANNED_AT).getOrThrow()
+        val repeated = confirmation.confirm(INTAKE, PACK, dose("2"), FIRST_PLANNED_AT).confirmed()
 
         assertFalse(repeated.episodeClosed)
         assertEquals(IntakeAccounting.LOCAL_APPLIED, repeated.accounting)
+        assertEquals(tablets("18"), requireNotNull(packages.find(PACK)).quantity)
+    }
+
+    /**
+     * Коробка просрочена на день приёма: без подтверждения — вопрос, и ничего не записано (красная
+     * проверка: убрать вопрос — приём записан молча); с подтверждением — записан. Годен до сегодня —
+     * не просрочен, вопроса нет (PLAN D6, C1 «Просроченная пачка»).
+     */
+    @Test
+    fun anExpiredBoxAsksBeforeTheIntakeIsWritten() = runTest {
+        val today = FIRST_PLANNED_AT.atZone(ZoneOffset.UTC).toLocalDate()
+        packages.describe(PACK, factsOf(pack(quantity = tablets("20"))).copy(expiresOn = ExpiryDate(today.minusDays(1))))
+        activate()
+
+        val asked = confirmation.confirm(INTAKE, PACK, dose("2"), FIRST_PLANNED_AT)
+
+        assertEquals(IntakeConfirmation.Outcome.Warned(listOf(IntakeWarning.Expired(ExpiryDate(today.minusDays(1))))), asked)
+        assertEquals(IntakeStatus.PLANNED, requireNotNull(intakes.find(INTAKE)).status)
+        assertEquals(tablets("20"), requireNotNull(packages.find(PACK)).quantity)
+        assertTrue(commands().isEmpty())
+
+        val confirmed = confirmation.confirm(INTAKE, PACK, dose("2"), FIRST_PLANNED_AT, acknowledged = true).confirmed()
+        assertEquals(IntakeStatus.TAKEN, confirmed.intake.status)
+        assertEquals(tablets("18"), requireNotNull(packages.find(PACK)).quantity)
+        // Повтор по уже принятому вопросов не задаёт: отвечает записанным.
+        assertEquals(confirmed.intake.status, confirmation.confirm(INTAKE, PACK, dose("2"), FIRST_PLANNED_AT).confirmed().intake.status)
+    }
+
+    @Test
+    fun aBoxGoodUntilTodayIsNotExpired() = runTest {
+        val today = FIRST_PLANNED_AT.atZone(ZoneOffset.UTC).toLocalDate()
+        packages.describe(PACK, factsOf(pack(quantity = tablets("20"))).copy(expiresOn = ExpiryDate(today)))
+        activate()
+
+        confirmation.confirm(INTAKE, PACK, dose("2"), FIRST_PLANNED_AT).confirmed()
+
         assertEquals(tablets("18"), requireNotNull(packages.find(PACK)).quantity)
     }
 }

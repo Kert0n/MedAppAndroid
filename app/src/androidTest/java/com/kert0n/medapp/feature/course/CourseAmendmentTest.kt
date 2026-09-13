@@ -1,5 +1,6 @@
 package com.kert0n.medapp.feature.course
 
+import com.kert0n.medapp.fixture.confirmed
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import com.kert0n.medapp.domain.course.CourseRecord
 import com.kert0n.medapp.domain.course.CourseRejected
@@ -89,7 +90,7 @@ class CourseAmendmentTest {
         scenarios.courseActivation.activate(draft.id, draft.revision)
         scenarios.courseUpkeep.keepUp()
         val today = items(draft.id).first { it.slot.localDate == LocalDate.of(2027, 3, 10) }
-        scenarios.intakeConfirmation.confirm(today.id, PACK, dose("2"), now).getOrThrow()
+        scenarios.intakeConfirmation.confirm(today.id, PACK, dose("2"), now).confirmed()
         return draft.id
     }
 

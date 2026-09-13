@@ -5,7 +5,6 @@ import com.kert0n.medapp.domain.intake.IntakeRejected
 import com.kert0n.medapp.domain.intake.UnplannedIntake
 import com.kert0n.medapp.domain.pack.PackageAvailability
 import com.kert0n.medapp.domain.value.Dose
-import com.kert0n.medapp.domain.value.Quantity
 import com.kert0n.medapp.feature.course.CourseClamping
 import com.kert0n.medapp.feature.course.openPlan
 import com.kert0n.medapp.queue.QueueService
@@ -30,7 +29,7 @@ import kotlin.uuid.Uuid
  *
  * **Заденет занятое** — принято больше, чем свободно любому (D4: доступное мне без моего
  * выделения, посчитанное от числа на экране). Такой приём сценарий не записывает, а отвечает этим и называет свободное; после
- * подтверждения человеком ([touchingReservedConfirmed]) факт записан, расход — местно либо
+ * подтверждения человеком ([acknowledged]) факт записан, расход — местно либо
  * `Consume` без брони, а мой курс, державший коробку, зажат под оставшееся ([CourseClamping]);
  * соседям нехватку приносит снимок (C1 «Разовый приём из занятого»). Кончившуюся коробку курс
  * теряет её концом — там, где записан приём.
@@ -49,7 +48,7 @@ class UnplannedIntakeRecording @Inject constructor(
         packageId: Uuid,
         amount: Dose,
         at: Instant,
-        touchingReservedConfirmed: Boolean = false
+        acknowledged: Boolean = false
     ): Outcome = transactions.run {
         val pkg = packages.find(packageId) ?: return@run Outcome.Rejected(IntakeRejected.Reason.PACKAGE_UNUSABLE)
         val taken = pkg.take(amount, at).getOrElse { return@run Outcome.Rejected((it as IntakeRejected).reason) }
@@ -59,7 +58,12 @@ class UnplannedIntakeRecording @Inject constructor(
         // видит на экране: решает он по нему (PLAN D4).
         val seen = checkNotNull(packages.projection(pkg.id)) { "пачка прочитана этой же транзакцией" }.availability
         val free = seen.freeForAnyone
-        if (!free.covers(amount) && !touchingReservedConfirmed) return@run Outcome.TouchesReserved(free)
+        // Вопросы — после отказов и до записи, все разом: человек отвечает один раз (PLAN D6).
+        val warnings = listOfNotNull(
+            pkg.facts.expiresOn?.takeIf { pkg.isExpiredOn(at.atZone(clock.zone).toLocalDate()) }?.let { IntakeWarning.Expired(it) },
+            IntakeWarning.TouchesReserved(free).takeIf { !free.covers(amount) }
+        )
+        if (warnings.isNotEmpty() && !acknowledged) return@run Outcome.Warned(warnings)
 
         val now = clock.instant()
         val intake = UnplannedIntake(Uuid.random(), taken)
@@ -84,12 +88,13 @@ class UnplannedIntakeRecording @Inject constructor(
     }
 
     /**
-     * Чем кончилось. Записано — экран показывает факт и где его расход; заденет занятое — экран
-     * спрашивает подтверждения, называя свободное, и ничего не записано; отказ — причина по месту.
+     * Чем кончилось (PLAN D6). Записано — экран показывает факт и где его расход; вопросы —
+     * просрочено, заденет занятое — экран задаёт разом, и ничего не записано, пока человек не
+     * подтвердит тем же вызовом; отказ — причина по месту, подтверждением не снимается.
      */
     sealed interface Outcome {
         data class Recorded(val intake: IntakeProjection.Unplanned, val accounting: IntakeAccounting) : Outcome
-        data class TouchesReserved(val free: Quantity) : Outcome
+        data class Warned(val warnings: List<IntakeWarning>) : Outcome
         data class Rejected(val reason: IntakeRejected.Reason) : Outcome
     }
 }

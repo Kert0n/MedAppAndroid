@@ -184,3 +184,14 @@ class Scenarios(database: MedAppDatabase, now: java.time.Instant) {
         database.intakeRepository(), courses, packages, transactions, queue, courseClosing, courseCalendar, clock
     )
 }
+
+/**
+ * Записанный приём по пункту курса. Тест, который его ждёт, говорит об этом прямо, а не
+ * разворачивает исход молча: вопрос и отказ здесь — провал с названным исходом.
+ */
+fun com.kert0n.medapp.feature.intake.IntakeConfirmation.Outcome.confirmed(): com.kert0n.medapp.feature.intake.IntakeConfirmation.Outcome.Confirmed =
+    this as? com.kert0n.medapp.feature.intake.IntakeConfirmation.Outcome.Confirmed ?: error("ожидался записанный приём, а не $this")
+
+/** Отказ сценария приёма по пункту курса — его причина. */
+fun com.kert0n.medapp.feature.intake.IntakeConfirmation.Outcome.rejected(): com.kert0n.medapp.domain.intake.IntakeRejected.Reason =
+    (this as? com.kert0n.medapp.feature.intake.IntakeConfirmation.Outcome.Rejected)?.reason ?: error("ожидался отказ, а не $this")

@@ -1,5 +1,6 @@
 package com.kert0n.medapp.storage.database
 
+import com.kert0n.medapp.fixture.confirmed
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import com.kert0n.medapp.domain.report.DayPlan
 import com.kert0n.medapp.domain.report.SpendingHorizon
@@ -94,7 +95,7 @@ class ObservationTest {
         scenarios.courseActivation.activate(draft.id, draft.revision)
         scenarios.courseUpkeep.keepUp()
         val first = database.intakeRepository().ofCourse(draft.id).filterIsInstance<CourseIntake>().minBy { it.plannedAt }
-        scenarios.intakeConfirmation.confirm(first.id, PACK, dose("2"), now).getOrThrow()
+        scenarios.intakeConfirmation.confirm(first.id, PACK, dose("2"), now).confirmed()
         return draft.id
     }
 
