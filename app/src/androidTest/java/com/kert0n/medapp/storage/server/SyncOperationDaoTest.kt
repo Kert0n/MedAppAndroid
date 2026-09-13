@@ -118,7 +118,7 @@ class SyncOperationDaoTest {
     @Test
     fun orderOfOnePackageIsAQueryAndNotADomainFunction() = runTest {
         queue.enqueue(first, PackageSyncCommand.CorrectStock(PACK, tablets("10")), createdAt)
-        queue.enqueue(second, MedKitSyncCommand.Create(HOME_KIT), createdAt)
+        queue.enqueue(second, MedKitSyncCommand.Publish(HOME_KIT), createdAt)
         queue.enqueue(third, PackageSyncCommand.ReleaseClaim(PACK), createdAt)
 
         val ofPack = queue.ofPackage(PACK).map { it.operation.id }
@@ -169,7 +169,7 @@ class SyncOperationDaoTest {
 
     @Test
     fun dependenciesTravelInTheirOwnTable() = runTest {
-        queue.enqueue(first, MedKitSyncCommand.Create(HOME_KIT), createdAt)
+        queue.enqueue(first, MedKitSyncCommand.Publish(HOME_KIT), createdAt)
         queue.enqueue(
             second,
             PackageSyncCommand.Create(PACK, HOME_KIT, tablets("20"), pack().facts.shared),

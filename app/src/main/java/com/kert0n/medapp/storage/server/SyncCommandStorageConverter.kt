@@ -49,7 +49,7 @@ object SyncCommandStorageConverter {
             is PackageSyncCommand.ReleaseClaim -> PACKAGE_RELEASE_CLAIM
         }
         is MedKitSyncCommand -> when (command) {
-            is MedKitSyncCommand.Create -> MEDKIT_CREATE
+            is MedKitSyncCommand.Publish -> MEDKIT_PUBLISH
             is MedKitSyncCommand.Delete -> MEDKIT_DELETE
             is MedKitSyncCommand.Leave -> MEDKIT_LEAVE
         }
@@ -141,7 +141,7 @@ object SyncCommandStorageConverter {
         PACKAGE_RELEASE_CLAIM -> PackageSyncCommand.ReleaseClaim(
             packageId = fields.uuid("packageId")
         )
-        MEDKIT_CREATE -> MedKitSyncCommand.Create(medKitId = fields.uuid("medKitId"))
+        MEDKIT_PUBLISH -> MedKitSyncCommand.Publish(medKitId = fields.uuid("medKitId"))
         MEDKIT_DELETE -> MedKitSyncCommand.Delete(
             medKitId = fields.uuid("medKitId"),
             transferTo = fields.optionalUuid("transferTo")
@@ -197,7 +197,7 @@ object SyncCommandStorageConverter {
     private const val PACKAGE_CONSUME = "PACKAGE_CONSUME"
     private const val PACKAGE_SET_CLAIM = "PACKAGE_SET_CLAIM"
     private const val PACKAGE_RELEASE_CLAIM = "PACKAGE_RELEASE_CLAIM"
-    private const val MEDKIT_CREATE = "MEDKIT_CREATE"
+    private const val MEDKIT_PUBLISH = "MEDKIT_PUBLISH"
     private const val MEDKIT_DELETE = "MEDKIT_DELETE"
     private const val MEDKIT_LEAVE = "MEDKIT_LEAVE"
 

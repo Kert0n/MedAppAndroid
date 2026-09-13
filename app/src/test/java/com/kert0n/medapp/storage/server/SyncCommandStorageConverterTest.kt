@@ -49,7 +49,7 @@ class SyncCommandStorageConverterTest {
         PackageSyncCommand.Consume(PACK, dose("1.5"), INTAKE, claimAfter = tablets("4")),
         PackageSyncCommand.SetClaim(PACK, tablets("6")),
         PackageSyncCommand.ReleaseClaim(PACK),
-        MedKitSyncCommand.Create(HOME_KIT),
+        MedKitSyncCommand.Publish(HOME_KIT),
         MedKitSyncCommand.Delete(HOME_KIT),
         MedKitSyncCommand.Delete(HOME_KIT, transferTo = SHARED_KIT),
         MedKitSyncCommand.Leave(SHARED_KIT)
@@ -75,7 +75,7 @@ class SyncCommandStorageConverterTest {
             listOf(
                 "PACKAGE_CREATE", "PACKAGE_DESCRIBE", "PACKAGE_CORRECT_STOCK", "PACKAGE_MOVE",
                 "PACKAGE_DELETE", "PACKAGE_WITHDRAW", "PACKAGE_CONSUME", "PACKAGE_SET_CLAIM", "PACKAGE_RELEASE_CLAIM",
-                "MEDKIT_CREATE", "MEDKIT_DELETE", "MEDKIT_LEAVE"
+                "MEDKIT_PUBLISH", "MEDKIT_DELETE", "MEDKIT_LEAVE"
             ),
             everyKind.map(SyncCommandStorageConverter::kindOf).distinct()
         )
@@ -109,7 +109,7 @@ class SyncCommandStorageConverterTest {
     fun commandNamesThePackageItTouchesAndMedKitCommandsDoNot() {
         assertEquals(PACK, SyncCommandStorageConverter.packageIdOf(PackageSyncCommand.Delete(PACK)))
         assertNull(SyncCommandStorageConverter.packageIdOf(MedKitSyncCommand.Leave(HOME_KIT)))
-        assertEquals(HOME_KIT, SyncCommandStorageConverter.medKitIdOf(MedKitSyncCommand.Create(HOME_KIT)))
+        assertEquals(HOME_KIT, SyncCommandStorageConverter.medKitIdOf(MedKitSyncCommand.Publish(HOME_KIT)))
         assertEquals(
             SHARED_KIT,
             SyncCommandStorageConverter.medKitIdOf(PackageSyncCommand.Move(PACK, SHARED_KIT))

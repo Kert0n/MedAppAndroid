@@ -1,6 +1,5 @@
 package com.kert0n.medapp.storage
 
-import com.kert0n.medapp.queue.medkit.PublicationStorage
 import com.kert0n.medapp.storage.course.CourseStorageRepository
 import com.kert0n.medapp.storage.intake.IntakeStorageRepository
 import com.kert0n.medapp.storage.medkit.MedKitStorageRepository
@@ -109,10 +108,6 @@ class WriteContractTest {
         // вызывающего в продукте; экран правки придёт в PR 7 и должен принести названные поля,
         // как `rename` у записи эпизода, — иначе он затрёт то, что сделал сосед.
         "MedKitStorageRepository.save" to (Shape.UNGUARDED by "(MedKit, Instant): Unit"),
-        // Публикация
-        "PublicationStorage.medKit" to (Shape.READ by "(Uuid): MedKit"),
-        "PublicationStorage.contentsOf" to (Shape.READ by "(Uuid): List<Package>"),
-        "PublicationStorage.publish" to (Shape.SNAPSHOT by "(Uuid, List<PackageSnapshot>, Instant): PublicationStorage\$Switch"),
         // Приём
         "IntakeStorageRepository.observeOfCourse" to (Shape.READ by "(Uuid): Flow<List<IntakeProjection>>"),
         "IntakeStorageRepository.ofCourse" to (Shape.READ by "(Uuid): List<? extends Intake>"),
@@ -144,8 +139,7 @@ class WriteContractTest {
         CourseStorageRepository::class.java,
         MedKitStorageRepository::class.java,
         IntakeStorageRepository::class.java,
-        StockMovementStorageRepository::class.java,
-        PublicationStorage::class.java
+        StockMovementStorageRepository::class.java
     )
 
     /**

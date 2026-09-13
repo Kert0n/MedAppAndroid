@@ -14,7 +14,7 @@ class MedKitSyncCommandTest {
     @Test
     fun everyCommandNamesItsMedKit() {
         val commands: List<MedKitSyncCommand> = listOf(
-            MedKitSyncCommand.Create(HOME_KIT),
+            MedKitSyncCommand.Publish(HOME_KIT),
             MedKitSyncCommand.Delete(HOME_KIT),
             MedKitSyncCommand.Leave(HOME_KIT)
         )

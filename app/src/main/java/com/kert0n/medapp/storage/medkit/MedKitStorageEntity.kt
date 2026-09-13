@@ -37,8 +37,8 @@ class MedKitStorageEntity(
         status = status
     )
 
-    /** Ссылка для чужого агрегата: пачке и движению от аптечки нужны тождество и публикация. */
-    fun toRef(): MedKitRef = MedKitRef(id, publication)
+    /** Ссылка для чужого агрегата: пачке и движению от аптечки нужны тождество, публикация и пометка. */
+    fun toRef(): MedKitRef = MedKitRef(id, publication, status)
 }
 
 fun MedKit.toStorageEntity(syncedAt: Instant? = null): MedKitStorageEntity = MedKitStorageEntity(

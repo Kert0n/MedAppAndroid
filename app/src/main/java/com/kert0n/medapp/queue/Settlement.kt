@@ -78,6 +78,13 @@ class Settlement(val transition: Transition, effects: List<Effect> = emptyList()
         /** Из полки вышли: её коробки нам больше не видны, а сама она остаётся остальным (E6). */
         data class MedKitLeft(val medKitId: Uuid) : Effect
 
+        /**
+         * Сервер завёл полку: она существует и у него. Пометку это не снимает — содержимое едет
+         * своими командами, и решение «сделать полку общей» доведено, когда закрылись они все
+         * ([Settled]); до тех пор приглашений полка не выдаёт (PLAN D2, E5).
+         */
+        data class MedKitPublished(val medKitId: Uuid) : Effect
+
         /** Учёт расхода у приёма, который поставил эту операцию. */
         data class Account(val accounting: IntakeAccounting) : Effect
 
@@ -163,6 +170,7 @@ private fun PackageSyncCommand.endsAs(): Settlement.Effect.Ending = when (this) 
  * коробке, а разбор и выход меняют полку целиком (PLAN E6).
  */
 private fun SyncCommand.appliedToTheShelf(): List<Settlement.Effect> = when (this) {
+    is MedKitSyncCommand.Publish -> listOf(Settlement.Effect.MedKitPublished(medKitId))
     is MedKitSyncCommand.Delete -> listOf(Settlement.Effect.MedKitDismantled(medKitId, transferTo))
     is MedKitSyncCommand.Leave -> listOf(Settlement.Effect.MedKitLeft(medKitId))
     else -> emptyList()

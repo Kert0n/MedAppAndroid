@@ -99,6 +99,16 @@ interface SyncOperationDao {
     )
     suspend fun unclosedOwnOfMedKit(medKitId: Uuid): Int
 
+    /**
+     * Сколько у полки незакрытых команд вообще — её собственных и по её коробкам. Столько ждёт
+     * публикация: полка становится общей вместе с содержимым, и половины не бывает (PLAN D2, E5).
+     */
+    @Query(
+        "SELECT COUNT(*) FROM sync_operations WHERE med_kit_id = :medKitId " +
+            "AND status NOT IN ('APPLIED', 'REFUSED', 'ACCESS_LOST')"
+    )
+    suspend fun unclosedOfMedKit(medKitId: Uuid): Int
+
     @Transaction
     @Query("SELECT * FROM sync_operations WHERE status = :status ORDER BY sequence")
     suspend fun withStatus(status: SyncOperationStatus): List<SyncOperationStorageRow>

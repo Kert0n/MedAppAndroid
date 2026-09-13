@@ -113,13 +113,30 @@ class PackageRelocation @Inject constructor(
 
     /** Местная коробка на общей полке: рассказать о ней серверу, а с ней — о выделении курса. */
     private suspend fun publish(pkg: Package, to: MedKitRef, at: Instant) {
-        val create = command(PackageSyncCommand.Create(pkg.id, to.id, pkg.quantity, pkg.facts.shared))
+        queue.change(to, announcement(pkg, to), at) { packages.mark(pkg.id, PackageStatus.CHANGING) }
+    }
+
+    /**
+     * Чем коробка становится известна серверу: созданием в полке [to] и, если курс её держит,
+     * выделением — бронью следом, зависимой от создания. Иначе на сервере выделения не было бы
+     * вовсе.
+     *
+     * Зовут это двое, и событие у коробки одно и то же: её переносят на общую полку — или полка под
+     * ней сама становится общей (`feature/medkits/MedKitPublishing`). Во втором случае [after]
+     * называет команду публикации: класть коробку некуда, пока полки у сервера нет (PLAN E5, E6).
+     */
+    internal suspend fun announcement(pkg: Package, to: MedKitRef, after: Set<Uuid> = emptySet()): List<QueuedCommand> {
+        val create = QueuedCommand(
+            Uuid.random(),
+            PackageSyncCommand.Create(pkg.id, to.id, pkg.quantity, pkg.facts.shared),
+            dependsOn = after
+        )
         val claim = courses.courseHolding(pkg.id)
             ?.let { courses.findPlan(it) }
             ?.allocatedOf(pkg.ref)
             ?.takeUnless { it.isZero }
             ?.let { QueuedCommand(Uuid.random(), PackageSyncCommand.SetClaim(pkg.id, it), dependsOn = setOf(create.id)) }
-        queue.change(to, listOfNotNull(create, claim), at) { packages.mark(pkg.id, PackageStatus.CHANGING) }
+        return listOfNotNull(create, claim)
     }
 
     private fun command(command: PackageSyncCommand) = QueuedCommand(Uuid.random(), command)

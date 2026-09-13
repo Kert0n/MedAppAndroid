@@ -28,7 +28,6 @@ import com.kert0n.medapp.fixture.queueService
 import com.kert0n.medapp.fixture.queueStorage
 import com.kert0n.medapp.fixture.source
 import com.kert0n.medapp.fixture.transactions
-import com.kert0n.medapp.network.medkit.MedKitPublication
 import com.kert0n.medapp.network.medkit.MembershipPostNetworkDTO
 import com.kert0n.medapp.network.server.ApiFailure
 import com.kert0n.medapp.network.server.ApiResult
@@ -42,7 +41,7 @@ import com.kert0n.medapp.queue.StoredSyncOperation
 import com.kert0n.medapp.queue.SyncCommand
 import com.kert0n.medapp.queue.SyncOperationStatus
 import com.kert0n.medapp.queue.intake.IntakeAccounting
-import com.kert0n.medapp.queue.medkit.MedKitPublishing
+import com.kert0n.medapp.feature.packages.PackageRelocation
 import com.kert0n.medapp.storage.intake.toStorageEntity as toIntakeStorageEntity
 import com.kert0n.medapp.storage.medkit.toStorageEntity as toMedKitStorageEntity
 import com.kert0n.medapp.storage.value.VocabularyRoomRepository
@@ -281,7 +280,12 @@ class SharedMedKitProbe {
             "не доставлено: " + stuck.joinToString { "${it.command} ${it.status} «${it.lastError}» до ${it.notBefore}" },
             stuck.isEmpty()
         )
-        assertTrue("расход доставлен раньше уноса", delivered.first().first is com.kert0n.medapp.queue.pack.PackageSyncCommand.Consume)
+        // Порядок полки: расход, поставленный раньше, уезжает раньше уноса — иначе сервер снял бы
+        // коробку с полки, не узнав о нём.
+        val order = delivered.map { it.first }
+        val consumed = order.indexOfFirst { it is com.kert0n.medapp.queue.pack.PackageSyncCommand.Consume }
+        val withdrawn = order.indexOfFirst { it is com.kert0n.medapp.queue.pack.PackageSyncCommand.Withdraw }
+        assertTrue("расход доставлен раньше уноса: $order", consumed in 0 until withdrawn)
         assertEquals(IntakeAccounting.REMOTE_APPLIED, anna.accountingOf(annas[0]))
         val carried = requireNotNull(anna.packages.find(shared.box))
         assertEquals(home, carried.medKit.id)
@@ -338,7 +342,9 @@ class SharedMedKitProbe {
         val packages = database.packageRepository()
         private val courses = database.courseRepository()
         private val queue = database.queueService()
-        private val publishing = MedKitPublishing(database.medKitRepository(), MedKitPublication(api), snapshots, transactions, clock)
+        private val medKits = database.medKitRepository()
+        private val relocation = PackageRelocation(packages, medKits, courses, queue, transactions, clock)
+        private val publishing = MedKitPublishing(medKits, packages, relocation, queue, transactions, clock)
         private val confirmation = IntakeConfirmation(
             database.intakeRepository(), courses, packages, transactions, queue, CourseClosing(courses, packages, queue), clock
         )
@@ -358,7 +364,17 @@ class SharedMedKitProbe {
             return id
         }
 
-        suspend fun publish(shelf: Uuid) = assertEquals(MedKitPublishing.Outcome.Published, publishing.publish(shelf))
+        /**
+         * Публикация при связи — решение и один проход очереди: полка становится общей вместе со
+         * своими коробками, и незакрытых команд после неё не остаётся (PLAN E5).
+         */
+        suspend fun publish(shelf: Uuid) {
+            assertEquals(MedKitPublishing.Outcome.PUBLISHING, publishing.publish(shelf))
+            drain()
+            val published = requireNotNull(medKits.find(shelf))
+            assertEquals(MedKit.Publication.PUBLISHED, published.publication)
+            assertTrue("полка не доведена: ${published.status}", published.acceptsInvitations)
+        }
 
         /** Вступление и то, что приложение пока не умеет само: положить полку с коробками к себе. */
         suspend fun join(invitation: String) {

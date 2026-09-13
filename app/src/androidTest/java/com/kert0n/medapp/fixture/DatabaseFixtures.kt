@@ -82,7 +82,7 @@ fun MedAppDatabase.intakeRepository() = com.kert0n.medapp.storage.intake.IntakeR
 )
 
 fun MedAppDatabase.medKitRepository() = com.kert0n.medapp.storage.medkit.MedKitRoomRepository(
-    this, medKits(), packages(), vocabulary()
+    this, medKits()
 )
 
 fun MedAppDatabase.queueRepository() = com.kert0n.medapp.storage.server.SyncOperationRoomRepository(
@@ -133,5 +133,8 @@ class Scenarios(database: MedAppDatabase, now: java.time.Instant) {
     )
     val medKitRemoval = com.kert0n.medapp.feature.medkits.MedKitRemoval(
         medKits, packages, packageRemoval, packageRelocation, queue, transactions, clock
+    )
+    val medKitPublishing = com.kert0n.medapp.feature.medkits.MedKitPublishing(
+        medKits, packages, packageRelocation, queue, transactions, clock
     )
 }

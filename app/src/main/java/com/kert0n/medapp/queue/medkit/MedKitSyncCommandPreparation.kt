@@ -12,7 +12,7 @@ import java.time.Instant
  * их как исполненные.
  */
 fun MedKitSyncCommand.toPreparedRequest(at: Instant): PreparedRequest = when (this) {
-    is MedKitSyncCommand.Create -> PreparedRequest(
+    is MedKitSyncCommand.Publish -> PreparedRequest(
         method = "POST",
         path = MedAppRoutes.MED_KITS,
         body = medAppJson.encodeToString(MedKitPostNetworkDTO.serializer(), MedKitPostNetworkDTO(medKitId)),

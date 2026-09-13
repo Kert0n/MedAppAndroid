@@ -191,6 +191,7 @@ class QueueRoomStorage @Inject constructor(
             // случается здесь — одной транзакцией с закрытием операции (PLAN E6, F5).
             is Settlement.Effect.MedKitDismantled -> dismantled(effect.medKitId, effect.transferTo, at)
             is Settlement.Effect.MedKitLeft -> left(effect.medKitId, at)
+            is Settlement.Effect.MedKitPublished -> publishedOnServer(effect.medKitId, at)
             is Settlement.Effect.Account -> intakes.setAccounting(id, effect.accounting)
             is Settlement.Effect.Cascade -> cascade(id, effect)
             is Settlement.Effect.Settled -> settled(id)
@@ -239,24 +240,47 @@ class QueueRoomStorage @Inject constructor(
     }
 
     /**
-     * Команда закрыта: вещь, которой она касалась, отпускается, если других незакрытых команд у неё
-     * нет (PLAN E1). У команды коробки это коробка; у команды полки — сама полка и те её коробки,
-     * которые не ждут своих команд: пометку им ставило решение полки, и ответ на него их отпускает.
-     * Кончившейся вещи нет — отпускать нечего.
+     * Команда закрыта: каждая вещь, которой она касалась, отпускается, если других незакрытых
+     * команд у неё не осталось (PLAN E1). Касается команда двоих — коробки, если она о коробке, и
+     * полки, на которой команда действовала. Кончившейся вещи нет — отпускать нечего.
      */
     private suspend fun settled(id: Uuid) {
         val operation = queue.find(id)?.operation ?: return
-        val packageId = operation.packageId
-        val medKitId = operation.medKitId
-        when {
-            packageId != null -> release(packageId)
-            medKitId != null && queue.unclosedOwnOfMedKit(medKitId) == 0 -> {
-                val shelf = medKits.find(medKitId) ?: return
-                val kit = shelf.toDomain()
-                if (kit.status != MedKitStatus.ACTIVE) medKits.upsert(kit.settled().toMedKitStorageEntity(shelf.syncedAt))
-                for (row in packages.ofMedKit(medKitId)) release(row.pack.id)
-            }
+        operation.packageId?.let { release(it) }
+        operation.medKitId?.let { releaseShelf(it) }
+    }
+
+    /**
+     * Полка отпускается, когда доведено решение, ради которого она помечена, — а «доведено» у
+     * решений разное. Уборка — одна команда серверу, и её ответ решение и закрывает: отказ по
+     * отдельной коробке касается только её, остальные коробки живут сами за себя. Публикация —
+     * полка **вместе с содержимым**, половины не бывает (D2), и потому она ждёт ещё и команды своих
+     * коробок. Вместе с пометкой полки снимаются пометки тех её коробок, которые не ждут
+     * собственных команд: их ставило то же решение.
+     *
+     * Непомеченную полку спрашивать не о чем — это обычный путь, и он ничего не стоит.
+     */
+    private suspend fun releaseShelf(medKitId: Uuid) {
+        val shelf = medKits.find(medKitId) ?: return
+        val kit = shelf.toDomain()
+        val unclosed = when (kit.status) {
+            MedKitStatus.ACTIVE -> return
+            MedKitStatus.PUBLISHING -> queue.unclosedOfMedKit(medKitId)
+            MedKitStatus.REMOVING -> queue.unclosedOwnOfMedKit(medKitId)
         }
+        if (unclosed > 0) return
+        medKits.upsert(kit.settled().toMedKitStorageEntity(shelf.syncedAt))
+        for (row in packages.ofMedKit(medKitId)) release(row.pack.id)
+    }
+
+    /**
+     * Сервер завёл полку: у нас она становится общей — переходом самой аптечки, перечитанной под
+     * этой транзакцией. Пометку переход не снимает: её снимет последняя закрытая команда полки
+     * (PLAN E5).
+     */
+    private suspend fun publishedOnServer(medKitId: Uuid, at: Instant) {
+        val shelf = medKits.find(medKitId) ?: return
+        medKits.upsert(shelf.toDomain().published().toMedKitStorageEntity(syncedAt = at))
     }
 
     /** Коробка без незакрытых команд возвращается в оборот; ждущая — нет: ответит её команда. */
