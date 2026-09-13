@@ -59,6 +59,12 @@ object SyncCommandStorageConverter {
     /** Какой пачки касается команда; `null` у команд аптечки — порядок по пачке строит запрос. */
     fun packageIdOf(command: SyncCommand): Uuid? = (command as? PackageSyncCommand)?.packageId
 
+    /**
+     * Какую полку команда называет **в своём теле**. Это запасной ответ на вопрос «на какой полке
+     * команда действует», а не сам этот ответ: полку называет тот, кто команду ставит, — ему это
+     * известно, а телу не всегда. У `Move` тело знает только цель, а действует команда на полке,
+     * с которой коробку забирают, и её подставляет вызывающий (PLAN E3).
+     */
     fun medKitIdOf(command: SyncCommand): Uuid? = when (command) {
         is MedKitSyncCommand -> command.medKitId
         is PackageSyncCommand.Create -> command.medKitId
