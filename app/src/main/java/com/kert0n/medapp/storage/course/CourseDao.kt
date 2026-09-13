@@ -32,6 +32,10 @@ interface CourseDao {
     @Query("SELECT * FROM courses WHERE title IS NULL ORDER BY created_at")
     fun observePlans(): Flow<List<CourseStorageRow>>
 
+    /** Номера идущих лечений: у плана нет имени — оно живёт в записи эпизода (PLAN F1). */
+    @Query("SELECT id FROM courses WHERE title IS NULL")
+    suspend fun planIds(): List<Uuid>
+
     @Transaction
     @Query("SELECT * FROM course_records WHERE id = :id")
     suspend fun findRecord(id: Uuid): CourseRecordStorageRow?

@@ -44,6 +44,8 @@ class CourseRoomRepository @Inject constructor(
     override suspend fun findPlan(id: Uuid): Course? =
         courses.findPlan(id)?.takeUnless { it.isDraft }?.toPlan(vocabulary.snapshot())
 
+    override suspend fun planIds(): List<Uuid> = courses.planIds()
+
     override suspend fun saveDraft(draft: CourseDraft, expected: Revision?): Boolean = database.withTransaction {
         val existing = courses.findPlan(draft.id)
         if (existing != null && !existing.isDraft) return@withTransaction false

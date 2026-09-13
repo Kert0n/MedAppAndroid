@@ -84,6 +84,7 @@ class WriteContractTest {
         "CourseStorageRepository.observeRecord" to (Shape.READ by "(Uuid): Flow<CourseRecordProjection>"),
         "CourseStorageRepository.findDraft" to (Shape.READ by "(Uuid): CourseDraft"),
         "CourseStorageRepository.findPlan" to (Shape.READ by "(Uuid): Course"),
+        "CourseStorageRepository.planIds" to (Shape.READ by "(): List<Uuid>"),
         "CourseStorageRepository.findRecord" to (Shape.READ by "(Uuid): CourseRecord"),
         "CourseStorageRepository.courseHolding" to (Shape.READ by "(Uuid): Uuid"),
         "CourseStorageRepository.rename" to (Shape.NAMED_FIELDS by "(Uuid, String, String): Boolean"),

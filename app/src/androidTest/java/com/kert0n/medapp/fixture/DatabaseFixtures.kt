@@ -144,4 +144,8 @@ class Scenarios(database: MedAppDatabase, now: java.time.Instant) {
         medKits, packages, packageRelocation, queue, transactions, clock
     )
     val courseDrafting = com.kert0n.medapp.feature.course.CourseDrafting(courses, packages, transactions, clock)
+    val courseCalendar = com.kert0n.medapp.feature.course.CourseCalendar(database.intakeRepository(), packages)
+    val courseUpkeep = com.kert0n.medapp.feature.course.CourseUpkeep(
+        courses, database.intakeRepository(), courseCalendar, transactions, clock
+    )
 }
