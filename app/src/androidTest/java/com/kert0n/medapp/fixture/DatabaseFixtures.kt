@@ -151,4 +151,8 @@ class Scenarios(database: MedAppDatabase, now: java.time.Instant) {
     val courseActivation = com.kert0n.medapp.feature.course.CourseActivation(
         courses, packages, courseCalendar, queue, transactions, clock
     )
+    val courseClosing = com.kert0n.medapp.feature.course.CourseClosing(courses, packages, queue)
+    val courseCancellation = com.kert0n.medapp.feature.course.CourseCancellation(
+        courses, database.intakeRepository(), courseClosing, transactions, clock
+    )
 }

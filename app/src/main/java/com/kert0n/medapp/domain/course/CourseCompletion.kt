@@ -22,14 +22,27 @@ class CourseCompletion(private val course: Course, private val progress: CourseP
      */
     fun close(record: CourseRecord, intakes: List<CourseIntake>, at: Instant): Closing {
         check(reached) { "лечение ещё идёт: осталось ${course.remainingDoses(progress)}" }
-        return Closing(
-            record = record.close(CourseRecord.Outcome.COMPLETED, at),
-            cancelled = intakes.filter { it.status == IntakeStatus.PLANNED }.map { it.cancel(at) }
-        )
+        return Closing.of(record, CourseRecord.Outcome.COMPLETED, intakes, at)
     }
 
-    /** Что закрытие меняет: закрытая запись и отменённые пункты — порознь их не бывает. */
+    /**
+     * Что закрытие меняет: закрытая запись и отменённые пункты — порознь их не бывает. Исходов у
+     * закрытия два — лечение состоялось или человек его отменил, — а меняет оно одно и то же.
+     */
     class Closing(val record: CourseRecord, cancelled: List<CourseIntake>) {
         val cancelled: List<CourseIntake> = cancelled.toList()
+
+        companion object {
+
+            /**
+             * Закрытие эпизода с исходом [outcome]: запись закрыта, плановые из [intakes] отменены.
+             * Отвеченные пункты не трогаются: это факты.
+             */
+            fun of(record: CourseRecord, outcome: CourseRecord.Outcome, intakes: List<CourseIntake>, at: Instant): Closing =
+                Closing(
+                    record = record.close(outcome, at),
+                    cancelled = intakes.filter { it.status == IntakeStatus.PLANNED }.map { it.cancel(at) }
+                )
+        }
     }
 }
