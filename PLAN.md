@@ -223,7 +223,7 @@ manufacturer?, country?, description?}`. **Количества и срока г
 | Пересчёт остатка **до нуля** невыразим: `quantity` строго положителен                                                                                   | Выражается `DELETE /v1/drugs/{drugId}`; локально пишется честное движение `CORRECTION` или `DISPOSAL`, а не выдуманный приём                                                    |
 | `null` в `PATCH` значит «не трогать»                                                                                                                    | Очистка необязательного поля — пустая строка. В клиенте `""` и `null` значат одно: «не заполнено»                                                                               |
 | Журнал повторов — **Caffeine в памяти процесса**, не дольше суток, вытесняется под нагрузкой раньше, теряется при перезапуске; общий у `sync` и `intakes`                    | Повтор с неизвестным исходом узнаётся журналом в пределах суток; сутки без связи ∧ перезапуск ∧ чужое изменение — принятый остаток риска (E3); журнал в базе просит MedAppServer#145                                                                                           |
-| Ответ `createInvitation` не несёт `expiresAt`; ключ лежит в кэше и может быть вытеснен раньше срока                                                     | Показывается **оценка** оставшегося времени от момента создания, помеченная как оценка, плюс кнопка «обновить код»                                                              |
+| Ответ `createInvitation` не несёт `expiresAt`; ключ лежит в кэше и может быть вытеснен раньше срока                                                     | Показывается **оценка** оставшегося времени от момента создания, помеченная как оценка, плюс кнопка «обновить код». Срок сервер задаёт настройкой `medkit.share.termInMinutes`; клиент знает его параметром сборки `INVITATION_TERM_MINUTES` (60) и получает `Invitation.expiresAround` |
 | Неизвестный ключ, истёкший ключ и выход пригласившего дают одинаковый 404                                                                               | Единственный текст: **«Приглашение недействительно. Попросите новый код»**                                                                                                      |
 | Дельта-эндпойнта, курсора и `updatedAt` нет                                                                                                             | Каждая синхронизация — полный снимок                                                                                                                                            |
 | Приглашение одно на оба способа: и QR, и текстовый код несут один `key` с одним сроком                                                                  | Обещать QR 15 минут, а тексту час, нельзя. Показывается один срок                                                                                                               |
@@ -2569,7 +2569,8 @@ com.kert0n.medapp
 ├─ di/         NetworkModule, DatabaseModule, WorkModule, DispatcherModule
 ├─ domain/     бизнес, по понятиям: value/, pack/, medkit/, course/, intake/, stock/, account/ —
 │              модель, её правила и **порты действий**: `DeviceAccount` (устройство знакомо
-│              серверу), `VocabularyLibrary` (чем считают количества). О хранении и доставке
+│              серверу), `VocabularyLibrary` (чем считают количества), `MedKitInvitations` (ключ
+│              приглашения в полку). О хранении и доставке
 │              не знает ничего: порт называет действие и его исходы, выполняет их другой корень
 ├─ network/    сеть, по понятиям: value/, pack/, medkit/ — DTO, сетевые мапперы,
 │   │          резолвер словаря, обвязка предусловий; про очередь не знает
@@ -2591,7 +2592,7 @@ com.kert0n.medapp
 │              ErrorMessage — платформа, а не правило
 ├─ platform/   notifications/, scanner/, credentials/, connectivity/, clipboard/
 └─ feature/    bootstrap/ (AppStart, AppStartState, AppStartViewModel, SetupScreen),
-               medkits/ (MedKitRemoval, MedKitPublishing, MedKitJoining), packages/ (PackageRemoval, PackageRelocation),
+               medkits/ (MedKitRemoval, MedKitPublishing, MedKitJoining, MedKitInvitation), packages/ (PackageRemoval, PackageRelocation),
                courses/ (CourseClosing), schedule/, intake/ (IntakeConfirmation), sharing/, analytics/,
                scanner/, settings/, syncstatus/
 ```

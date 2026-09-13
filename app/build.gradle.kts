@@ -101,6 +101,9 @@ android {
             "CRPT_BASE_URL",
             "\"${secretOrNull("MEDAPP_CRPT_BASE_URL") ?: "https://mobile.api.crpt.ru"}\""
         )
+        // Сервер срок приглашения не отдаёт, а задаёт настройкой `medkit.share.termInMinutes`:
+        // клиент показывает оценку по этому числу (PLAN B6).
+        buildConfigField("long", "INVITATION_TERM_MINUTES", "60L")
     }
 
     buildTypes {
@@ -220,6 +223,7 @@ dependencies {
     androidTestImplementation(libs.androidx.compose.ui.test.junit4)
     androidTestImplementation(libs.androidx.navigation.testing)
     androidTestImplementation(libs.androidx.work.testing)
+    androidTestImplementation(libs.ktor.client.mock)
     androidTestImplementation(libs.hilt.android.testing)
     kspAndroidTest(libs.hilt.compiler)
 

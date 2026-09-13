@@ -31,6 +31,7 @@ import com.kert0n.medapp.fixture.snapshotStorage
 import com.kert0n.medapp.fixture.source
 import com.kert0n.medapp.fixture.transactions
 import com.kert0n.medapp.network.medkit.MembershipPostNetworkDTO
+import com.kert0n.medapp.network.medkit.ServerMedKitInvitations
 import com.kert0n.medapp.network.server.ApiFailure
 import com.kert0n.medapp.network.server.ApiResult
 import com.kert0n.medapp.network.server.MedAppApi
@@ -138,7 +139,7 @@ class SharedMedKitProbe {
         val shelf = anna.localShelf("Общая")
         val box = anna.addBox(shelf, "20")
         anna.publish(shelf)
-        boris.join(success(anna.api.createInvitation(shelf)).key)
+        boris.join(anna.invite(shelf))
         val intakes = boris.treatFrom(box)
 
         boris.confirm(intakes[0], box)
@@ -220,7 +221,7 @@ class SharedMedKitProbe {
         val shared = sharedShelfWithBorisTreated()
         val dacha = anna.localShelf("Дача")
         anna.publish(dacha)
-        boris.join(success(anna.api.createInvitation(dacha)).key)
+        boris.join(anna.invite(dacha))
 
         assertEquals(MedKitRemoval.Outcome.MARKED, anna.scenarios().medKitRemoval.remove(shared.shelf, MedKitRemoval.Fate.MoveTo(dacha)))
         anna.drain()
@@ -250,7 +251,7 @@ class SharedMedKitProbe {
         val shared = sharedShelfWithBorisTreated()
         val dacha = anna.localShelf("Дача")
         anna.publish(dacha)
-        boris.join(success(anna.api.createInvitation(dacha)).key)
+        boris.join(anna.invite(dacha))
 
         assertEquals(PackageRelocation.Outcome.MARKED, anna.scenarios().packageRelocation.move(shared.box, dacha))
         anna.drain()
@@ -432,7 +433,7 @@ class SharedMedKitProbe {
         val shared = sharedShelfWithBorisTreated()
         val dacha = anna.localShelf("Дача")
         anna.publish(dacha)
-        boris.join(success(anna.api.createInvitation(dacha)).key)
+        boris.join(anna.invite(dacha))
 
         boris.confirm(shared.intakes[1], shared.box)
         assertEquals(MedKitRemoval.Outcome.MARKED, anna.scenarios().medKitRemoval.remove(shared.shelf, MedKitRemoval.Fate.MoveTo(dacha)))
@@ -499,7 +500,7 @@ class SharedMedKitProbe {
         val shared = sharedShelfWithBorisTreated()
         val dacha = anna.localShelf("Дача")
         anna.publish(dacha)
-        success(boris.api.joinMedKit(MembershipPostNetworkDTO(success(anna.api.createInvitation(dacha)).key)))
+        success(boris.api.joinMedKit(MembershipPostNetworkDTO(anna.invite(dacha))))
 
         assertEquals(MedKitRemoval.Outcome.MARKED, anna.scenarios().medKitRemoval.remove(shared.shelf, MedKitRemoval.Fate.MoveTo(dacha)))
         anna.drain()
@@ -545,6 +546,7 @@ class SharedMedKitProbe {
         private val courses = database.courseRepository()
         private val queue = database.queueService()
         private val medKits = database.medKitRepository()
+        private val invitation = MedKitInvitation(medKits, ServerMedKitInvitations(api), reading, Duration.ofMinutes(60), clock)
         private val relocation = PackageRelocation(packages, medKits, courses, queue, transactions, clock)
         private val publishing = MedKitPublishing(medKits, packages, relocation, queue, transactions, clock)
         private val confirmation = IntakeConfirmation(
@@ -587,6 +589,13 @@ class SharedMedKitProbe {
             val joined = (outcome as? MedKitJoining.Outcome.Joined)?.medKitId
                 ?: throw AssertionError("вступление не состоялось: $outcome")
             assertEquals("Общая аптечка", requireNotNull(database.medKits().find(joined)).name)
+        }
+
+        /** Приглашение сценарием приложения: звать можно только в полку, уехавшую целиком (PLAN D2). */
+        suspend fun invite(shelf: Uuid): String {
+            val outcome = invitation.invite(shelf)
+            return (outcome as? MedKitInvitation.Outcome.Invited)?.invitation?.key?.value
+                ?: throw AssertionError("приглашение не выдано: $outcome")
         }
 
         /** Полный снимок, как его читает приложение: легло всё, что названо. */
