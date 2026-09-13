@@ -4,6 +4,7 @@ import com.kert0n.medapp.domain.medkit.MedKit
 import com.kert0n.medapp.domain.medkit.MedKitProjection
 import com.kert0n.medapp.domain.medkit.MedKitStatus
 import java.time.Instant
+import java.time.LocalDate
 import kotlin.uuid.Uuid
 import kotlinx.coroutines.flow.Flow
 
@@ -13,10 +14,15 @@ import kotlinx.coroutines.flow.Flow
  */
 interface MedKitStorageRepository {
 
-    /** Потоки несут проекции — величины для экрана; сущность отдаёт `find` в транзакции сценария (PLAN H1). */
-    fun observeAll(): Flow<List<MedKitProjection>>
+    /**
+     * Потоки несут проекции — величины для экрана; сущность отдаёт `find` в транзакции сценария
+     * (PLAN H1). Вместе с полкой приходит её содержимое — сколько коробок и сколько просрочено на
+     * [today]: день приходит аргументом, потому что база часов не читает (PLAN D2). Полки и их
+     * содержимое читаются одним снимком, и на весь список содержимое считается одним запросом.
+     */
+    fun observeAll(today: LocalDate): Flow<List<MedKitProjection>>
 
-    fun observe(id: Uuid): Flow<MedKitProjection?>
+    fun observe(id: Uuid, today: LocalDate): Flow<MedKitProjection?>
 
     suspend fun find(id: Uuid): MedKit?
 

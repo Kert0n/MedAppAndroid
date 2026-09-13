@@ -3,6 +3,7 @@ package com.kert0n.medapp.presentation.pack
 import com.kert0n.medapp.domain.medkit.MedKit
 import com.kert0n.medapp.domain.pack.Claims
 import com.kert0n.medapp.domain.pack.PackageProjection
+import com.kert0n.medapp.domain.medkit.MedKitContents
 import com.kert0n.medapp.domain.medkit.MedKitProjection
 import com.kert0n.medapp.fixture.projected
 import com.kert0n.medapp.domain.value.DosageForm
@@ -84,14 +85,14 @@ class PresentationStateTest {
         }.stateIn(backgroundScope, SharingStarted.Eagerly, MedKitListState(emptyList()))
         runCurrent()
 
-        updates.emit(listOf(original.projection()))
+        updates.emit(listOf(original.projection(MedKitContents.EMPTY)))
         runCurrent()
         assertEquals("Домашняя", state.value.medKits.single().name)
 
         val edited = original.describe("Дачная", null)
         assertEquals(original, edited)
-        assertNotEquals(original.projection(), edited.projection())
-        updates.emit(listOf(edited.projection()))
+        assertNotEquals(original.projection(MedKitContents.EMPTY), edited.projection(MedKitContents.EMPTY))
+        updates.emit(listOf(edited.projection(MedKitContents.EMPTY)))
         runCurrent()
         assertEquals("Дачная", state.value.medKits.single().name)
         assertNull(state.value.medKits.single().location)

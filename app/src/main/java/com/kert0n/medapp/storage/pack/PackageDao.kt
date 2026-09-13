@@ -7,7 +7,17 @@ import androidx.room.Query
 import androidx.room.Transaction
 import androidx.room.Upsert
 import com.kert0n.medapp.domain.pack.Package
+import com.kert0n.medapp.domain.pack.PackageAvailability
 import com.kert0n.medapp.domain.pack.PackageEnding
+import com.kert0n.medapp.domain.pack.PackageProjection
+import com.kert0n.medapp.domain.value.Quantity
+import com.kert0n.medapp.queue.PackageQueueState
+import com.kert0n.medapp.queue.StoredSyncOperation
+import com.kert0n.medapp.queue.pack.PackageSyncCommand
+import com.kert0n.medapp.storage.database.chunkedForQuery
+import com.kert0n.medapp.storage.intake.IntakeDao
+import com.kert0n.medapp.storage.server.SyncOperationDao
+import com.kert0n.medapp.storage.server.SyncOperationStorageRow
 import com.kert0n.medapp.domain.value.Vocabulary
 import com.kert0n.medapp.network.pack.PackageSnapshot
 import com.kert0n.medapp.network.pack.PackageSyncState
@@ -234,7 +244,7 @@ interface PackageDao {
      */
     @Query(
         """
-        SELECT s.package_id AS package_id, s.allocated_doses AS allocated_doses,
+        SELECT s.package_id AS package_id, c.id AS course_id, s.allocated_doses AS allocated_doses,
                c.dose_amount AS dose_amount, c.unit_id AS unit_id
         FROM course_sources s
         JOIN active_package_assignments a
@@ -275,7 +285,57 @@ interface PackageDao {
     @Transaction
     @Query("SELECT * FROM packages WHERE med_kit_id = :medKitId ORDER BY name")
     suspend fun ofMedKit(medKitId: Uuid): List<PackageStorageRow>
+
+    /** Живые коробки по названным номерам — тому, кто собирает расклад по пачкам курса (PLAN D5). */
+    @Transaction
+    @Query("SELECT * FROM packages WHERE id IN (:ids)")
+    suspend fun among(ids: List<Uuid>): List<PackageStorageRow>
 }
+
+/**
+ * Проекции пачек одним чтением на порцию: оценка количества — незакрытые команды поверх
+ * подтверждённого остатка по возрастанию номера (команда, которую нечем прочитать после
+ * обновления приложения, в число не входит — PLAN E1, F4); выделение и держащий курс — из
+ * назначения активному курсу; последний мой приём — по приёмам из коробки (PLAN D4). Спрашивать
+ * очередь, выделения и приёмы про каждую пачку значило бы двести запросов там, где хватает
+ * одного; порядок по `sequence` внутри пачки группировка сохраняет.
+ *
+ * Зовётся внутри уже открытой транзакции того, кто читает: списка пачек и обеспечения курса.
+ */
+suspend fun PackageDao.projectionsOf(
+    packages: List<Package>,
+    queue: SyncOperationDao,
+    intakes: IntakeDao,
+    words: Vocabulary
+): List<PackageProjection> {
+    val ids = packages.map { it.id }
+    val allocations = ids.chunkedForQuery().flatMap { allocationsOf(it) }.associateBy { it.packageId }
+    val unclosed = ids.chunkedForQuery()
+        .flatMap { queue.unclosedOfPackages(it) }
+        .groupBy { requireNotNull(it.operation.packageId) { "операция пачки называет свою пачку" } }
+    val lastUsed = ids.chunkedForQuery().flatMap { intakes.lastTakenFrom(it) }.associate { it.packageId to it.lastUsedAt }
+    return packages.map { pkg ->
+        val state = PackageQueueState(pkg, commandsOf(unclosed[pkg.id].orEmpty(), words))
+        val allocation = allocations[pkg.id]
+        val availability = PackageAvailability(
+            pkg = pkg,
+            effective = state.amount,
+            myAllocation = allocation?.allocated(words, pkg.quantity.unit) ?: Quantity.zero(pkg.quantity.unit)
+        )
+        pkg.projection(
+            availability = availability,
+            hasUnconfirmedChanges = state.hasUnconfirmedChanges,
+            holdingCourseId = allocation?.courseId,
+            lastUsedAt = lastUsed[pkg.id]
+        )
+    }
+}
+
+/** Команды пачки из строк очереди; нечитаемую после обновления приложения пропускаем (PLAN F4). */
+private fun commandsOf(rows: List<SyncOperationStorageRow>, words: Vocabulary): List<PackageSyncCommand> =
+    rows.mapNotNull {
+        (it.toDomain(words) as? StoredSyncOperation.Readable)?.operation?.command as? PackageSyncCommand
+    }
 
 /**
  * Снимок пачки, разрешённый в домен, — в базу. Единственная дверь: половины расходятся только

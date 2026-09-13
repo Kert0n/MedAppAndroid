@@ -99,6 +99,11 @@ class MedAppDatabaseMigrationTest {
                 v2.execSQL("INSERT INTO package_details (package_id, added_at, note) VALUES ('$id', 5, 'в машине')")
             }
             v2.execSQL("INSERT INTO claims (package_id, total, mine) VALUES ('$PACK', '5', '2')")
+            // Отказанная операция версии 2 хранила причину текстом журнала: она переносится значением.
+            v2.execSQL(
+                "INSERT INTO sync_operations (id, kind, payload, payload_version, sequence, status, attempts, created_at, last_error) " +
+                    "VALUES ('$operation', 'CONSUME', '{}', 1, 0, 'REFUSED', 1, 0, 'INSUFFICIENT')"
+            )
             v2.execSQL(
                 "INSERT INTO course_records (id, title, dose_amount, unit_id, form_id, total_doses, start, " +
                     "days_mask, zone, started_at) VALUES ('$COURSE', 'Курс', '2', '$TABLETS_ID', " +
@@ -166,6 +171,8 @@ class MedAppDatabaseMigrationTest {
             listOf(listOf(INTAKE.toString(), OTHER_PACK.toString(), OTHER_PACK.toString(), "2", "LOCAL_APPLIED", operation)),
             rows("SELECT id, planned_package_id, taken_package_id, taken_amount, accounting, operation_id FROM intakes")
         )
+        // Причина отказа — значением у отказанной; у остальных её нет.
+        assertEquals(listOf(listOf(operation, "INSUFFICIENT")), rows("SELECT id, refusal_reason FROM sync_operations"))
         // Движений версии 2 — прихода, переноса — после миграции нет вместе с таблицей.
         assertEquals(emptyList<List<String?>>(), rows("SELECT name FROM sqlite_master WHERE type = 'table' AND name = 'stock_adjustments'"))
         // Истраченное за год читается по моменту ответа, а не перебором (PLAN H6).

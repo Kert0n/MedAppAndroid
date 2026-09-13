@@ -5,9 +5,15 @@ import androidx.room.Insert
 import androidx.room.Query
 import androidx.room.Transaction
 import androidx.room.Upsert
+import com.kert0n.medapp.domain.course.Course
+import com.kert0n.medapp.domain.course.CourseProgress
 import com.kert0n.medapp.domain.course.Revision
+import com.kert0n.medapp.domain.intake.CourseIntake
 import com.kert0n.medapp.domain.pack.PackageRef
+import com.kert0n.medapp.domain.report.CourseInProgress
 import com.kert0n.medapp.domain.value.Vocabulary
+import com.kert0n.medapp.storage.database.chunkedForQuery
+import com.kert0n.medapp.storage.intake.IntakeDao
 import java.time.Instant
 import kotlin.uuid.Uuid
 import kotlinx.coroutines.flow.Flow
@@ -169,6 +175,27 @@ interface CourseDao {
 
     @Query("DELETE FROM active_package_assignments WHERE course_id = :courseId")
     suspend fun releaseAssignmentsOf(courseId: Uuid)
+}
+
+/**
+ * Идущие лечения с их прогрессом — то, из чего считают обеспечение и отчёты (PLAN D5, H6).
+ * Пункты всех курсов читаются порциями, а не по курсу. Зовётся внутри транзакции читающего.
+ */
+suspend fun CourseDao.plansInProgress(intakes: IntakeDao, vocabulary: Vocabulary): List<CourseInProgress> =
+    withProgress(plans().map { it.toPlan(vocabulary) }, intakes, vocabulary)
+
+/** Одно идущее лечение с прогрессом; `null` — плана нет или это черновик. */
+suspend fun CourseDao.planInProgress(id: Uuid, intakes: IntakeDao, vocabulary: Vocabulary): CourseInProgress? {
+    val plan = findPlan(id)?.takeUnless { it.isDraft }?.toPlan(vocabulary) ?: return null
+    return withProgress(listOf(plan), intakes, vocabulary).single()
+}
+
+private suspend fun withProgress(courses: List<Course>, intakes: IntakeDao, vocabulary: Vocabulary): List<CourseInProgress> {
+    val byCourse = courses.map { it.id }.chunkedForQuery()
+        .flatMap { intakes.ofCourses(it) }
+        .map { it.toDomain(vocabulary) as CourseIntake }
+        .groupBy { it.courseId }
+    return courses.map { CourseInProgress(it, CourseProgress.of(byCourse[it.id].orEmpty())) }
 }
 
 /**

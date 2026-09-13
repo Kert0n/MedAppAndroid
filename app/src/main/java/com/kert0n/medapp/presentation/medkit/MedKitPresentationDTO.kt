@@ -1,6 +1,7 @@
 package com.kert0n.medapp.presentation.medkit
 
 import com.kert0n.medapp.domain.medkit.MedKit
+import com.kert0n.medapp.domain.medkit.MedKitContents
 import java.time.Instant
 import kotlin.uuid.Uuid
 
@@ -14,5 +15,6 @@ data class MedKitPresentationDTO(
     val createdAt: Instant,
     val syncedAt: Instant?,
     val isShared: Boolean,
-    val acceptsInvitations: Boolean
+    val acceptsInvitations: Boolean,
+    val contents: MedKitContents
 )

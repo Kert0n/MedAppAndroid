@@ -86,6 +86,8 @@ class WriteContractTest {
         // Лечение
         "CourseStorageRepository.observeDrafts" to (Shape.READ by "(): Flow<List<CourseDraftProjection>>"),
         "CourseStorageRepository.observePlan" to (Shape.READ by "(Uuid): Flow<CourseProjection>"),
+        "CourseStorageRepository.observeCoverage" to (Shape.READ by "(Uuid): Flow<CourseCoverage>"),
+        "CourseStorageRepository.observeCoverages" to (Shape.READ by "(): Flow<Map<Uuid, CourseCoverage>>"),
         "CourseStorageRepository.observeRecords" to (Shape.READ by "(): Flow<List<CourseRecordProjection>>"),
         "CourseStorageRepository.observeRecord" to (Shape.READ by "(Uuid): Flow<CourseRecordProjection>"),
         "CourseStorageRepository.findDraft" to (Shape.READ by "(Uuid): CourseDraft"),
@@ -105,8 +107,8 @@ class WriteContractTest {
         "CourseStorageRepository.saveDraft" to (Shape.GUARDED by "(CourseDraft, Revision): Boolean"),
         "CourseStorageRepository.discardDraft" to (Shape.NAMED_FIELDS by "(Uuid): Boolean"),
         // Аптечка
-        "MedKitStorageRepository.observeAll" to (Shape.READ by "(): Flow<List<MedKitProjection>>"),
-        "MedKitStorageRepository.observe" to (Shape.READ by "(Uuid): Flow<MedKitProjection>"),
+        "MedKitStorageRepository.observeAll" to (Shape.READ by "(LocalDate): Flow<List<MedKitProjection>>"),
+        "MedKitStorageRepository.observe" to (Shape.READ by "(Uuid, LocalDate): Flow<MedKitProjection>"),
         "MedKitStorageRepository.observeSyncedAt" to (Shape.READ by "(Uuid): Flow<Instant>"),
         "MedKitStorageRepository.find" to (Shape.READ by "(Uuid): MedKit"),
         "MedKitStorageRepository.delete" to (Shape.NAMED_FIELDS by "(Uuid): Boolean"),
@@ -116,6 +118,7 @@ class WriteContractTest {
         "MedKitStorageRepository.describe" to (Shape.NAMED_FIELDS by "(Uuid, String, String): Boolean"),
         // Приём
         "IntakeStorageRepository.observeOfCourse" to (Shape.READ by "(Uuid): Flow<List<IntakeProjection>>"),
+        "IntakeStorageRepository.observeOfPackage" to (Shape.READ by "(Uuid): Flow<List<IntakeProjection>>"),
         "IntakeStorageRepository.ofCourse" to (Shape.READ by "(Uuid): List<? extends Intake>"),
         "IntakeStorageRepository.find" to (Shape.READ by "(Uuid): Intake"),
         "IntakeStorageRepository.syncStateOf" to (Shape.READ by "(Uuid): IntakeSyncState"),

@@ -120,6 +120,23 @@ class CourseCoverageTest {
         }
     }
 
+    /**
+     * Граница ползунка лежит в строке источника и считается теми же входами: первой пачке —
+     * не больше того, что она даёт (10 доз из 20 таблеток), и не больше, чем потребность
+     * оставляет сверх выделенного второй (28 − 4); второй — 6 доз из 12 таблеток.
+     */
+    @Test
+    fun eachRowNamesTheCeilingOfItsOwnSlider() {
+        val found = twoPacks(first = 5, second = 4).coverage()
+        assertEquals(10.doses, found.perSource[0].maxDoses)
+        assertEquals(6.doses, found.perSource[1].maxDoses)
+
+        // Потребность почти выбрана первой: второй остаётся столько, сколько потребность оставляет.
+        val nearlyAllocated = twoPacks(first = 26, second = 0).coverage()
+        assertEquals(2.doses, nearlyAllocated.perSource[1].maxDoses)
+        assertEquals(10.doses, nearlyAllocated.perSource[0].maxDoses)
+    }
+
     @Test
     fun coverageNeverExceedsTheNeed() {
         // Выделено больше, чем осталось приёмов: обеспечено ровно столько, сколько нужно.

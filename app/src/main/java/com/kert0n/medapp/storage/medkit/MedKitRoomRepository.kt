@@ -2,11 +2,14 @@ package com.kert0n.medapp.storage.medkit
 
 import androidx.room.withTransaction
 import com.kert0n.medapp.domain.medkit.MedKit
+import com.kert0n.medapp.domain.medkit.MedKitContents
 import com.kert0n.medapp.domain.medkit.MedKitProjection
 import com.kert0n.medapp.domain.medkit.MedKitStatus
 import com.kert0n.medapp.storage.database.MedAppDatabase
+import com.kert0n.medapp.storage.database.observing
 import com.kert0n.medapp.storage.pack.toStorageEntity
 import java.time.Instant
+import java.time.LocalDate
 import javax.inject.Inject
 import kotlin.uuid.Uuid
 import kotlinx.coroutines.flow.Flow
@@ -17,11 +20,22 @@ class MedKitRoomRepository @Inject constructor(
     private val medKits: MedKitDao
 ) : MedKitStorageRepository {
 
-    override fun observeAll(): Flow<List<MedKitProjection>> =
-        medKits.observeAll().map { rows -> rows.map { it.toDomain().projection() } }
+    /**
+     * Полки и их содержимое — одним снимком: список, где свежие полки стоят со старым счётом
+     * коробок, в базе никогда не существовал. Содержимое всех полок — один `GROUP BY`, а не
+     * запрос на полку (PLAN D2, REQ-055).
+     */
+    override fun observeAll(today: LocalDate): Flow<List<MedKitProjection>> =
+        database.observing(*CONTENTS_TABLES) {
+            val contents = medKits.contents(today, medKitId = null).associateBy { it.medKitId }
+            medKits.all().map { it.toDomain().projection(contents[it.id]?.toDomain() ?: MedKitContents.EMPTY) }
+        }
 
-    override fun observe(id: Uuid): Flow<MedKitProjection?> =
-        medKits.observe(id).map { it?.toDomain()?.projection() }
+    override fun observe(id: Uuid, today: LocalDate): Flow<MedKitProjection?> =
+        database.observing(*CONTENTS_TABLES) {
+            val contents = medKits.contents(today, id).singleOrNull()?.toDomain() ?: MedKitContents.EMPTY
+            medKits.find(id)?.toDomain()?.projection(contents)
+        }
 
     override suspend fun find(id: Uuid): MedKit? = medKits.find(id)?.toDomain()
 
@@ -58,4 +72,9 @@ class MedKitRoomRepository @Inject constructor(
         participantCount: Long,
         syncedAt: Instant
     ) = medKits.applyServerParticipants(id, participantCount, syncedAt)
+
+    private companion object {
+        /** Из чего складывается полка с содержимым: сама полка, живые коробки и их сроки. */
+        val CONTENTS_TABLES = arrayOf("med_kits", "packages", "package_details")
+    }
 }

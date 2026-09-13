@@ -19,7 +19,6 @@ import com.kert0n.medapp.queue.medkit.MedKitSyncCommand
 import com.kert0n.medapp.queue.pack.PackageSyncCommand
 import java.time.Instant
 import org.junit.Assert.assertEquals
-import org.junit.Assert.assertThrows
 import org.junit.Test
 
 /**
@@ -39,7 +38,7 @@ class SettlementTest {
     @Test
     fun appliedWithASnapshotClosesLaysItDownAndAccountsTheIntake() {
         val settlement = Delivery.Applied(PackageState.Present(snapshot)).settlement(consume)
-        assertEquals(Transition.Close(SyncOperationStatus.APPLIED), settlement.transition)
+        assertEquals(Transition.Close.Applied, settlement.transition)
         assertEquals(
             listOf(Effect.Account(IntakeAccounting.REMOTE_APPLIED), Effect.LayDown(snapshot), Effect.Settled),
             settlement.effects
@@ -57,7 +56,7 @@ class SettlementTest {
         // Выход касается полки целиком, а не какой-то её коробки: состояния пачки у него нет
         // вовсе, а следствие — то, что до согласия сервера не трогали (PLAN E6).
         val settlement = Delivery.Applied(PackageState.None).settlement(leave)
-        assertEquals(Transition.Close(SyncOperationStatus.APPLIED), settlement.transition)
+        assertEquals(Transition.Close.Applied, settlement.transition)
         assertEquals(
             listOf(Effect.Account(IntakeAccounting.REMOTE_APPLIED), Effect.MedKitLeft(SHARED_KIT), Effect.Settled),
             settlement.effects
@@ -150,7 +149,7 @@ class SettlementTest {
     @Test
     fun refusedClosesWithTheReasonAccountsAndCascades() {
         val settlement = Delivery.Refused(RefusalReason.INSUFFICIENT, PackageState.Present(snapshot)).settlement(consume)
-        assertEquals(Transition.Close(SyncOperationStatus.REFUSED, "INSUFFICIENT"), settlement.transition)
+        assertEquals(Transition.Close.Refused(RefusalReason.INSUFFICIENT), settlement.transition)
         assertEquals(
             listOf(
                 Effect.Account(IntakeAccounting.REMOTE_REFUSED),
@@ -172,7 +171,7 @@ class SettlementTest {
     @Test
     fun accessLostMarksThePackageAccountsAndCascades() {
         val settlement = Delivery.AccessLost.settlement(consume)
-        assertEquals(Transition.Close(SyncOperationStatus.ACCESS_LOST), settlement.transition)
+        assertEquals(Transition.Close.AccessLost, settlement.transition)
         assertEquals(
             listOf(
                 Effect.Account(IntakeAccounting.REMOTE_REFUSED),
@@ -212,8 +211,14 @@ class SettlementTest {
         }
     }
 
+    /** Закрытие — три случая, и у каждого свой закрытый статус; причина есть ровно у отказа. */
     @Test
-    fun aCloseLeadsOnlyIntoAClosedState() {
-        assertThrows(IllegalArgumentException::class.java) { Transition.Close(SyncOperationStatus.PENDING) }
+    fun aCloseNamesItsClosedStatusAndOnlyARefusalCarriesAReason() {
+        assertEquals(SyncOperationStatus.APPLIED, Transition.Close.Applied.status)
+        assertEquals(SyncOperationStatus.ACCESS_LOST, Transition.Close.AccessLost.status)
+        assertEquals(SyncOperationStatus.REFUSED, Transition.Close.Refused(RefusalReason.CONFLICT).status)
+        assertEquals(RefusalReason.CONFLICT, Transition.Close.Refused(RefusalReason.CONFLICT).refusalReason)
+        assertEquals(null, Transition.Close.Applied.refusalReason)
+        assertEquals(null, Transition.Close.AccessLost.refusalReason)
     }
 }

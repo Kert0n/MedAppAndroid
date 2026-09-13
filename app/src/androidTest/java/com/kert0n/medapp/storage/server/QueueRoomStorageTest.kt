@@ -413,9 +413,10 @@ class QueueRoomStorageTest {
         val refused = requireNotNull(database.syncOperations().find(operation)).toDomain(VOCABULARY) as StoredSyncOperation.Readable
         val dependent = requireNotNull(database.syncOperations().find(release)).toDomain(VOCABULARY) as StoredSyncOperation.Readable
         assertEquals(SyncOperationStatus.REFUSED, refused.operation.status)
+        assertEquals(RefusalReason.INSUFFICIENT, refused.operation.refusalReason)
         assertEquals("INSUFFICIENT", refused.operation.lastError)
         assertEquals(SyncOperationStatus.REFUSED, dependent.operation.status)
-        assertEquals("SUPERSEDED", dependent.operation.lastError)
+        assertEquals(RefusalReason.SUPERSEDED, dependent.operation.refusalReason)
         assertEquals(IntakeAccounting.REMOTE_REFUSED, requireNotNull(database.intakes().findEntity(INTAKE)).accounting)
         assertEquals(tablets("17"), requireNotNull(database.packages().find(PACK)).toDomain(VOCABULARY).quantity)
         assertTrue(storage.ready(at.plusSeconds(600)).isEmpty())

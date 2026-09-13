@@ -49,7 +49,8 @@ class SyncOperationStorageRow(
                 lastTriedAt = operation.lastTriedAt,
                 answer = operation.answerStatus?.let { RawResponse(it, operation.answerBody.orEmpty()) },
                 notBefore = operation.notBefore,
-                outcomeUnknown = operation.outcomeUnknown
+                outcomeUnknown = operation.outcomeUnknown,
+                refusalReason = operation.refusalReason
             )
         )
     } catch (missed: VocabularyMiss) {

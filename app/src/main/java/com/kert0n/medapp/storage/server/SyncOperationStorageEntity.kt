@@ -5,6 +5,7 @@ import androidx.room.Embedded
 import androidx.room.Entity
 import androidx.room.Index
 import androidx.room.PrimaryKey
+import com.kert0n.medapp.queue.RefusalReason
 import com.kert0n.medapp.queue.SyncOperation
 import com.kert0n.medapp.queue.SyncOperationStatus
 import java.time.Instant
@@ -20,6 +21,8 @@ import kotlin.uuid.Uuid
  * одной упаковке строится запросом, а не доменной функцией. `answer_*` — ответ сервера,
  * записанный до применения: он есть ровно у `ANSWERED`, и закрытие его стирает.
  * `outcome_unknown` — замороженный запрос уходил, и исход неизвестен; сбрасывается вместе с ним.
+ * `refusal_reason` — причина отказа перечислением, как и `status`; есть ровно у `REFUSED`, а
+ * `last_error` остаётся журналу (PLAN E2).
  */
 @Entity(
     tableName = "sync_operations",
@@ -48,7 +51,8 @@ class SyncOperationStorageEntity(
     @ColumnInfo(name = "answer_status") val answerStatus: Int? = null,
     @ColumnInfo(name = "answer_body") val answerBody: String? = null,
     @ColumnInfo(name = "not_before") val notBefore: Instant? = null,
-    @ColumnInfo(name = "outcome_unknown", defaultValue = "0") val outcomeUnknown: Boolean = false
+    @ColumnInfo(name = "outcome_unknown", defaultValue = "0") val outcomeUnknown: Boolean = false,
+    @ColumnInfo(name = "refusal_reason") val refusalReason: RefusalReason? = null
 )
 
 /**
@@ -75,5 +79,6 @@ fun SyncOperation.toStorageEntity(
     answerStatus = answer?.status,
     answerBody = answer?.body,
     notBefore = notBefore,
-    outcomeUnknown = outcomeUnknown
+    outcomeUnknown = outcomeUnknown,
+    refusalReason = refusalReason
 )

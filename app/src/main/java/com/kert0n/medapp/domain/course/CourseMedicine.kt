@@ -117,7 +117,7 @@ class CourseMedicine(sources: List<CourseSource> = emptyList()) {
             coveredUntil = remaining.getOrNull(covered.count - 1)?.at,
             firstUncoveredAt = remaining.getOrNull(covered.count)?.at,
             perSource = capacities.map {
-                CourseCoverage.Source(it.pkg, it.allocated, it.covers, it.leftover)
+                CourseCoverage.Source(it.pkg, it.allocated, it.covers, it.leftover, maxDoses(it.pkg, dose, required, availability))
             }
         )
     }

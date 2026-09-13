@@ -19,6 +19,10 @@ import kotlin.uuid.Uuid
  * отправки, 5xx, неразборчивый ответ, смерть процесса в `SENDING`. Факт о **запросе**: живёт,
  * пока жив он, и умирает вместе с ним при переподготовке. По нему расход решает, что значит 404
  * (PLAN E3). [attempts] — только вход задержки и смысла не несёт.
+ *
+ * [refusalReason] — почему сервер делать не будет: значение, а не текст журнала, и есть оно ровно
+ * у [SyncOperationStatus.REFUSED] (PLAN E2). Экран берёт по нему слова, а [lastError] остаётся
+ * журналу.
  */
 class SyncOperation(
     val id: Uuid,
@@ -35,7 +39,8 @@ class SyncOperation(
     val lastTriedAt: Instant? = null,
     val answer: RawResponse? = null,
     val notBefore: Instant? = null,
-    val outcomeUnknown: Boolean = false
+    val outcomeUnknown: Boolean = false,
+    val refusalReason: RefusalReason? = null
 ) {
     /** Своя копия: множество, оставшееся у вызывающего, меняло бы порядок отправки очереди. */
     val dependsOn: Set<Uuid> = dependsOn.toSet()
@@ -49,6 +54,9 @@ class SyncOperation(
             "записанный ответ бывает ровно у операции, которая его получила и ещё не закрыта"
         }
         require(!outcomeUnknown || prepared != null) { "неизвестный исход бывает только у отправленного запроса" }
+        require((refusalReason != null) == (status == SyncOperationStatus.REFUSED)) {
+            "причина отказа есть ровно у отказанной операции: $status и $refusalReason друг другу не пара"
+        }
     }
 
     override fun equals(other: Any?): Boolean =
@@ -68,12 +76,13 @@ class SyncOperation(
                 lastTriedAt == other.lastTriedAt &&
                 answer == other.answer &&
                 notBefore == other.notBefore &&
-                outcomeUnknown == other.outcomeUnknown
+                outcomeUnknown == other.outcomeUnknown &&
+                refusalReason == other.refusalReason
             )
 
     override fun hashCode(): Int = Objects.hash(
         id, command, sequence, createdAt, payloadVersion, prepared, groupId, dependsOn,
-        status, attempts, lastError, lastTriedAt, answer, notBefore, outcomeUnknown
+        status, attempts, lastError, lastTriedAt, answer, notBefore, outcomeUnknown, refusalReason
     )
 
     override fun toString(): String =

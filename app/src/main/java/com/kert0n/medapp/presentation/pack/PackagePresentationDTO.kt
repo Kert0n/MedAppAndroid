@@ -21,6 +21,9 @@ import kotlin.uuid.Uuid
  * Версии предусловия здесь нет: человеку она ничего не говорит, а экрану состояния синхронизации
  * нужен момент последней сверки, который маппер получает аргументом.
  *
+ * holdingCourseId — идущий курс, которому коробка отдана; lastUsedAt — когда из неё брали
+ * последний раз, `null` — не брали (PLAN D4).
+ *
  * expiresOn — величина ExpiryDate, а не дата: «годен до» остаётся включительным до самого экрана.
  * Соседние purchasedOn и openedOn — обычные даты, потому что за ними нет правила. Величины
  * Money и Quantity, наоборот, заменены своими DTO: им нужен формат, а сроку — нет.
@@ -48,6 +51,8 @@ data class PackagePresentationDTO(
     val availableToMe: QuantityPresentationDTO,
     val freeForAnyone: QuantityPresentationDTO,
     val hasUnconfirmedChanges: Boolean,
+    val holdingCourseId: Uuid?,
+    val lastUsedAt: Instant?,
     val status: PackageStatus,
     val syncedAt: Instant?
 )

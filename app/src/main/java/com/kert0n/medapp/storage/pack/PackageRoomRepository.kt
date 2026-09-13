@@ -4,15 +4,10 @@ import androidx.room.withTransaction
 import com.kert0n.medapp.domain.pack.Claims
 import com.kert0n.medapp.domain.pack.Package
 import com.kert0n.medapp.domain.pack.PackageAfter
-import com.kert0n.medapp.domain.pack.PackageAvailability
 import com.kert0n.medapp.domain.pack.PackageEnding
 import com.kert0n.medapp.domain.pack.PackageFacts
 import com.kert0n.medapp.domain.pack.PackageProjection
 import com.kert0n.medapp.domain.pack.PackageStatus
-import com.kert0n.medapp.domain.value.Quantity
-import com.kert0n.medapp.domain.value.Vocabulary
-import com.kert0n.medapp.queue.PackageQueueState
-import com.kert0n.medapp.queue.pack.PackageSyncCommand
 import com.kert0n.medapp.network.pack.PackageSnapshot
 import com.kert0n.medapp.network.pack.PackageSyncState
 import com.kert0n.medapp.storage.course.CourseDao
@@ -21,11 +16,9 @@ import com.kert0n.medapp.storage.course.releaseSource
 import com.kert0n.medapp.storage.course.toSourceStorageEntities
 import com.kert0n.medapp.storage.course.toStorageEntity as toCourseStorageEntity
 import com.kert0n.medapp.storage.database.MedAppDatabase
-import com.kert0n.medapp.storage.database.chunkedForQuery
 import com.kert0n.medapp.storage.database.observing
-import com.kert0n.medapp.queue.StoredSyncOperation
+import com.kert0n.medapp.storage.intake.IntakeDao
 import com.kert0n.medapp.storage.server.SyncOperationDao
-import com.kert0n.medapp.storage.server.SyncOperationStorageRow
 import com.kert0n.medapp.storage.value.VocabularyDao
 import java.time.Instant
 import java.time.LocalDate
@@ -39,6 +32,7 @@ class PackageRoomRepository @Inject constructor(
     private val packages: PackageDao,
     private val courses: CourseDao,
     private val queue: SyncOperationDao,
+    private val intakes: IntakeDao,
     private val vocabulary: VocabularyDao
 ) : PackageStorageRepository {
 
@@ -151,7 +145,7 @@ class PackageRoomRepository @Inject constructor(
     private suspend fun projectionOf(id: Uuid): PackageProjection? = database.withTransaction {
         val words = vocabulary.snapshot()
         val pkg = packages.find(id)?.toDomain(words) ?: return@withTransaction null
-        projectionOf(pkg, packages.allocationsOf(listOf(id)).firstOrNull(), queue.unclosedOfPackages(listOf(id)), words)
+        packages.projectionsOf(listOf(pkg), queue, intakes, words).single()
     }
 
     /**
@@ -171,57 +165,14 @@ class PackageRoomRepository @Inject constructor(
         database.withTransaction {
             val words = vocabulary.snapshot()
             val found = packages.matching(query, today).map { it.toDomain(words) }
-            val ids = found.map { it.id }
-            val allocations = ids.chunkedForQuery().flatMap { packages.allocationsOf(it) }
-            val unclosed = unclosedOf(ids)
-            val projected = found.map { pkg ->
-                projectionOf(pkg, allocations.firstOrNull { it.packageId == pkg.id }, unclosed[pkg.id].orEmpty(), words)
-            }
+            val projected = packages.projectionsOf(found, queue, intakes, words)
             if (query.filter != PackageQuery.Filter.HasFree) projected
             else projected.filter { !it.availability.freeForAnyone.isZero }
         }
 
-    /**
-     * Проекция пачки: оценка количества — незакрытые команды поверх подтверждённого остатка по
-     * возрастанию номера; команда, которую нечем прочитать после обновления приложения, в число
-     * не входит и названа среди нечитаемых отдельно (PLAN E1, F4). Выделение — из назначения
-     * активному курсу (PLAN D4).
-     */
-    private suspend fun projectionOf(
-        pkg: Package,
-        allocation: PackageAllocationRow?,
-        unclosed: List<SyncOperationStorageRow>,
-        words: Vocabulary
-    ): PackageProjection {
-        val state = PackageQueueState(pkg, commandsOf(unclosed, words))
-        val availability = PackageAvailability(
-            pkg = pkg,
-            effective = state.amount,
-            myAllocation = allocation?.allocated(words, pkg.quantity.unit) ?: Quantity.zero(pkg.quantity.unit)
-        )
-        return pkg.projection(availability, state.hasUnconfirmedChanges)
-    }
-
-    /** Команды пачки из строк очереди; нечитаемую после обновления приложения пропускаем (PLAN F4). */
-    private fun commandsOf(rows: List<SyncOperationStorageRow>, words: Vocabulary): List<PackageSyncCommand> =
-        rows.mapNotNull {
-            (it.toDomain(words) as? StoredSyncOperation.Readable)?.operation?.command as? PackageSyncCommand
-        }
-
-    /**
-     * Незакрытые операции всего списка — одним чтением на порцию: спрашивать очередь про каждую
-     * пачку значило бы двести запросов там, где хватает одного. Порядок по `sequence` внутри
-     * пачки группировка сохраняет.
-     */
-    private suspend fun unclosedOf(ids: List<Uuid>): Map<Uuid, List<SyncOperationStorageRow>> =
-        ids.chunkedForQuery()
-            .flatMap { queue.unclosedOfPackages(it) }
-            .groupBy { requireNotNull(it.operation.packageId) { "операция пачки называет свою пачку" } }
-
     private companion object {
 
-
-        /** Из чего складывается доступность: пачка с её сведениями и бронями, очередь, выделения. */
+        /** Из чего складывается проекция: пачка с её сведениями и бронями, очередь, выделения, приёмы. */
         val AVAILABILITY_TABLES = arrayOf(
             "packages",
             "package_records",
@@ -230,7 +181,8 @@ class PackageRoomRepository @Inject constructor(
             "sync_operations",
             "courses",
             "course_sources",
-            "active_package_assignments"
+            "active_package_assignments",
+            "intakes"
         )
     }
 }
