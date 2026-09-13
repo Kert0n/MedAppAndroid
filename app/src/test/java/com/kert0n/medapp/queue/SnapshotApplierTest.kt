@@ -50,11 +50,21 @@ class SnapshotApplierTest {
          "reservations":{"total":"4.000000","mine":"4.000000","version":2}}
     """
 
-    private fun snapshotJson(vararg drugs: String, participants: Long = 2) = """
+    private fun snapshotJson(vararg drugs: String, participants: Long = 2, also: String = "") = """
         {"id":"${Uuid.random()}","medKits":[
-          {"id":"$HOME_KIT","userCount":$participants,"drugs":[${drugs.joinToString(",")}]}
+          {"id":"$HOME_KIT","userCount":$participants,"drugs":[${drugs.joinToString(",")}]}$also
         ]}
     """
+
+    private fun shelfJson(id: Uuid, vararg drugs: String) =
+        """,{"id":"$id","userCount":3,"drugs":[${drugs.joinToString(",")}]}"""
+
+    private fun knowledge(
+        medKits: Set<Uuid> = emptySet(),
+        packages: Set<Uuid> = emptySet(),
+        heldMedKits: Set<Uuid> = medKits + HOME_KIT,
+        heldPackages: Set<Uuid> = packages
+    ) = ServerKnowledge(medKits, packages, heldMedKits, heldPackages)
 
     private class Store : VocabularyStore {
         var words = Vocabulary(listOf(TABLETS), listOf(TABLET_FORM))
@@ -78,7 +88,7 @@ class SnapshotApplierTest {
         override suspend fun enqueue(queued: QueuedCommand, shelf: Uuid, at: Instant) = error("не для этого теста")
     }
 
-    private class Laid(private val knew: ServerKnowledge = ServerKnowledge(emptySet(), emptySet())) : SnapshotStorage {
+    private class Laid(private val knew: ServerKnowledge) : SnapshotStorage {
         var calls = 0
         var laid: ServerSnapshot? = null
         val snapshot get() = requireNotNull(laid) { "снимок не клали" }
@@ -118,7 +128,7 @@ class SnapshotApplierTest {
     /** Снимок кладётся целиком и одной записью: и участники полки, и её коробки. */
     @Test
     fun theWholeSnapshotGoesDownInOneWrite() = runTest {
-        val storage = Laid()
+        val storage = Laid(knowledge())
 
         val outcome = applier(storage, snapshotJson(drug(PACK, HOME_KIT), drug(OTHER_PACK, HOME_KIT))).refresh()
 
@@ -129,25 +139,46 @@ class SnapshotApplierTest {
     }
 
     /**
-     * Полка снимка нам неизвестна: коробку некуда класть, и выдумывать полку без имени и места
-     * хранения мы не беремся (PLAN C0). Пропуск назван, остальное ложится.
+     * Полки, которой у нас нет, в снимке — штатный случай: нас позвали, а ответ на вступление
+     * потерялся. Снимок её приносит вместе с коробками (PLAN C0, E4).
      */
     @Test
-    fun aBoxOnAnUnknownShelfIsSkippedByNameAndTheRestGoesDown() = runTest {
-        val storage = Laid()
+    fun aShelfWeDoNotHaveArrivesWithItsBoxes() = runTest {
+        val storage = Laid(knowledge())
 
-        val outcome = applier(storage, snapshotJson(drug(PACK, HOME_KIT), drug(OTHER_PACK, SHARED_KIT))).refresh()
+        val outcome = applier(
+            storage,
+            snapshotJson(drug(PACK, HOME_KIT), also = shelfJson(SHARED_KIT, drug(OTHER_PACK, SHARED_KIT)))
+        ).refresh()
+
+        assertEquals(SnapshotApplier.Outcome.Applied(medKits = 2, packages = 2, skipped = emptyList()), outcome)
+        assertEquals(setOf(SHARED_KIT), storage.snapshot.arrivedMedKits)
+        assertEquals(SHARED_KIT, storage.snapshot.packages.single { it.pack.id == OTHER_PACK }.pack.medKit.id)
+    }
+
+    /**
+     * Полка была у нас к началу чтения, а к разбору её уже нет — убрали, пока снимок летел.
+     * Запоздавший снимок её не возвращает: пропуск назван, остальное ложится (PLAN C0).
+     */
+    @Test
+    fun aShelfRemovedWhileTheSnapshotFlewDoesNotComeBack() = runTest {
+        val storage = Laid(knowledge(heldMedKits = setOf(HOME_KIT, SHARED_KIT)))
+
+        val outcome = applier(
+            storage,
+            snapshotJson(drug(PACK, HOME_KIT), also = shelfJson(SHARED_KIT, drug(OTHER_PACK, SHARED_KIT)))
+        ).refresh()
 
         val applied = outcome as SnapshotApplier.Outcome.Applied
+        assertEquals(emptySet<Uuid>(), storage.snapshot.arrivedMedKits)
         assertEquals(listOf(PACK), storage.snapshot.packages.map { it.pack.id })
-        assertEquals(1, applied.skipped.size)
         assertTrue(applied.skipped.single(), applied.skipped.single().contains(SHARED_KIT.toString()))
     }
 
     /** Единица, появившаяся на сервере, — обычное дело: словарь дочитывается, и коробка ложится. */
     @Test
     fun aUnitThatAppearedOnTheServerIsReadAndTheBoxGoesDown() = runTest {
-        val storage = Laid()
+        val storage = Laid(knowledge())
 
         val outcome = applier(storage, snapshotJson(drug(PACK, HOME_KIT, unitId = MILLILITRES.id))).refresh()
 
@@ -162,7 +193,7 @@ class SnapshotApplierTest {
     @Test
     fun whatTheSnapshotDoesNotNameIsGone() = runTest {
         val gone = Uuid.random()
-        val storage = Laid(ServerKnowledge(medKits = setOf(HOME_KIT, gone), packages = setOf(PACK, OTHER_PACK)))
+        val storage = Laid(knowledge(medKits = setOf(HOME_KIT, gone), packages = setOf(PACK, OTHER_PACK)))
 
         applier(storage, snapshotJson(drug(PACK, HOME_KIT))).refresh()
 
@@ -176,9 +207,9 @@ class SnapshotApplierTest {
      */
     @Test
     fun aBoxNamedButUnresolvedIsNotCountedAsGone() = runTest {
-        val storage = Laid(ServerKnowledge(medKits = setOf(HOME_KIT), packages = setOf(PACK, OTHER_PACK)))
+        val storage = Laid(knowledge(medKits = setOf(HOME_KIT), packages = setOf(PACK, OTHER_PACK)))
 
-        applier(storage, snapshotJson(drug(PACK, HOME_KIT), drug(OTHER_PACK, SHARED_KIT))).refresh()
+        applier(storage, snapshotJson(drug(PACK, HOME_KIT), drug(OTHER_PACK, HOME_KIT, unitId = Uuid.random()))).refresh()
 
         assertEquals(emptySet<Uuid>(), storage.snapshot.gonePackages)
         assertEquals(listOf(PACK), storage.snapshot.packages.map { it.pack.id })
@@ -187,7 +218,7 @@ class SnapshotApplierTest {
     /** Не прочитали — не кладём ничего: кэш остаётся прежним, а причина названа (PLAN E4). */
     @Test
     fun aSnapshotThatCouldNotBeReadChangesNothing() = runTest {
-        val storage = Laid()
+        val storage = Laid(knowledge())
 
         val outcome = applier(storage, snapshot = null, online = false).refresh()
 

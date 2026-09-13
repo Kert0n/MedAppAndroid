@@ -253,6 +253,10 @@ interface PackageDao {
     )
     suspend fun knownToServer(): List<Uuid>
 
+    /** Все живые коробки — чтобы снимок не вернул убранную, пока он летел (PLAN C0, E4). */
+    @Query("SELECT id FROM packages")
+    suspend fun held(): List<Uuid>
+
     @Transaction
     @Query("SELECT * FROM packages WHERE med_kit_id = :medKitId ORDER BY name")
     suspend fun ofMedKit(medKitId: Uuid): List<PackageStorageRow>

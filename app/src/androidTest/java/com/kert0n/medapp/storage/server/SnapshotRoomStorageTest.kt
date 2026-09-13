@@ -6,6 +6,7 @@ import com.kert0n.medapp.domain.pack.Claims
 import com.kert0n.medapp.fixture.HOME_KIT
 import com.kert0n.medapp.fixture.OTHER_PACK
 import com.kert0n.medapp.fixture.PACK
+import com.kert0n.medapp.fixture.SHARED_KIT
 import com.kert0n.medapp.fixture.inMemoryDatabase
 import com.kert0n.medapp.fixture.medKit
 import com.kert0n.medapp.fixture.pack
@@ -17,6 +18,9 @@ import com.kert0n.medapp.network.pack.PackageSyncState
 import com.kert0n.medapp.network.server.ResourceVersion
 import com.kert0n.medapp.storage.database.MedAppDatabase
 import com.kert0n.medapp.storage.medkit.toStorageEntity as toMedKitStorageEntity
+import com.kert0n.medapp.domain.value.Quantity
+import com.kert0n.medapp.domain.value.QuantityUnit
+import java.math.BigDecimal
 import java.time.Instant
 import kotlin.uuid.Uuid
 import kotlinx.coroutines.test.runTest
@@ -49,7 +53,7 @@ class SnapshotRoomStorageTest {
         database = inMemoryDatabase()
         storage = SnapshotRoomStorage(
             database, database.medKits(), database.packages(), database.courses(),
-            database.stockMovements(), database.vocabulary()
+            database.stockMovements(), database.vocabulary(), arrivedName = "Общая аптечка"
         )
         database.medKits().upsert(
             medKit(id = HOME_KIT, publication = MedKit.Publication.PUBLISHED, participantCount = 1).toMedKitStorageEntity()
@@ -72,8 +76,10 @@ class SnapshotRoomStorageTest {
         participants: Map<Uuid, Long>,
         packages: List<PackageSnapshot>,
         goneMedKits: Set<Uuid> = emptySet(),
-        gonePackages: Set<Uuid> = emptySet()
-    ) = ServerSnapshot(participants, packages, goneMedKits, gonePackages)
+        gonePackages: Set<Uuid> = emptySet(),
+        arrivedMedKits: Set<Uuid> = emptySet(),
+        heldPackages: Set<Uuid> = emptySet()
+    ) = ServerSnapshot(participants, packages, goneMedKits, gonePackages, arrivedMedKits, heldPackages)
 
     /** Участники полки и серверная часть её коробок ложатся вместе, одной записью. */
     @Test
@@ -129,19 +135,86 @@ class SnapshotRoomStorageTest {
 
         assertEquals(setOf(HOME_KIT), knew.medKits)
         assertEquals(setOf(PACK), knew.packages)
+        // Что у нас вообще есть — вопрос другой: сюда входит всё, и неотправленное, и помеченное.
+        assertEquals(setOf(HOME_KIT, SHARED_KIT), knew.heldMedKits)
+        assertEquals(setOf(PACK, OTHER_PACK, third), knew.heldPackages)
+    }
+
+    /**
+     * Полка, которой у нас не было, приходит со снимком: имени сервер не знает, и она заводится
+     * «Общей аптечкой», которую человек переименует сам, — вместе со своими коробками (PLAN C0, E4).
+     */
+    @Test
+    fun aShelfTheServerNamesArrivesAsTheSharedMedKit() = runTest {
+        val arrived = Uuid.random()
+
+        storage.lay(
+            serverSnapshot(mapOf(arrived to 3L), listOf(snapshot(PACK, medKitId = arrived)), arrivedMedKits = setOf(arrived)),
+            at
+        )
+
+        val shelf = requireNotNull(database.medKits().find(arrived)).toDomain()
+        assertEquals("Общая аптечка", shelf.name)
+        assertEquals(MedKit.Publication.PUBLISHED, shelf.publication)
+        assertEquals(3L, shelf.participantCount)
+        assertTrue(shelf.acceptsInvitations)
+        assertEquals(arrived, database.packageRepository().find(PACK)?.medKit?.id)
+    }
+
+    /** Полку уже завело вступление, пока снимок летел: имя, данное человеком, снимок не трогает. */
+    @Test
+    fun aShelfThatArrivedMeanwhileKeepsItsName() = runTest {
+        storage.lay(serverSnapshot(mapOf(HOME_KIT to 4L), emptyList(), arrivedMedKits = setOf(HOME_KIT)), at)
+
+        val shelf = requireNotNull(database.medKits().find(HOME_KIT)).toDomain()
+        assertEquals("Домашняя", shelf.name)
+        assertEquals(4L, shelf.participantCount)
+    }
+
+    /**
+     * Коробку выбросили, пока снимок летел: к началу чтения она была, к укладке её нет. Ответ,
+     * прочитанный раньше, об этом не знает — и не возвращает её (PLAN C0).
+     */
+    @Test
+    fun aBoxRemovedWhileTheSnapshotFlewDoesNotComeBack() = runTest {
+        storage.lay(
+            serverSnapshot(mapOf(HOME_KIT to 2L), listOf(snapshot(PACK)), heldPackages = setOf(PACK)),
+            at
+        )
+
+        assertNull(database.packages().find(PACK))
+    }
+
+    /** Полку убрали, пока снимок летел: её коробкам некуда лечь, и снимок их не заводит. */
+    @Test
+    fun boxesOfAShelfRemovedWhileTheSnapshotFlewAreNotLaid() = runTest {
+        val removed = Uuid.random()
+
+        storage.lay(serverSnapshot(mapOf(removed to 2L), listOf(snapshot(PACK, medKitId = removed))), at)
+
+        assertNull(database.medKits().find(removed))
+        assertNull(database.packages().find(PACK))
     }
 
     /**
      * Сорвалась укладка одной коробки — не остаётся половины снимка: ни чужих коробок, ни нового
-     * числа участников. Полки, которую называет вторая коробка, у нас нет, и ключ схемы это ловит.
+     * числа участников. Единицы, которой считают вторую коробку, в словаре нет, и ключ схемы это
+     * ловит.
      */
     @Test
     fun aSnapshotThatCouldNotBeLaidDownWholeLeavesNothing() = runTest {
+        val unknownUnit = QuantityUnit(Uuid.random(), "неведомая")
+        val broken = PackageSnapshot(
+            pack = pack(
+                id = OTHER_PACK,
+                medKit = medKit(id = HOME_KIT, publication = MedKit.Publication.PUBLISHED).ref,
+                quantity = Quantity(BigDecimal("5"), unknownUnit)
+            ),
+            sync = PackageSyncState(OTHER_PACK, version = ResourceVersion(4), claimsVersion = ResourceVersion(2))
+        )
+
         val refusal = runCatching {
-            storage.lay(
-                serverSnapshot(mapOf(HOME_KIT to 3L), listOf(snapshot(PACK), snapshot(OTHER_PACK, medKitId = Uuid.random()))),
-                at
-            )
+            storage.lay(serverSnapshot(mapOf(HOME_KIT to 3L), listOf(snapshot(PACK), broken)), at)
         }.exceptionOrNull()
 
         assertNotNull(refusal)

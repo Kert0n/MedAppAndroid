@@ -1,11 +1,15 @@
 package com.kert0n.medapp.queue
 
+import com.kert0n.medapp.domain.medkit.MedKit
+import com.kert0n.medapp.domain.medkit.MedKitRef
+import com.kert0n.medapp.domain.medkit.MedKitStatus
 import com.kert0n.medapp.network.pack.PackageSnapshot
 import com.kert0n.medapp.network.pack.PackageSnapshotNetworkDTO
 import com.kert0n.medapp.network.pack.toDomain
 import com.kert0n.medapp.network.value.VocabularyResolver
 import java.time.Instant
 import javax.inject.Inject
+import kotlin.uuid.Uuid
 
 /**
  * Разрешает всё, что снимок пачки называет, — единицу, форму, аптечку — и собирает его в домен
@@ -15,6 +19,8 @@ import javax.inject.Inject
  *   названной причиной, не закрывая операцию;
  * - **полка** незнакома — коробка ушла туда, где нас нет: сосед переставил её в свою полку. Ждать
  *   нечего, это окончательный ответ — [Resolution.Elsewhere], и для нас это утрата доступа (E6).
+ *   Исключение одно: полку, которую тот же полный снимок и приносит (`arriving`), он заводит сам,
+ *   и коробке на ней есть куда лечь (E4).
  *
  * Снимок, нарушающий инварианты домена, — данные сервера, а не ошибка программиста, и из прохода
  * исключением не выходит.
@@ -26,9 +32,11 @@ class PackageSnapshotResolver @Inject constructor(
     private val storage: QueueStorage
 ) {
 
-    suspend fun resolve(snapshot: PackageSnapshotNetworkDTO, at: Instant): Resolution {
-        val medKit = storage.medKit(snapshot.pack.medKitId)
-            ?: return Resolution.Elsewhere(snapshot.pack.medKitId)
+    suspend fun resolve(snapshot: PackageSnapshotNetworkDTO, at: Instant, arriving: Set<Uuid> = emptySet()): Resolution {
+        val medKitId = snapshot.pack.medKitId
+        val medKit = storage.medKit(medKitId)
+            ?: MedKitRef(medKitId, MedKit.Publication.PUBLISHED, MedKitStatus.ACTIVE).takeIf { medKitId in arriving }
+            ?: return Resolution.Elsewhere(medKitId)
         val resolution = try {
             vocabulary.resolve { snapshot.toDomain(it, medKit, addedAt = at, observedAt = at) }
         } catch (invalid: IllegalArgumentException) {
@@ -47,7 +55,7 @@ class PackageSnapshotResolver @Inject constructor(
         data class Resolved(val snapshot: PackageSnapshot) : Resolution
 
         /** Коробка на полке [medKitId], которой у нас нет: туда, где нас нет. Окончательно. */
-        data class Elsewhere(val medKitId: kotlin.uuid.Uuid) : Resolution
+        data class Elsewhere(val medKitId: Uuid) : Resolution
 
         /** [stop] — словарь не дочитался из-за связи: дальше в этом проходе идти незачем. */
         data class Unresolved(val reason: String, val stop: Boolean) : Resolution

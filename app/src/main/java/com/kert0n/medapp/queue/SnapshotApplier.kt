@@ -14,7 +14,8 @@ import javax.inject.Singleton
  * Читает у сервера полное состояние и кладёт его к себе (PLAN E4). Дешёвой сверки не существует —
  * состав полки и число участников чужой расход не двигают (B6), — поэтому спрашивается всё сразу:
  * `GET /v1/users/me` отвечает не списком изменений, а **утверждением о целом**: вот полки, которые
- * я вижу, и вот всё, что на них лежит.
+ * я вижу, и вот всё, что на них лежит. Поэтому полка, которой у нас нет, в нём — штатный случай:
+ * нас позвали, а ответ на вступление потерялся, — и заводится она здесь же.
  *
  * Сеть между транзакциями, а не внутри (F5): сначала читается ответ, потом он разрешается в домен,
  * и только разрешённое ложится одной записью. Промах словаря дочитывается один раз за чтение —
@@ -36,29 +37,31 @@ class SnapshotApplier @Inject constructor(
 
     suspend fun refresh(): Outcome {
         val at = clock.instant()
-        // Спрашивается до сети: что человек заведёт, пока снимок летит, в ответ попасть не могло.
+        // Спрашивается до сети: что человек заведёт или уберёт, пока снимок летит, ответ не знает.
         val knew = storage.serverKnows()
         val read = when (val answer = api.snapshot()) {
             is ApiResult.Success -> answer.value
             is ApiResult.Failure -> return Outcome.Refused(answer.failure.asUnavailability())
         }
         val participants = read.medKits.associate { it.id to it.participantCount }
+        // Полку, которой у нас не было, снимок заводит: сервер назвал её нашей — вступили, а ответ
+        // на вступление потерялся. Была и пропала, пока снимок летел, — её убрали, не заводим.
+        val arriving = participants.keys - knew.heldMedKits
         val resolved = ArrayList<PackageSnapshot>()
         val skipped = ArrayList<String>()
         var vocabularyRefreshable = true
         for (medKit in read.medKits) {
             for (dto in medKit.packages) {
-                var resolution = snapshots.resolve(dto, at)
+                var resolution = snapshots.resolve(dto, at, arriving)
                 if (resolution is PackageSnapshotResolver.Resolution.Unresolved && !resolution.stop && vocabularyRefreshable) {
                     vocabularyRefreshable = false
-                    if (vocabulary.refresh() is ApiResult.Success) resolution = snapshots.resolve(dto, at)
+                    if (vocabulary.refresh() is ApiResult.Success) resolution = snapshots.resolve(dto, at, arriving)
                 }
                 when (resolution) {
                     is PackageSnapshotResolver.Resolution.Resolved -> resolved += resolution.snapshot
-                    // Полка снимка нам неизвестна: положить коробку некуда, и выдумывать полку,
-                    // у которой нет ни имени, ни места хранения, мы не беремся (PLAN C0).
+                    // Полки уже нет: её убрали у нас, пока снимок летел, и класть коробку некуда.
                     is PackageSnapshotResolver.Resolution.Elsewhere ->
-                        skipped += "коробка ${dto.pack.id} на незнакомой полке ${resolution.medKitId}"
+                        skipped += "коробка ${dto.pack.id} на убранной полке ${resolution.medKitId}"
                     is PackageSnapshotResolver.Resolution.Unresolved ->
                         skipped += "коробка ${dto.pack.id}: ${resolution.reason}"
                 }
@@ -71,7 +74,9 @@ class SnapshotApplier @Inject constructor(
             participants = participants,
             packages = resolved,
             goneMedKits = knew.medKits - participants.keys,
-            gonePackages = knew.packages - named
+            gonePackages = knew.packages - named,
+            arrivedMedKits = arriving,
+            heldPackages = knew.heldPackages
         )
         storage.lay(snapshot, at)
         return Outcome.Applied(medKits = participants.size, packages = resolved.size, skipped = skipped)

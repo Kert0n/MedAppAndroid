@@ -42,7 +42,6 @@ interface MedKitDao {
     @Query("SELECT * FROM med_kits WHERE id = :id")
     suspend fun find(id: Uuid): MedKitStorageEntity?
 
-    /** Пустую строку аптечки: содержимое к этому моменту либо переехало, либо удалено (PLAN E6). */
     /**
      * Полки, о которых сервер знает и по которым нечего ждать: помеченная ждёт ответа на своё
      * решение, и её отсутствие в снимке объясняет он, а не снимок (PLAN E4, E5).
@@ -50,6 +49,11 @@ interface MedKitDao {
     @Query("SELECT id FROM med_kits WHERE publication = 'PUBLISHED' AND status = 'ACTIVE'")
     suspend fun knownToServer(): List<Uuid>
 
+    /** Все полки, какие у нас есть, — чтобы снимок отличил появившуюся от убранной (PLAN E4). */
+    @Query("SELECT id FROM med_kits")
+    suspend fun held(): List<Uuid>
+
+    /** Пустую строку аптечки: содержимое к этому моменту либо переехало, либо удалено (PLAN E6). */
     @Query("DELETE FROM med_kits WHERE id = :id")
     suspend fun delete(id: Uuid): Int
 }
