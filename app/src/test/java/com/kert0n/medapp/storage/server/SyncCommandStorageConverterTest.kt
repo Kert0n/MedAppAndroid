@@ -42,7 +42,7 @@ class SyncCommandStorageConverterTest {
         PackageSyncCommand.Create(PACK, HOME_KIT, tablets("20"), facts),
         PackageSyncCommand.Create(PACK, HOME_KIT, tablets("20"), facts, fromMedKitId = SHARED_KIT),
         PackageSyncCommand.Describe(PACK, facts, facts.copy(name = "Paracetamol", category = null)),
-        PackageSyncCommand.CorrectStock(PACK, tablets("18.5")),
+        PackageSyncCommand.CorrectStock(PACK, tablets("20"), tablets("18.5")),
         PackageSyncCommand.Move(PACK, SHARED_KIT),
         PackageSyncCommand.Delete(PACK),
         PackageSyncCommand.Withdraw(PACK, SHARED_KIT, tablets("20")),
@@ -178,7 +178,7 @@ class SyncCommandStorageConverterTest {
     /** Единица вне снимка — промах словаря, а не порча payload: он лечится чтением, а не человеком. */
     @Test
     fun aUnitMissingFromTheSnapshotIsAVocabularyMissNotAFormatError() {
-        val command = PackageSyncCommand.CorrectStock(PACK, millilitres("10"))
+        val command = PackageSyncCommand.CorrectStock(PACK, millilitres("20"), millilitres("10"))
         val refusal = runCatching {
             SyncCommandStorageConverter.commandOf(
                 kind = SyncCommandStorageConverter.kindOf(command),

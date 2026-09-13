@@ -585,22 +585,85 @@ class QueueWorkerTest {
         assertEquals(SyncOperationStatus.REFUSED, storage.operations.getValue(INTAKE).status)
     }
 
-    /** Чужая правка перекрыла описание: отказ с названной причиной, истина прочитана, человек смотрит заново. */
+    /**
+     * 412 у правки сведений — гонка: сосед выпил таблетку между чтением и отправкой. Истина
+     * читается, правка готовится заново своими полями поверх неё и уходит тем же проходом — чужой
+     * приём решение человека не сбрасывает (C1 «Действие над общей пачкой — разница»).
+     */
     @Test
-    fun staleDescriptionIsRefusedWithTheReasonNamedAndTheTruthRead() = runTest {
+    fun staleDescriptionIsRepreparedOverTheFreshTruth() = runTest {
         val describe = PackageSyncCommand.Describe(
             PACK,
             com.kert0n.medapp.domain.pack.PackageSharedFacts("Парацетамол", TABLET_FORM),
             com.kert0n.medapp.domain.pack.PackageSharedFacts("Парацетамол 500", TABLET_FORM)
         )
         val storage = Storage(listOf(operation(describe)))
-        val transport = transport { ApiResult.Failure(ApiFailure.PreconditionFailed) }
-        transport.snapshotAnswer = ApiResult.Success(snapshot)
+        var attempts = 0
+        val transport = transport(fresh = snapshotWithVersion(3)) {
+            attempts++
+            if (attempts == 1) ApiResult.Failure(ApiFailure.PreconditionFailed) else ApiResult.Success(RawResponse(200, snapshotJson.replace("\"version\":4", "\"version\":8")))
+        }
+        transport.snapshotAnswer = ApiResult.Success(snapshotWithVersion(7))
 
         worker(storage, transport).drain()
 
-        assertEquals(Delivery.Refused(RefusalReason.STALE, PackageState.Present(resolved(snapshot))), storage.settled.single().second)
+        assertEquals(Delivery.Stale(resolved(snapshotWithVersion(7))), storage.settled[0].second)
+        assertEquals(Delivery.Applied(PackageState.Present(resolved(snapshotWithVersion(8)))), storage.settled[1].second)
+        assertEquals(listOf(ResourceVersion(3), ResourceVersion(7)), transport.sent.map { it.drugVersion })
+        assertTrue(transport.sent.all { it.body!!.contains("Парацетамол 500") })
+        assertEquals(SyncOperationStatus.APPLIED, storage.operations.getValue(INTAKE).status)
+    }
+
+    /**
+     * Сосед переименовал коробку иначе: то же поле изменено иначе, соотнести нельзя — подготовка
+     * закрывает операцию отказом `CONFLICT`, и человек описывает ситуацию заново (C1).
+     */
+    @Test
+    fun aDescriptionTheNeighbourChangedDifferentlyIsAConflictAtPreparation() = runTest {
+        val describe = PackageSyncCommand.Describe(
+            PACK,
+            com.kert0n.medapp.domain.pack.PackageSharedFacts("Парацетамол", TABLET_FORM),
+            com.kert0n.medapp.domain.pack.PackageSharedFacts("Парацетамол 500", TABLET_FORM)
+        )
+        val storage = Storage(listOf(operation(describe)))
+        val renamed = medAppJson.decodeFromString(
+            PackageSnapshotNetworkDTO.serializer(),
+            snapshotJson.replace("Парацетамол", "Панадол")
+        )
+        val transport = transport(fresh = renamed) { error("несводимая правка на провод не идёт") }
+
+        worker(storage, transport).drain()
+
+        assertTrue(transport.sent.isEmpty())
+        assertEquals(Delivery.Refused(RefusalReason.CONFLICT, PackageState.None), storage.settled.single().second)
         assertEquals(SyncOperationStatus.REFUSED, storage.operations.getValue(INTAKE).status)
+    }
+
+    /**
+     * Пересчёт — разница поверх свежего числа: видел 20, назвал 17, а свежее чтение принесло 17 —
+     * уходит 14. Ниже нуля свести нельзя: видел 20, назвал 2, а прочитано 17 — отказ подготовки.
+     */
+    @Test
+    fun aRecountLaysItsDifferenceOverTheFreshNumberOrConflicts() = runTest {
+        val recount = PackageSyncCommand.CorrectStock(PACK, seen = tablets("20"), actual = tablets("17"))
+        val storage = Storage(listOf(operation(recount)))
+        val transport = transport(fresh = snapshotWithVersion(3)) {
+            ApiResult.Success(RawResponse(200, snapshotJson.replace("17.000000", "14.000000")))
+        }
+
+        worker(storage, transport).drain()
+
+        assertTrue(transport.sent.single().body!!.contains("\"quantity\":\"14"))
+        assertEquals(SyncOperationStatus.APPLIED, storage.operations.getValue(INTAKE).status)
+
+        val tooMuch = PackageSyncCommand.CorrectStock(PACK, seen = tablets("20"), actual = tablets("2"))
+        val refusing = Storage(listOf(operation(tooMuch)))
+        val silent = transport(fresh = snapshotWithVersion(3)) { error("несводимый пересчёт на провод не идёт") }
+
+        worker(refusing, silent).drain()
+
+        assertTrue(silent.sent.isEmpty())
+        assertEquals(Delivery.Refused(RefusalReason.CONFLICT, PackageState.None), refusing.settled.single().second)
     }
 
     @Test

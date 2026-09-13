@@ -178,9 +178,7 @@ class QueueWorker @Inject constructor(
                 is QueueAnswer.Snapshot -> known(read.snapshot) { Step.Settled(Delivery.Applied(PackageState.Present(it))) }
                 QueueAnswer.Gone -> Step.Settled(Delivery.Applied(PackageState.Gone))
                 is QueueAnswer.Claim, QueueAnswer.Nothing ->
-                    if (command is PackageSyncCommand.Delete || command is PackageSyncCommand.Withdraw ||
-                        (command is PackageSyncCommand.CorrectStock && command.actual.isZero)
-                    ) {
+                    if (command is PackageSyncCommand.Delete || command is PackageSyncCommand.Withdraw) {
                         Step.Settled(Delivery.Applied(PackageState.Gone))
                     } else {
                         when (val snapshot = snapshotRead(command.packageId)) {
@@ -207,19 +205,18 @@ class QueueWorker @Inject constructor(
         }
 
     /**
-     * Версия устарела — сервер отверг запрос до применения, в журнал он не попал. Расход и бронь
-     * готовятся заново по свежему состоянию под тем же номером; описание, пересчёт, перенос и
-     * удаление перекрыты чужой правкой — отказ, человек смотрит заново (PLAN E3). У курсового
-     * расхода прежде смотрится бронь: потерянный ответ, за которым пришёл отказ по версии,
-     * оставляет след в `mine`, и тогда расход применён.
+     * Версия устарела — сервер отверг запрос до применения, в журнал он не попал: гонка длиной в
+     * секунды. Любая команда пачки готовится заново по свежему состоянию под тем же номером —
+     * разница человека ложится поверх чужого изменения, а сводима ли она, решает подготовка
+     * (PLAN E3, C1). У курсового расхода прежде смотрится бронь: потерянный ответ, за которым
+     * пришёл отказ по версии, оставляет след в `mine`, и тогда расход применён.
      */
     private suspend fun stale(command: SyncCommand, request: PreparedRequest): Delivery = when (command) {
         is PackageSyncCommand -> snapshotThen(command.packageId) { snapshot ->
-            when {
-                command is PackageSyncCommand.Consume && command.provenAppliedBy(snapshot, request) ->
-                    Delivery.Applied(PackageState.Present(snapshot))
-                command.onStale == StalePolicy.REPREPARE -> Delivery.Stale(snapshot)
-                else -> Delivery.Refused(RefusalReason.STALE, PackageState.Present(snapshot))
+            if (command is PackageSyncCommand.Consume && command.provenAppliedBy(snapshot, request)) {
+                Delivery.Applied(PackageState.Present(snapshot))
+            } else {
+                Delivery.Stale(snapshot)
             }
         }
         is MedKitSyncCommand -> Delivery.Refused(RefusalReason.STALE, PackageState.None)
@@ -262,15 +259,15 @@ class QueueWorker @Inject constructor(
     }
 
     /**
-     * 404 значит разное для разных команд (PLAN B4): что именно — говорит команда. У расхода есть
-     * ещё один случай: повтор запроса, который уже уходил с неизвестным исходом и мог уничтожить
-     * пачку, дойдя до нуля, — тогда пачки нет по нашей же причине, и это применение, а не потеря
-     * доступа (PLAN E3). Известный исход — 429, обрыв до сервера — такого не значит.
+     * 404 значит разное для разных команд (PLAN B4): что именно — говорит команда. У расхода и
+     * пересчёта есть ещё один случай: повтор запроса, который уже уходил с неизвестным исходом и
+     * мог уничтожить пачку, дойдя до нуля, — тогда пачки нет по нашей же причине, и это применение,
+     * а не потеря доступа (PLAN E3). Известный исход — 429, обрыв до сервера — такого не значит.
      */
     private suspend fun notFound(operation: SyncOperation, request: PreparedRequest): Delivery = when (val command = operation.command) {
         is PackageSyncCommand -> when (command.onNotFound) {
             NotFoundPolicy.ACCESS_LOST ->
-                if (command is PackageSyncCommand.Consume && operation.outcomeUnknown && command.emptiedBy(request)) {
+                if (operation.outcomeUnknown && command.emptiedBy(request)) {
                     Delivery.Applied(PackageState.Gone)
                 } else {
                     Delivery.AccessLost

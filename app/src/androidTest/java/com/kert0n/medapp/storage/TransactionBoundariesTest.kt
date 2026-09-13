@@ -389,7 +389,7 @@ class TransactionBoundariesTest {
     @Test
     fun localKitGetsNoCommandsEvenWhenTheChangeGoesThrough() = runTest {
         val local = medKit(publication = MedKit.Publication.LOCAL)
-        val recount = QueuedCommand(operation, PackageSyncCommand.CorrectStock(PACK, tablets("17")))
+        val recount = QueuedCommand(operation, PackageSyncCommand.CorrectStock(PACK, tablets("20"), tablets("17")))
 
         assertTrue(
             queue.change(local.ref, listOf(recount), at) {
@@ -405,7 +405,7 @@ class TransactionBoundariesTest {
     @Test
     fun aChangeWithNowhereToLandQueuesNothing() = runTest {
         val gone = Uuid.parse("00000000-0000-4000-8000-0000000000ee")
-        val recount = QueuedCommand(operation, PackageSyncCommand.CorrectStock(gone, tablets("17")))
+        val recount = QueuedCommand(operation, PackageSyncCommand.CorrectStock(gone, tablets("20"), tablets("17")))
 
         assertFalse(
             queue.change(published.ref, listOf(recount), at) {
@@ -609,7 +609,7 @@ class TransactionBoundariesTest {
     @Test
     fun failedAdjustmentLeavesTheStock() = runTest {
         database.syncOperations().enqueue(operation, PackageSyncCommand.Delete(PACK), at)
-        val recount = QueuedCommand(operation, PackageSyncCommand.CorrectStock(PACK, tablets("4")))
+        val recount = QueuedCommand(operation, PackageSyncCommand.CorrectStock(PACK, tablets("20"), tablets("4")))
 
         val failure = runCatching {
             queue.change(published.ref, listOf(recount), at) {

@@ -123,6 +123,7 @@ object SyncCommandStorageConverter {
         )
         PACKAGE_CORRECT_STOCK -> PackageSyncCommand.CorrectStock(
             packageId = fields.uuid("packageId"),
+            seen = fields.quantity("seen", vocabulary),
             actual = fields.quantity("actual", vocabulary)
         )
         PACKAGE_MOVE -> PackageSyncCommand.Move(
@@ -171,7 +172,10 @@ object SyncCommandStorageConverter {
                 put("before", factsObject(command.before))
                 put("after", factsObject(command.after))
             }
-            is PackageSyncCommand.CorrectStock -> putQuantity("actual", command.actual)
+            is PackageSyncCommand.CorrectStock -> {
+                putQuantity("seen", command.seen)
+                putQuantity("actual", command.actual)
+            }
             is PackageSyncCommand.Move ->
                 put("targetMedKitId", JsonPrimitive(command.targetMedKitId.toString()))
             is PackageSyncCommand.Delete -> Unit
