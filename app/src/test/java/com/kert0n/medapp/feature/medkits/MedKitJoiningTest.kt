@@ -115,41 +115,42 @@ class MedKitJoiningTest {
     }
 
     /**
-     * «Уже вступили», а полки у нас нет — прошлый ответ потерялся. Снимок приносит её, и это и есть
-     * вступление: экран откроет полку, а не скажет «вы уже там» про полку, которой не видно.
+     * «Уже вступили», а полки у нас нет — прошлый ответ потерялся. Снимок приносит её в список; какая
+     * из появившихся полок та самая, не угадывается — исход «уже в полке» (PLAN E4).
      */
     @Test
-    fun alreadyAMemberWithoutTheShelfRecoversItFromTheSnapshot() = runTest {
+    fun alreadyAMemberBringsTheShelfIntoTheListWithoutGuessingIt() = runTest {
         val storage = Laid()
 
         val outcome = joining(storage, HttpStatusCode.Conflict to "", snapshotJson(SHARED_KIT)).join(key)
 
-        assertEquals(MedKitJoining.Outcome.Joined(SHARED_KIT), outcome)
+        assertEquals(MedKitJoining.Outcome.AlreadyMember, outcome)
         assertEquals(setOf(SHARED_KIT), storage.laid.single().arrivedMedKits)
     }
 
-    /** «Уже вступили», и полка давно у нас: снимок нового не принёс — так и говорим. */
+    /**
+     * Появилась ровно одна полка — и всё равно не «вступили в неё»: снимок приносит все полки, которых
+     * у нас нет, и связать одну из них с этим кодом нечем.
+     */
     @Test
-    fun alreadyAMemberWithTheShelfSaysSo() = runTest {
-        val outcome = joining(Laid(), HttpStatusCode.Conflict to "", snapshotJson()).join(key)
+    fun aSingleArrivalIsNotTakenForTheInvitedShelf() = runTest {
+        val outcome = joining(Laid(), HttpStatusCode.Conflict to "", snapshotJson(Uuid.random())).join(key)
 
         assertEquals(MedKitJoining.Outcome.AlreadyMember, outcome)
     }
 
-    /** Ответ на вступление потерялся, а сервер вступил: снимок это показывает новой полкой. */
+    /**
+     * Ответ на вступление потерялся: снимок приносит полку, если вступили, а человеку — повторить;
+     * повтор ответит «уже вступили» либо вступит.
+     */
     @Test
-    fun aLostAnswerThatJoinedIsFoundInTheSnapshot() = runTest {
-        val outcome = joining(Laid(), HttpStatusCode.BadGateway to "", snapshotJson(SHARED_KIT)).join(key)
+    fun aLostAnswerReadsTheSnapshotAndAsksToRetry() = runTest {
+        val storage = Laid()
 
-        assertEquals(MedKitJoining.Outcome.Joined(SHARED_KIT), outcome)
-    }
-
-    /** Ответ потерялся, и новой полки нет: не вступили — повторить позже. */
-    @Test
-    fun aLostAnswerThatDidNotJoinAsksToRetry() = runTest {
-        val outcome = joining(Laid(), HttpStatusCode.BadGateway to "", snapshotJson()).join(key)
+        val outcome = joining(storage, HttpStatusCode.BadGateway to "", snapshotJson(SHARED_KIT)).join(key)
 
         assertEquals(MedKitJoining.Outcome.Unavailable(Unavailability.SERVER_SILENT), outcome)
+        assertEquals(setOf(SHARED_KIT), storage.laid.single().arrivedMedKits)
     }
 
     /** Код неизвестен, истёк или пригласивший вышел — для нас это одно, и снимок не читается (B6). */

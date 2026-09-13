@@ -513,8 +513,8 @@ class SharedMedKitProbe {
 
         // У Бориса на сервере могут быть и другие полки, а база у пробы всякий раз свежая: снимок
         // приносит все, каких у него нет, и дача среди них.
-        val read = boris.refresh()
-        assertTrue("дача не пришла: ${read.arrived}", dacha in read.arrived)
+        boris.refresh()
+        assertEquals("Общая аптечка", requireNotNull(boris.database.medKits().find(dacha)).name)
         assertEquals(dacha, requireNotNull(boris.packages.find(shared.box)).medKit.id)
     }
 
@@ -599,11 +599,10 @@ class SharedMedKitProbe {
         }
 
         /** Полный снимок, как его читает приложение: легло всё, что названо. */
-        suspend fun refresh(): SnapshotApplier.Outcome.Applied {
+        suspend fun refresh() {
             val outcome = reading.refresh()
             val applied = outcome as? SnapshotApplier.Outcome.Applied ?: throw AssertionError("снимок не прочитан: $outcome")
             assertEquals("пропуски снимка: ${applied.skipped}", emptyList<String>(), applied.skipped)
-            return applied
         }
 
         /** Лечение из коробки: пять доз по две штуки выделено, три плановых приёма по дням. */

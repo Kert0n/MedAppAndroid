@@ -32,13 +32,22 @@ class PackageSnapshotResolver @Inject constructor(
     private val storage: QueueStorage
 ) {
 
-    suspend fun resolve(snapshot: PackageSnapshotNetworkDTO, at: Instant, arriving: Set<Uuid> = emptySet()): Resolution {
+    /**
+     * [words] — заход разбора, общий для многих снимков: словарь в нём дочитывается не больше
+     * раза, сколько бы коробок ни промахнулось.
+     */
+    suspend fun resolve(
+        snapshot: PackageSnapshotNetworkDTO,
+        at: Instant,
+        arriving: Set<Uuid> = emptySet(),
+        words: VocabularyResolver.Session = vocabulary.session()
+    ): Resolution {
         val medKitId = snapshot.pack.medKitId
         val medKit = storage.medKit(medKitId)
             ?: MedKitRef(medKitId, MedKit.Publication.PUBLISHED, MedKitStatus.ACTIVE).takeIf { medKitId in arriving }
             ?: return Resolution.Elsewhere(medKitId)
         val resolution = try {
-            vocabulary.resolve { snapshot.toDomain(it, medKit, addedAt = at, observedAt = at) }
+            words.resolve { snapshot.toDomain(it, medKit, addedAt = at, observedAt = at) }
         } catch (invalid: IllegalArgumentException) {
             return Resolution.Unresolved("снимок вне контракта: ${invalid.message}", stop = false)
         }

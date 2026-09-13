@@ -67,11 +67,12 @@ class MedKitInvitationTest {
     @After
     fun tearDown() = database.close()
 
-    /** Полный снимок отвечает, что у нас нет ни одной полки. */
-    private fun invitation(server: Server): MedKitInvitation {
+    /** Полный снимок отвечает, что у нас нет ни одной полки; `online = false` — снимок не прочитать. */
+    private fun invitation(server: Server, online: Boolean = true): MedKitInvitation {
         val api = MedAppApi(
             medAppHttpClient(
                 MockEngine {
+                    if (!online) throw java.io.IOException("нет связи")
                     respond("""{"id":"${Uuid.random()}","medKits":[]}""", HttpStatusCode.OK, headersOf(HttpHeaders.ContentType, "application/json"))
                 },
                 "https://medapp.test",
@@ -129,6 +130,17 @@ class MedKitInvitationTest {
 
         assertEquals(MedKitInvitation.Outcome.MedKitGone, outcome)
         assertNull(database.medKits().find(SHARED_KIT))
+    }
+
+    /** Снимок не прочитался — полка ещё в списке, и «её нет» экран не скажет: сервера нет. */
+    @Test
+    fun aShelfTheServerNoLongerShowsStaysUntilTheSnapshotIsRead() = runTest {
+        published(SHARED_KIT)
+
+        val outcome = invitation(Server(MedKitInvitations.Issue.NotAccessible), online = false).invite(SHARED_KIT)
+
+        assertEquals(MedKitInvitation.Outcome.Unavailable(Unavailability.NO_CONNECTION), outcome)
+        assertEquals(SHARED_KIT, database.medKits().find(SHARED_KIT)?.id)
     }
 
     @Test

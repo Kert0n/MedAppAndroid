@@ -13,8 +13,9 @@ import kotlin.uuid.Uuid
  *
  * **Ответ может потеряться, и это обычное дело.** Сервер вступил, а до нас ответ не дошёл; повтор
  * тем же кодом отвечает «уже вступили» — без номера полки. Сценарий не оставляет человека без
- * полки: он читает полный снимок, а тот приносит полку, которой у нас не было (E4). Появилась
- * ровно одна — это она, и вступление состоялось.
+ * полки: он читает полный снимок, и тот приносит полку, которой у нас не было (E4). **Какая из
+ * появившихся полок — та самая, не угадывается:** снимок приносит все полки, которых у нас нет, и
+ * связать одну из них с этим кодом нечем. Поэтому исход — «вы уже в полке», и полка видна в списке.
  */
 class MedKitJoining @Inject constructor(
     private val snapshots: SnapshotApplier
@@ -24,21 +25,22 @@ class MedKitJoining @Inject constructor(
         is SnapshotApplier.Joining.Joined -> Outcome.Joined(joining.medKitId)
         SnapshotApplier.Joining.InvitationInvalid -> Outcome.InvitationInvalid
         is SnapshotApplier.Joining.Refused -> Outcome.Unavailable(joining.reason)
-        SnapshotApplier.Joining.AlreadyMember -> recovered(otherwise = Outcome.AlreadyMember)
-        // Ответа нет: либо вступили, и снимок это покажет, либо нет — и тогда повторить стоит позже.
-        SnapshotApplier.Joining.OutcomeUnknown -> recovered(otherwise = Outcome.Unavailable(Unavailability.SERVER_SILENT))
-    }
-
-    /** Вступление, чей ответ мы не получили, проявляется в снимке новой полкой. */
-    private suspend fun recovered(otherwise: Outcome): Outcome = when (val read = snapshots.refresh()) {
-        is SnapshotApplier.Outcome.Applied -> read.arrived.singleOrNull()?.let { Outcome.Joined(it) } ?: otherwise
-        is SnapshotApplier.Outcome.Refused -> otherwise
+        SnapshotApplier.Joining.AlreadyMember -> {
+            snapshots.refresh()
+            Outcome.AlreadyMember
+        }
+        // Ответа нет: вступили — снимок принесёт полку, а повтор тем же кодом ответит «уже вступили»;
+        // не вступили — повтор вступит. В обоих случаях человеку повторить.
+        SnapshotApplier.Joining.OutcomeUnknown -> {
+            snapshots.refresh()
+            Outcome.Unavailable(Unavailability.SERVER_SILENT)
+        }
     }
 
     /**
      * Чем кончилось. Вступили — экран открывает полку; уже в ней — говорит об этом и показывает
-     * список; код недействителен — единственный текст «попросите новый код» (B6); сервера нет —
-     * причина и повтор.
+     * список, где полка уже лежит; код недействителен — единственный текст «попросите новый код»
+     * (B6); сервера нет — причина и повтор.
      */
     sealed interface Outcome {
 

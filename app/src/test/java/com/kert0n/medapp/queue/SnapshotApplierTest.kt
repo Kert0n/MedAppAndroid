@@ -101,13 +101,14 @@ class SnapshotApplierTest {
     }
 
     /** Сервер: снимок по `/users/me`, словарь по своим путям; `online = false` — связи нет вовсе. */
+    private var units = 0
+
     private fun applier(
         storage: Laid,
         snapshot: String?,
         online: Boolean = true,
         joined: Pair<HttpStatusCode, String>? = null
     ): SnapshotApplier {
-        var units = 0
         val api = MedAppApi(
             medAppHttpClient(
                 MockEngine { request ->
@@ -142,7 +143,7 @@ class SnapshotApplierTest {
 
         val outcome = applier(storage, snapshotJson(drug(PACK, HOME_KIT), drug(OTHER_PACK, HOME_KIT))).refresh()
 
-        assertEquals(SnapshotApplier.Outcome.Applied(medKits = 1, packages = 2, skipped = emptyList(), arrived = emptySet()), outcome)
+        assertEquals(SnapshotApplier.Outcome.Applied(medKits = 1, packages = 2, skipped = emptyList()), outcome)
         assertEquals(1, storage.calls)
         assertEquals(mapOf(HOME_KIT to 2L), storage.snapshot.participants)
         assertEquals(listOf(PACK, OTHER_PACK), storage.snapshot.packages.map { it.pack.id })
@@ -161,7 +162,7 @@ class SnapshotApplierTest {
             snapshotJson(drug(PACK, HOME_KIT), also = shelfJson(SHARED_KIT, drug(OTHER_PACK, SHARED_KIT)))
         ).refresh()
 
-        assertEquals(SnapshotApplier.Outcome.Applied(medKits = 2, packages = 2, skipped = emptyList(), arrived = setOf(SHARED_KIT)), outcome)
+        assertEquals(SnapshotApplier.Outcome.Applied(medKits = 2, packages = 2, skipped = emptyList()), outcome)
         assertEquals(setOf(SHARED_KIT), storage.snapshot.arrivedMedKits)
         assertEquals(SHARED_KIT, storage.snapshot.packages.single { it.pack.id == OTHER_PACK }.pack.medKit.id)
     }
@@ -192,7 +193,7 @@ class SnapshotApplierTest {
 
         val outcome = applier(storage, snapshotJson(drug(PACK, HOME_KIT, unitId = MILLILITRES.id))).refresh()
 
-        assertEquals(SnapshotApplier.Outcome.Applied(medKits = 1, packages = 1, skipped = emptyList(), arrived = emptySet()), outcome)
+        assertEquals(SnapshotApplier.Outcome.Applied(medKits = 1, packages = 1, skipped = emptyList()), outcome)
         assertEquals(MILLILITRES, storage.snapshot.packages.single().pack.quantity.unit)
     }
 
@@ -270,5 +271,23 @@ class SnapshotApplierTest {
         assertEquals(SnapshotApplier.Joining.InvitationInvalid, invalid)
         assertEquals(SnapshotApplier.Joining.OutcomeUnknown, unknown)
         assertEquals(0, storage.calls)
+    }
+
+    /**
+     * Две коробки называют единицу, которой нет и на сервере: словарь дочитывается один раз на всё
+     * чтение, а не на каждую коробку, и обе названы пропуском.
+     */
+    @Test
+    fun theVocabularyIsReadOnceForTheWholeSnapshot() = runTest {
+        val storage = Laid(knowledge())
+        val unknown = Uuid.random()
+
+        val outcome = applier(
+            storage,
+            snapshotJson(drug(PACK, HOME_KIT, unitId = unknown), drug(OTHER_PACK, HOME_KIT, unitId = unknown))
+        ).refresh() as SnapshotApplier.Outcome.Applied
+
+        assertEquals(1, units)
+        assertEquals(2, outcome.skipped.size)
     }
 }

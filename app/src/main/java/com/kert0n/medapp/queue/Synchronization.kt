@@ -7,6 +7,7 @@ import javax.inject.Inject
 import javax.inject.Singleton
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.NonCancellable
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -14,6 +15,7 @@ import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
+import kotlinx.coroutines.withContext
 
 /**
  * Заход синхронизации: отдать серверу своё и прочитать у него правду (PLAN E4). Поводов много —
@@ -60,7 +62,11 @@ class Synchronization @Inject constructor(
         } catch (failure: Throwable) {
             mine.completeExceptionally(failure)
         } finally {
-            guard.withLock { running = null }
+            // Отмена, пришедшая, пока замок занят, не должна оставить законченный заход «идущим»:
+            // все следующие поводы присоединялись бы к нему навсегда.
+            withContext(NonCancellable) {
+                guard.withLock { if (running === mine) running = null }
+            }
         }
         return mine.await()
     }

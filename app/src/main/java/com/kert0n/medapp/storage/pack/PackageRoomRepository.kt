@@ -101,7 +101,9 @@ class PackageRoomRepository @Inject constructor(
         }
 
     override suspend fun applySnapshot(snapshot: PackageSnapshot, observedAt: Instant): SnapshotApplied =
-        packages.applySnapshot(snapshot, observedAt, movements, vocabulary.snapshot())
+        // Прочитанный остаток, укладка и разница — одной транзакцией: иначе запись между ними
+        // сделала бы «было» устаревшим, и в историю ушла бы неверная разница (PLAN D7, F5).
+        database.withTransaction { packages.applySnapshot(snapshot, observedAt, movements, vocabulary.snapshot()) }
 
     override suspend fun saveClaims(packageId: Uuid, claims: Claims?) {
         if (claims == null) packages.deleteClaims(packageId)

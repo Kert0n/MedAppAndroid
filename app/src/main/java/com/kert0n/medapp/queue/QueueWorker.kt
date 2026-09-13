@@ -59,6 +59,12 @@ class QueueWorker @Inject constructor(
     private val single = Mutex()
 
     /**
+     * Заход разбора текущего прохода: промах словаря дочитывается один раз на проход, а не на
+     * каждую операцию. Проход один — [single], — поэтому и заход у него один.
+     */
+    private var words: VocabularyResolver.Session = vocabulary.session()
+
+    /**
      * Проход: пока в базе есть готовая операция — берётся первая по номеру, и так до тех пор,
      * пока готовых не останется или связь не оборвётся. Готовность — одно определение, и живёт
      * оно в запросе ([QueueStorage.ready]): срок, зависимости, порядок по пачке. Поэтому
@@ -69,16 +75,13 @@ class QueueWorker @Inject constructor(
      */
     suspend fun drain(): Report = single.withLock {
         val drain = Drain()
-        var vocabularyRefreshable = true
+        words = vocabulary.session()
         while (true) {
             val entry = storage.ready(clock.instant()).firstOrNull { it.id !in drain.skippedIds } ?: break
             val operation = when (entry) {
                 is StoredSyncOperation.Readable -> entry.operation
                 is StoredSyncOperation.Unreadable -> {
-                    if (entry.reason is StoredSyncOperation.Reason.VocabularyStale && vocabularyRefreshable) {
-                        vocabularyRefreshable = false
-                        if (vocabulary.refresh() is ApiResult.Success) continue
-                    }
+                    if (entry.reason is StoredSyncOperation.Reason.VocabularyStale && words.refreshOnce()) continue
                     drain.skip(entry)
                     continue
                 }
@@ -196,7 +199,7 @@ class QueueWorker @Inject constructor(
 
     /** Снимок из ответа ложится в базу только разрешённым: неизвестное дочитывается или ждёт. */
     private suspend fun known(snapshot: PackageSnapshotNetworkDTO, then: (PackageSnapshot) -> Step): Step =
-        when (val resolution = snapshots.resolve(snapshot, clock.instant())) {
+        when (val resolution = snapshots.resolve(snapshot, clock.instant(), words = words)) {
             is PackageSnapshotResolver.Resolution.Resolved -> then(resolution.snapshot)
             // Команда применена, а коробка уже на полке, где нас нет: ответ окончательный (E6).
             is PackageSnapshotResolver.Resolution.Elsewhere -> Step.Settled(Delivery.Applied(PackageState.Elsewhere))
@@ -298,7 +301,7 @@ class QueueWorker @Inject constructor(
      * Пачки нет — доступа к ней нет; связи нет — проход останавливается; иначе — повтор позже.
      */
     private suspend fun snapshotRead(packageId: Uuid): Read = when (val read = transport.packageSnapshot(packageId)) {
-        is ApiResult.Success -> when (val resolution = snapshots.resolve(read.value, clock.instant())) {
+        is ApiResult.Success -> when (val resolution = snapshots.resolve(read.value, clock.instant(), words = words)) {
             is PackageSnapshotResolver.Resolution.Resolved -> Read.Snapshot(resolution.snapshot)
             // Коробка на полке, где нас нет: отправлять некуда — это утрата доступа, а не повтор (E6).
             is PackageSnapshotResolver.Resolution.Elsewhere -> Read.Failed(Delivery.AccessLost)

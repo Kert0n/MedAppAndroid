@@ -70,12 +70,7 @@ class SnapshotApplier @Inject constructor(
             heldPackages = knew.heldPackages
         )
         storage.lay(snapshot, at)
-        return Outcome.Applied(
-            medKits = participants.size,
-            packages = resolution.packages.size,
-            skipped = resolution.skipped,
-            arrived = arriving
-        )
+        return Outcome.Applied(medKits = participants.size, packages = resolution.packages.size, skipped = resolution.skipped)
     }
 
     /**
@@ -115,15 +110,12 @@ class SnapshotApplier @Inject constructor(
     private suspend fun resolve(medKits: List<MedKitNetworkDTO>, arriving: Set<Uuid>, at: Instant): Resolution {
         val resolved = ArrayList<PackageSnapshot>()
         val skipped = ArrayList<String>()
-        var vocabularyRefreshable = true
+        // Один заход разбора на весь ответ: сколько бы коробок ни назвали незнакомую единицу,
+        // словарь дочитывается один раз.
+        val words = vocabulary.session()
         for (medKit in medKits) {
             for (dto in medKit.packages) {
-                var resolution = snapshots.resolve(dto, at, arriving)
-                if (resolution is PackageSnapshotResolver.Resolution.Unresolved && !resolution.stop && vocabularyRefreshable) {
-                    vocabularyRefreshable = false
-                    if (vocabulary.refresh() is ApiResult.Success) resolution = snapshots.resolve(dto, at, arriving)
-                }
-                when (resolution) {
+                when (val resolution = snapshots.resolve(dto, at, arriving, words)) {
                     is PackageSnapshotResolver.Resolution.Resolved -> resolved += resolution.snapshot
                     // Полки уже нет: её убрали у нас, пока снимок летел, и класть коробку некуда.
                     is PackageSnapshotResolver.Resolution.Elsewhere ->
@@ -141,17 +133,11 @@ class SnapshotApplier @Inject constructor(
     /**
      * Чем кончилось чтение. Различает поведение экрана состояния синхронизации: прочитали — видно
      * время последнего успешного обновления, и [Applied.skipped] говорит, что легло не всё; не
-     * прочитали — названа причина, а кэш остаётся прежним (PLAN E4, H3 №28). [Applied.arrived] —
-     * полки, которые снимок завёл: по ним вступление с потерянным ответом узнаёт свою полку.
+     * прочитали — названа причина, а кэш остаётся прежним (PLAN E4, H3 №28).
      */
     sealed interface Outcome {
 
-        data class Applied(
-            val medKits: Int,
-            val packages: Int,
-            val skipped: List<String>,
-            val arrived: Set<Uuid>
-        ) : Outcome
+        data class Applied(val medKits: Int, val packages: Int, val skipped: List<String>) : Outcome
 
         data class Refused(val reason: Unavailability) : Outcome
     }

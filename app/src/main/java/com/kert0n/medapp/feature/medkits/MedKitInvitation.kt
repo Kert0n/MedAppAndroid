@@ -37,9 +37,11 @@ class MedKitInvitation @Inject constructor(
         if (!medKit.acceptsInvitations) return Outcome.Busy
         return when (val issue = invitations.issue(medKit)) {
             is MedKitInvitations.Issue.Issued -> Outcome.Invited(Invitation(issue.key, clock.instant(), term))
-            MedKitInvitations.Issue.NotAccessible -> {
-                snapshots.refresh()
-                Outcome.MedKitGone
+            // Полка ушла из списка, только если снимок лёг; не лёг — она ещё видна, и сказать «её нет»
+            // значило бы разойтись со списком.
+            MedKitInvitations.Issue.NotAccessible -> when (val read = snapshots.refresh()) {
+                is SnapshotApplier.Outcome.Applied -> Outcome.MedKitGone
+                is SnapshotApplier.Outcome.Refused -> Outcome.Unavailable(read.reason)
             }
             is MedKitInvitations.Issue.Unavailable -> Outcome.Unavailable(issue.reason)
         }
