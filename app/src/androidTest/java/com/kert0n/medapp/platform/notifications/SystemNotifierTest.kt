@@ -93,21 +93,34 @@ class SystemNotifierTest {
     @Test
     fun showingNeedsThePermissionAndUsesTheKeyAsTagAndId() = runTest {
         if (!granted()) {
+            // Без разрешения показ не проходит; что висит в шторке с прежней установки, показ не трогает.
+            val before = manager.activeNotifications.count { it.tag == planned.key.subject }
             assertFalse(notifier.show(planned))
-            assertNull(manager.activeNotifications.firstOrNull { it.tag == planned.key.subject })
+            assertEquals(before, manager.activeNotifications.count { it.tag == planned.key.subject })
             InstrumentationRegistry.getInstrumentation().uiAutomation
                 .grantRuntimePermission(context.packageName, Manifest.permission.POST_NOTIFICATIONS)
+            manager.cancelAll()
         }
 
         assertTrue(notifier.show(planned))
 
-        val shown = requireNotNull(manager.activeNotifications.firstOrNull { it.tag == planned.key.subject }) { "уведомление не показано" }
+        val shown = requireNotNull(awaitShown(planned.key.subject)) { "уведомление не показано" }
         assertEquals(NotificationKind.EXPIRY_SOURCE_3D.ordinal, shown.id)
         assertEquals(NotificationChannel.EXPIRY.id, shown.notification.channelId)
         assertTrue(shown.notification.extras.getCharSequence(android.app.Notification.EXTRA_TITLE).toString().contains("Парацетамол"))
 
         notifier.dismiss(planned.key)
-        assertNull(manager.activeNotifications.firstOrNull { it.tag == planned.key.subject })
+        assertNull(awaitShown(planned.key.subject, expected = false))
+    }
+
+    /** Система показывает и гасит асинхронно: ждём, но недолго. */
+    private fun awaitShown(tag: String, expected: Boolean = true): android.service.notification.StatusBarNotification? {
+        repeat(40) {
+            val found = manager.activeNotifications.firstOrNull { it.tag == tag }
+            if ((found != null) == expected) return found
+            Thread.sleep(50)
+        }
+        return manager.activeNotifications.firstOrNull { it.tag == tag }
     }
 
     /** Повода больше нет — показывать нечего: коробки нет, и `false` без исключения. */

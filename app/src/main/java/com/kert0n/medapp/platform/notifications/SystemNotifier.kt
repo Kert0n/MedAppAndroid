@@ -9,7 +9,6 @@ import androidx.core.app.NotificationCompat
 import androidx.core.app.NotificationManagerCompat
 import androidx.core.content.ContextCompat
 import com.kert0n.medapp.R
-import com.kert0n.medapp.app.MainActivity
 import com.kert0n.medapp.domain.intake.IntakeProjection
 import com.kert0n.medapp.domain.notification.NotificationAction
 import com.kert0n.medapp.domain.notification.NotificationKey
@@ -122,9 +121,13 @@ class SystemNotifier @Inject constructor(
         NotificationTarget.SyncStatus -> Text(context.getString(R.string.notice_sync_title), context.getString(R.string.notice_sync_body))
     }
 
-    /** Открыть приложение по цели: только идентификаторы и дата в extras (G3). */
+    /**
+     * Открыть приложение по цели: только идентификаторы и дата в extras (G3). Платформа не знает
+     * экранов и их Activity (H1) — открывается то, что пакет объявил точкой входа.
+     */
     private fun openIntent(notification: PlannedNotification): PendingIntent {
-        val intent = Intent(context, MainActivity::class.java).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_SINGLE_TOP)
+        val intent = requireNotNull(context.packageManager.getLaunchIntentForPackage(context.packageName)) { "у приложения есть точка входа" }
+            .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_SINGLE_TOP)
         when (val target = notification.target) {
             is NotificationTarget.Intake -> intent.putExtra(EXTRA_INTAKE_ID, target.intakeId.toString())
             is NotificationTarget.PackageCard -> intent.putExtra(EXTRA_PACKAGE_ID, target.packageId.toString())

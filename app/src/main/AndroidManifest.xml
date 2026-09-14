@@ -35,6 +35,11 @@
             </intent-filter>
         </activity>
 
+        <!-- Будильник приёма: сработал — напоминание показано, если пункт ещё ждёт ответа (PLAN D8). -->
+        <receiver
+            android:name=".platform.notifications.IntakeAlarmReceiver"
+            android:exported="false" />
+
         <!-- WorkManager собирает фоновые задачи графом (MedApp), а не своим инициализатором. -->
         <provider
             android:name="androidx.startup.InitializationProvider"

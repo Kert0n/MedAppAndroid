@@ -2,6 +2,8 @@ package com.kert0n.medapp.di
 
 import com.kert0n.medapp.domain.notification.NotificationSettingsSource
 import com.kert0n.medapp.domain.notification.Notifier
+import com.kert0n.medapp.domain.notification.ReminderAlarms
+import com.kert0n.medapp.platform.notifications.AlarmManagerReminders
 import com.kert0n.medapp.platform.notifications.DefaultNotificationSettings
 import com.kert0n.medapp.platform.notifications.SystemNotifier
 import dagger.Binds
@@ -22,4 +24,8 @@ abstract class NotificationModule {
     @Binds
     @Singleton
     abstract fun notificationSettings(implementation: DefaultNotificationSettings): NotificationSettingsSource
+
+    @Binds
+    @Singleton
+    abstract fun reminderAlarms(implementation: AlarmManagerReminders): ReminderAlarms
 }
