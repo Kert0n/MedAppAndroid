@@ -178,6 +178,10 @@ interface CourseDao {
     @Query("SELECT * FROM coverage_reductions WHERE course_id = :courseId ORDER BY at")
     suspend fun reductionsOf(courseId: Uuid): List<CoverageReductionStorageEntity>
 
+    /** Сокращения всех лечений разом — сверке, чтобы не ходить по запросу на курс. */
+    @Query("SELECT * FROM coverage_reductions WHERE at >= :since ORDER BY at")
+    suspend fun recentReductions(since: Instant): List<CoverageReductionStorageEntity>
+
     @Query("SELECT * FROM coverage_reductions WHERE course_id = :courseId AND at >= :since ORDER BY at")
     suspend fun reductionsSince(courseId: Uuid, since: Instant): List<CoverageReductionStorageEntity>
 

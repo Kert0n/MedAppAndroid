@@ -50,6 +50,9 @@ interface CourseStorageRepository {
      */
     suspend fun reductionsSince(courseId: Uuid, since: Instant): List<CoverageReduction>
 
+    /** Сокращения всех лечений с [since] — одним чтением, сверке (PLAN D8). */
+    suspend fun recentReductions(since: Instant): List<CoverageReduction>
+
     suspend fun findDraft(id: Uuid): CourseDraft?
 
     suspend fun findPlan(id: Uuid): Course?

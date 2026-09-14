@@ -112,12 +112,12 @@ class NotificationReconciliation @Inject constructor(
      * событие, и повторная сверка его не трогает. Старше срока — не воскресает: сказать о
      * прошлогоднем событии нечего, а строки о нём владелец доставки давно прибрал.
      */
-    private suspend fun reductionsDue(at: Instant): List<Reminder> =
-        courses.observeCoverages().first().keys.flatMap { courseId ->
-            courses.reductionsSince(courseId, at.minus(Reminder.RETENTION)).map { reduction ->
-                Reminder(NotificationKey.reduction(reduction.id), NotificationTarget.CourseSources(courseId), reduction.at)
-            }
-        }
+    private suspend fun reductionsDue(at: Instant): List<Reminder> {
+        val inProgress = courses.planIds().toSet()
+        return courses.recentReductions(at.minus(Reminder.RETENTION))
+            .filter { it.courseId in inProgress }
+            .map { reduction -> Reminder(NotificationKey.reduction(reduction.id), NotificationTarget.CourseSources(reduction.courseId), reduction.at) }
+    }
 
     /**
      * Обеспечение идущих лечений на момент [at] (PLAN D8): за `coverageThresholdDays` календарных

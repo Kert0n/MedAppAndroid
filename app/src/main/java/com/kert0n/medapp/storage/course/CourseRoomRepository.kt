@@ -69,6 +69,9 @@ class CourseRoomRepository @Inject constructor(
     override suspend fun reductionsSince(courseId: Uuid, since: Instant): List<CoverageReduction> =
         courses.reductionsSince(courseId, since).map { it.toDomain() }
 
+    override suspend fun recentReductions(since: Instant): List<CoverageReduction> =
+        courses.recentReductions(since).map { it.toDomain() }
+
     override fun observeReductions(courseId: Uuid): Flow<List<CoverageReduction>> =
         database.observing("coverage_reductions") { courses.reductionsOf(courseId).map { it.toDomain() } }
 
