@@ -43,7 +43,7 @@ class CrptProbe {
         for ((index, code) in codes.withIndex()) {
             val response = client.post(CrptApi.CHECK) {
                 contentType(ContentType.Application.Json)
-                setBody(CrptCheckRequestNetworkDTO(code.wire, CrptCheckRequestNetworkDTO.DATA_MATRIX))
+                setBody(CrptCheckRequestNetworkDTO.of(code))
             }
             val raw = response.bodyAsText()
             println("CRPT_PROBE[$index] status=${response.status}")
