@@ -14,6 +14,7 @@ import com.kert0n.medapp.domain.medkit.MedKit
 import com.kert0n.medapp.domain.value.Doses
 import com.kert0n.medapp.feature.course.CourseCalendar
 import com.kert0n.medapp.feature.course.CourseClosing
+import com.kert0n.medapp.feature.course.CourseFollowing
 import com.kert0n.medapp.fixture.COURSE
 import com.kert0n.medapp.fixture.FIRST_PLANNED_AT
 import com.kert0n.medapp.fixture.INTAKE
@@ -93,7 +94,9 @@ class IntakeConfirmationTest {
         val transactions = database.transactions()
         val clock = Clock.fixed(now, ZoneOffset.UTC)
         val service = QueueService(transactions, database.queueStorage())
-        confirmation = IntakeConfirmation(intakes, courses, packages, transactions, service, CourseClosing(courses, packages, service, withdrawal), CourseCalendar(intakes, packages, promising, withdrawal), withdrawal, clock)
+        val calendar = CourseCalendar(intakes, packages, promising, withdrawal)
+        val following = CourseFollowing(courses, packages, calendar, service, transactions)
+        confirmation = IntakeConfirmation(intakes, courses, packages, transactions, service, CourseClosing(courses, following, withdrawal), calendar, withdrawal, clock)
         packages.add(pack(quantity = tablets("20")))
     }
 
@@ -248,9 +251,11 @@ class IntakeConfirmationTest {
         miss(first)
         // Отвечают назавтра после пропуска: день второго пункта ещё идёт, и пропуском он не стал.
         val service = QueueService(database.transactions(), database.queueStorage())
+        val calendar = CourseCalendar(intakes, packages, promising, withdrawal)
+        val following = CourseFollowing(courses, packages, calendar, service, database.transactions())
         val nextMorning = IntakeConfirmation(
-            intakes, courses, packages, database.transactions(), service, CourseClosing(courses, packages, service, withdrawal),
-            CourseCalendar(intakes, packages, promising, withdrawal), withdrawal, Clock.fixed(slots[1].at, ZoneOffset.UTC)
+            intakes, courses, packages, database.transactions(), service, CourseClosing(courses, following, withdrawal),
+            calendar, withdrawal, Clock.fixed(slots[1].at, ZoneOffset.UTC)
         )
 
         nextMorning.confirm(INTAKE, PACK, dose("2"), slots[0].at).confirmed()

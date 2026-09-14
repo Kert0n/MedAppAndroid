@@ -3,11 +3,7 @@ package com.kert0n.medapp.feature.course
 import com.kert0n.medapp.domain.course.Course
 import com.kert0n.medapp.domain.course.CourseCompletion
 import com.kert0n.medapp.domain.pack.PackageRef
-import com.kert0n.medapp.queue.QueueService
-import com.kert0n.medapp.queue.QueuedCommand
-import com.kert0n.medapp.queue.pack.PackageSyncCommand
 import com.kert0n.medapp.storage.course.CourseStorageRepository
-import com.kert0n.medapp.storage.pack.PackageStorageRepository
 import java.time.Instant
 import javax.inject.Inject
 import kotlin.uuid.Uuid
@@ -20,24 +16,17 @@ import kotlin.uuid.Uuid
  */
 class CourseClosing @Inject constructor(
     private val courses: CourseStorageRepository,
-    private val packages: PackageStorageRepository,
-    private val queue: QueueService,
+    private val following: CourseFollowing,
     private val reminders: com.kert0n.medapp.feature.notification.ReminderWithdrawal
 ) {
 
     /**
      * [except] — пачка, чьё снятие брони уже уехало зависимым от расхода: второй раз его не
-     * ставят. Кому отвечает пачка, знает она сама, а не ссылка из курса: живая пачка читается
-     * той же транзакцией; коробки уже нет — снимать бронь не с чего.
+     * ставят. Брони конца — разница к «ничего не выделено», и ставит их единственный владелец.
      */
     suspend fun close(course: Course, closing: CourseCompletion.Closing, at: Instant, except: PackageRef? = null): List<Uuid> {
         courses.close(closing)
-        for (source in course.sources) {
-            if (source.pkg == except) continue
-            val pkg = packages.find(source.pkg.id) ?: continue
-            val released = QueuedCommand(Uuid.random(), PackageSyncCommand.ReleaseClaim(pkg.id))
-            queue.change(pkg.medKit, listOf(released), at) { true }
-        }
+        following.announceClaims(course, course.unallocated(), at, except)
         // Отменённые пункты больше не напоминают о себе: обязательство отзывается **этой же**
         // транзакцией, а гасит карточки и переставляет будильник владелец доставки — после
         // фиксации, по сигналу изменившейся таблицы (PLAN D8, F5).

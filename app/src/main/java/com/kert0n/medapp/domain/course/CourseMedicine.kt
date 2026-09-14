@@ -291,6 +291,9 @@ class CourseMedicine(sources: List<CourseSource> = emptyList()) {
         val covers: Doses get() = minOf(allocated, whole)
     }
 
+    /** Тот же состав без выделений: точка отсчёта для разницы броней — до начала и после конца (PLAN D5). */
+    internal fun unallocated(): CourseMedicine = withSources(sources.map { it.copy(allocatedDoses = 0.doses) })
+
     private fun withSources(sources: List<CourseSource>): CourseMedicine = CourseMedicine(sources)
 
     override fun equals(other: Any?): Boolean =

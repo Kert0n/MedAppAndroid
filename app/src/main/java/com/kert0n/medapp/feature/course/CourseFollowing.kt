@@ -84,13 +84,17 @@ class CourseFollowing @Inject constructor(
     }
 
     /**
-     * Бронь — `выделено × доза`: изменилось выделение — зажимом, счётом доз мимо плана —
-     * изменилась и она, и уезжает разницей по каждой пачке — на полку **её** коробки, а не той,
-     * что изменилась (PLAN D5, E2). Кому везти, решает очередь: местной полке ничего, публикуемой —
-     * только объявления, а бронь коробки, чьё создание ещё в пути, встаёт за ним в очередь полки.
+     * Бронь — `выделено × доза`: изменилось выделение — зажимом, счётом доз мимо плана, началом,
+     * правкой или концом лечения — изменилась и она, и уезжает разницей по каждой пачке — на полку
+     * **её** коробки, а не той, что изменилась (PLAN D5, E2). **Единственный**, кто ставит команды
+     * брони (`ClaimOwnershipTest`): начало считает от `Course.unallocated()`, конец — к нему. Кому
+     * везти, решает очередь: местной полке ничего, публикуемой — только объявления, а бронь
+     * коробки, чьё создание ещё в пути, встаёт за ним в очередь полки. [except] — коробка, чьё
+     * снятие уже уехало зависимым от расхода: второй раз его не ставят.
      */
-    suspend fun announceClaims(before: Course, after: Course, at: Instant) {
+    suspend fun announceClaims(before: Course, after: Course, at: Instant, except: PackageRef? = null) {
         for (command in after.claimChangesSince(before)) {
+            if (command.packageId == except?.id) continue
             val pkg = packages.find(command.packageId) ?: continue
             queue.change(pkg.medKit, listOf(QueuedCommand(Uuid.random(), command)), at) { true }
         }

@@ -4,10 +4,7 @@ import com.kert0n.medapp.domain.course.CourseDraft
 import com.kert0n.medapp.domain.course.CourseProjection
 import com.kert0n.medapp.domain.course.CourseRejected
 import com.kert0n.medapp.domain.course.Revision
-import com.kert0n.medapp.queue.QueueService
-import com.kert0n.medapp.queue.QueuedCommand
 import com.kert0n.medapp.queue.Transactions
-import com.kert0n.medapp.queue.pack.PackageSyncCommand
 import com.kert0n.medapp.storage.course.CourseStorageRepository
 import com.kert0n.medapp.storage.pack.PackageStorageRepository
 import java.time.Clock
@@ -30,7 +27,7 @@ class CourseActivation @Inject constructor(
     private val courses: CourseStorageRepository,
     private val packages: PackageStorageRepository,
     private val calendar: CourseCalendar,
-    private val queue: QueueService,
+    private val following: CourseFollowing,
     private val transactions: Transactions,
     private val clock: Clock
 ) {
@@ -54,12 +51,8 @@ class CourseActivation @Inject constructor(
         courses.activate(CourseDraft.Activation(course, started.record))
         // Лечение начали задним числом — прошедшие дни сразу пропуски, а не ждущие пункты.
         calendar.catchUp(course, now)
-        for (source in course.sources) {
-            val claim = course.allocatedOf(source.pkg)?.takeUnless { it.isZero } ?: continue
-            val pkg = checkNotNull(packages.find(source.pkg.id)) { "пачка прочитана этой же транзакцией" }
-            val command = QueuedCommand(Uuid.random(), PackageSyncCommand.SetClaim(pkg.id, claim))
-            queue.change(pkg.medKit, listOf(command), now) { true }
-        }
+        // Бронь — разницей от «ничего не выделено»: ставит её единственный владелец (PLAN D5, E2).
+        following.announceClaims(course.unallocated(), course, now)
         Outcome.Started(course.projection())
     }
 
