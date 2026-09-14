@@ -562,7 +562,7 @@ UUID и проверяем принадлежность; недоступнос�
 | **Устаревший внешний эффект компенсируется** | владелец доставки читал отозванное, гасил и удалял по ключам безусловно; показывал по объекту, прочитанному до ожидания сети; «карточку, показанную зря, погасит следующий проход» | протокол: **проверка основания → условное применение → компенсация**. Перед показом наступившее **перечитывается** после ожидания свежести; `settle` перечитывает и, если обязательство изменилось (отложено, снято), гасит только что показанную карточку тем же проходом; удаление отозванного и давнего — перечитав в транзакции, только то, что всё ещё отозвано или забываемо (`deleteAll` — форма `IN_TRANSACTION`) | разбор GPT (B20) #3, #4: между чтением и удалением обязательство воскрешалось и удалялось живым; отложенное во время ожидания сети показывалось и висело — следующий проход снимает только `WITHDRAWN`, а отложенное `DUE`. Транзакция защищает запись, а внешний эффект защищает только компенсация |
 | **Тождество намерения — полное имя цели** | `PendingIntent` открытия и действий различались кодом запроса `key.hashCode()`; идентификатор цели лежал в extras, которые в тождество не входят | `Intent.setIdentifier(«вид:предмет»)` у открытия, `«вид:предмет/действие»` у действий, у постановок будильника — точность (API 29 = `minSdk`); код запроса остаётся хешем, но тождество от него не зависит | разбор GPT (B20) #6: два пункта с совпавшим хешем получили один системный `PendingIntent`, и `FLAG_UPDATE_CURRENT` подменил цель прежней карточки |
 | **Кодирование под чужой API — на сетевой границе** | `DataMatrixCode.wire` и `FNC1` в домене | `DataMatrixCode(text)` — только сохранность кода; `{FNC1}` кладёт `CrptCheckRequestNetworkDTO.of(code)` в `network/crpt` | разбор GPT (B20): смена формата CRPT требовала правки домена — критерий нарушения границы из AGENTS |
-| **Отказ разобран человеком** | отвергнутая операция оставалась в `observeOutstanding()` навсегда — экрану U6 «решить, как её закрывать» | `sync_operations.dismissed_at`: сценарий `feature/sync/OperationDismissing.dismiss(operationId)` — отвергнутую отмечает, нечитаемую закрывает отказом `UNREADABLE` с каскадом зависимых и отмечает; `outstanding()` разобранное не отдаёт, `SYNC_ATTENTION` снимается сверкой по сигналу | B20 закрывает долги Base: у экрана нет своего решения, ему нужен шаг. Строка не удаляется — приём держится за учёт своего расхода |
+| **Отказ разобран человеком** | отвергнутая операция оставалась в `observeOutstanding()` навсегда — экрану U6 «решить, как её закрывать» | `sync_operations.dismissed_at`: сценарий `feature/operation/OperationDismissing.dismiss(operationId)` — отвергнутую отмечает, нечитаемую закрывает отказом `UNREADABLE` с каскадом зависимых и отмечает; `outstanding()` разобранное не отдаёт, `SYNC_ATTENTION` снимается сверкой по сигналу | B20 закрывает долги Base: у экрана нет своего решения, ему нужен шаг. Строка не удаляется — приём держится за учёт своего расхода |
 | **Сводка — ссылка на экран** | — | `DAILY_DIGEST` — уведомление-**ссылка** на план на дату (экран 12): в шторке содержания нет | уточнение владельца 2026-09-14: план дня — экран приложения, уведомление может только привести к нему |
 
 ## C2. Чего в первой законченной версии нет
@@ -3322,13 +3322,15 @@ com.kert0n.medapp                         есть · [B17] — появится
 │              MedKitInvitation), packages/ (PackageAdding, PackageDescribing, PackageAdjusting,
 │              PackageRemoval, PackageRelocation), course/ (CourseClosing, CourseDrafting,
 │              CourseCalendar, CourseUpkeep, CourseActivation, CourseCancellation, CourseAmendment,
-│              SourceEditing, CourseClamping, CourseOffPlanCounting), intake/ (IntakeConfirmation,
+│              SourceEditing, CourseFollowing — курс следует за коробкой, владелец реакции,
+│              CourseOffPlanCounting), intake/ (IntakeConfirmation,
 │              UnplannedIntakeRecording, IntakeDeclining), template/ (TemplateSearching),
-│              notification/ (NotificationReconciliation — что должно быть обещано, ReminderOutbox —
-│              единственный владелец показа и будильника, ReminderAnswering, DailyRound,
-│              порт DailySchedule); settings/ (AppSettings, порт SettingsStore, SettingsChanging —
-│              записать и применить); account/ (AccountReplacement — решение «ключ утрачен»);
-│              scan/ (PackageScanning — код даёт предложение, а не факт)
+│              notification/ (NotificationReconciliation — что должно быть обещано, NotificationUpkeep —
+│              когда сверять, ReminderOutbox — единственный владелец показа и будильника,
+│              ReminderAnswering, DailyRound, порт DailySchedule); settings/ (AppSettings, порт
+│              SettingsStore, SettingsChanging — записать и применить); account/ (AccountReplacement —
+│              решение «ключ утрачен»); scan/ (PackageScanning — код даёт предложение, а не факт);
+│              operation/ (OperationDismissing — отказ разобран человеком)
 ├─ presentation/ представление, по понятиям: value/, pack/, medkit/, bootstrap/ — DTO состояния,
 │              мапперы из проекций, разбор ввода, ViewModel; ParsedInput, ScreenState в корне.
 │              Пишут UI-PR; `bootstrap/` появилось с оболочкой и живёт по тем же правилам

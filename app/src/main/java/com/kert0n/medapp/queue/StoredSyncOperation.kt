@@ -17,6 +17,17 @@ sealed interface StoredSyncOperation {
 
     val id: Uuid
 
+    /**
+     * Ждёт решения человека: отвергнутое сервером или нечитаемое само не разрешится (PLAN D8,
+     * H3 №28). Строка, которой не хватило словаря, — не повод: её дочитает работник.
+     */
+    val needsDecision: Boolean
+        get() = when (this) {
+            is Readable -> operation.status == SyncOperationStatus.REFUSED
+            is Stale -> false
+            is Unreadable -> true
+        }
+
     data class Readable(val operation: SyncOperation) : StoredSyncOperation {
         override val id: Uuid get() = operation.id
     }

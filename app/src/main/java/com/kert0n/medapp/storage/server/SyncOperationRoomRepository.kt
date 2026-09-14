@@ -5,6 +5,7 @@ import com.kert0n.medapp.queue.RefusalReason
 import com.kert0n.medapp.queue.SyncCommand
 import com.kert0n.medapp.queue.SyncOperation
 import com.kert0n.medapp.queue.SyncOperationStatus
+import androidx.room.withTransaction
 import com.kert0n.medapp.storage.database.MedAppDatabase
 import com.kert0n.medapp.storage.database.observing
 import com.kert0n.medapp.storage.value.VocabularyDao
@@ -58,6 +59,21 @@ class SyncOperationRoomRepository @Inject constructor(
             val words = vocabulary.snapshot()
             queue.outstanding().map { it.toDomain(words) }
         }
+
+    override suspend fun stored(id: Uuid): StoredSyncOperation? = queue.find(id)?.toDomain(vocabulary.snapshot())
+
+    override suspend fun dismiss(id: Uuid, at: Instant): Boolean = database.withTransaction {
+        if (queue.dismiss(id, at) != 1) return@withTransaction false
+        // Зависимые, закрытые следом за этой (`SUPERSEDED`), — тем же решением: отдельно их не разбирают.
+        val pending = ArrayDeque(listOf(id))
+        while (pending.isNotEmpty()) {
+            for (dependent in queue.supersededDependentsOf(pending.removeFirst())) {
+                queue.dismiss(dependent, at)
+                pending += dependent
+            }
+        }
+        true
+    }
 
     override suspend fun unreadable(): List<StoredSyncOperation.Unreadable> =
         queue.all().let { rows ->

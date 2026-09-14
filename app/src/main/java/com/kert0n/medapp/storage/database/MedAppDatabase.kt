@@ -190,6 +190,8 @@ abstract class MedAppDatabase : RoomDatabase() {
                         "('INVALID', 'INSUFFICIENT', 'UNIT_CHANGED', 'STALE', 'CONFLICT', 'SUPERSEDED') " +
                         "THEN `last_error` ELSE 'INVALID' END WHERE `status` = 'REFUSED'"
                 )
+                // Отказ, разобранный человеком, уходит с экрана, а строка остаётся (C1).
+                connection.execSQL("ALTER TABLE `sync_operations` ADD COLUMN `dismissed_at` INTEGER")
                 connection.execSQL(
                     """
                     CREATE TABLE IF NOT EXISTS `package_records` (

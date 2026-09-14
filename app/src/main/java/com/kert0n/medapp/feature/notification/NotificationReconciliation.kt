@@ -13,8 +13,6 @@ import com.kert0n.medapp.storage.intake.IntakeStorageRepository
 import com.kert0n.medapp.storage.pack.PackageQuery
 import com.kert0n.medapp.storage.notification.ReminderStorageRepository
 import com.kert0n.medapp.storage.pack.PackageStorageRepository
-import com.kert0n.medapp.queue.StoredSyncOperation
-import com.kert0n.medapp.queue.SyncOperationStatus
 import com.kert0n.medapp.storage.server.SyncOperationStorageRepository
 import com.kert0n.medapp.queue.Transactions
 import java.time.LocalDate
@@ -172,18 +170,12 @@ class NotificationReconciliation @Inject constructor(
      * разрешится. Строка, которой не хватило словаря, — не повод: её дочитает работник. Обязательство
      * одно на всю очередь, предмет — последняя такая операция: новый отказ говорится снова, прежняя
      * карточка уходит, а сказанное второй раз не беспокоит. Решать стало нечего — снимается.
-     * Отвергнутое остаётся в очереди, пока человек его не разберёт, и через срок хранения сказанное
-     * забывается — тогда о нерешённом напоминают ещё раз.
+     * Отвергнутое остаётся в очереди, пока человек его не разберёт (`OperationDismissing`), и через
+     * срок хранения сказанное забывается — тогда о нерешённом напоминают ещё раз.
      */
     suspend fun syncAttention(at: Instant): Reminder? {
-        val newest = operations.observeOutstanding().first().lastOrNull { it.needsDecision() } ?: return null
+        val newest = operations.observeOutstanding().first().lastOrNull { it.needsDecision } ?: return null
         return Reminder(NotificationKey.sync(newest.id), NotificationTarget.SyncStatus, at)
-    }
-
-    private fun StoredSyncOperation.needsDecision(): Boolean = when (this) {
-        is StoredSyncOperation.Readable -> operation.status == SyncOperationStatus.REFUSED
-        is StoredSyncOperation.Stale -> false
-        is StoredSyncOperation.Unreadable -> true
     }
 
     /** Пункты, ставшие пропуском неответом (их называет проход календаря), — уведомлением каждому (PLAN D8). */

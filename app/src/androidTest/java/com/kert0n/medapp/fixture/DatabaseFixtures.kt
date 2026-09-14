@@ -212,6 +212,7 @@ class Scenarios(
         notificationSettings, transactions
     )
     val dailyRound = com.kert0n.medapp.feature.notification.DailyRound(courseUpkeep, notificationReconciliation, clock)
+    val operationDismissing = com.kert0n.medapp.feature.operation.OperationDismissing(database.queueRepository(), database.queueStorage(), transactions, clock)
     val reminderAnswering = com.kert0n.medapp.feature.notification.ReminderAnswering(
         intakeDeclining, reminderStore, reminderWithdrawal, notificationSettings, transactions, clock
     )

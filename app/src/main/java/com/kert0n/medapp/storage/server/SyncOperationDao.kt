@@ -134,12 +134,17 @@ interface SyncOperationDao {
 
     /**
      * Что ещё касается человека: незакрытые — ждут, отправляются, ответ записан — и отказанные,
-     * которым нужно его решение. Применённые и утратившие доступ экрану не нужны (PLAN H3 №28).
-     * Чтение, а не поток: нечитаемые строки различает разбор, и поток строит репозиторий.
+     * которым нужно его решение. Применённые, утратившие доступ и разобранные человеком экрану не
+     * нужны (PLAN H3 №28). Чтение, а не поток: нечитаемые строки различает разбор, и поток строит
+     * репозиторий.
      */
     @Transaction
-    @Query("SELECT * FROM sync_operations WHERE status NOT IN ('APPLIED', 'ACCESS_LOST') ORDER BY sequence")
+    @Query("SELECT * FROM sync_operations WHERE status NOT IN ('APPLIED', 'ACCESS_LOST') AND dismissed_at IS NULL ORDER BY sequence")
     suspend fun outstanding(): List<SyncOperationStorageRow>
+
+    /** Отказ разобран человеком: отметка, а не удаление — приём держится за учёт своего расхода. */
+    @Query("UPDATE sync_operations SET dismissed_at = :at WHERE id = :id AND dismissed_at IS NULL")
+    suspend fun dismiss(id: Uuid, at: Instant): Int
 
     @Transaction
     @Query("SELECT * FROM sync_operations WHERE status = :status ORDER BY sequence")
@@ -291,6 +296,13 @@ interface SyncOperationDao {
             "WHERE d.depends_on_id = :dependsOn AND o.status IN ('PENDING', 'SENDING')"
     )
     suspend fun unclosedDependentsOf(dependsOn: Uuid): List<Uuid>
+
+    /** Зависимые, закрытые следом за родителем (`SUPERSEDED`): решение о нём — решение и о них. */
+    @Query(
+        "SELECT operation_id FROM sync_operation_dependencies d JOIN sync_operations o ON o.id = d.operation_id " +
+            "WHERE d.depends_on_id = :dependsOn AND o.refusal_reason = 'SUPERSEDED'"
+    )
+    suspend fun supersededDependentsOf(dependsOn: Uuid): List<Uuid>
 
     @Query("SELECT depends_on_id FROM sync_operation_dependencies WHERE operation_id = :id")
     suspend fun dependenciesOf(id: Uuid): List<Uuid>

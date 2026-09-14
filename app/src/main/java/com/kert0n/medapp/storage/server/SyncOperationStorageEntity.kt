@@ -52,7 +52,9 @@ class SyncOperationStorageEntity(
     @ColumnInfo(name = "answer_body") val answerBody: String? = null,
     @ColumnInfo(name = "not_before") val notBefore: Instant? = null,
     @ColumnInfo(name = "outcome_unknown", defaultValue = "0") val outcomeUnknown: Boolean = false,
-    @ColumnInfo(name = "refusal_reason") val refusalReason: RefusalReason? = null
+    @ColumnInfo(name = "refusal_reason") val refusalReason: RefusalReason? = null,
+    /** Отказ разобран человеком в этот момент: строка остаётся, экрану и вниманию к очереди она больше не нужна (C1). */
+    @ColumnInfo(name = "dismissed_at") val dismissedAt: Instant? = null
 )
 
 /**
