@@ -1,5 +1,6 @@
 package com.kert0n.medapp.presentation.value
 
+import com.kert0n.medapp.domain.attempt
 import com.kert0n.medapp.domain.value.Money
 import com.kert0n.medapp.presentation.ParsedInput
 import java.math.BigDecimal
@@ -52,7 +53,7 @@ fun MoneyPresentationDTO.toDomain(): ParsedInput<Money, MoneyPresentationError> 
     if (text.isEmpty()) return rejected(MoneyPresentationError.EMPTY)
 
     // Валюта разбирается первой: без неё неизвестно, какая длина ввода допустима.
-    val currency = runCatching { Currency.getInstance(currencyCode) }.getOrNull()
+    val currency = attempt { Currency.getInstance(currencyCode) }.getOrNull()
         ?: return rejected(MoneyPresentationError.UNKNOWN_CURRENCY)
 
     if (text.length > maxInputLength(currency)) return rejected(MoneyPresentationError.TOO_LONG)
@@ -62,7 +63,7 @@ fun MoneyPresentationDTO.toDomain(): ParsedInput<Money, MoneyPresentationError> 
     val parsed = decimalFormat(separator).parseFully(text)
         ?: return rejected(MoneyPresentationError.NOT_A_DECIMAL)
 
-    return runCatching { Money(parsed, currency) }.fold(
+    return attempt { Money(parsed, currency) }.fold(
         onSuccess = { ParsedInput.Parsed(it) },
         onFailure = { rejected(MoneyPresentationError.OUT_OF_CURRENCY_RANGE) }
     )

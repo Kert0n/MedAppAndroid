@@ -1,5 +1,6 @@
 package com.kert0n.medapp.queue
 
+import com.kert0n.medapp.domain.attempt
 import com.kert0n.medapp.di.ApplicationScope
 import java.time.Clock
 import java.time.Duration
@@ -87,7 +88,7 @@ class QueueOutbox @Inject constructor(
     } catch (failure: Exception) {
         _state.update { it.copy(passes = it.passes + 1, lastFailure = failure.toString()) }
         val retryAt = clock.instant().plus(RETRY_AFTER_FAILURE.toJavaDuration())
-        val due = runCatching { storage.nextDueAt(clock.instant()) }.getOrNull()
+        val due = attempt { storage.nextDueAt(clock.instant()) }.getOrNull()
         if (due != null && due.isBefore(retryAt)) due else retryAt
     }
 

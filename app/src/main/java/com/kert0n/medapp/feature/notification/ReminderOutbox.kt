@@ -1,5 +1,6 @@
 package com.kert0n.medapp.feature.notification
 
+import com.kert0n.medapp.domain.attempt
 import com.kert0n.medapp.di.ApplicationScope
 import com.kert0n.medapp.domain.notification.NoticeDelivery
 import com.kert0n.medapp.domain.notification.NotificationKind
@@ -71,7 +72,7 @@ class ReminderOutbox @Inject constructor(
     /** Повод без ожидания: сработал будильник, вошли в приложение, загрузилось устройство. */
     fun runNow() {
         if (wake.trySend(Unit).isSuccess) return
-        scope.launch { runCatching { pass() } }
+        scope.launch { attempt { pass() } }
     }
 
     private suspend fun run() {
@@ -105,7 +106,7 @@ class ReminderOutbox @Inject constructor(
             // Сбой прохода — тоже срок: мы вернёмся, а не замолчим до входа в приложение (E4).
             _state.update { it.copy(passes = it.passes + 1, lastFailure = failure.toString()) }
             val retryAt = clock.instant().plus(RETRY_AFTER_FAILURE)
-            runCatching { alarms.wakeAt(retryAt, exact = false) }
+            attempt { alarms.wakeAt(retryAt, exact = false) }
             Report(shown = 0, dismissed = 0, blocked = 0, nextAt = retryAt)
         }
     }
@@ -121,7 +122,7 @@ class ReminderOutbox @Inject constructor(
         var blocked = 0
         for (reminder in due) {
             // Сбой одного показа не уносит остальные: работник очереди изолирует свои так же (E4).
-            val outcome = runCatching { notifier.show(reminder) }.getOrElse { Delivery.FAILED }
+            val outcome = attempt { notifier.show(reminder) }.getOrElse { Delivery.FAILED }
             if (outcome == Delivery.NOT_ALLOWED) {
                 // Показать нечем: обязательство ждёт листа приёмов, и будильника оно не попросит.
                 blocked++

@@ -1,5 +1,6 @@
 package com.kert0n.medapp.network.crpt
 
+import com.kert0n.medapp.domain.attempt
 import com.kert0n.medapp.di.CrptHttp
 import com.kert0n.medapp.domain.Unavailability
 import com.kert0n.medapp.domain.scan.DataMatrixCode
@@ -31,7 +32,7 @@ class CrptApi @Inject constructor(@CrptHttp private val client: HttpClient) {
         }
         when (response.status) {
             HttpStatusCode.OK -> {
-                val body = runCatching { response.body<CrptCheckNetworkDTO>() }.getOrNull()
+                val body = attempt { response.body<CrptCheckNetworkDTO>() }.getOrNull()
                     ?: return CrptCheck.Unavailable(Unavailability.SERVER_SILENT)
                 if (body.codeFounded) CrptCheck.Body(body) else CrptCheck.NotFound
             }

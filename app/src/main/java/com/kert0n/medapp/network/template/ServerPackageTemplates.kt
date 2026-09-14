@@ -1,5 +1,6 @@
 package com.kert0n.medapp.network.template
 
+import com.kert0n.medapp.domain.attempt
 import com.kert0n.medapp.domain.pack.PackageSharedFacts
 import com.kert0n.medapp.domain.template.PackageTemplate
 import com.kert0n.medapp.domain.template.PackageTemplates
@@ -49,7 +50,7 @@ private fun PackageTemplateNetworkDTO.resolveIn(words: Vocabulary) {
     unitId?.let(words::unitOrMiss)
 }
 
-internal fun PackageTemplateNetworkDTO.toDomain(words: Vocabulary): PackageTemplate? = runCatching {
+internal fun PackageTemplateNetworkDTO.toDomain(words: Vocabulary): PackageTemplate? = attempt {
     PackageTemplate(
         id = id,
         facts = PackageSharedFacts(

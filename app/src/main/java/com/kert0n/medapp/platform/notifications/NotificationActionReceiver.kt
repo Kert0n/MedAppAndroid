@@ -1,5 +1,6 @@
 package com.kert0n.medapp.platform.notifications
 
+import com.kert0n.medapp.domain.attempt
 import android.content.BroadcastReceiver
 import android.content.Context
 import android.content.Intent
@@ -38,7 +39,7 @@ class NotificationActionReceiver : BroadcastReceiver() {
 
     override fun onReceive(context: Context, intent: Intent) {
         val action = intent.action?.let { name -> NotificationAction.entries.firstOrNull { it.name == name } } ?: return
-        val intakeId = intent.getStringExtra(EXTRA_INTAKE_ID)?.let { runCatching { Uuid.parse(it) }.getOrNull() } ?: return
+        val intakeId = intent.getStringExtra(EXTRA_INTAKE_ID)?.let { attempt { Uuid.parse(it) }.getOrNull() } ?: return
         val pending = goAsync()
         CoroutineScope(SupervisorJob() + Dispatchers.IO).launch {
             try {

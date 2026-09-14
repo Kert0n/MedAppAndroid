@@ -15,15 +15,20 @@ import io.ktor.http.ContentType
 import io.ktor.http.HttpStatusCode
 import io.ktor.http.contentType
 import kotlinx.coroutines.runBlocking
+import kotlinx.serialization.json.JsonArray
+import kotlinx.serialization.json.JsonElement
+import kotlinx.serialization.json.JsonObject
 import org.junit.Assert.assertTrue
 import org.junit.Assume.assumeTrue
 import org.junit.Test
 
 /**
  * Живой ответ «Честного знака» — **по одному запросу на код** за запуск и только по `-PprobeCrpt`
- * (PLAN H5): чужой недокументированный API, обращаемся бережно. Проба печатает каждый ответ
- * (серийный номер заглушкой) и проверяет, что его форма читается нашим DTO; при «не найдено» или
- * отказе она не перебирает варианты, а называет ответ. Коды — из `local.properties`, в git не попадают.
+ * (PLAN H5): чужой недокументированный API, обращаемся бережно. Проба печатает **форму** ответа —
+ * имена ключей без значений — и разрешённые поля (категория, название, аптечный блок, метки
+ * атрибутов, страна); сырое тело, код, GTIN и серийный номер в отчёт не попадают ни в каком виде.
+ * При «не найдено» или отказе проба не перебирает варианты, а называет ответ. Коды — из
+ * `local.properties`, в git не попадают.
  */
 class CrptProbe {
 
@@ -41,22 +46,28 @@ class CrptProbe {
                 setBody(CrptCheckRequestNetworkDTO(code.wire, CrptCheckRequestNetworkDTO.DATA_MATRIX))
             }
             val raw = response.bodyAsText()
-            // Серийный номер коробки в отчёт не попадает: ни как текст, ни как JSON-экранированный код.
-            val shown = raw.replace(code.text, "<код>").replace(Regex("\"(code|serial)\":\"[^\"]*\""), "\"$1\":\"<скрыто>\"")
-            println("CRPT_PROBE[$index] status=${response.status} body=$shown")
+            println("CRPT_PROBE[$index] status=${response.status}")
 
             // 451 — доступ закрыт по месту: из сети вне России реестр не отвечает. Это названный
             // исход, а не провал пробы; форму ответа он подтвердить не даёт.
             assertTrue(
-                "код $index: статус ${response.status} — ни ответ, ни «не найдено», ни отказ по месту: $shown",
+                "код $index: статус ${response.status} — ни ответ, ни «не найдено», ни отказ по месту",
                 response.status in listOf(HttpStatusCode.OK, HttpStatusCode.NotFound, HttpStatusCode.BadRequest, CrptApi.UNAVAILABLE_FOR_LEGAL_REASONS)
             )
             if (response.status == HttpStatusCode.OK) {
+                println("CRPT_PROBE[$index] shape=${shapeOf(crptJson.parseToJsonElement(raw))}")
                 val dto = crptJson.decodeFromString(CrptCheckNetworkDTO.serializer(), raw)
                 println("CRPT_PROBE[$index] codeFounded=${dto.codeFounded} category=${dto.category} name=${dto.productName} expireDate=${dto.expireDate}")
                 println("CRPT_PROBE[$index] pharmacy=${dto.pharmacy} labels=${dto.attributes.keys} country=${dto.chip("country")}")
                 println("CRPT_PROBE[$index] suggestion=${dto.toSuggestion(Vocabulary.empty)}")
             }
         }
+    }
+
+    /** Имена ключей без значений: форму ответа видно, а идентификаторов и текстов в отчёте нет. */
+    private fun shapeOf(element: JsonElement): String = when (element) {
+        is JsonObject -> element.entries.joinToString(",", "{", "}") { (key, value) -> key + shapeOf(value).let { if (it.isEmpty()) "" else ":$it" } }
+        is JsonArray -> element.firstOrNull()?.let { "[" + shapeOf(it) + "]" } ?: "[]"
+        else -> ""
     }
 }

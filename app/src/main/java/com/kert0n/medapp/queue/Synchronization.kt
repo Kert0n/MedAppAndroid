@@ -1,5 +1,6 @@
 package com.kert0n.medapp.queue
 
+import com.kert0n.medapp.domain.attempt
 import com.kert0n.medapp.di.ApplicationScope
 import com.kert0n.medapp.domain.notification.Freshness
 import java.time.Clock
@@ -77,7 +78,7 @@ class Synchronization @Inject constructor(
 
     /** Повод без ожидания: вход в приложение, появившаяся связь. Итог — в [state]. */
     fun request() {
-        scope.launch { runCatching { synchronize() } }
+        scope.launch { attempt { synchronize() } }
     }
 
     /**
@@ -91,7 +92,7 @@ class Synchronization @Inject constructor(
 
     /** То же, но с итогом — проверкам важно, дождались ли захода. */
     suspend fun awaitBriefly(within: Duration): Round? {
-        val round = scope.async { runCatching { synchronize() }.getOrNull() }
+        val round = scope.async { attempt { synchronize() }.getOrNull() }
         return withTimeoutOrNull(within.toMillis()) { round.await() }
     }
 

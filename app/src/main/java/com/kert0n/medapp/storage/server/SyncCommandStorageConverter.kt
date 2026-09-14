@@ -1,5 +1,6 @@
 package com.kert0n.medapp.storage.server
 
+import com.kert0n.medapp.domain.attempt
 import com.kert0n.medapp.domain.pack.PackageSharedFacts
 import com.kert0n.medapp.domain.value.Dose
 import com.kert0n.medapp.domain.value.Quantity
@@ -112,7 +113,7 @@ object SyncCommandStorageConverter {
         vocabulary: Vocabulary
     ): SyncCommand? {
         if (payloadVersion !in readableSince(kind)..PAYLOAD_VERSION) return null
-        val fields = runCatching { json.parseToJsonElement(payload) as JsonObject }.getOrNull()
+        val fields = attempt { json.parseToJsonElement(payload) as JsonObject }.getOrNull()
             ?: throw IllegalArgumentException("payload команды «$kind» не разбирается")
         return try {
             read(kind, fields, vocabulary)

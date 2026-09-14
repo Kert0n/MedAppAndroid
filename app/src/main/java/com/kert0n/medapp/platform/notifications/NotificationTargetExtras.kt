@@ -1,5 +1,6 @@
 package com.kert0n.medapp.platform.notifications
 
+import com.kert0n.medapp.domain.attempt
 import android.content.Intent
 import com.kert0n.medapp.domain.notification.NotificationTarget
 import java.time.LocalDate
@@ -32,8 +33,8 @@ object NotificationTargetExtras {
     }
 
     fun decode(extras: Map<String, String>): NotificationTarget? {
-        val id = extras[ID]?.let { runCatching { Uuid.parse(it) }.getOrNull() }
-        val date = extras[DATE]?.let { runCatching { LocalDate.parse(it) }.getOrNull() }
+        val id = extras[ID]?.let { attempt { Uuid.parse(it) }.getOrNull() }
+        val date = extras[DATE]?.let { attempt { LocalDate.parse(it) }.getOrNull() }
         return when (extras[KIND]) {
             "INTAKE" -> id?.let { NotificationTarget.Intake(it) }
             "PACKAGE" -> id?.let { NotificationTarget.PackageCard(it) }

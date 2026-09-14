@@ -1,5 +1,6 @@
 package com.kert0n.medapp.platform.connectivity
 
+import com.kert0n.medapp.domain.attempt
 import android.content.Context
 import android.net.ConnectivityManager
 import android.net.Network
@@ -44,7 +45,7 @@ class SyncTriggers @Inject constructor(
                 // обязательств делаются **в процессе**, здесь и сейчас (PLAN F4, D8). Через
                 // WorkManager это откладывалось до его очереди, а быстрый повторный вход
                 // политикой REPLACE отменял незаконченный проход.
-                scope.launch { runCatching { daily.run() } }
+                scope.launch { attempt { daily.run() } }
                 synchronization.request()
             }
         })

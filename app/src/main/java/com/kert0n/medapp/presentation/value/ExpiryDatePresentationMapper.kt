@@ -1,5 +1,6 @@
 package com.kert0n.medapp.presentation.value
 
+import com.kert0n.medapp.domain.attempt
 import com.kert0n.medapp.domain.pack.ExpiryDate
 import com.kert0n.medapp.presentation.ParsedInput
 import java.text.ParsePosition
@@ -72,7 +73,7 @@ private fun matchesShape(text: String, format: DateTimeFormatter): Boolean {
 
 private fun resolve(
     parse: () -> ExpiryDate
-): ParsedInput<ExpiryDate, ExpiryDatePresentationError> = runCatching(parse).fold(
+): ParsedInput<ExpiryDate, ExpiryDatePresentationError> = attempt(parse).fold(
     onSuccess = { ParsedInput.Parsed(it) },
     onFailure = { ParsedInput.Rejected(ExpiryDatePresentationError.IMPOSSIBLE_DATE) }
 )

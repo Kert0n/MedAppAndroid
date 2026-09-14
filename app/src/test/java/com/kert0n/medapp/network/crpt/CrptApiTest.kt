@@ -103,6 +103,19 @@ class CrptApiTest {
         )
     }
 
+    /**
+     * Отмена во время чтения тела — отмена, а не «сервер промолчал» (разбор #30). Красная проверка:
+     * `runCatching` вокруг `body()` вернул бы `SERVER_SILENT`.
+     */
+    @Test
+    fun cancellationWhileReadingTheBodyIsNotSwallowed() = runTest {
+        val api = api { throw kotlinx.coroutines.CancellationException("остановили") }
+
+        val outcome = kotlin.runCatching { api.check(code) }
+
+        assertTrue(outcome.exceptionOrNull() is kotlinx.coroutines.CancellationException)
+    }
+
     /** Ключей, которых мы не знаем, и пропавших блоков ответ не боится: меньше подсказок, а не ошибка. */
     @Test
     fun aChangedShapeStillReads() = runTest {
