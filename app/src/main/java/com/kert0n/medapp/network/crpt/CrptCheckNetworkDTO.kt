@@ -3,9 +3,11 @@ package com.kert0n.medapp.network.crpt
 import kotlinx.serialization.Serializable
 
 /**
- * Ответ `POST /v2/mobile/check` «Честного знака» — как его наблюдали, а не как он задокументирован:
- * документации нет (PLAN H5). Всё необязательно, незнакомые ключи не мешают: сменившаяся форма
- * даёт меньше подсказок, а не ошибку — трогать чужой API мы хотим как можно меньше.
+ * Ответ `POST /v2/mobile/check` «Честного знака» — как его наблюдали (проба 2026-09-14, PLAN H5),
+ * а не как он задокументирован: документации нет. Всё необязательно, незнакомые ключи не мешают:
+ * сменившаяся форма даёт меньше подсказок, а не ошибку — трогать чужой API мы хотим как можно
+ * меньше. Из `screen.items[]` читаются аптечный блок (`pharmacyData`), атрибуты (`attrList`) и
+ * фишки карточки (`chips`) — страна приходит фишкой `country`, а не атрибутом.
  */
 @Serializable
 data class CrptCheckNetworkDTO(
@@ -18,6 +20,11 @@ data class CrptCheckNetworkDTO(
 ) {
     /** Аптечный блок — первый из экранных блоков, у которого он есть. */
     val pharmacy: CrptPharmacyNetworkDTO? get() = screen?.items?.firstNotNullOfOrNull { it.pharmacyData }
+
+    /** Фишка карточки по виду — например, страна. */
+    fun chip(type: String): String? =
+        screen?.items?.asSequence()?.flatMap { it.chips.orEmpty().asSequence() }
+            ?.firstOrNull { it.chipType == type }?.value?.trim()?.takeIf { it.isNotEmpty() }
 
     /** Атрибуты всех блоков одной таблицей `label → value`; повтор метки — первое значение. */
     val attributes: Map<String, String>
@@ -39,8 +46,12 @@ data class CrptScreenNetworkDTO(val items: List<CrptScreenItemNetworkDTO>? = nul
 data class CrptScreenItemNetworkDTO(
     val itemType: String? = null,
     val pharmacyData: CrptPharmacyNetworkDTO? = null,
-    val attrList: List<CrptAttributeNetworkDTO>? = null
+    val attrList: List<CrptAttributeNetworkDTO>? = null,
+    val chips: List<CrptChipNetworkDTO>? = null
 )
+
+@Serializable
+data class CrptChipNetworkDTO(val chipType: String? = null, val value: String? = null)
 
 @Serializable
 data class CrptPharmacyNetworkDTO(

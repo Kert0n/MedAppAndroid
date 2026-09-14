@@ -39,7 +39,8 @@ class CrptProbe {
             setBody(CrptCheckRequestNetworkDTO(code.wire, CrptCheckRequestNetworkDTO.DATA_MATRIX))
         }
         val raw = response.bodyAsText()
-        val shown = raw.replace(code.text, "<код>")
+        // Серийный номер коробки в отчёт не попадает: ни как текст, ни как JSON-экранированный код.
+        val shown = raw.replace(code.text, "<код>").replace(Regex("\"(code|serial)\":\"[^\"]*\""), "\"$1\":\"<скрыто>\"")
         println("CRPT_PROBE status=${response.status} body=$shown")
 
         // 451 — доступ закрыт по месту: из сети вне России реестр не отвечает. Это названный
@@ -51,7 +52,7 @@ class CrptProbe {
         if (response.status == HttpStatusCode.OK) {
             val dto = crptJson.decodeFromString(CrptCheckNetworkDTO.serializer(), raw)
             println("CRPT_PROBE codeFounded=${dto.codeFounded} category=${dto.category} name=${dto.productName} expireDate=${dto.expireDate}")
-            println("CRPT_PROBE pharmacy=${dto.pharmacy} labels=${dto.attributes.keys}")
+            println("CRPT_PROBE pharmacy=${dto.pharmacy} labels=${dto.attributes.keys} country=${dto.chip("country")}")
             println("CRPT_PROBE suggestion=${dto.toSuggestion(Vocabulary.empty)}")
         }
     }

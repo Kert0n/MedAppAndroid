@@ -68,9 +68,10 @@ class CrptApiTest {
 
         val body = (check as CrptCheck.Body).dto
         assertEquals("drugs", body.category)
-        assertEquals("таблетки, покрытые пленочной оболочкой", body.pharmacy?.form)
-        assertEquals("ОАО «Синтез»", body.attributes["Производитель"])
-        assertEquals(1804714200000L, body.expireDate)
+        assertEquals("таблетки покрытые пленочной оболочкой", body.pharmacy?.form)
+        assertEquals("Д-Р РЕДДИ`С ЛАБОРАТОРИС ЛТД.", body.attributes["Производитель"])
+        assertEquals("ИНДИЯ", body.chip("country"))
+        assertEquals(1838073600000L, body.expireDate)
     }
 
     /** `200` с признаком «не нашли» — нормальный ответ; `404` и `400` — тот же случай. */

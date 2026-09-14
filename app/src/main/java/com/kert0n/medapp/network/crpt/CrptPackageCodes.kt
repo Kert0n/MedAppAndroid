@@ -39,8 +39,8 @@ internal fun CrptCheckNetworkDTO.toSuggestion(words: Vocabulary): PackageSuggest
     return PackageSuggestion(
         name = productName.orNullIfBlank() ?: pharmacy?.title.orNullIfBlank(),
         form = formText?.let { FormSuggestion.of(words.formsNamed(it)) } ?: FormSuggestion.None,
-        manufacturer = attributes.byLabel(MANUFACTURER_LABELS),
-        country = attributes.byLabel(COUNTRY_LABELS),
+        manufacturer = attributes[MANUFACTURER_LABEL] ?: attributes.byLabel(MANUFACTURER_ROOTS),
+        country = chip(COUNTRY_CHIP) ?: attributes.byLabel(COUNTRY_ROOTS),
         expiresOn = expiresOn(),
         activeSubstance = pharmacy?.activeSubstance.orNullIfBlank(),
         dosageText = pharmacy?.dosage.orNullIfBlank() ?: attributes[DOSAGE_LABEL],
@@ -50,15 +50,18 @@ internal fun CrptCheckNetworkDTO.toSuggestion(words: Vocabulary): PackageSuggest
 }
 
 /**
- * Метки атрибутов — наблюдаемые, а не документированные (H5): «Форма выпуска», «Объём / Масса
- * единицы потребления», «Количество единиц потребления», «Объём» видел референс; производитель и
- * страна — по живому ответу пробы, до него берётся метка, содержащая корень слова.
+ * Метки — наблюдаемые, а не документированные (H5): «Форма выпуска», «Объём / Масса единицы
+ * потребления», «Количество единиц потребления», «Объём» видел референс; «Производитель» и фишку
+ * `country` показала проба 2026-09-14 (у лекарства страна — фишкой карточки, а не атрибутом). На
+ * случай иной метки у другой категории товара — запасной поиск по корню слова.
  */
 private const val FORM_LABEL = "Форма выпуска"
 private const val DOSAGE_LABEL = "Объём / Масса единицы потребления"
 private val QUANTITY_LABELS = listOf("Количество единиц потребления", "Объём")
-private val MANUFACTURER_LABELS = listOf("производител", "изготовител")
-private val COUNTRY_LABELS = listOf("страна")
+private const val MANUFACTURER_LABEL = "Производитель"
+private const val COUNTRY_CHIP = "country"
+private val MANUFACTURER_ROOTS = listOf("производител", "изготовител")
+private val COUNTRY_ROOTS = listOf("страна")
 
 private fun Map<String, String>.byLabel(roots: List<String>): String? =
     entries.firstOrNull { (label, _) -> roots.any { label.lowercase().contains(it) } }?.value

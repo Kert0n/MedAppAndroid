@@ -28,19 +28,20 @@ class CrptSuggestionTest {
 
     private fun dto(text: String): CrptCheckNetworkDTO = json.decodeFromString(CrptCheckNetworkDTO.serializer(), text)
 
+    /** Живой ответ 2026-09-14: полночь 31 марта по Москве — в UTC ещё 30-е, страна — фишкой карточки. */
     @Test
     fun aFoundMedicineFillsWhatTheAnswerNamesAndNothingElse() {
         val suggestion = dto(CrptFixtures.found).toSuggestion(words)
 
-        assertEquals("Ибупрофен таблетки покрытые пленочной оболочкой 200 мг №20", suggestion.name)
+        assertEquals("Цетрин", suggestion.name)
         assertEquals(FormSuggestion.One(coated), suggestion.form)
-        assertEquals("ОАО «Синтез»", suggestion.manufacturer)
-        assertEquals("Россия", suggestion.country)
-        assertEquals(LocalDate.of(2027, 3, 11), suggestion.expiresOn?.lastDay)
-        assertEquals("Ибупрофен", suggestion.activeSubstance)
+        assertEquals("Д-Р РЕДДИ`С ЛАБОРАТОРИС ЛТД.", suggestion.manufacturer)
+        assertEquals("ИНДИЯ", suggestion.country)
+        assertEquals(LocalDate.of(2028, 3, 31), suggestion.expiresOn?.lastDay)
+        assertEquals("цетиризин", suggestion.activeSubstance)
         // Строки для глаз: числом они не становятся — у предложения нет полей для этого.
-        assertEquals("200 мг", suggestion.dosageText)
-        assertEquals("20 шт", suggestion.quantityText)
+        assertEquals("10 мг", suggestion.dosageText)
+        assertEquals("30 шт", suggestion.quantityText)
         assertTrue(suggestion.isMedicine)
     }
 
