@@ -128,7 +128,10 @@ class WriteContractTest {
         "IntakeStorageRepository.save" to (Shape.ACTION by "(RecordedIntake): Unit"),
         "IntakeStorageRepository.record" to (Shape.ACTION by "(IntakeOutcome): Boolean"),
         "IntakeStorageRepository.materialise" to (Shape.CREATION by "(List<CourseIntake>): Integer"),
-        "IntakeStorageRepository.prunePlanned" to (Shape.NAMED_FIELDS by "(Uuid, Set<ScheduledOccurrence>): Integer")
+        "IntakeStorageRepository.prunePlanned" to (Shape.NAMED_FIELDS by "(Uuid, Set<ScheduledOccurrence>): Integer"),
+        "NotificationLogStorageRepository.wasShown" to (Shape.READ by "(NotificationKey, NoticeDelivery): Boolean"),
+        "NotificationLogStorageRepository.remember" to (Shape.NAMED_FIELDS by "(NotificationKey, NoticeDelivery, Instant): Unit"),
+        "NotificationLogStorageRepository.forget" to (Shape.NAMED_FIELDS by "(NotificationKey): Unit")
     )
 
     /**
@@ -142,7 +145,8 @@ class WriteContractTest {
         CourseStorageRepository::class.java,
         MedKitStorageRepository::class.java,
         IntakeStorageRepository::class.java,
-        com.kert0n.medapp.storage.report.ReportStorageRepository::class.java
+        com.kert0n.medapp.storage.report.ReportStorageRepository::class.java,
+        com.kert0n.medapp.storage.server.NotificationLogStorageRepository::class.java
     )
 
     /**

@@ -23,6 +23,22 @@ value class ExpiryDate(val lastDay: LocalDate) {
         return !lastDay.isAfter(date.plusDays(days))
     }
 
+    /**
+     * Какой этап предупреждения о годности наступает в день [date] (PLAN D8): за три дня, за день,
+     * в последний день годности. По **календарным датам**, а не через `72h`: переход на летнее
+     * время день не сдвигает. Просроченной этапов нет — у неё статус, а не предупреждение; и
+     * поздно подключённая коробка получает только этап сегодняшнего дня, а не залп прошедших.
+     */
+    fun stageOn(date: LocalDate): Stage? = when (date) {
+        lastDay.minusDays(3) -> Stage.SOURCE_3D
+        lastDay.minusDays(1) -> Stage.SOURCE_1D
+        lastDay -> Stage.TODAY
+        else -> null
+    }
+
+    /** Этапы годности: первые два — коробкам-источникам системным уведомлением, последний — всем баннером (D8). */
+    enum class Stage { SOURCE_3D, SOURCE_1D, TODAY }
+
     companion object {
         /** С какого числа дней до конца срока пачка «истекает скоро» — больший из порогов D8. */
         const val SOON_DAYS = 3L
