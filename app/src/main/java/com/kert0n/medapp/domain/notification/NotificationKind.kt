@@ -28,12 +28,12 @@ enum class NotificationKind(val channel: NotificationChannel) {
         get() = if (this == EXPIRY_TODAY) NoticeDelivery.IN_APP_BANNER else NoticeDelivery.SYSTEM
 
     /**
-     * Что можно сделать прямо с карточки: отвечают только напоминанию о приёме. «Принял» здесь
-     * нет — он требует экрана при просрочке и отменённом курсе, а запустить его из приёмника
-     * платформа с Android 12 не даёт (C1). Он вернётся вместе с экраном предупреждения в U5.
+     * Что можно сделать прямо с карточки: отвечают только напоминанию о приёме. «Принял» требует
+     * экрана при просрочке и отменённом курсе, поэтому он — намерение открыть приложение с целью
+     * и действием, а не приёмник (C1); куда вести — решает оболочка (U5).
      */
     val actions: List<NotificationAction>
-        get() = if (this == INTAKE_DUE) listOf(NotificationAction.SKIP, NotificationAction.SNOOZE) else emptyList()
+        get() = if (this == INTAKE_DUE) listOf(NotificationAction.TAKE, NotificationAction.SKIP, NotificationAction.SNOOZE) else emptyList()
 }
 
 /**
@@ -54,5 +54,16 @@ enum class NotificationChannel(val importance: Importance) {
 /** Как доставляется: системным уведомлением или баннером внутри приложения (PLAN D8). */
 enum class NoticeDelivery { SYSTEM, IN_APP_BANNER }
 
-/** Что можно сделать прямо с уведомления, не открывая приложение. */
-enum class NotificationAction { SKIP, SNOOZE }
+/**
+ * Что можно сделать прямо с уведомления. «Пропустить» и «Отложить» обходятся без экрана;
+ * «Принял» открывает приложение — записать приём молча нельзя, когда есть о чём предупредить
+ * (PLAN D8, C1).
+ */
+enum class NotificationAction {
+    TAKE,
+    SKIP,
+    SNOOZE;
+
+    /** Без экрана: делается приёмником, не открывая приложение. */
+    val handledInBackground: Boolean get() = this != TAKE
+}

@@ -23,10 +23,9 @@ import kotlinx.coroutines.launch
  * экран; «Отложить» сдвигает срок обязательства.
  *
  * **Активность отсюда не запускается.** Приёмник, поднятый нажатием на уведомление, с Android 12
- * этого не может — платформа зовёт это notification trampoline и запуск блокирует (C1). Поэтому в
- * шторке нет «Принял»: он требует экрана при просрочке, отменённом курсе и затронутых бронях, а
- * гасить карточку, ничего не записав, хуже, чем не иметь кнопки. Он вернётся вместе с экраном
- * предупреждения в U5.
+ * этого не может — платформа зовёт это notification trampoline и запуск блокирует (C1). Поэтому
+ * «Принял» сюда не приходит: он требует экрана при просрочке, отменённом курсе и затронутых
+ * бронях и едет намерением открыть приложение — с целью и действием в extras (U5 ведёт к форме).
  */
 @AndroidEntryPoint
 class NotificationActionReceiver : BroadcastReceiver() {
@@ -38,7 +37,8 @@ class NotificationActionReceiver : BroadcastReceiver() {
     lateinit var notifier: Notifier
 
     override fun onReceive(context: Context, intent: Intent) {
-        val action = intent.action?.let { name -> NotificationAction.entries.firstOrNull { it.name == name } } ?: return
+        val action = intent.action?.let { name -> NotificationAction.entries.firstOrNull { it.name == name } }
+            ?.takeIf { it.handledInBackground } ?: return
         val intakeId = intent.getStringExtra(EXTRA_INTAKE_ID)?.let { attempt { Uuid.parse(it) }.getOrNull() } ?: return
         val pending = goAsync()
         CoroutineScope(SupervisorJob() + Dispatchers.IO).launch {
@@ -46,6 +46,7 @@ class NotificationActionReceiver : BroadcastReceiver() {
                 when (action) {
                     NotificationAction.SKIP -> answering.skip(intakeId)
                     NotificationAction.SNOOZE -> answering.snooze(intakeId)
+                    NotificationAction.TAKE -> return@launch
                 }
                 // Человек нажал — карточка уходит сразу, ждать прохода владельца незачем.
                 notifier.dismiss(NotificationKey.intake(intakeId, NotificationKind.INTAKE_DUE))

@@ -1,5 +1,6 @@
 package com.kert0n.medapp.platform.notifications
 
+import com.kert0n.medapp.domain.notification.NotificationAction
 import com.kert0n.medapp.domain.notification.NotificationTarget
 import java.io.File
 import java.time.LocalDate
@@ -26,8 +27,19 @@ class NotificationTargetExtrasTest {
     @Test
     fun everyTargetSurvivesTheRoundTrip() {
         for (target in samples) {
-            assertEquals(target, NotificationTargetExtras.decode(NotificationTargetExtras.encode(target)))
+            assertEquals(NotificationTargetExtras.Opening(target, null), NotificationTargetExtras.decode(NotificationTargetExtras.encode(target)))
         }
+    }
+
+    /** Кнопка «Принял» — то же намерение с действием: действие читается, а незнакомое не роняет цель. */
+    @Test
+    fun theActionTravelsWithTheTargetAndAStrangeOneIsIgnored() {
+        val intake = samples.first()
+        for (action in NotificationAction.entries) {
+            assertEquals(NotificationTargetExtras.Opening(intake, action), NotificationTargetExtras.decode(NotificationTargetExtras.encode(intake, action)))
+        }
+        val strange = NotificationTargetExtras.encode(intake) + ("notification_action" to "DANCE")
+        assertEquals(NotificationTargetExtras.Opening(intake, null), NotificationTargetExtras.decode(strange))
     }
 
     @Test

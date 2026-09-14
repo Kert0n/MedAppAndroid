@@ -192,6 +192,49 @@ class SystemNotifierTest {
     }
 
     /**
+     * «Принял» — намерение **открыть приложение**, «Пропустить» и «Отложить» — широковещание
+     * приёмнику: первый требует экрана, вторым он не нужен. Из приёмника активность не открыть
+     * (trampoline), поэтому кнопка и едет активностью — с целью и действием в extras.
+     */
+    @Test
+    fun takeOpensTheAppWhileSkipAndSnoozeGoToTheReceiver() = runTest {
+        if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.TIRAMISU) {
+            InstrumentationRegistry.getInstrumentation().uiAutomation
+                .grantRuntimePermission(context.packageName, Manifest.permission.POST_NOTIFICATIONS)
+        }
+        // Текст напоминания собирается из пункта и курса, поэтому лечение заводится по-настоящему.
+        val scenarios = com.kert0n.medapp.fixture.Scenarios(database, planned.dueAt)
+        val tablets = kotlin.uuid.Uuid.random()
+        database.packageRepository().add(pack(id = tablets, name = "Ибупрофен", quantity = tablets("20"), form = com.kert0n.medapp.fixture.TABLET_FORM))
+        val created = scenarios.courseDrafting.create("Ибупрофен")
+        val saved = scenarios.courseDrafting.edit(
+            created.id, created.revision,
+            listOf(
+                com.kert0n.medapp.feature.course.CourseDrafting.Edit.SetDose(com.kert0n.medapp.fixture.dose("2")),
+                com.kert0n.medapp.feature.course.CourseDrafting.Edit.SetForm(com.kert0n.medapp.fixture.TABLET_FORM),
+                com.kert0n.medapp.feature.course.CourseDrafting.Edit.SetSchedule(com.kert0n.medapp.fixture.schedule(start = LocalDate.of(2027, 3, 28))),
+                com.kert0n.medapp.feature.course.CourseDrafting.Edit.SetTotalDoses(com.kert0n.medapp.domain.value.Doses(3)),
+                com.kert0n.medapp.feature.course.CourseDrafting.Edit.Attach(tablets, com.kert0n.medapp.domain.value.Doses(3))
+            )
+        ) as com.kert0n.medapp.feature.course.CourseDrafting.Outcome.Saved
+        scenarios.courseActivation.activate(saved.draft.id, saved.draft.revision)
+        val first = database.intakeRepository().ofCourse(saved.draft.id).filterIsInstance<com.kert0n.medapp.domain.intake.CourseIntake>().minBy { it.plannedAt }
+        val reminder = Reminder(NotificationKey.intake(first.id, NotificationKind.INTAKE_DUE), NotificationTarget.Intake(first.id), planned.dueAt)
+
+        assertEquals(com.kert0n.medapp.domain.notification.Delivery.SHOWN, notifier.show(reminder))
+
+        val shown = requireNotNull(awaitShown(reminder.key.subject)) { "напоминание не показано" }
+        val actions = shown.notification.actions.associateBy { it.title.toString() }
+        assertEquals(setOf("Принял", "Пропустить", "Отложить"), actions.keys)
+        if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.S) {
+            assertTrue("«Принял» не открывает приложение", actions.getValue("Принял").actionIntent.isActivity)
+            assertTrue("«Пропустить» открывает активность — trampoline", actions.getValue("Пропустить").actionIntent.isBroadcast)
+            assertTrue("«Отложить» открывает активность — trampoline", actions.getValue("Отложить").actionIntent.isBroadcast)
+        }
+        notifier.dismiss(reminder.key)
+    }
+
+    /**
      * Приёмник действий не запускает активность ни при каком исходе: из уведомления это
      * запрещённый платформой переход (C1). Проверка читает манифест и класс приёмника — так
      * нарушение видно до того, как человек нажмёт кнопку и ничего не произойдёт.

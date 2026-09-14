@@ -87,18 +87,17 @@ class ReminderAnsweringTest {
         Reminder(reminderKey(intake), com.kert0n.medapp.domain.notification.NotificationTarget.Intake(intake.id), intake.plannedAt)
 
     /**
-     * В шторке нет «Принял»: он требует экрана при просрочке, отменённом курсе и затронутых
-     * бронях, а запустить экран из приёмника уведомления платформа с Android 12 не даёт (C1).
-     * Записывать молча, не показав предупреждения, нельзя — предупреждение действием из шторки не
-     * обходится. Остаются два действия, которым экран не нужен.
+     * «Принял» требует экрана при просрочке, отменённом курсе и затронутых бронях, а запустить
+     * экран из приёмника уведомления платформа с Android 12 не даёт (C1). Поэтому без экрана
+     * обходятся только два действия — они и идут приёмнику; «Принял» открывает приложение.
      */
     @Test
-    fun theShadeOffersOnlyWhatNeedsNoScreen() {
+    fun onlySkipAndSnoozeNeedNoScreen() {
         assertEquals(
-            listOf(NotificationAction.SKIP, NotificationAction.SNOOZE),
+            listOf(NotificationAction.TAKE, NotificationAction.SKIP, NotificationAction.SNOOZE),
             NotificationKind.INTAKE_DUE.actions
         )
-        assertEquals(listOf(NotificationAction.SKIP, NotificationAction.SNOOZE), NotificationAction.entries)
+        assertEquals(listOf(NotificationAction.SKIP, NotificationAction.SNOOZE), NotificationAction.entries.filter { it.handledInBackground })
         // И у остального действий нет вовсе: отвечать там не на что.
         assertTrue(NotificationKind.entries.filter { it != NotificationKind.INTAKE_DUE }.all { it.actions.isEmpty() })
     }
