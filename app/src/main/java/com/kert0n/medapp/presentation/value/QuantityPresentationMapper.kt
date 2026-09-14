@@ -1,5 +1,6 @@
 package com.kert0n.medapp.presentation.value
 
+import com.kert0n.medapp.domain.attempt
 import com.kert0n.medapp.domain.value.Quantity
 import com.kert0n.medapp.domain.value.Vocabulary
 import com.kert0n.medapp.presentation.ParsedInput
@@ -41,7 +42,7 @@ fun QuantityPresentationDTO.toDomain(vocabulary: Vocabulary): ParsedInput<Quanti
         ?: return ParsedInput.Rejected(QuantityPresentationError.UNKNOWN_UNIT)
     // Последнее слово за величиной: её нынешние пределы здесь известны, но менять их вправе домен,
     // и тогда отказ должен остаться отказом, а не исключением наружу.
-    return runCatching { Quantity(BigDecimal(text), known) }
+    return attempt { Quantity(BigDecimal(text), known) }
         .fold(
             onSuccess = { ParsedInput.Parsed(it) },
             onFailure = {

@@ -24,7 +24,8 @@ fun crptHttpClient(engine: HttpClientEngine, baseUrl: String): HttpClient = Http
     defaultRequest { url(baseUrl) }
 }
 
-private val crptJson = Json {
+/** Нестрогий разбор чужого API — им же читает и проба, чтобы сверять живой ответ той же формой. */
+internal val crptJson = Json {
     ignoreUnknownKeys = true
     explicitNulls = false
 }

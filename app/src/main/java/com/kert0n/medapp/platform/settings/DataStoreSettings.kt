@@ -1,5 +1,6 @@
 package com.kert0n.medapp.platform.settings
 
+import com.kert0n.medapp.domain.attempt
 import androidx.datastore.core.CorruptionException
 import androidx.datastore.core.DataStore
 import androidx.datastore.preferences.core.MutablePreferences
@@ -83,7 +84,7 @@ class DataStoreSettings(
 
     private fun Preferences.toSettings(): AppSettings {
         val defaults = NotificationSettings.DEFAULT
-        val notifications = runCatching {
+        val notifications = attempt {
             NotificationSettings(
                 intakeRemindersEnabled = this[INTAKE_REMINDERS] ?: defaults.intakeRemindersEnabled,
                 snoozeMinutes = this[SNOOZE_MINUTES] ?: defaults.snoozeMinutes,
@@ -94,7 +95,7 @@ class DataStoreSettings(
                 remoteChangeEnabled = this[REMOTE_CHANGE] ?: defaults.remoteChangeEnabled
             )
         }.getOrDefault(defaults)
-        val interval = runCatching {
+        val interval = attempt {
             this[SYNC_INTERVAL_MINUTES]?.let { SyncInterval(it) }
         }.getOrNull() ?: SyncInterval.DEFAULT
         return AppSettings(notifications, interval)

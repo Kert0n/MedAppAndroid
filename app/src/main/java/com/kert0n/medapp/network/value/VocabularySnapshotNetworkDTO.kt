@@ -1,5 +1,6 @@
 package com.kert0n.medapp.network.value
 
+import com.kert0n.medapp.domain.attempt
 import java.time.LocalDate
 import kotlinx.serialization.Serializable
 
@@ -18,7 +19,7 @@ data class VocabularySnapshotNetworkDTO(
 ) {
     init {
         require(version == FORMAT_VERSION) { "формат снимка словарей $version этой сборкой не читается" }
-        require(runCatching { LocalDate.parse(capturedOn) }.isSuccess) {
+        require(attempt { LocalDate.parse(capturedOn) }.isSuccess) {
             "дата снятия словарей — ISO-дата, а не «$capturedOn»"
         }
         require(quantityUnits.distinctBy { it.id }.size == quantityUnits.size) {
