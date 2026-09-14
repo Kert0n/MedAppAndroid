@@ -74,16 +74,16 @@ class CrptSuggestionTest {
         assertNull(suggestion.manufacturer)
     }
 
-    /** Форма, которой словарь не знает, — пусто, но текст реестра остаётся: человек его видит. */
+    /** Форма, на которую ничего не похоже, — пусто, но текст реестра остаётся; похожая — догадка. */
     @Test
-    fun anUnknownFormStaysEmptyWithItsText() {
+    fun anUnknownFormStaysEmptyWithItsTextAndASimilarOneIsGuessed() {
         val unknown = dto("""{"codeFounded": true, "category": "drugs", "screen": {"items": [{"pharmacyData": {"form": "пластырь"}}]}}""").toSuggestion(words)
         assertNull(unknown.form)
         assertEquals("пластырь", unknown.formText)
 
         val withoutPlainTablets = Vocabulary(emptyList(), listOf(coated, cream))
         val other = dto("""{"codeFounded": true, "category": "drugs", "screen": {"items": [{"attrList": [{"label": "Форма выпуска", "value": "Таблетки"}]}]}}""")
-        assertNull(other.toSuggestion(withoutPlainTablets).form)
+        assertEquals(coated, other.toSuggestion(withoutPlainTablets).form)
     }
 
     /** Без аптечного блока и атрибутов — только имя: остальное не придумывается. */

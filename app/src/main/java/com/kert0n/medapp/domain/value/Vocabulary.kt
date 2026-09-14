@@ -32,14 +32,27 @@ class Vocabulary(units: Collection<QuantityUnit>, forms: Collection<DosageForm>)
     fun form(id: Uuid): DosageForm? = forms[id]
 
     /**
-     * Какую форму словаря называет текст [text] (PLAN H5). Словарь и чужой текст получены разными
-     * путями, и дословное совпадение — удача; сравниваются основы слов ([DosageForm.stems]):
-     * совпали целиком — форма; нет — `null`: либо даём то, что узнали, либо не даём ничего,
-     * догадок и выбора из похожих нет (решение владельца 2026-09-14). Косая черта между словами —
-     * альтернативы: узнана ровно одна — она; обе — это выбор, а не ответ, `null`.
+     * Какую форму словаря называет текст [text] (PLAN H5) — **лучшая догадка**, одна: она сразу
+     * подставляется, а ошибётся — человек поправит сам (решение владельца 2026-09-14). Словарь и
+     * чужой текст получены разными путями, поэтому сравниваются основы слов ([DosageForm.stems]):
+     * совпали целиком — она; иначе самая длинная форма, с которой текст начинается («таблетки
+     * шипучие» → «таблетки»); иначе самая короткая форма, которая начинается с текста («капли» →
+     * «капли глазные»); иначе самая короткая с той же основой первого слова; ничего похожего —
+     * `null`. Косая черта между словами — альтернативы: догадка по первой, которая что-то дала.
      */
     fun formNamed(text: String): DosageForm? =
-        DosageForm.alternatives(text).mapNotNull { wanted -> forms.values.firstOrNull { it.stems == wanted } }.distinct().singleOrNull()
+        DosageForm.alternatives(text).firstNotNullOfOrNull { wanted -> guess(wanted) }
+
+    private fun guess(wanted: List<String>): DosageForm? {
+        val known = forms.values
+        known.firstOrNull { it.stems == wanted }?.let { return it }
+        known.filter { wanted.startsWith(it.stems) }.maxByOrNull { it.stems.size }?.let { return it }
+        known.filter { it.stems.startsWith(wanted) }.minByOrNull { it.stems.size }?.let { return it }
+        return known.filter { it.stems.first() == wanted.first() }.minByOrNull { it.stems.size }
+    }
+
+    private fun List<String>.startsWith(prefix: List<String>): Boolean =
+        prefix.size <= size && subList(0, prefix.size) == prefix
 
     override fun equals(other: Any?): Boolean =
         this === other || (other is Vocabulary && units == other.units && forms == other.forms)
