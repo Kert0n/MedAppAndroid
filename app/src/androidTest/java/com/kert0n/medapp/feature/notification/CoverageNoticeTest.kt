@@ -16,6 +16,7 @@ import com.kert0n.medapp.fixture.inMemoryDatabase
 import com.kert0n.medapp.fixture.intakeRepository
 import com.kert0n.medapp.fixture.pack
 import com.kert0n.medapp.fixture.packageRepository
+import com.kert0n.medapp.fixture.queueRepository
 import com.kert0n.medapp.fixture.schedule
 import com.kert0n.medapp.fixture.tablets
 import com.kert0n.medapp.fixture.transactions
@@ -52,7 +53,7 @@ class CoverageNoticeTest {
     fun setUp() = runTest {
         database = inMemoryDatabase()
         scenarios = Scenarios(database, now)
-        planning = NotificationReconciliation(database.intakeRepository(), database.packageRepository(), database.courseRepository(), scenarios.reminderStore, scenarios.reminderPromising, scenarios.reminderWithdrawal, settings, database.transactions())
+        planning = NotificationReconciliation(database.intakeRepository(), database.packageRepository(), database.courseRepository(), scenarios.reminderStore, database.queueRepository(), scenarios.reminderPromising, scenarios.reminderWithdrawal, settings, database.transactions())
         database.packageRepository().add(pack(id = PACK, quantity = tablets("20"), form = TABLET_FORM))
     }
 

@@ -12,6 +12,9 @@ import com.kert0n.medapp.storage.intake.IntakeStorageRepository
 import com.kert0n.medapp.storage.pack.PackageQuery
 import com.kert0n.medapp.storage.notification.ReminderStorageRepository
 import com.kert0n.medapp.storage.pack.PackageStorageRepository
+import com.kert0n.medapp.queue.StoredSyncOperation
+import com.kert0n.medapp.queue.SyncOperationStatus
+import com.kert0n.medapp.storage.server.SyncOperationStorageRepository
 import com.kert0n.medapp.queue.Transactions
 import java.time.LocalDate
 import java.time.ZoneId
@@ -39,6 +42,7 @@ class NotificationReconciliation @Inject constructor(
     private val packages: PackageStorageRepository,
     private val courses: CourseStorageRepository,
     private val reminders: ReminderStorageRepository,
+    private val operations: SyncOperationStorageRepository,
     private val promising: ReminderPromising,
     private val withdrawal: ReminderWithdrawal,
     private val settings: NotificationSettingsSource,
@@ -61,7 +65,7 @@ class NotificationReconciliation @Inject constructor(
         val current = settings.current()
         val events = expiryDue(today, now) + coverageDue(now)
         val digest = digest(today, zone, events.size)
-        val desired = events + listOfNotNull(digest)
+        val desired = events + listOfNotNull(digest, syncAttention(now))
         val reductions = if (current.remoteChangeEnabled) reductionsDue(now) else emptyList()
         // Лишнее — то, что было обещано по состоянию, а в нынешнем состоянии повода не имеет.
         // Сводка, обещанная на другое время и ещё не сказанная, — тоже лишнее: человек перенёс её,
@@ -164,6 +168,21 @@ class NotificationReconciliation @Inject constructor(
         }
     }
 
+    /**
+     * Очередь ждёт решения человека (PLAN D8, H3 №28): отвергнутое сервером или нечитаемое само не
+     * разрешится. Обязательство одно на всю очередь, предмет — последняя такая операция: новый
+     * отказ говорится снова, прежняя карточка уходит, а сказанное второй раз не беспокоит. Решать
+     * стало нечего — снимается. Отвергнутое остаётся в очереди, пока человек его не разберёт, и
+     * через срок хранения сказанное забывается — тогда о нерешённом напоминают ещё раз.
+     */
+    suspend fun syncAttention(at: Instant): Reminder? {
+        val newest = operations.observeOutstanding().first().lastOrNull {
+            it is StoredSyncOperation.Unreadable ||
+                (it is StoredSyncOperation.Readable && it.operation.status == SyncOperationStatus.REFUSED)
+        } ?: return null
+        return Reminder(NotificationKey.sync(newest.id), NotificationTarget.SyncStatus, at)
+    }
+
     /** Пункты, ставшие пропуском неответом (их называет проход календаря), — уведомлением каждому (PLAN D8). */
     fun missed(intakeIds: List<Uuid>, at: Instant): List<Reminder> = intakeIds.map { id ->
         Reminder(NotificationKey.intake(id, NotificationKind.INTAKE_MISSED), NotificationTarget.Intake(id), at)
@@ -201,7 +220,8 @@ class NotificationReconciliation @Inject constructor(
             NotificationKind.EXPIRY_TODAY,
             NotificationKind.COVERAGE_3D,
             NotificationKind.COVERAGE_END,
-            NotificationKind.DAILY_DIGEST
+            NotificationKind.DAILY_DIGEST,
+            NotificationKind.SYNC_ATTENTION
         )
     }
 }

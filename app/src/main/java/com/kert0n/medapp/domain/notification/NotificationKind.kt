@@ -13,7 +13,9 @@ enum class NotificationKind(val channel: NotificationChannel) {
     COVERAGE_SHORT(NotificationChannel.COVERAGE),
     COVERAGE_3D(NotificationChannel.COVERAGE),
     COVERAGE_END(NotificationChannel.COVERAGE),
-    DAILY_DIGEST(NotificationChannel.DIGEST);
+    DAILY_DIGEST(NotificationChannel.DIGEST),
+    /** Очередь ждёт решения человека: отвергнутое или нечитаемое — одно обязательство на всю очередь. */
+    SYNC_ATTENTION(NotificationChannel.SYNC);
 
     /** Точный будильник нужен только напоминанию о приёме: остальное — календарные события дня. */
     val exact: Boolean get() = this == INTAKE_DUE
@@ -35,16 +37,16 @@ enum class NotificationKind(val channel: NotificationChannel) {
 }
 
 /**
- * Канал — то, что человек выключает по отдельности в системных настройках (PLAN D8). Четыре канала
- * со своей важностью; строковые идентификаторы и названия — у платформы. Канал синхронизации
- * заводится в B18 вместе с `SYNC_ATTENTION`: канал, который никогда ничего не показывает, человек
- * видит в настройках как обман.
+ * Канал — то, что человек выключает по отдельности в системных настройках (PLAN D8). Пять каналов
+ * со своей важностью; строковые идентификаторы и названия — у платформы. Канал без вида, который
+ * на нём что-то показывает, не заводится: человек видит его в настройках как обман.
  */
 enum class NotificationChannel(val importance: Importance) {
     INTAKES(Importance.HIGH),
     EXPIRY(Importance.DEFAULT),
     COVERAGE(Importance.DEFAULT),
-    DIGEST(Importance.LOW);
+    DIGEST(Importance.LOW),
+    SYNC(Importance.DEFAULT);
 
     enum class Importance { HIGH, DEFAULT, LOW }
 }

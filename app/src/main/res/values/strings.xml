@@ -32,6 +32,7 @@
     <string name="channel_expiry">Сроки годности</string>
     <string name="channel_coverage">Нехватка лекарств</string>
     <string name="channel_digest">Сводка дня</string>
+    <string name="channel_sync">Синхронизация</string>
 
     <!-- Уведомления: тексты -->
     <string name="notice_intake_due_title">Пора принять: %1$s</string>
@@ -50,6 +51,8 @@
     <string name="notice_coverage_body_none">Ни одного обеспеченного приёма</string>
     <string name="notice_digest_title">Сводка дня</string>
     <string name="notice_digest_body">Что принять и что проверить %1$s</string>
+    <string name="notice_sync_attention_title">Нужно ваше решение</string>
+    <string name="notice_sync_attention_body">Сервер не принял часть изменений — откройте состояние синхронизации</string>
 
     <!-- Уведомления: действия -->
     <string name="action_skip">Пропустить</string>

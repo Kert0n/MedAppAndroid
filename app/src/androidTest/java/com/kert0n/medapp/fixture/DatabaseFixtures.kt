@@ -192,7 +192,7 @@ class Scenarios(
         database.intakeRepository(), courses, packages, transactions, queue, courseClosing, courseCalendar, reminderWithdrawal, clock
     )
     val notificationReconciliation = com.kert0n.medapp.feature.notification.NotificationReconciliation(
-        database.intakeRepository(), packages, courses, reminderStore, reminderPromising, reminderWithdrawal,
+        database.intakeRepository(), packages, courses, reminderStore, database.queueRepository(), reminderPromising, reminderWithdrawal,
         notificationSettings, transactions
     )
     val dailyRound = com.kert0n.medapp.feature.notification.DailyRound(courseUpkeep, notificationReconciliation, clock)

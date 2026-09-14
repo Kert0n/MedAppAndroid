@@ -114,6 +114,23 @@ class SystemNotifierTest {
         assertNull(awaitShown(planned.key.subject, expected = false))
     }
 
+    /** Внимание к очереди — карточка на канале `sync`, без данных в цели: очередь одна (H3 №28). */
+    @Test
+    fun syncAttentionIsShownOnItsOwnChannel() = runTest {
+        if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.TIRAMISU) {
+            InstrumentationRegistry.getInstrumentation().uiAutomation
+                .grantRuntimePermission(context.packageName, Manifest.permission.POST_NOTIFICATIONS)
+        }
+        val attention = Reminder(NotificationKey.sync(kotlin.uuid.Uuid.random()), NotificationTarget.SyncStatus, planned.dueAt)
+
+        assertEquals(com.kert0n.medapp.domain.notification.Delivery.SHOWN, notifier.show(attention))
+
+        val shown = requireNotNull(awaitShown(attention.key.subject)) { "уведомление не показано" }
+        assertEquals(NotificationChannel.SYNC.id, shown.notification.channelId)
+        assertEquals(NotificationKind.SYNC_ATTENTION.ordinal, shown.id)
+        notifier.dismiss(attention.key)
+    }
+
     /** Система показывает и гасит асинхронно: ждём, но недолго. */
     private fun awaitShown(tag: String, expected: Boolean = true): android.service.notification.StatusBarNotification? {
         repeat(40) {
@@ -161,19 +178,18 @@ class SystemNotifierTest {
 
     /**
      * Канал, который приложение перестало объявлять, система держит у себя дальше: у того, кто
-     * ставил прежнюю сборку, в настройках остаётся переключатель «Синхронизация», не способный
-     * ничего показать. Заведение каналов должно убирать за собой.
+     * ставил прежнюю сборку, в настройках остаётся переключатель, не способный ничего показать. Заведение каналов должно убирать за собой.
      */
     @Test
     fun aChannelWeNoLongerDeclareIsRemoved() {
         val manager = context.getSystemService(android.app.NotificationManager::class.java)
         manager.createNotificationChannel(
-            android.app.NotificationChannel("sync", "Синхронизация", android.app.NotificationManager.IMPORTANCE_LOW)
+            android.app.NotificationChannel("legacy", "Прежний канал", android.app.NotificationManager.IMPORTANCE_LOW)
         )
 
         NotificationChannels(context).ensure()
 
-        assertEquals(null, manager.getNotificationChannel("sync"))
+        assertEquals(null, manager.getNotificationChannel("legacy"))
     }
 
     /**

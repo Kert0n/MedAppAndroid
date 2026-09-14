@@ -1861,7 +1861,7 @@ data class NotificationKey(val kind: NotificationKind, val subject: String) {
         ): NotificationKey
         fun reduction(reductionId: Uuid): NotificationKey
         fun digest(date: LocalDate): NotificationKey
-        fun sync(): NotificationKey                         // одно обязательство на всю очередь
+        fun sync(newestOperationId: Uuid): NotificationKey  // одно на всю очередь; предмет — последняя операция, ждущая решения
     }
 }
 sealed interface NotificationTarget {
@@ -2061,8 +2061,10 @@ interface DevicePermissions { fun current(): PermissionStates }
 | `sync`     | DEFAULT  | `SYNC_ATTENTION` — очередь ждёт решения   |
 
 `SYNC_ATTENTION` — обязательство **от состояния**, одно на всю очередь: сверка обещает его, пока в
-`observeOutstanding()` есть отвергнутое или нечитаемое, и снимает, когда не осталось. Ведёт на экран
-№28 без данных в намерении. Канал заведён вместе с видом: канал, который никогда ничего не
+`observeOutstanding()` есть отвергнутое или нечитаемое, и снимает, когда не осталось. Предмет —
+**последняя** такая операция: новый отказ говорится снова, прежняя карточка уходит, а сказанное
+второй раз не беспокоит; через срок хранения сказанное забывается, и о нерешённом напоминают ещё
+раз. Ведёт на экран №28 без данных в намерении. Канал заведён вместе с видом: канал, который никогда ничего не
 показывает, человек видит в системных настройках как обман.
 
 `INTAKE_DUE`: `AlarmManager`, `setExactAndAllowWhileIdle`, проверка `canScheduleExactAlarms()`;

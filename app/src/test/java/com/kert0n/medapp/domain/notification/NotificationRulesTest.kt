@@ -98,6 +98,18 @@ class NotificationRulesTest {
         assertEquals(NotificationChannel.Importance.HIGH, NotificationChannel.INTAKES.importance)
     }
 
+    /** Внимание к очереди — системное, неточное, без действий, на своём канале; ключ один на всю очередь. */
+    @Test
+    fun syncAttentionIsOneQuietNoticeOnItsOwnChannel() {
+        val kind = NotificationKind.SYNC_ATTENTION
+        assertEquals(NotificationChannel.SYNC, kind.channel)
+        assertEquals(NotificationChannel.Importance.DEFAULT, NotificationChannel.SYNC.importance)
+        assertEquals(NoticeDelivery.SYSTEM, kind.delivery)
+        assertTrue(!kind.exact)
+        assertEquals(emptyList<NotificationAction>(), kind.actions)
+        assertEquals(NotificationKey.sync(Uuid.parse("00000000-0000-4000-8000-000000000001")).kind, kind)
+    }
+
     @Test
     fun settingsHoldTheDefaultsOfD8() {
         val settings = NotificationSettings.DEFAULT
