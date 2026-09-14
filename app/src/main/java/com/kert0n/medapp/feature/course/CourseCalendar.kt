@@ -78,30 +78,31 @@ class CourseCalendar @Inject constructor(
      * пункта впереди; за один проход ответа не остаётся недоделанным.
      */
     suspend fun catchUp(course: Course, now: Instant): CourseUpkeep.Report {
-        var missed = 0
+        val missed = mutableListOf<Uuid>()
         var planned = 0
         do {
             planned += extend(course, now)
             val marked = missOverdue(course, now)
             missed += marked
-        } while (marked > 0)
+        } while (marked.isNotEmpty())
         return CourseUpkeep.Report(missed, planned)
     }
 
     /**
      * Неотвеченные пункты, чей день **в зоне курса** кончился, — `MISSED` условным переходом из
      * `PLANNED`: ответ, пришедший тем временем, не перетирается. Моментом ответа служит конец дня
-     * пункта — тогда неответ и наступил (PLAN D6). Возвращает число пропущенных.
+     * пункта — тогда неответ и наступил (PLAN D6). Возвращает пункты, пропущенные **этим** проходом:
+     * о них сообщают (D8), а об отказе человека — нет, он решил сам.
      */
-    suspend fun missOverdue(course: Course, now: Instant): Int {
+    suspend fun missOverdue(course: Course, now: Instant): List<Uuid> {
         val zone = course.schedule.zone
         val today = now.atZone(zone).toLocalDate()
         val overdue = intakes.ofCourse(course.id).filterIsInstance<CourseIntake>()
             .filter { it.status == IntakeStatus.PLANNED && it.slot.localDate.isBefore(today) }
-        return overdue.count { intake ->
+        return overdue.filter { intake ->
             val endOfDay = intake.slot.localDate.plusDays(1).atStartOfDay(zone).toInstant()
             intakes.record(IntakeOutcome(intake.miss(endOfDay), expected = setOf(IntakeStatus.PLANNED), recordedAt = now))
-        }
+        }.map { it.id }
     }
 
     /**

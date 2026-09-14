@@ -67,7 +67,7 @@ class CourseCalendarTest {
         // Сегодняшний пункт в 09:00 уже прошёл, но день не кончился — он ждёт ответа; и 60 дней вперёд.
         assertEquals(61, planned.size)
         assertEquals(61, first.planned)
-        assertEquals(CourseUpkeep.Report(missed = 0, planned = 0), second)
+        assertEquals(CourseUpkeep.Report(missedIntakes = emptyList(), planned = 0), second)
     }
 
     /** Короткий курс — ровно столько пунктов, сколько доз: окно режет и число доз. */

@@ -3,6 +3,7 @@ package com.kert0n.medapp.feature.course
 import com.kert0n.medapp.queue.Transactions
 import com.kert0n.medapp.storage.course.CourseStorageRepository
 import java.time.Clock
+import kotlin.uuid.Uuid
 import javax.inject.Inject
 import javax.inject.Singleton
 import kotlinx.coroutines.sync.Mutex
@@ -27,21 +28,24 @@ class CourseUpkeep @Inject constructor(
 
     private val single = Mutex()
 
-    /** Сколько пунктов пропущено и сколько заведено этим проходом. */
+    /** Какие пункты пропущены и сколько заведено этим проходом. */
     suspend fun keepUp(): Report = single.withLock {
         val now = clock.instant()
-        var missed = 0
+        val missed = mutableListOf<Uuid>()
         var planned = 0
         for (id in courses.planIds()) {
             transactions.run {
                 val course = courses.findPlan(id) ?: return@run
                 val done = calendar.catchUp(course, now)
-                missed += done.missed
+                missed += done.missedIntakes
                 planned += done.planned
             }
         }
         Report(missed, planned)
     }
 
-    data class Report(val missed: Int, val planned: Int)
+    /** [missedIntakes] — пункты, ставшие пропуском **этим** проходом: о них и сообщают (PLAN D8). */
+    data class Report(val missedIntakes: List<Uuid>, val planned: Int) {
+        val missed: Int get() = missedIntakes.size
+    }
 }

@@ -16,6 +16,7 @@ import com.kert0n.medapp.storage.intake.IntakeStorageRepository
 import com.kert0n.medapp.storage.pack.PackageQuery
 import com.kert0n.medapp.storage.pack.PackageStorageRepository
 import java.time.LocalDate
+import java.time.ZoneId
 import kotlinx.coroutines.flow.first
 import java.time.Duration
 import java.time.Instant
@@ -93,6 +94,23 @@ class NotificationPlanning @Inject constructor(
         return intakes.plannedBefore(now.plus(REMINDER_HORIZON))
             .filter { !it.plannedAt.isBefore(now.minus(GRACE)) }
             .map { reminder(it) }
+    }
+
+    /** Пункты, ставшие пропуском неответом (их называет проход календаря), — уведомлением каждому (PLAN D8). */
+    fun missed(intakeIds: List<Uuid>, at: Instant): List<PlannedNotification> = intakeIds.map { id ->
+        PlannedNotification(NotificationKey.intake(id, NotificationKind.INTAKE_MISSED), at, NotificationTarget.Intake(id), NoticeDelivery.SYSTEM)
+    }
+
+    /**
+     * Сводка дня — одно уведомление, если есть о чём: события дня ([events]) или плановые пункты на
+     * сегодня. Пусто — сводки нет; выключена — тоже.
+     */
+    suspend fun digest(today: LocalDate, zone: ZoneId, events: Int, at: Instant): PlannedNotification? {
+        if (!settings.current().digestEnabled) return null
+        val dayEnd = today.plusDays(1).atStartOfDay(zone).toInstant()
+        val plannedToday = intakes.plannedBefore(dayEnd).any { it.slot.localDate == today }
+        if (events == 0 && !plannedToday) return null
+        return PlannedNotification(NotificationKey.digest(today), at, NotificationTarget.DayPlan(today), NoticeDelivery.SYSTEM)
     }
 
     /** Напоминание об одном пункте — когда сработал его будильник; пункт уже отвечен — `null`. */

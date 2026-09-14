@@ -5,6 +5,8 @@ import com.kert0n.medapp.domain.notification.Notifier
 import com.kert0n.medapp.domain.notification.ReminderAlarms
 import com.kert0n.medapp.platform.notifications.AlarmManagerReminders
 import com.kert0n.medapp.platform.notifications.DefaultNotificationSettings
+import com.kert0n.medapp.platform.notifications.WorkManagerDailySchedule
+import com.kert0n.medapp.feature.notification.DailySchedule
 import com.kert0n.medapp.platform.notifications.SystemNotifier
 import dagger.Binds
 import dagger.Module
@@ -28,4 +30,8 @@ abstract class NotificationModule {
     @Binds
     @Singleton
     abstract fun reminderAlarms(implementation: AlarmManagerReminders): ReminderAlarms
+
+    @Binds
+    @Singleton
+    abstract fun dailySchedule(implementation: WorkManagerDailySchedule): DailySchedule
 }

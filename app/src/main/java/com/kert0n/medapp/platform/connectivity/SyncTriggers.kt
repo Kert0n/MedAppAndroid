@@ -7,7 +7,7 @@ import androidx.lifecycle.DefaultLifecycleObserver
 import androidx.lifecycle.LifecycleOwner
 import androidx.lifecycle.ProcessLifecycleOwner
 import com.kert0n.medapp.di.ApplicationScope
-import com.kert0n.medapp.feature.course.CourseUpkeep
+import com.kert0n.medapp.feature.notification.DailySchedule
 import com.kert0n.medapp.queue.Synchronization
 import dagger.hilt.android.qualifiers.ApplicationContext
 import java.util.concurrent.atomic.AtomicBoolean
@@ -29,7 +29,7 @@ import kotlinx.coroutines.launch
 class SyncTriggers @Inject constructor(
     @ApplicationContext private val context: Context,
     private val synchronization: Synchronization,
-    private val upkeep: CourseUpkeep,
+    private val daily: DailySchedule,
     @ApplicationScope private val scope: CoroutineScope
 ) {
 
@@ -41,7 +41,8 @@ class SyncTriggers @Inject constructor(
         ProcessLifecycleOwner.get().lifecycle.addObserver(object : DefaultLifecycleObserver {
             override fun onStart(owner: LifecycleOwner) {
                 // Календарь сети не ждёт: неответ и окно пунктов приводятся в порядок сразу (PLAN F4).
-                scope.launch { runCatching { upkeep.keepUp() } }
+                // Вход в приложение — проход дня: календарь, будильники, что наступило сегодня (PLAN D8).
+                daily.runNow()
                 synchronization.request()
             }
         })

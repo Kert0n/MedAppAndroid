@@ -5,6 +5,9 @@ import androidx.hilt.work.HiltWorkerFactory
 import androidx.work.Configuration
 import com.kert0n.medapp.platform.connectivity.SyncTriggers
 import com.kert0n.medapp.platform.notifications.NotificationChannels
+import com.kert0n.medapp.feature.notification.DailySchedule
+import com.kert0n.medapp.domain.notification.NotificationSettingsSource
+import kotlinx.coroutines.runBlocking
 import com.kert0n.medapp.queue.QueueOutbox
 import com.kert0n.medapp.queue.SyncSchedule
 import dagger.hilt.android.HiltAndroidApp
@@ -34,6 +37,12 @@ class MedApp : Application(), Configuration.Provider {
     lateinit var channels: NotificationChannels
 
     @Inject
+    lateinit var daily: DailySchedule
+
+    @Inject
+    lateinit var notificationSettings: NotificationSettingsSource
+
+    @Inject
     lateinit var workerFactory: HiltWorkerFactory
 
     override val workManagerConfiguration: Configuration
@@ -46,5 +55,7 @@ class MedApp : Application(), Configuration.Provider {
         outbox.start()
         triggers.start()
         schedule.keepRegular()
+        // Проход дня — к желаемому времени сводки; вход в приложение зовёт его сразу (SyncTriggers).
+        daily.keepDaily(runBlocking { notificationSettings.current() }.digestAt)
     }
 }
