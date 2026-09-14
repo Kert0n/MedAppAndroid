@@ -3243,13 +3243,15 @@ com.kert0n.medapp                         есть · [B17] — появится
 ├─ di/         NetworkModule, DatabaseModule, StorageModule, WorkModule, DispatcherModule,
 │              CredentialsModule
 ├─ domain/     бизнес, по понятиям: value/, pack/, medkit/, course/, intake/, account/, template/,
-│              report/ (отчёты личного кабинета);
+│              report/ (отчёты личного кабинета); scan/ (ScannedCode, DataMatrixCode,
+│              PackageSuggestion, порт PackageCodes);
 │              notification/ — `Reminder` (обязательство), правила дат и порты `Notifier`,
 │              `ReminderAlarms`, `NotificationSettingsSource`; **порты действий** домена:
 │              `DeviceAccount`, `VocabularyLibrary`, `MedKitInvitations`, `PackageTemplates`.
 │              Время — через `Clock`; о хранении и доставке не знает ничего
 ├─ network/    сеть, по понятиям: value/, pack/, medkit/, account/, template/ — DTO, мапперы,
-│   │          резолвер словаря, обвязка предусловий; [B19] crpt/; про очередь не знает
+│   │          резолвер словаря, обвязка предусловий; crpt/ (CrptApi, DTO ответа, CrptPackageCodes —
+│   │          исполняет порт домена без пропуска MedApp); про очередь не знает
 │   └─ server/ доставка без предметного понятия: MedAppApi (примитивы), клиенты HTTP, CrptHttpClient
 ├─ queue/      доставка в обе стороны: SyncOperation и её статус, PreparedRequest, свёртка
 │   │          PackageQueueState, QueuedCommand, QueueStorage, Transactions, QueueTransport,
@@ -3285,7 +3287,7 @@ com.kert0n.medapp                         есть · [B17] — появится
 │              единственный владелец показа и будильника, ReminderAnswering, DailyRound,
 │              порт DailySchedule); settings/ (AppSettings, порт SettingsStore, SettingsChanging —
 │              записать и применить); account/ (AccountReplacement — решение «ключ утрачен»);
-│              [B19] scan/
+│              scan/ (PackageScanning — код даёт предложение, а не факт)
 ├─ presentation/ представление, по понятиям: value/, pack/, medkit/, bootstrap/ — DTO состояния,
 │              мапперы из проекций, разбор ввода, ViewModel; ParsedInput, ScreenState в корне.
 │              Пишут UI-PR; `bootstrap/` появилось с оболочкой и живёт по тем же правилам
@@ -3734,8 +3736,46 @@ data class PackageQuery(
 `{FNC1}` — **литеральная строка из шести символов** `{`, `F`, `N`, `C`, `1`, `}`, а не управляющий
 байт.
 
-Разделители переменных полей DataMatrix **не вычищаются огулом**: нормализация описывается точными
-парами вход→выход и покрывается тестами на фикстурах, иначе можно срезать значащий символ.
+**Код не разбирается и не нормализуется** (решение владельца 2026-09-14): DataMatrix «Честного
+знака» несёт крипто-хвост, мы его не расшифровываем — как и референс, — и в CRPT уходит **текст
+сканера без изменений** с одним префиксом `{FNC1}`; разделители GS (`U+001D`) между полями `91`/`92`
+остаются на месте. Любая «чистка» срезала бы значащий символ; правило держит тест тела запроса.
+
+```kotlin
+// domain/scan — что дал сканер и что говорит код
+data class ScannedCode(val format: CodeFormat, val text: String)
+enum class CodeFormat { DATA_MATRIX, QR, OTHER }      // три пути: CRPT, приглашение (экран 22), «не поддерживается»
+data class DataMatrixCode(val text: String) {       // require: непустой; wire = "{FNC1}" + text как есть
+    val wire: String
+}
+// Предложение, а не факт: всё необязательно, кроме isMedicine; Quantity/Dose здесь нет — превращать нечем.
+data class PackageSuggestion(
+    val name: String?, val form: FormSuggestion, val manufacturer: String?, val country: String?,
+    val expiresOn: ExpiryDate?, val activeSubstance: String?, val dosageText: String?, val quantityText: String?,
+    val isMedicine: Boolean
+)
+sealed interface FormSuggestion { One(form); Several(forms); None }   // экран: подставить / выбрать / оставить пустым
+interface PackageCodes { suspend fun lookup(code: DataMatrixCode): Lookup }  // Found(suggestion) / NotFound / Unavailable(reason)
+// feature/scan
+class PackageScanning { suspend fun lookup(code: ScannedCode): Outcome }    // Suggested / NotFound / Unsupported / Unavailable
+```
+
+Исполняет порт `network/crpt/CrptPackageCodes` через `CrptApi.check(code)` на отдельном клиенте
+(G3): `200` с `codeFounded=false`, `404` и `400` — «не найдено»; обрыв — `NO_CONNECTION`; прочее
+и нечитаемое тело — `SERVER_SILENT`. Ответ разбирается нестрого: `codeFounded`, `category`,
+`productName`, `expireDate`, `screen.items[]` с `pharmacyData` (title, activeSubstance, form,
+dosage, quantity) и `attrList` (`label`/`value`). Форма — `pharmacyData.form` либо атрибут «Форма
+выпуска», количество — `pharmacyData.quantity` либо «Количество единиц потребления»/«Объём»,
+дозировка — `pharmacyData.dosage` либо «Объём / Масса единицы потребления» (метки — наблюдаемые
+референсом); производитель и страна — по меткам, которые назовёт живой ответ. Форма
+сопоставляется `Vocabulary.formsNamed(text)`: нормализация имени (регистр, знаки, пробелы) и
+контролируемый список синонимов на `DosageForm`; точное совпадение — одна, формы с тем же первым
+словом — несколько, иначе — ни одной.
+
+**Бережно к чужому API.** Тесты ходят только в фикстуры. Живой CRPT спрашивает одна проба
+`CrptProbe` — только `-PprobeCrpt`, один запрос за запуск, раз на PR, код из `local.properties`
+(`MEDAPP_CRPT_PROBE_CODE`, в git не попадает); при «не найдено» проба не перебирает варианты, а
+называет ответ.
 
 **Формат определяет распознаватель**, а не длина строки: ML Kit отдаёт `barcode.format`.
 
