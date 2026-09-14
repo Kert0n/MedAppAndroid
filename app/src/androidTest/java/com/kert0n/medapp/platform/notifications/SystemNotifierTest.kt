@@ -130,4 +130,22 @@ class SystemNotifierTest {
         val gone = Reminder(planned.key, NotificationTarget.PackageCard(kotlin.uuid.Uuid.random()), planned.dueAt)
         assertFalse(notifier.show(gone))
     }
+
+    /**
+     * Приёмник действий не запускает активность ни при каком исходе: из уведомления это
+     * запрещённый платформой переход (C1). Проверка читает манифест и класс приёмника — так
+     * нарушение видно до того, как человек нажмёт кнопку и ничего не произойдёт.
+     */
+    @Test
+    fun theActionReceiverNeverStartsAnActivity() {
+        val source = NotificationActionReceiver::class.java.declaredMethods.map { it.name }
+        assertTrue("startActivity в приёмнике", source.none { it.contains("openApp", ignoreCase = true) })
+
+        val declared = context.packageManager.queryBroadcastReceivers(
+            android.content.Intent(com.kert0n.medapp.domain.notification.NotificationAction.SKIP.name)
+                .setPackage(context.packageName),
+            0
+        )
+        assertTrue("приёмник действий объявлен внутренним", declared.none { it.activityInfo.exported })
+    }
 }

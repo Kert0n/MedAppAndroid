@@ -4,6 +4,7 @@ import androidx.test.ext.junit.runners.AndroidJUnit4
 import com.kert0n.medapp.domain.intake.CourseIntake
 import com.kert0n.medapp.domain.intake.IntakeStatus
 import com.kert0n.medapp.domain.notification.NotificationKey
+import com.kert0n.medapp.domain.notification.NotificationAction
 import com.kert0n.medapp.domain.notification.NotificationKind
 import com.kert0n.medapp.domain.notification.Reminder
 import com.kert0n.medapp.domain.pack.ExpiryDate
@@ -84,48 +85,21 @@ class ReminderAnsweringTest {
     private fun reminderFor(intake: CourseIntake) =
         Reminder(reminderKey(intake), com.kert0n.medapp.domain.notification.NotificationTarget.Intake(intake.id), intake.plannedAt)
 
-    /** Двойное «Принял» — один приём и одна команда; обязательство отозвано и карточка погашена. */
+    /**
+     * В шторке нет «Принял»: он требует экрана при просрочке, отменённом курсе и затронутых
+     * бронях, а запустить экран из приёмника уведомления платформа с Android 12 не даёт (C1).
+     * Записывать молча, не показав предупреждения, нельзя — предупреждение действием из шторки не
+     * обходится. Остаются два действия, которым экран не нужен.
+     */
     @Test
-    fun takeWritesOnceAndWithdrawsTheReminder() = runTest {
-        val id = treated()
-        val intake = first(id)
-        scenarios.reminderStore.raiseAll(listOf(reminderFor(intake)))
-
-        assertEquals(ReminderAnswering.Response.Done, scenarios.reminderAnswering.take(intake.id))
-        assertEquals(ReminderAnswering.Response.Done, scenarios.reminderAnswering.take(intake.id))
-
-        assertEquals(IntakeStatus.TAKEN, requireNotNull(database.intakeRepository().find(intake.id)).status)
-        assertEquals(tablets("18"), requireNotNull(database.packageRepository().find(PACK)).quantity)
-        assertEquals(0, database.syncOperations().all().size) // местная полка — команд нет
-        // Отозвано транзакцией приёма; гасит карточку владелец доставки — после коммита.
-        assertEquals(Reminder.State.WITHDRAWN, requireNotNull(scenarios.reminderStore.find(reminderKey(intake))).state)
-        scenarios.reminderOutbox.pass()
-        assertTrue(scenarios.notifier.dismissed.contains(reminderKey(intake)))
-        assertNull(scenarios.reminderStore.find(reminderKey(intake)))
-    }
-
-    /** Просроченная коробка: из шторки приём не записывается — открывается приложение (предупреждение не обходится). */
-    @Test
-    fun takeOnAnExpiredBoxOpensTheAppAndWritesNothing() = runTest {
-        val id = treated()
-        database.packageRepository().describe(PACK, factsOf(pack(quantity = tablets("20"), form = TABLET_FORM)).copy(expiresOn = ExpiryDate(today.minusDays(1))))
-        val intake = first(id)
-
-        assertEquals(ReminderAnswering.Response.OpenApp, scenarios.reminderAnswering.take(intake.id))
-
-        assertEquals(IntakeStatus.PLANNED, requireNotNull(database.intakeRepository().find(intake.id)).status)
-        assertEquals(tablets("20"), requireNotNull(database.packageRepository().find(PACK)).quantity)
-    }
-
-    /** По пункту отменённого курса «Принял» открывает приложение и ничего не пишет. */
-    @Test
-    fun takeOnACancelledCourseOpensTheApp() = runTest {
-        val id = treated()
-        val intake = first(id)
-        scenarios.courseCancellation.cancel(id)
-
-        assertEquals(ReminderAnswering.Response.OpenApp, scenarios.reminderAnswering.take(intake.id))
-        assertEquals(IntakeStatus.CANCELLED, requireNotNull(database.intakeRepository().find(intake.id)).status)
+    fun theShadeOffersOnlyWhatNeedsNoScreen() {
+        assertEquals(
+            listOf(NotificationAction.SKIP, NotificationAction.SNOOZE),
+            NotificationKind.INTAKE_DUE.actions
+        )
+        assertEquals(listOf(NotificationAction.SKIP, NotificationAction.SNOOZE), NotificationAction.entries)
+        // И у остального действий нет вовсе: отвечать там не на что.
+        assertTrue(NotificationKind.entries.filter { it != NotificationKind.INTAKE_DUE }.all { it.actions.isEmpty() })
     }
 
     /** «Отложить» сдвигает будильник на snoozeMinutes; plannedAt и статус пункта прежние. */

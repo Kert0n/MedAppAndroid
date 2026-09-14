@@ -88,7 +88,6 @@ private val NotificationTarget.stored: String
         is NotificationTarget.PackageCard -> "PACKAGE"
         is NotificationTarget.CourseSources -> "COURSE_SOURCES"
         is NotificationTarget.DayPlan -> "DAY_PLAN"
-        NotificationTarget.SyncStatus -> "SYNC"
     }
 
 private val NotificationTarget.id: Uuid?
@@ -97,13 +96,11 @@ private val NotificationTarget.id: Uuid?
         is NotificationTarget.PackageCard -> packageId
         is NotificationTarget.CourseSources -> courseId
         is NotificationTarget.DayPlan -> null
-        NotificationTarget.SyncStatus -> null
     }
 
 private fun targetOf(kind: String, id: Uuid?, date: LocalDate?): NotificationTarget = when (kind) {
     "INTAKE" -> NotificationTarget.Intake(requireNotNull(id) { "у цели-пункта есть идентификатор" })
     "PACKAGE" -> NotificationTarget.PackageCard(requireNotNull(id) { "у цели-коробки есть идентификатор" })
     "COURSE_SOURCES" -> NotificationTarget.CourseSources(requireNotNull(id) { "у цели-лечения есть идентификатор" })
-    "SYNC" -> NotificationTarget.SyncStatus
     else -> NotificationTarget.DayPlan(requireNotNull(date) { "у цели-дня есть дата" })
 }

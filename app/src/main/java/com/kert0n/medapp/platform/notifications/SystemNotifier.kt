@@ -122,7 +122,6 @@ class SystemNotifier @Inject constructor(
             )
         }
         is NotificationTarget.DayPlan -> Text(context.getString(R.string.notice_digest_title), context.getString(R.string.notice_digest_body, target.date.format(DATE)))
-        NotificationTarget.SyncStatus -> Text(context.getString(R.string.notice_sync_title), context.getString(R.string.notice_sync_body))
     }
 
     /**
@@ -137,7 +136,6 @@ class SystemNotifier @Inject constructor(
             is NotificationTarget.PackageCard -> intent.putExtra(EXTRA_PACKAGE_ID, target.packageId.toString())
             is NotificationTarget.CourseSources -> intent.putExtra(EXTRA_COURSE_ID, target.courseId.toString())
             is NotificationTarget.DayPlan -> intent.putExtra(EXTRA_DATE, target.date.toString())
-            NotificationTarget.SyncStatus -> intent.putExtra(EXTRA_SYNC, true)
         }
         return PendingIntent.getActivity(context, notification.key.hashCode(), intent, PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE)
     }
@@ -152,10 +150,8 @@ class SystemNotifier @Inject constructor(
 
     private val NotificationAction.label: Int
         get() = when (this) {
-            NotificationAction.TAKE -> R.string.action_take
             NotificationAction.SKIP -> R.string.action_skip
             NotificationAction.SNOOZE -> R.string.action_snooze
-            NotificationAction.OPEN -> R.string.action_open
         }
 
     companion object {
@@ -163,7 +159,6 @@ class SystemNotifier @Inject constructor(
         const val EXTRA_PACKAGE_ID = "package_id"
         const val EXTRA_COURSE_ID = "course_id"
         const val EXTRA_DATE = "date"
-        const val EXTRA_SYNC = "sync"
 
         private val DATE: DateTimeFormatter = DateTimeFormatter.ofLocalizedDate(FormatStyle.MEDIUM)
     }

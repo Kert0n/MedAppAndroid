@@ -12,5 +12,4 @@ sealed interface NotificationTarget {
     data class PackageCard(val packageId: Uuid) : NotificationTarget
     data class CourseSources(val courseId: Uuid) : NotificationTarget
     data class DayPlan(val date: LocalDate) : NotificationTarget
-    data object SyncStatus : NotificationTarget
 }

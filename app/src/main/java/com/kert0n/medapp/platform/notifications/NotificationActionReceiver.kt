@@ -18,9 +18,14 @@ import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.launch
 
 /**
- * Действие с уведомления о приёме (PLAN D8): «Принял», «Пропустить», «Отложить» — сценарием
- * [ReminderAnswering], тем же, что и экран. Вопрос или отказ открывают приложение с одним
- * `intakeId` — предупреждение действием из шторки не обходится.
+ * Действие с уведомления о приёме (PLAN D8): «Пропустить» — `IntakeDeclining` тем же вызовом, что
+ * экран; «Отложить» сдвигает срок обязательства.
+ *
+ * **Активность отсюда не запускается.** Приёмник, поднятый нажатием на уведомление, с Android 12
+ * этого не может — платформа зовёт это notification trampoline и запуск блокирует (C1). Поэтому в
+ * шторке нет «Принял»: он требует экрана при просрочке, отменённом курсе и затронутых бронях, а
+ * гасить карточку, ничего не записав, хуже, чем не иметь кнопки. Он вернётся вместе с экраном
+ * предупреждения в U5.
  */
 @AndroidEntryPoint
 class NotificationActionReceiver : BroadcastReceiver() {
@@ -37,14 +42,12 @@ class NotificationActionReceiver : BroadcastReceiver() {
         val pending = goAsync()
         CoroutineScope(SupervisorJob() + Dispatchers.IO).launch {
             try {
-                val response = when (action) {
-                    NotificationAction.TAKE -> answering.take(intakeId)
+                when (action) {
                     NotificationAction.SKIP -> answering.skip(intakeId)
                     NotificationAction.SNOOZE -> answering.snooze(intakeId)
-                    NotificationAction.OPEN -> ReminderAnswering.Response.OpenApp
                 }
+                // Человек нажал — карточка уходит сразу, ждать прохода владельца незачем.
                 notifier.dismiss(NotificationKey.intake(intakeId, NotificationKind.INTAKE_DUE))
-                if (response is ReminderAnswering.Response.OpenApp) openApp(context, intakeId)
             } catch (failure: Exception) {
                 // Сбой хранения или системы — не повод ронять процесс: журнал, и следующий проход повторит.
                 if (failure is kotlinx.coroutines.CancellationException) throw failure
@@ -53,13 +56,6 @@ class NotificationActionReceiver : BroadcastReceiver() {
                 pending.finish()
             }
         }
-    }
-
-    private fun openApp(context: Context, intakeId: Uuid) {
-        val launch = context.packageManager.getLaunchIntentForPackage(context.packageName) ?: return
-        context.startActivity(
-            launch.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_SINGLE_TOP).putExtra(EXTRA_INTAKE_ID, intakeId.toString())
-        )
     }
 
     companion object {

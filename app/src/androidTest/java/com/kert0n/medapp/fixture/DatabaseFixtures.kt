@@ -195,7 +195,7 @@ class Scenarios(
     )
     val dailyRound = com.kert0n.medapp.feature.notification.DailyRound(courseUpkeep, notificationReconciliation, clock)
     val reminderAnswering = com.kert0n.medapp.feature.notification.ReminderAnswering(
-        database.intakeRepository(), intakeConfirmation, intakeDeclining, reminderStore, notificationSettings, clock
+        intakeDeclining, reminderStore, notificationSettings, clock
     )
     /**
      * Владелец показа и будильника. В проверках его проход зовут явно: так видно, что показ —

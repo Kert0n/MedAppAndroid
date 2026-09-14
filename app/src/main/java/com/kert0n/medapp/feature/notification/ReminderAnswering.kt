@@ -1,13 +1,10 @@
 package com.kert0n.medapp.feature.notification
 
-import com.kert0n.medapp.domain.intake.CourseIntake
 import com.kert0n.medapp.domain.notification.NotificationKey
 import com.kert0n.medapp.domain.notification.NotificationKind
 import com.kert0n.medapp.domain.notification.NotificationSettingsSource
-import com.kert0n.medapp.storage.notification.ReminderStorageRepository
-import com.kert0n.medapp.feature.intake.IntakeConfirmation
 import com.kert0n.medapp.feature.intake.IntakeDeclining
-import com.kert0n.medapp.storage.intake.IntakeStorageRepository
+import com.kert0n.medapp.storage.notification.ReminderStorageRepository
 import java.time.Clock
 import java.time.Duration
 import java.time.Instant
@@ -15,32 +12,29 @@ import javax.inject.Inject
 import kotlin.uuid.Uuid
 
 /**
- * Ответ на напоминание из шторки — тем же путём, что с экрана (PLAN D8, C1): «Принял» —
- * `IntakeConfirmation` плановой пачкой и плановой дозой, «Пропустить» — `IntakeDeclining`,
- * «Отложить» — тот же будильник через `snoozeMinutes`. Вопрос и отказ из шторки не обходятся:
- * человеку открывается приложение, и решает он там.
+ * Ответ на напоминание из шторки — тем же путём, что с экрана (PLAN D8, C1): «Пропустить» —
+ * `IntakeDeclining`, «Отложить» — сдвиг срока обязательства на `snoozeMinutes`.
+ *
+ * «Принял» здесь нет. Он требует экрана всякий раз, когда есть о чём предупредить — просрочка,
+ * отменённый курс, затронутые брони, — а запустить экран из приёмника уведомления платформа с
+ * Android 12 не даёт. Записывать молча, не показав предупреждения, нельзя: предупреждение
+ * действием из шторки не обходится. Кнопка вернётся вместе с экраном в U5.
  */
 class ReminderAnswering @Inject constructor(
-    private val intakes: IntakeStorageRepository,
-    private val confirmation: IntakeConfirmation,
     private val declining: IntakeDeclining,
     private val reminders: ReminderStorageRepository,
     private val settings: NotificationSettingsSource,
     private val clock: Clock
 ) {
 
-    suspend fun take(intakeId: Uuid): Response {
-        val intake = intakes.find(intakeId) as? CourseIntake ?: return Response.OpenApp
-        val pkg = intake.plannedPackage ?: return Response.OpenApp
-        return when (confirmation.confirm(intakeId, pkg.id, intake.plannedAmount, clock.instant())) {
-            is IntakeConfirmation.Outcome.Confirmed -> Response.Done
-            is IntakeConfirmation.Outcome.Warned, is IntakeConfirmation.Outcome.Rejected -> Response.OpenApp
-        }
-    }
-
+    /** Отказ человека: пункт становится пропуском, и напоминать о нём больше нечего. */
     suspend fun skip(intakeId: Uuid): Response = when (declining.decline(intakeId, clock.instant())) {
         IntakeDeclining.Outcome.DECLINED, IntakeDeclining.Outcome.ALREADY_ANSWERED -> Response.Done
-        IntakeDeclining.Outcome.EPISODE_CLOSED, IntakeDeclining.Outcome.GONE -> Response.OpenApp
+        // Курса или пункта больше нет — напоминать не о чем, и говорить человеку нечего.
+        IntakeDeclining.Outcome.EPISODE_CLOSED, IntakeDeclining.Outcome.GONE -> {
+            reminders.withdraw(listOf(NotificationKey.intake(intakeId, NotificationKind.INTAKE_DUE)))
+            Response.Done
+        }
     }
 
     /**
@@ -54,10 +48,9 @@ class ReminderAnswering @Inject constructor(
         return Response.Snoozed(at)
     }
 
-    /** Чем кончилось для шторки: уведомление гасится, отложено до момента, либо открывается приложение. */
+    /** Чем кончилось для шторки: карточка гасится либо отложена до названного момента. */
     sealed interface Response {
         data object Done : Response
         data class Snoozed(val at: Instant) : Response
-        data object OpenApp : Response
     }
 }

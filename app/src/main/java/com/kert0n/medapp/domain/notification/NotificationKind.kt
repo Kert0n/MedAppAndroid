@@ -13,8 +13,7 @@ enum class NotificationKind(val channel: NotificationChannel) {
     COVERAGE_SHORT(NotificationChannel.COVERAGE),
     COVERAGE_3D(NotificationChannel.COVERAGE),
     COVERAGE_END(NotificationChannel.COVERAGE),
-    DAILY_DIGEST(NotificationChannel.DIGEST),
-    SYNC_ATTENTION(NotificationChannel.SYNC);
+    DAILY_DIGEST(NotificationChannel.DIGEST);
 
     /** Точный будильник нужен только напоминанию о приёме: остальное — календарные события дня. */
     val exact: Boolean get() = this == INTAKE_DUE
@@ -26,25 +25,26 @@ enum class NotificationKind(val channel: NotificationChannel) {
     val delivery: NoticeDelivery
         get() = if (this == EXPIRY_TODAY) NoticeDelivery.IN_APP_BANNER else NoticeDelivery.SYSTEM
 
-    /** Что можно сделать прямо с карточки: отвечают только напоминанию о приёме. */
+    /**
+     * Что можно сделать прямо с карточки: отвечают только напоминанию о приёме. «Принял» здесь
+     * нет — он требует экрана при просрочке и отменённом курсе, а запустить его из приёмника
+     * платформа с Android 12 не даёт (C1). Он вернётся вместе с экраном предупреждения в U5.
+     */
     val actions: List<NotificationAction>
-        get() = if (this == INTAKE_DUE) {
-            listOf(NotificationAction.TAKE, NotificationAction.SKIP, NotificationAction.SNOOZE)
-        } else {
-            emptyList()
-        }
+        get() = if (this == INTAKE_DUE) listOf(NotificationAction.SKIP, NotificationAction.SNOOZE) else emptyList()
 }
 
 /**
- * Канал — то, что человек выключает по отдельности в системных настройках (PLAN D8). Пять каналов
- * с своей важностью; строковые идентификаторы и названия — у платформы.
+ * Канал — то, что человек выключает по отдельности в системных настройках (PLAN D8). Четыре канала
+ * со своей важностью; строковые идентификаторы и названия — у платформы. Канал синхронизации
+ * заводится в B18 вместе с `SYNC_ATTENTION`: канал, который никогда ничего не показывает, человек
+ * видит в настройках как обман.
  */
 enum class NotificationChannel(val importance: Importance) {
     INTAKES(Importance.HIGH),
     EXPIRY(Importance.DEFAULT),
     COVERAGE(Importance.DEFAULT),
-    DIGEST(Importance.LOW),
-    SYNC(Importance.LOW);
+    DIGEST(Importance.LOW);
 
     enum class Importance { HIGH, DEFAULT, LOW }
 }
@@ -52,5 +52,5 @@ enum class NotificationChannel(val importance: Importance) {
 /** Как доставляется: системным уведомлением или баннером внутри приложения (PLAN D8). */
 enum class NoticeDelivery { SYSTEM, IN_APP_BANNER }
 
-/** Что можно сделать прямо с уведомления. */
-enum class NotificationAction { TAKE, SKIP, SNOOZE, OPEN }
+/** Что можно сделать прямо с уведомления, не открывая приложение. */
+enum class NotificationAction { SKIP, SNOOZE }

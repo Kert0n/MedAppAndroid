@@ -30,7 +30,5 @@ data class NotificationKey(val kind: NotificationKind, val subject: String) {
         fun reduction(reductionId: Uuid): NotificationKey = NotificationKey(NotificationKind.COVERAGE_SHORT, reductionId.toString())
 
         fun digest(date: LocalDate): NotificationKey = NotificationKey(NotificationKind.DAILY_DIGEST, date.toString())
-
-        fun sync(operationId: Uuid): NotificationKey = NotificationKey(NotificationKind.SYNC_ATTENTION, operationId.toString())
     }
 }
