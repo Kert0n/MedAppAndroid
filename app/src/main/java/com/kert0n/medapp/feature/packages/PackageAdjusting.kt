@@ -4,7 +4,7 @@ import com.kert0n.medapp.domain.pack.Package
 import com.kert0n.medapp.domain.pack.PackageAfter
 import com.kert0n.medapp.domain.pack.PackageStatus
 import com.kert0n.medapp.domain.value.Quantity
-import com.kert0n.medapp.feature.course.CourseClamping
+import com.kert0n.medapp.feature.course.CourseFollowing
 import com.kert0n.medapp.queue.QueueService
 import com.kert0n.medapp.queue.QueuedCommand
 import com.kert0n.medapp.queue.Transactions
@@ -28,11 +28,11 @@ import kotlin.uuid.Uuid
  * `CHANGING`; ноль в проекции — коробка кончится, когда полка согласится. Утилизация на такой полке
  * — тот же пересчёт: видел [seen], выбросил [amount], осталось `seen − amount`.
  *
- * Лечение, державшее коробку, зажимается под новую доступность ([CourseClamping], D5).
+ * Лечение, державшее коробку, зажимается под новую доступность ([CourseFollowing], D5).
  */
 class PackageAdjusting @Inject constructor(
     private val packages: PackageStorageRepository,
-    private val clamping: CourseClamping,
+    private val following: CourseFollowing,
     private val queue: QueueService,
     private val transactions: Transactions,
     private val clock: Clock
@@ -46,7 +46,7 @@ class PackageAdjusting @Inject constructor(
         // Кончившуюся коробку лечение уже потеряло своей дверью; кончающуюся на полке потеряет
         // ответ. Зажимать есть что только у оставшейся — и по тому же числу, что на экране (D4).
         val after = if (ended) null else packages.projection(pkg.id)?.availability
-        if (after != null && !after.effective.isZero) clamping.clampTheCourseHolding(pkg, now)
+        if (after != null && !after.effective.isZero) following.follow(pkg.id, now)
         if (ended) Outcome.ENDED else Outcome.ADJUSTED
     }
 

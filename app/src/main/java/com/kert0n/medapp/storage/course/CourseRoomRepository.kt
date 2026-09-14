@@ -72,8 +72,14 @@ class CourseRoomRepository @Inject constructor(
     override fun observeReductions(courseId: Uuid): Flow<List<CoverageReduction>> =
         database.observing("coverage_reductions") { courses.reductionsOf(courseId).map { it.toDomain() } }
 
-    override suspend fun clampHolding(packageId: Uuid, at: Instant): List<CourseFollowed> = database.withTransaction {
-        courses.followBox(packageId, packages, intakes, queue, vocabulary.snapshot(), at)
+    override suspend fun holdersOf(packageId: Uuid): List<Uuid> = courses.coursesHolding(packageId)
+
+    override suspend fun planInProgress(id: Uuid): CourseInProgress? = database.withTransaction {
+        courses.planInProgress(id, intakes, vocabulary.snapshot())
+    }
+
+    override suspend fun recordReduction(reduction: CoverageReduction) {
+        courses.insertReduction(reduction.toStorageEntity())
     }
 
     override suspend fun findDraft(id: Uuid): CourseDraft? =

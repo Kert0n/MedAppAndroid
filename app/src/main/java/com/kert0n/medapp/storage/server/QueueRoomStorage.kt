@@ -13,6 +13,7 @@ import com.kert0n.medapp.network.server.RawResponse
 import com.kert0n.medapp.queue.Delivery
 import com.kert0n.medapp.queue.PackageState
 import com.kert0n.medapp.queue.Preparation
+import com.kert0n.medapp.domain.course.PackageFollowing
 import com.kert0n.medapp.queue.QueueStorage
 import com.kert0n.medapp.queue.QueuedCommand
 import com.kert0n.medapp.queue.Settlement
@@ -31,7 +32,6 @@ import com.kert0n.medapp.storage.course.CourseDao
 import com.kert0n.medapp.storage.database.MedAppDatabase
 import com.kert0n.medapp.storage.intake.IntakeDao
 import com.kert0n.medapp.storage.medkit.MedKitDao
-import com.kert0n.medapp.storage.course.followBox
 import com.kert0n.medapp.storage.medkit.loseAccess
 import com.kert0n.medapp.storage.pack.PackageDao
 import com.kert0n.medapp.storage.pack.applySnapshot
@@ -41,6 +41,7 @@ import com.kert0n.medapp.domain.value.Vocabulary
 import com.kert0n.medapp.storage.value.VocabularyDao
 import java.time.Instant
 import javax.inject.Inject
+import javax.inject.Provider
 import kotlin.uuid.Uuid
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.map
@@ -59,7 +60,12 @@ class QueueRoomStorage @Inject constructor(
     private val intakes: IntakeDao,
     private val medKits: MedKitDao,
     private val courses: CourseDao,
-    private val vocabulary: VocabularyDao
+    private val vocabulary: VocabularyDao,
+    /**
+     * Курс следует за коробкой — прикладной владелец реакции (PLAN D5); здесь ему дают транзакцию.
+     * Лениво, потому что он сам ставит команды через эту же очередь, и граф иначе замкнулся бы в кольцо.
+     */
+    private val following: Provider<PackageFollowing>
 ) : QueueStorage {
 
     /** Room сообщает об изменении таблицы после коммита — то, что outbox и должен услышать. */
@@ -378,16 +384,8 @@ class QueueRoomStorage @Inject constructor(
                 is PackageAfter.Ended -> return packages.end(after.ending, courses, words, at)
             }
         }
-        followTheBox(snapshot.pack.id, words, at)
+        following.get().follow(snapshot.pack.id, at)
     }
-
-    /**
-     * Курс следует за коробкой той же транзакцией, что кладёт ответ сервера: чужой расход или бронь,
-     * увиденные ответом, зажимают выделения, и бронь уезжает разницей — каждая своей пачке и её
-     * полке (PLAN D5, E4).
-     */
-    private suspend fun followTheBox(packageId: Uuid, words: Vocabulary, at: Instant) =
-        queue.enqueueClaimChanges(courses.followBox(packageId, packages, intakes, queue, words, at), packages, at)
 
     /** Зависимость значит «нужен эффект»: не будет его у родителя — не будет и у зависимых, и у их зависимых. */
     private suspend fun cascade(id: Uuid, effect: Settlement.Effect.Cascade) {

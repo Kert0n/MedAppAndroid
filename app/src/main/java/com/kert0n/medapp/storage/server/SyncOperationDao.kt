@@ -10,7 +10,6 @@ import com.kert0n.medapp.queue.SyncOperation
 import com.kert0n.medapp.queue.RefusalReason
 import com.kert0n.medapp.queue.SyncOperationStatus
 import com.kert0n.medapp.queue.pack.claimChangesSince
-import com.kert0n.medapp.storage.course.CourseFollowed
 import com.kert0n.medapp.storage.pack.PackageDao
 import java.time.Instant
 import kotlin.uuid.Uuid
@@ -295,22 +294,4 @@ interface SyncOperationDao {
 
     @Query("SELECT depends_on_id FROM sync_operation_dependencies WHERE operation_id = :id")
     suspend fun dependenciesOf(id: Uuid): List<Uuid>
-}
-
-/**
- * Брони после того, как курсы последовали за коробкой, — разницей, каждая команда **своей** пачке
- * и её полке (PLAN D5, E2): зажим мог тронуть и другие источники курса, а они лежат на своих
- * полках. Едет команда только той коробке, чьи изменения отвечают серверу; местной полке и
- * коробке, о которой сервер ещё не слышал, везти нечего — то же правило, что у `QueueService`.
- *
- * Зовётся внутри транзакции того, кто коробку изменил, — укладки снимка или ответа на команду.
- */
-suspend fun SyncOperationDao.enqueueClaimChanges(followed: List<CourseFollowed>, packages: PackageDao, at: Instant) {
-    for (course in followed) {
-        for (command in course.after.claimChangesSince(course.before)) {
-            val row = packages.find(command.packageId) ?: continue
-            if (!row.answersToServer) continue
-            enqueue(Uuid.random(), command, at, medKitId = row.pack.medKitId)
-        }
-    }
 }

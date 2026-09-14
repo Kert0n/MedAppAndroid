@@ -69,7 +69,7 @@ class CourseAmendment @Inject constructor(
         val course = if (completion.reached) {
             changed
         } else {
-            changed.clamped(changed.remainingDoses(progress), calendar.availabilityOf(changed), now)
+            changed.clamped(changed.remainingDoses(progress), packages.availabilityFor(changed), now)
         }
         if (!courses.amend(course, expected)) return@run Outcome.Stale
 

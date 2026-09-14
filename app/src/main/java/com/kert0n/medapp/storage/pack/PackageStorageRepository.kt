@@ -1,6 +1,8 @@
 package com.kert0n.medapp.storage.pack
 
 import com.kert0n.medapp.domain.pack.Claims
+import com.kert0n.medapp.domain.course.Course
+import com.kert0n.medapp.domain.pack.Availability
 import com.kert0n.medapp.domain.pack.Package
 import com.kert0n.medapp.domain.pack.PackageEnding
 import com.kert0n.medapp.domain.pack.PackageProjection
@@ -78,6 +80,13 @@ interface PackageStorageRepository {
      * на всех: коробки, которой нет, это не касается — `false`.
      */
     suspend fun answersToServer(packageId: Uuid): Boolean
+
+    /**
+     * Расклад «сколько доступно мне» по пачкам лечения — от того же числа, которое видит человек:
+     * с незакрытыми командами поверх и без чужих броней (PLAN D4). Пачки, которой уже нет, в
+     * раскладе ничего. По нему лечение зажимается и считает обеспечение.
+     */
+    suspend fun availabilityFor(course: Course): Availability
 
     /**
      * Решение по коробке принято, а полка ещё не ответила: коробка получает пометку [status] своим

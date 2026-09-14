@@ -2,6 +2,9 @@ package com.kert0n.medapp.storage.pack
 
 import androidx.room.withTransaction
 import com.kert0n.medapp.domain.pack.Claims
+import com.kert0n.medapp.domain.course.Course
+import com.kert0n.medapp.domain.pack.Availability
+import com.kert0n.medapp.storage.course.availabilityOf
 import com.kert0n.medapp.domain.pack.Package
 import com.kert0n.medapp.domain.pack.PackageAfter
 import com.kert0n.medapp.domain.pack.PackageEnding
@@ -60,6 +63,10 @@ class PackageRoomRepository @Inject constructor(
 
     override suspend fun answersToServer(packageId: Uuid): Boolean =
         packages.find(packageId)?.answersToServer ?: false
+
+    override suspend fun availabilityFor(course: Course): Availability = database.withTransaction {
+        packages.availabilityOf(listOf(course), queue, intakes, vocabulary.snapshot()).getValue(course.id)
+    }
 
     override suspend fun mark(packageId: Uuid, status: PackageStatus, by: Uuid): Boolean =
         change(packageId) {

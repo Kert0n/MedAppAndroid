@@ -18,6 +18,8 @@ import com.kert0n.medapp.storage.server.SyncOperationStorageRepository
 import com.kert0n.medapp.network.value.VocabularyStore
 import com.kert0n.medapp.queue.QueueBacklog
 import com.kert0n.medapp.queue.QueueStorage
+import com.kert0n.medapp.domain.course.PackageFollowing
+import com.kert0n.medapp.feature.course.CourseFollowing
 import com.kert0n.medapp.queue.SnapshotStorage
 import com.kert0n.medapp.queue.Transactions
 import com.kert0n.medapp.storage.database.RoomTransactions
@@ -94,6 +96,10 @@ abstract class StorageModule {
     @Binds
     @Singleton
     abstract fun snapshotStorage(implementation: SnapshotRoomStorage): SnapshotStorage
+
+    /** Курс следует за коробкой: действие называет домен, исполняет прикладной владелец (PLAN D5). */
+    @Binds
+    abstract fun packageFollowing(implementation: CourseFollowing): PackageFollowing
 
     /** Резолвер словаря живёт в сети и получает снимок через свой интерфейс. */
     @Binds

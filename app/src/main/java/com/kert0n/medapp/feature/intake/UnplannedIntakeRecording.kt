@@ -5,7 +5,7 @@ import com.kert0n.medapp.domain.intake.IntakeRejected
 import com.kert0n.medapp.domain.intake.UnplannedIntake
 import com.kert0n.medapp.domain.pack.PackageAvailability
 import com.kert0n.medapp.domain.value.Dose
-import com.kert0n.medapp.feature.course.CourseClamping
+import com.kert0n.medapp.feature.course.CourseFollowing
 import com.kert0n.medapp.feature.course.openPlan
 import com.kert0n.medapp.queue.QueueService
 import com.kert0n.medapp.queue.QueuedCommand
@@ -30,7 +30,7 @@ import kotlin.uuid.Uuid
  * **Заденет занятое** — принято больше, чем свободно любому (D4: доступное мне без моего
  * выделения, посчитанное от числа на экране). Такой приём сценарий не записывает, а отвечает этим и называет свободное; после
  * подтверждения человеком ([acknowledged]) факт записан, расход — местно либо
- * `Consume` без брони, а мой курс, державший коробку, зажат под оставшееся ([CourseClamping]);
+ * `Consume` без брони, а мой курс, державший коробку, зажат под оставшееся ([CourseFollowing]);
  * соседям нехватку приносит снимок (C1 «Разовый приём из занятого»). Кончившуюся коробку курс
  * теряет её концом — там, где записан приём.
  */
@@ -38,7 +38,7 @@ class UnplannedIntakeRecording @Inject constructor(
     private val intakes: IntakeStorageRepository,
     private val courses: CourseStorageRepository,
     private val packages: PackageStorageRepository,
-    private val clamping: CourseClamping,
+    private val following: CourseFollowing,
     private val queue: QueueService,
     private val transactions: Transactions,
     private val clock: Clock
@@ -83,7 +83,7 @@ class UnplannedIntakeRecording @Inject constructor(
         // лежит в проекции командой. Ноль — коробка кончилась или кончится по ответу, и её теряет
         // дверь конца (PLAN D4, E1).
         val after = packages.projection(pkg.id)?.availability
-        if (after != null && !after.effective.isZero) clamping.clampTheCourseHolding(pkg, now)
+        if (after != null && !after.effective.isZero) following.follow(pkg.id, now)
         Outcome.Recorded(intake.projection(), sync.accounting)
     }
 

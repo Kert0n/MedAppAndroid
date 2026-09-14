@@ -11,6 +11,7 @@ import com.kert0n.medapp.queue.Transactions
 import com.kert0n.medapp.storage.course.CourseReallocation
 import com.kert0n.medapp.storage.course.CourseStorageRepository
 import com.kert0n.medapp.storage.intake.IntakeStorageRepository
+import com.kert0n.medapp.storage.pack.PackageStorageRepository
 import java.time.Clock
 import javax.inject.Inject
 import kotlin.uuid.Uuid
@@ -28,8 +29,9 @@ import kotlin.uuid.Uuid
 class CourseOffPlanCounting @Inject constructor(
     private val courses: CourseStorageRepository,
     private val intakes: IntakeStorageRepository,
+    private val packages: PackageStorageRepository,
     private val calendar: CourseCalendar,
-    private val clamping: CourseClamping,
+    private val following: CourseFollowing,
     private val closing: CourseClosing,
     private val transactions: Transactions,
     private val clock: Clock
@@ -42,10 +44,10 @@ class CourseOffPlanCounting @Inject constructor(
         if (before.revision != expected) return@run Outcome.Stale
         val now = clock.instant()
         calendar.missOverdue(before, now)
-        val course = before.setTakenOffPlan(total, calendar.availabilityOf(before), now)
+        val course = before.setTakenOffPlan(total, packages.availabilityFor(before), now)
         if (course === before) return@run Outcome.Set(before.projection())
         check(courses.reallocate(CourseReallocation(course, expected))) { "план прочитан этой же транзакцией" }
-        clamping.announceClaims(before, course, now)
+        following.announceClaims(before, course, now)
 
         val ofCourse = intakes.ofCourse(courseId).filterIsInstance<CourseIntake>()
         val progress = CourseProgress.of(ofCourse)

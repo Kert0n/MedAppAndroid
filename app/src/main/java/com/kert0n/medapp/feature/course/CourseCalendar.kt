@@ -52,7 +52,7 @@ class CourseCalendar @Inject constructor(
         prune(course, remaining.toSet(), now)
         val window = remaining.filter { it.at.isBefore(now.plus(WINDOW)) }
         if (window.isEmpty()) return 0
-        val order = course.spendOrder(Doses(window.size), availabilityOf(course))
+        val order = course.spendOrder(Doses(window.size), packages.availabilityFor(course))
         val materialised = window.mapIndexed { index, slot ->
             CourseIntake(
                 id = Uuid.random(),
@@ -137,21 +137,6 @@ class CourseCalendar @Inject constructor(
         prune(course, remaining = emptySet(), now = now)
         return extend(course, now)
     }
-
-    /**
-     * Расклад «сколько доступно мне» по пачкам курса — от того же числа, которое видит человек:
-     * подтверждённого остатка с незакрытыми решениями по коробке поверх и без чужих броней
-     * (PLAN D4). Пачку, которой уже нет, курс вот-вот потеряет своим переходом; до тех пор она не
-     * даёт ничего.
-     */
-    internal suspend fun availabilityOf(course: Course): Availability = Availability(
-        course.sources.associate { source ->
-            source.pkg.id to (
-                packages.projection(source.pkg.id)?.availability?.availableToMe
-                    ?: Quantity.zero(source.pkg.unit)
-                )
-        }
-    )
 
     companion object {
         /** На сколько вперёд лежат плановые пункты: достраивает их `CourseUpkeep` (PLAN F4). */

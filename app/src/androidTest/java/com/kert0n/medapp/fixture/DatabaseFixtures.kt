@@ -99,14 +99,30 @@ fun MedAppDatabase.transactions() = com.kert0n.medapp.storage.database.RoomTrans
 
 /** Порт очереди для работника — транзакции взятия и применения исхода. */
 fun MedAppDatabase.queueStorage() = com.kert0n.medapp.storage.server.QueueRoomStorage(
-    this, syncOperations(), packages(), intakes(), medKits(), courses(), vocabulary()
+    this, syncOperations(), packages(), intakes(), medKits(), courses(), vocabulary(),
+    javax.inject.Provider { courseFollowing() }
 )
 
 /** Порт полного снимка — укладка целиком одной транзакцией; полка с сервера зовётся как в ресурсах. */
 fun MedAppDatabase.snapshotStorage() = com.kert0n.medapp.storage.server.SnapshotRoomStorage(
     this, medKits(), packages(), courses(), intakes(), vocabulary(), syncOperations(),
-    arrivedName = "Общая аптечка"
+    arrivedName = "Общая аптечка",
+    following = javax.inject.Provider { courseFollowing() }
 )
+
+/**
+ * Курс следует за коробкой — владелец реакции, которого укладка снимка и ответа зовут из своей
+ * транзакции (PLAN D5). Собирается лениво: он сам ставит команды через ту же очередь.
+ */
+fun MedAppDatabase.courseFollowing(): com.kert0n.medapp.feature.course.CourseFollowing {
+    val reminders = com.kert0n.medapp.storage.notification.ReminderRoomRepository(this, reminders())
+    val calendar = com.kert0n.medapp.feature.course.CourseCalendar(
+        intakeRepository(), packageRepository(),
+        com.kert0n.medapp.feature.notification.ReminderPromising(reminders, FakeSettings(), transactions()),
+        com.kert0n.medapp.feature.notification.ReminderWithdrawal(reminders, transactions())
+    )
+    return com.kert0n.medapp.feature.course.CourseFollowing(courseRepository(), packageRepository(), calendar, queueService(), transactions())
+}
 
 /**
  * Пачка целиком в базу: запись о коробке, живая строка и сведения — как их пишет репозиторий.
@@ -148,8 +164,8 @@ class Scenarios(
 
     val packageAdding = com.kert0n.medapp.feature.packages.PackageAdding(packages, medKits, queue, transactions, clock)
     val courseCalendar = com.kert0n.medapp.feature.course.CourseCalendar(database.intakeRepository(), packages, reminderPromising, reminderWithdrawal)
-    val courseClamping = com.kert0n.medapp.feature.course.CourseClamping(courses, packages, courseCalendar, queue)
-    val packageDescribing = com.kert0n.medapp.feature.packages.PackageDescribing(packages, courseClamping, queue, transactions, clock)
+    val courseFollowing = com.kert0n.medapp.feature.course.CourseFollowing(courses, packages, courseCalendar, queue, transactions)
+    val packageDescribing = com.kert0n.medapp.feature.packages.PackageDescribing(packages, courseFollowing, queue, transactions, clock)
     val packageRemoval = com.kert0n.medapp.feature.packages.PackageRemoval(
         packages, queue, transactions, clock
     )
@@ -164,9 +180,9 @@ class Scenarios(
         medKits, packages, packageRelocation, queue, transactions, clock
     )
     val courseDrafting = com.kert0n.medapp.feature.course.CourseDrafting(courses, packages, transactions, clock)
-    val packageAdjusting = com.kert0n.medapp.feature.packages.PackageAdjusting(packages, courseClamping, queue, transactions, clock)
+    val packageAdjusting = com.kert0n.medapp.feature.packages.PackageAdjusting(packages, courseFollowing, queue, transactions, clock)
     val unplannedIntakeRecording = com.kert0n.medapp.feature.intake.UnplannedIntakeRecording(
-        database.intakeRepository(), courses, packages, courseClamping, queue, transactions, clock
+        database.intakeRepository(), courses, packages, courseFollowing, queue, transactions, clock
     )
     val courseUpkeep = com.kert0n.medapp.feature.course.CourseUpkeep(courses, courseCalendar, transactions, clock)
     val courseActivation = com.kert0n.medapp.feature.course.CourseActivation(
@@ -186,7 +202,7 @@ class Scenarios(
         database.intakeRepository(), courses, courseCalendar, reminderWithdrawal, transactions, clock
     )
     val courseOffPlanCounting = com.kert0n.medapp.feature.course.CourseOffPlanCounting(
-        courses, database.intakeRepository(), courseCalendar, courseClamping, courseClosing, transactions, clock
+        courses, database.intakeRepository(), packages, courseCalendar, courseFollowing, courseClosing, transactions, clock
     )
     val intakeConfirmation = com.kert0n.medapp.feature.intake.IntakeConfirmation(
         database.intakeRepository(), courses, packages, transactions, queue, courseClosing, courseCalendar, reminderWithdrawal, clock

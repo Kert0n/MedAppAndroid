@@ -3,6 +3,7 @@ package com.kert0n.medapp.storage.course
 import com.kert0n.medapp.domain.course.Course
 import com.kert0n.medapp.domain.course.CourseCompletion
 import com.kert0n.medapp.domain.course.CourseCoverage
+import com.kert0n.medapp.domain.report.CourseInProgress
 import com.kert0n.medapp.domain.course.CoverageReduction
 import com.kert0n.medapp.domain.course.CourseDraft
 import com.kert0n.medapp.domain.course.CourseDraftProjection
@@ -93,12 +94,17 @@ interface CourseStorageRepository {
     suspend fun courseHolding(packageId: Uuid): Uuid?
 
     /**
-     * Курс следует за коробкой: каждое идущее лечение, держащее пачку, зажимает выделения под то,
-     * что доступно ему сейчас, условно по своей редакции (PLAN D5). Та же дверь, какой пользуется
-     * укладка снимка. Возвращает пары «до и после» — брони разницей ставит сценарий; пусто —
-     * зажимать было нечего. Зовётся внутри транзакции сценария, который коробку изменил.
+     * Какие лечения держат коробку источником — по составу, а не по назначениям: назначения
+     * бывают только у начатого, а состав есть и у черновика (PLAN D5). За коробкой следует
+     * каждое из них (`CourseFollowing`).
      */
-    suspend fun clampHolding(packageId: Uuid, at: Instant): List<CourseFollowed>
+    suspend fun holdersOf(packageId: Uuid): List<Uuid>
+
+    /** Идущее лечение с прогрессом — то, от чего считают потребность и зажим; `null` — плана нет или это черновик. */
+    suspend fun planInProgress(id: Uuid): CourseInProgress?
+
+    /** Событие сокращения обеспечения (PLAN D5): записывается тем, кто зажал курс, той же транзакцией. */
+    suspend fun recordReduction(reduction: CoverageReduction)
 
     /**
      * Изменённое лечение — доза, форма, расписание, число доз, выделения под них — ложится в план,

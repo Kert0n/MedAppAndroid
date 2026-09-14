@@ -82,7 +82,7 @@ class SourceEditing @Inject constructor(
         calendar.missOverdue(before, now)
         val progress = CourseProgress.of(intakes.ofCourse(id).filterIsInstance<CourseIntake>())
         val required = course.remainingDoses(progress)
-        val availability = calendar.availabilityOf(course)
+        val availability = packages.availabilityFor(course)
         // Предел нарушает прежде всего та пачка, которой прибавили: её человек и двигал.
         course.sources
             .sortedByDescending { source -> before.sources.none { it.pkg == source.pkg && it.allocatedDoses >= source.allocatedDoses } }

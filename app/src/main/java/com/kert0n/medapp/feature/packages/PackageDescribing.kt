@@ -2,7 +2,7 @@ package com.kert0n.medapp.feature.packages
 
 import com.kert0n.medapp.domain.pack.PackageFacts
 import com.kert0n.medapp.domain.pack.PackageStatus
-import com.kert0n.medapp.feature.course.CourseClamping
+import com.kert0n.medapp.feature.course.CourseFollowing
 import com.kert0n.medapp.queue.QueueService
 import com.kert0n.medapp.queue.QueuedCommand
 import com.kert0n.medapp.queue.Transactions
@@ -30,7 +30,7 @@ import kotlin.uuid.Uuid
  */
 class PackageDescribing @Inject constructor(
     private val packages: PackageStorageRepository,
-    private val clamping: CourseClamping,
+    private val following: CourseFollowing,
     private val queue: QueueService,
     private val transactions: Transactions,
     private val clock: Clock
@@ -59,7 +59,7 @@ class PackageDescribing @Inject constructor(
             true
         }
         // Коробка изменилась — курс следует за ней той же дверью: другая форма отключает источник (PLAN D5).
-        clamping.clampTheCourseHolding(pkg, now)
+        following.follow(pkg.id, now)
         Outcome.SAVED
     }
 

@@ -50,7 +50,7 @@ class CourseActivation @Inject constructor(
             return@run Outcome.Rejected((failure as? CourseRejected ?: throw failure).reason)
         }
         // Выделение — намерение человека, но больше, чем пачка даёт, его не бывает (PLAN D5).
-        val course = started.course.let { it.clamped(it.totalDoses, calendar.availabilityOf(it), now) }
+        val course = started.course.let { it.clamped(it.totalDoses, packages.availabilityFor(it), now) }
         courses.activate(CourseDraft.Activation(course, started.record))
         // Лечение начали задним числом — прошедшие дни сразу пропуски, а не ждущие пункты.
         calendar.catchUp(course, now)

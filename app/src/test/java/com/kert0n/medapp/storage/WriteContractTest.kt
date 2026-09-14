@@ -80,6 +80,7 @@ class WriteContractTest {
         "PackageStorageRepository.contentsOf" to (Shape.READ by "(Uuid): List<Package>"),
         "PackageStorageRepository.observeSyncState" to (Shape.READ by "(Uuid): Flow<PackageSyncState>"),
         "PackageStorageRepository.answersToServer" to (Shape.READ by "(Uuid): Boolean"),
+        "PackageStorageRepository.availabilityFor" to (Shape.READ by "(Course): Availability"),
         "PackageStorageRepository.add" to (Shape.CREATION by "(Package, PackageSyncState): Unit"),
         "PackageStorageRepository.describe" to (Shape.NAMED_FIELDS by "(Uuid, PackageFacts): Boolean"),
         "PackageStorageRepository.saveClaims" to (Shape.NAMED_FIELDS by "(Uuid, Claims): Unit"),
@@ -106,7 +107,9 @@ class WriteContractTest {
         "CourseStorageRepository.planIds" to (Shape.READ by "(): List<Uuid>"),
         "CourseStorageRepository.findRecord" to (Shape.READ by "(Uuid): CourseRecord"),
         "CourseStorageRepository.courseHolding" to (Shape.READ by "(Uuid): Uuid"),
-        "CourseStorageRepository.clampHolding" to (Shape.NAMED_FIELDS by "(Uuid, Instant): List<CourseFollowed>"),
+        "CourseStorageRepository.holdersOf" to (Shape.READ by "(Uuid): List<Uuid>"),
+        "CourseStorageRepository.planInProgress" to (Shape.READ by "(Uuid): CourseInProgress"),
+        "CourseStorageRepository.recordReduction" to (Shape.CREATION by "(CoverageReduction): Unit"),
         "CourseStorageRepository.rename" to (Shape.NAMED_FIELDS by "(Uuid, String, String): Boolean"),
         // `long` — редакция: `value class Revision` на JVM разворачивается в своё число.
         "CourseStorageRepository.amend" to (Shape.GUARDED by "(Course, long): Boolean"),
