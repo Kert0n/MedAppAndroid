@@ -17,6 +17,7 @@ import com.kert0n.medapp.fixture.medKit
 import com.kert0n.medapp.fixture.pack
 import com.kert0n.medapp.fixture.unplannedIntake
 import com.kert0n.medapp.fixture.packageRepository
+import com.kert0n.medapp.fixture.queueRepository
 import com.kert0n.medapp.fixture.queueStorage
 import com.kert0n.medapp.fixture.transactions
 import com.kert0n.medapp.fixture.tablets
@@ -590,6 +591,38 @@ class QueueRoomStorageTest {
         assertEquals(SyncOperationStatus.ACCESS_LOST, dependent.status)
         assertNull("утрата доступа без причины", dependent.refusalReason)
         assertNull("зависимая закрыта не тем переходом, что своя: last_error", dependent.lastError)
+    }
+
+    /**
+     * **Нечитаемая строка закрывается тем же переходом, что и читаемая.** Состояние отправки
+     * читается без словаря — оно в колонках, — и учётка, которую заменили, закрывает обе одинаково:
+     * `ACCESS_LOST`, без причины и без строки журнала. Пока у нечитаемой была своя SQL-дверь, она
+     * писала «учётка заменена» туда, где читаемая не пишет ничего.
+     */
+    @Test
+    fun anUnreadableRowIsClosedLikeAReadableOne() = runTest {
+        val readable = operation
+        val unreadable = Uuid.parse("00000000-0000-4000-8000-000000000093")
+        database.syncOperations().enqueue(readable, PackageSyncCommand.Consume(PACK, dose("3"), INTAKE), at, medKitId = HOME_KIT)
+        val stored = database.syncOperations().enqueue(unreadable, PackageSyncCommand.Consume(PACK, dose("1"), INTAKE), at, medKitId = HOME_KIT).toStorageEntity(HOME_KIT)
+        database.syncOperations().update(
+            SyncOperationStorageEntity(
+                id = stored.id, kind = stored.kind, payload = stored.payload, payloadVersion = 99,
+                sequence = stored.sequence, status = stored.status, attempts = stored.attempts,
+                createdAt = stored.createdAt, packageId = stored.packageId, medKitId = stored.medKitId
+            )
+        )
+        assertTrue(database.queueRepository().stored(unreadable) is StoredSyncOperation.Unreadable)
+
+        assertEquals(1, database.medKitRepository().abandonServer(at.plusSeconds(1)))
+
+        val closed = listOf(readable, unreadable).map { requireNotNull(database.syncOperations().find(it)).operation }
+        for (row in closed) {
+            assertEquals(SyncOperationStatus.ACCESS_LOST, row.status)
+            assertNull("утрата доступа без причины: ${row.id}", row.refusalReason)
+            assertNull("закрыта не тем переходом, что читаемая: last_error у ${row.id}", row.lastError)
+            assertEquals("момент закрытия — у обеих", at.plusSeconds(1), row.lastTriedAt)
+        }
     }
 
     /** Закрытие одно: закрытую операцию второй исход не переписывает и следствий не оставляет. */

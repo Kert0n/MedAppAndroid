@@ -19,7 +19,9 @@ import com.kert0n.medapp.queue.QueuedCommand
 import com.kert0n.medapp.queue.Settlement
 import com.kert0n.medapp.queue.StoredSyncOperation
 import com.kert0n.medapp.queue.SyncOperation
+import com.kert0n.medapp.queue.SyncOperationState
 import com.kert0n.medapp.queue.SyncOperationStatus
+import com.kert0n.medapp.queue.readThisTransaction
 import com.kert0n.medapp.queue.Take
 import com.kert0n.medapp.queue.medkit.MedKitSyncCommand
 import com.kert0n.medapp.queue.pack.PackageSyncCommand
@@ -86,23 +88,21 @@ class QueueRoomStorage @Inject constructor(
     /**
      * Свежее состояние ложится в базу первым, предусловия берутся у пачки после этого — в той же
      * транзакции: версии, подтверждённый остаток и своя бронь — то, что у сервера сейчас (PLAN
-     * E2, E3). Второй раз запрос не собирается: `freeze` не трогает строку, где он уже есть.
+     * E2, E3). Берётся только ожидающая или отправлявшаяся — это предусловие переходов
+     * [SyncOperation.taken] и [SyncOperation.resent]; второй раз запрос не собирается.
      */
     override suspend fun take(id: Uuid, fresh: PackageSnapshot?, at: Instant): Take? = database.withTransaction {
         val words = vocabulary.snapshot()
         val stored = queue.find(id)?.toDomain(words) as? StoredSyncOperation.Readable
             ?: return@withTransaction null
         val operation = stored.operation
-        // Берётся только ожидающая или отправлявшаяся: закрытая и получившая ответ — нет.
-        if (operation.status != SyncOperationStatus.PENDING && operation.status != SyncOperationStatus.SENDING) {
-            return@withTransaction null
-        }
+        if (operation.status.isClosed || operation.awaitsApplication) return@withTransaction null
         val command = operation.command
         // Унесённую домой коробку человек мог уже выбросить у себя. Серверу она всё равно должна
         // исчезнуть, а свежий снимок, положенный в базу, завёл бы её обратно: он даёт только версию.
         val carriedAway = command is PackageSyncCommand.Withdraw && packages.find(command.packageId) == null
         if (!carriedAway) fresh?.let { layDown(it, at) }
-        if (operation.prepared == null) {
+        val sending = if (operation.prepared == null) {
             val request = when (command) {
                 // Снимают по версии полки, а её подтверждённое число запоминается в запросе: из него
                 // и из сделанного дома сложится остаток, когда полка ответит (PLAN E6).
@@ -125,35 +125,29 @@ class QueueRoomStorage @Inject constructor(
                 is MedKitSyncCommand -> command.toMedKitPreparedRequest(at)
                 else -> command.unknownRoot()
             }
-            val columns = request.toStorageColumns()
-            val frozen = queue.freeze(
-                id = id,
-                method = columns.method,
-                path = columns.path,
-                query = columns.query,
-                body = columns.body,
-                drugVersion = columns.drugVersion,
-                claimsVersion = columns.claimsVersion,
-                quantityBefore = columns.quantityBefore,
-                mineBefore = columns.mineBefore,
-                unitId = columns.unitId,
-                preparedAt = columns.at
-            )
-            // Ноль строк — операцию закрыли или взяли между чтением и взятием: не наша.
-            if (frozen == 0) return@withTransaction null
+            operation.taken(request)
         } else {
-            if (queue.markSending(id) == 0) return@withTransaction null
-        }
-        (queue.find(id)?.toDomain(words) as? StoredSyncOperation.Readable)?.operation?.let { Take.Sending(it) }
+            operation.resent()
+        } ?: return@withTransaction null
+        save(sending, was = operation.status)
+        Take.Sending(sending)
     }
 
-    override suspend fun answered(id: Uuid, answer: RawResponse, at: Instant) {
-        queue.answered(id, answer.status, answer.body, at)
+    override suspend fun answered(id: Uuid, answer: RawResponse, at: Instant) = database.withTransaction {
+        val operation = operationOf(id) ?: return@withTransaction
+        val answered = operation.answered(answer, at) ?: return@withTransaction
+        save(answered, was = operation.status)
     }
 
-    override suspend fun defer(id: Uuid, reason: String, at: Instant, notBefore: Instant) {
-        queue.defer(id, reason, at, notBefore)
+    override suspend fun defer(id: Uuid, reason: String, at: Instant, notBefore: Instant) = database.withTransaction {
+        val operation = operationOf(id) ?: return@withTransaction
+        val deferred = operation.deferred(reason, at, notBefore) ?: return@withTransaction
+        save(deferred, was = operation.status)
     }
+
+    /** Операция после перехода — в строку, которую прочитали этой же транзакцией (F5). */
+    private suspend fun save(operation: SyncOperation, was: SyncOperationStatus) =
+        (queue.save(operation.id, operation.state, operation.prepared?.toStorageColumns(), was) == 1).readThisTransaction("операция")
 
     /** Подготовка закрыла операцию сама: истина по пачке уже в базе — она только что легла свежим снимком. */
     private suspend fun closedByPreparation(operation: SyncOperation, delivery: Delivery, at: Instant): Take {
@@ -162,33 +156,27 @@ class QueueRoomStorage @Inject constructor(
     }
 
     /**
-     * Переход и его эффекты одной транзакцией. Закрытие одно: строка, которую уже закрыли, второй
-     * раз не закрывается, и следствий у второго закрытия нет — условие стоит в самом запросе.
+     * Переход и его эффекты одной транзакцией. Что переход меняет и из какого статуса возможен,
+     * решает состояние операции ([SyncOperationState]); неприменимый — `null`, и следствий у него
+     * нет: закрытая второй раз не закрывается. Строка, которую нечем прочитать, несёт то же
+     * состояние и закрывается тем же переходом; повторить или переподготовить её нечем.
      */
     override suspend fun settle(id: Uuid, settlement: Settlement, at: Instant) = database.withTransaction {
-        val changed = when (val transition = settlement.transition) {
-            is Settlement.Transition.Close -> close(id, transition, at)
+        val row = queue.find(id) ?: return@withTransaction
+        val stored = row.toDomain(vocabulary.snapshot())
+        val after: SyncOperationState = when (val transition = settlement.transition) {
+            is Settlement.Transition.Close -> stored.state.closed(transition, at)
             is Settlement.Transition.Reprepare ->
-                queue.reprepare(id, transition.lastError, at, transition.notBefore)
-            is Settlement.Transition.Retry -> queue.settle(
-                id, SyncOperationStatus.PENDING, transition.lastError, at,
-                attempted = if (transition.attempted) 1 else 0,
-                notBefore = transition.notBefore,
-                outcomeUnknown = if (transition.outcomeUnknown) 1 else 0
+                (stored as? StoredSyncOperation.Readable)?.state?.reprepared(transition.lastError, at, transition.notBefore)
+            is Settlement.Transition.Retry -> (stored as? StoredSyncOperation.Readable)?.state?.retried(
+                transition.lastError, at, transition.attempted, transition.outcomeUnknown, transition.notBefore
             )
-        }
-        if (changed == 0) return@withTransaction
+        } ?: return@withTransaction
+        // Переподготовка сбрасывает запрос; остальные переходы его не трогают.
+        val prepared = row.operation.prepared.takeIf { after.hasRequest }
+        (queue.save(id, after, prepared, was = stored.state.status) == 1).readThisTransaction("операция")
         for (effect in settlement.effects) apply(id, effect, at)
     }
-
-    /**
-     * Закрытие — одна дверь для своей операции и для зависимых: что пишется в строку при закрытии,
-     * знает только это место. Закрытая операция не повторяется, а счёт попыток — вход задержки и
-     * только он: закрытию нечего им двигать (PLAN E2, E3). Причина — значением и ровно у отказа;
-     * журналу она же строкой.
-     */
-    private suspend fun close(id: Uuid, close: Settlement.Transition.Close, at: Instant): Int =
-        queue.settle(id, close.status, close.refusalReason?.name, at, attempted = 0, refusalReason = close.refusalReason)
 
     private suspend fun apply(id: Uuid, effect: Settlement.Effect, at: Instant) {
         when (effect) {
@@ -396,8 +384,9 @@ class QueueRoomStorage @Inject constructor(
      */
     private suspend fun cascade(id: Uuid, effect: Settlement.Effect.Cascade, at: Instant) {
         for (dependent in queue.dependentsOf(id)) {
-            if (dependent.status.isClosed) continue
-            close(dependent.id, effect.close, at)
+            // Зависимая закрывается тем же переходом, что и своя; закрытая — не применим.
+            val closed = dependent.toState().closed(effect.close, at) ?: continue
+            (queue.save(dependent.id, closed, dependent.prepared, was = dependent.status) == 1).readThisTransaction("зависимая операция")
             intakes.setAccounting(dependent.id, effect.accounting)
             settled(dependent.id)
         }

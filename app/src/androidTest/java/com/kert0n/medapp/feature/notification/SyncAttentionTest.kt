@@ -8,6 +8,7 @@ import com.kert0n.medapp.domain.notification.Reminder
 import com.kert0n.medapp.domain.value.Quantity
 import com.kert0n.medapp.domain.value.QuantityUnit
 import com.kert0n.medapp.fixture.INTAKE
+import com.kert0n.medapp.fixture.settle
 import com.kert0n.medapp.fixture.PACK
 import com.kert0n.medapp.fixture.Scenarios
 import com.kert0n.medapp.fixture.TABLET_FORM

@@ -5,8 +5,11 @@ import androidx.room.Embedded
 import androidx.room.Entity
 import androidx.room.Index
 import androidx.room.PrimaryKey
+import com.kert0n.medapp.domain.value.Attempts
+import com.kert0n.medapp.network.server.RawResponse
 import com.kert0n.medapp.queue.RefusalReason
 import com.kert0n.medapp.queue.SyncOperation
+import com.kert0n.medapp.queue.SyncOperationState
 import com.kert0n.medapp.queue.SyncOperationStatus
 import java.time.Instant
 import kotlin.uuid.Uuid
@@ -57,6 +60,19 @@ class SyncOperationStorageEntity(
     @ColumnInfo(name = "refusal_reason") val refusalReason: RefusalReason? = null,
     /** Отказ разобран человеком в этот момент: строка остаётся, экрану и вниманию к очереди она больше не нужна (C1). */
     @ColumnInfo(name = "dismissed_at") val dismissedAt: Instant? = null
+)
+
+/** Состояние отправки — из колонок, без словаря: его переходы применимы и к строке, которую нечем прочитать. */
+fun SyncOperationStorageEntity.toState(): SyncOperationState = SyncOperationState(
+    status = status,
+    attempts = Attempts(attempts),
+    lastError = lastError,
+    lastTriedAt = lastTriedAt,
+    answer = answerStatus?.let { RawResponse(it, answerBody.orEmpty()) },
+    notBefore = notBefore,
+    outcomeUnknown = outcomeUnknown,
+    refusalReason = refusalReason,
+    hasRequest = prepared != null
 )
 
 /**

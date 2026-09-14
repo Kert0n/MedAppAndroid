@@ -15,8 +15,9 @@ import kotlin.uuid.Uuid
 import kotlinx.coroutines.flow.Flow
 
 /**
- * Строки очереди для тех, кто их ставит и читает: поставить, найти, по статусу, сменить статус,
- * назвать нечитаемые. Транзакции работника — взятие в отправку и применение исхода с его
+ * Строки очереди для тех, кто их ставит и читает: поставить, найти, по статусу, назвать
+ * нечитаемые, отметить разобранной. Состояние отправки меняют только переходы операции —
+ * дверь у [QueueRoomStorage]. Транзакции работника — взятие в отправку и применение исхода с его
  * эффектами — живут в [QueueRoomStorage].
  */
 class SyncOperationRoomRepository @Inject constructor(
@@ -42,17 +43,6 @@ class SyncOperationRoomRepository @Inject constructor(
             val words = vocabulary.snapshot()
             rows.mapNotNull { (it.toDomain(words) as? StoredSyncOperation.Readable)?.operation }
         }
-
-    override suspend fun settle(
-        id: Uuid,
-        status: SyncOperationStatus,
-        lastError: String?,
-        at: Instant?,
-        attempted: Boolean,
-        refusalReason: RefusalReason?
-    ) {
-        queue.settle(id, status, lastError, at, if (attempted) 1 else 0, refusalReason = refusalReason)
-    }
 
     override fun observeOutstanding(): Flow<List<StoredSyncOperation>> =
         database.observing("sync_operations", "sync_operation_dependencies") {

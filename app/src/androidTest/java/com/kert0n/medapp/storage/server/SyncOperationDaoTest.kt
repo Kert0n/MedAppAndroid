@@ -3,6 +3,7 @@ package com.kert0n.medapp.storage.server
 import com.kert0n.medapp.domain.value.Attempts
 import android.database.sqlite.SQLiteConstraintException
 import com.kert0n.medapp.fixture.HOME_KIT
+import com.kert0n.medapp.fixture.settle
 import com.kert0n.medapp.fixture.INTAKE
 import com.kert0n.medapp.fixture.OTHER_PACK
 import com.kert0n.medapp.fixture.PACK
@@ -16,6 +17,7 @@ import com.kert0n.medapp.fixture.tablets
 import com.kert0n.medapp.queue.medkit.MedKitSyncCommand
 import com.kert0n.medapp.queue.pack.PackageSyncCommand
 import com.kert0n.medapp.queue.PreparedRequest
+import com.kert0n.medapp.queue.Settlement
 import com.kert0n.medapp.network.server.ResourceVersion
 import com.kert0n.medapp.queue.SyncOperation
 import com.kert0n.medapp.queue.StoredSyncOperation
@@ -238,47 +240,43 @@ class SyncOperationDaoTest {
     }
 
     /**
-     * Факт «исход неизвестен» принадлежит запросу: прилипает при потерянном ответе, ставится
-     * сам, когда операцию застали в отправке (процесс умер в полёте), и умирает вместе с запросом
-     * при переподготовке (PLAN E3).
+     * Одна дверь состояния: [SyncOperationDao.save] кладёт то, что отдал переход, — статус,
+     * попытки, срок, факт о запросе и сам запрос, — и читается это обратно тем же. Что переходы
+     * значат (неизвестный исход прилипает и умирает с запросом), проверяет `SyncOperationStateTest`
+     * без базы; здесь — что колонки и тип говорят одно.
      */
     @Test
-    fun unknownOutcomeSticksToTheRequestAndDiesWithIt() = runTest {
+    fun saveWritesTheStateAndTheRequestAndTheyReadBackTheSame() = runTest {
         queue.enqueue(first, PackageSyncCommand.Consume(PACK, dose("1"), INTAKE), createdAt)
-        val frozen = queue.freeze(
-            first, "PUT", "/drugs/$PACK/sync/$first", "{}", null, 3L, null, "20", null, TABLETS.id, createdAt
+        val request = PreparedRequest(
+            "PUT", "/drugs/$PACK/sync/$first", mapOf("a" to "b"), "{}",
+            drugVersion = ResourceVersion(3), claimsVersion = null, quantityBefore = tablets("20"), mineBefore = null, preparedAt = createdAt
         )
-        assertEquals(1, frozen)
+        val sending = requireNotNull(readable(first).taken(request))
+        assertEquals(1, queue.save(first, sending.state, sending.prepared?.toStorageColumns(), was = SyncOperationStatus.PENDING))
+        assertEquals(sending, readable(first))
 
-        // 429 — сервер не применял: факта нет.
-        queue.settle(first, SyncOperationStatus.PENDING, "429", createdAt, attempted = 1, outcomeUnknown = 0)
-        assertEquals(false, readable(first).outcomeUnknown)
-
-        // Потерянный ответ — факт есть, и следующий известный исход его не стирает.
-        queue.markSending(first)
-        queue.settle(first, SyncOperationStatus.PENDING, "ответ потерян", createdAt, attempted = 1, outcomeUnknown = 1)
-        queue.markSending(first)
-        queue.settle(first, SyncOperationStatus.PENDING, "429", createdAt, attempted = 1, outcomeUnknown = 0)
+        val unknown = requireNotNull(sending.retried("ответ потерян", createdAt, attempted = true, outcomeUnknown = true, notBefore = createdAt.plusSeconds(2)))
+        assertEquals(1, queue.save(first, unknown.state, unknown.prepared?.toStorageColumns(), was = SyncOperationStatus.SENDING))
+        assertEquals(unknown, readable(first))
         assertEquals(true, readable(first).outcomeUnknown)
 
-        // Переподготовка сбрасывает запрос — и факт вместе с ним; счёт попыток остаётся у операции.
-        queue.markSending(first)
-        queue.reprepare(first, "устарело", createdAt, notBefore = null)
-        val reprepared = readable(first)
-        assertEquals(false, reprepared.outcomeUnknown)
-        assertEquals(Attempts(3), reprepared.attempts)
+        val fresh = requireNotNull(requireNotNull(unknown.resent()).reprepared("устарело", createdAt, null))
+        assertEquals(1, queue.save(first, fresh.state, null, was = SyncOperationStatus.PENDING))
+        assertEquals("сброшенный запрос сброшен и в колонках", null, readable(first).prepared)
+        assertEquals(false, readable(first).outcomeUnknown)
+        assertEquals(Attempts(1), readable(first).attempts)
     }
 
-    /** Операция, застигнутая в отправке, — полёт, о котором никто не рассказал: исход неизвестен. */
+    /** Пишется только строка, которую прочитали: статус сменился — ноль строк, состояние не тронуто. */
     @Test
-    fun anOperationFoundSendingIsTakenWithAnUnknownOutcome() = runTest {
+    fun saveWritesOnlyTheRowInTheStatusThatWasRead() = runTest {
         queue.enqueue(first, PackageSyncCommand.Consume(PACK, dose("1"), INTAKE), createdAt)
-        queue.freeze(first, "PUT", "/drugs/$PACK/sync/$first", "{}", null, 3L, null, "20", null, TABLETS.id, createdAt)
-        assertEquals(false, readable(first).outcomeUnknown)
+        val closed = requireNotNull(readable(first).closed(Settlement.Transition.Close.Applied, createdAt))
 
-        queue.markSending(first)
+        assertEquals(0, queue.save(first, closed.state, null, was = SyncOperationStatus.SENDING))
 
-        assertEquals(true, readable(first).outcomeUnknown)
+        assertEquals(SyncOperationStatus.PENDING, readable(first).status)
     }
 
     /** Ближайший срок — среди незакрытых и ещё не наступивших: закрытые и наступившие ждать не заставляют. */
