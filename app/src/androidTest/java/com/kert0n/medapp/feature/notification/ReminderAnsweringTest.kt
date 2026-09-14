@@ -249,4 +249,39 @@ class ReminderAnsweringTest {
 
         assertEquals(intake.plannedAt, afterRestart.reminders.wakeAt)
     }
+
+    /**
+     * «Отложить» по обязательству, которого уже сняли (курс отменили, пока карточка висела):
+     * воскрешать снятое нельзя, а человеку надо ответить так, чтобы карточка ушла. Сейчас переход
+     * бросает, приёмник ловит исключение **до** гашения — и карточка остаётся висеть.
+     */
+    @Test
+    fun snoozingAWithdrawnReminderIsDoneAndDoesNotReviveIt() = runTest {
+        val id = treated()
+        val intake = first(id)
+        scenarios.reminderPromising.promise(listOf(reminderFor(intake)))
+        scenarios.reminderWithdrawal.withdrawKeys(listOf(reminderKey(intake)))
+
+        val response = runCatching { scenarios.reminderAnswering.snooze(intake.id) }
+
+        assertEquals(ReminderAnswering.Response.Done, response.getOrNull())
+        assertEquals(
+            Reminder.State.WITHDRAWN,
+            requireNotNull(scenarios.reminderStore.find(reminderKey(intake))).state
+        )
+    }
+
+    /** «Отложить» по обязательству, которого нет вовсе: отвечать сроком, которого не записали, — ложь. */
+    @Test
+    fun snoozingAMissingReminderIsDoneNotSnoozed() = runTest {
+        val id = treated()
+        val intake = first(id)
+        scenarios.reminderWithdrawal.withdrawKeys(listOf(reminderKey(intake)))
+        scenarios.reminderOutbox.pass()
+        assertNull(scenarios.reminderStore.find(reminderKey(intake)))
+
+        val response = scenarios.reminderAnswering.snooze(intake.id)
+
+        assertEquals("срок назван, а записать его было некуда", ReminderAnswering.Response.Done, response)
+    }
 }

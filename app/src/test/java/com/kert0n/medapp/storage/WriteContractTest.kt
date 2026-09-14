@@ -4,6 +4,7 @@ import com.kert0n.medapp.storage.course.CourseStorageRepository
 import com.kert0n.medapp.storage.intake.IntakeStorageRepository
 import com.kert0n.medapp.storage.medkit.MedKitStorageRepository
 import com.kert0n.medapp.storage.pack.PackageStorageRepository
+import java.io.File
 import java.lang.reflect.Method
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
@@ -49,6 +50,14 @@ class WriteContractTest {
 
         /** Пришедшее с провода: истина по нему — сервер, и спорить с ним нечем. */
         SNAPSHOT,
+
+        /**
+         * Прочитанный экземпляр, который читает, меняет и пишет **один и тот же узкий шаг внутри
+         * своей транзакции**. Редакции здесь нет и не нужно: вклиниться между чтением и записью
+         * нельзя — Room берёт замок записи на входе в транзакцию (PLAN C1, F5). Защита держится не
+         * подписью метода, а тем, **кто** его зовёт, поэтому владельцы названы поимённо ниже.
+         */
+        IN_TRANSACTION,
 
         /**
          * Прочитанный экземпляр без токена редакции — **долг**, а не форма. Каждый такой метод
@@ -138,7 +147,7 @@ class WriteContractTest {
         "ReminderStorageRepository.stale" to (Shape.READ by "(Instant): List<Reminder>"),
         "ReminderStorageRepository.ofKinds" to (Shape.READ by "(Collection<? extends NotificationKind>): List<Reminder>"),
         // Обязательство считает своё состояние само и приходит сюда целиком: спорить с ним нечем.
-        "ReminderStorageRepository.saveAll" to (Shape.ACTION by "(Collection<Reminder>): Unit"),
+        "ReminderStorageRepository.saveAll" to (Shape.IN_TRANSACTION by "(Collection<Reminder>): Unit"),
         "ReminderStorageRepository.deleteAll" to (Shape.NAMED_FIELDS by "(Collection<NotificationKey>): Unit")
     )
 
@@ -147,6 +156,29 @@ class WriteContractTest {
      * редакции, в список молча не попадёт — его придётся приписать сюда руками и объяснить.
      */
     private val known: Set<String> = emptySet()
+
+    /**
+     * Кому позволено читать и писать обязательство — с именем шага-владельца. Список закрыт: пятое
+     * место, взявшееся писать прочитанный экземпляр, либо открывает свою транзакцию и приписывается
+     * сюда, либо объявляется долгом. Молча назвать такую запись действием больше нельзя.
+     */
+    private val inTransaction: Map<String, Set<String>> = mapOf(
+        "ReminderStorageRepository.saveAll" to setOf(
+            // Завести недостающее и воскресить отозванное.
+            "feature/notification/ReminderPromising.kt",
+            // Снять обещанное, у которого не стало повода.
+            "feature/notification/ReminderWithdrawal.kt",
+            // Отложить по кнопке из шторки.
+            "feature/notification/ReminderAnswering.kt",
+            // Записать исход показа — перечитав: пока шла система, обязательство могли изменить.
+            "feature/notification/ReminderOutbox.kt"
+        )
+    )
+
+    private val sources: File = listOf(
+        File("src/main/java/com/kert0n/medapp"),
+        File("app/src/main/java/com/kert0n/medapp")
+    ).firstOrNull { it.isDirectory } ?: error("исходники не найдены: проверка прошла бы впустую")
 
     private val ports = listOf(
         PackageStorageRepository::class.java,
@@ -196,6 +228,37 @@ class WriteContractTest {
             emptyMap<String, List<String>>(),
             changed
         )
+    }
+
+    /**
+     * Форма `IN_TRANSACTION` держится не подписью, а вызывающими, поэтому проверяется трижды: у
+     * каждого такого метода назван список владельцев, никто кроме них его не зовёт, и каждый
+     * владелец действительно открывает транзакцию вокруг чтения и записи.
+     */
+    @Test
+    fun onlyTheNamedStepsReadAndWriteInOneTransaction() {
+        val guarded = contract.filterValues { it.shape == Shape.IN_TRANSACTION }.keys
+        assertEquals("шаг-владелец не назван у метода формы IN_TRANSACTION", inTransaction.keys, guarded)
+
+        for ((method, owners) in inTransaction) {
+            val name = method.substringAfter('.')
+            for (owner in owners) {
+                val file = File(sources, owner)
+                assertTrue("нет файла $owner — проверка сторожила бы пустоту", file.isFile && file.length() > 0)
+                assertTrue(
+                    "$owner назван владельцем $method, но не открывает транзакцию вокруг чтения и записи",
+                    file.readText().contains("transactions.run")
+                )
+            }
+            // Порт и его реализация метод объявляют — речь о тех, кто его **зовёт**.
+            val callers = sources.walkTopDown()
+                .filter { it.extension == "kt" }
+                .filterNot { it.relativeTo(sources).invariantSeparatorsPath.startsWith("storage/") }
+                .filter { it.readText().contains(Regex("\\.$name\\s*\\(")) }
+                .map { it.relativeTo(sources).invariantSeparatorsPath }
+                .toSortedSet()
+            assertEquals("$method зовут не только названные шаги-владельцы", owners.toSortedSet(), callers)
+        }
     }
 
     @Test

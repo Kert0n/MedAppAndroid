@@ -3,6 +3,7 @@ package com.kert0n.medapp.feature.notification
 import com.kert0n.medapp.domain.notification.NotificationKey
 import com.kert0n.medapp.domain.notification.NotificationKind
 import com.kert0n.medapp.domain.notification.NotificationSettingsSource
+import com.kert0n.medapp.domain.notification.Reminder
 import com.kert0n.medapp.feature.intake.IntakeDeclining
 import com.kert0n.medapp.storage.notification.ReminderStorageRepository
 import java.time.Clock
@@ -25,6 +26,7 @@ class ReminderAnswering @Inject constructor(
     private val reminders: ReminderStorageRepository,
     private val withdrawal: ReminderWithdrawal,
     private val settings: NotificationSettingsSource,
+    private val transactions: com.kert0n.medapp.queue.Transactions,
     private val clock: Clock
 ) {
 
@@ -42,15 +44,25 @@ class ReminderAnswering @Inject constructor(
      * Сдвигается срок **обязательства** — не `plannedAt` и не граница `MISSED` (PLAN D8). Сдвиг
      * лежит в таблице, поэтому переживает и проход дня, и перезагрузку: будильник — исполнитель
      * сохранённого срока, а не его хранилище.
+     *
+     * Откладывать нечего — обязательства нет или его сняли — отвечаем [Response.Done]: называть
+     * срок, которого не записали, значит соврать человеку и оставить карточку висеть.
      */
     suspend fun snooze(intakeId: Uuid): Response {
         val at = clock.instant().plus(Duration.ofMinutes(settings.current().snoozeMinutes.toLong()))
         val key = NotificationKey.intake(intakeId, NotificationKind.INTAKE_DUE)
-        reminders.find(key)?.let { reminder ->
-            reminder.defer(at)
-            reminders.saveAll(listOf(reminder))
+        // Читаем и пишем одной транзакцией: пока человек жал кнопку, лечение могли отменить, и
+        // отсрочка, положенная поверх снятого, воскресила бы его (F5).
+        val deferred = transactions.run {
+            val reminder = reminders.find(key)?.takeIf { it.state != Reminder.State.WITHDRAWN }
+            reminder?.also {
+                it.defer(at)
+                reminders.saveAll(listOf(it))
+            } != null
         }
-        return Response.Snoozed(at)
+        // Обещания больше нет или его сняли — откладывать нечего, и называть срок человеку незачем:
+        // карточка просто уходит.
+        return if (deferred) Response.Snoozed(at) else Response.Done
     }
 
     /** Чем кончилось для шторки: карточка гасится либо отложена до названного момента. */

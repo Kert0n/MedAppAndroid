@@ -43,6 +43,7 @@ class ReminderOutbox @Inject constructor(
     private val notifier: Notifier,
     private val alarms: ReminderAlarms,
     private val freshness: Freshness,
+    private val transactions: com.kert0n.medapp.queue.Transactions,
     private val clock: Clock,
     @ApplicationScope private val scope: CoroutineScope
 ) {
@@ -118,28 +119,49 @@ class ReminderOutbox @Inject constructor(
 
         var shown = 0
         var blocked = 0
-        val settled = mutableListOf<Reminder>()
         for (reminder in due) {
             // Сбой одного показа не уносит остальные: работник очереди изолирует свои так же (E4).
             val outcome = runCatching { notifier.show(reminder) }.getOrElse { Delivery.FAILED }
-            when (outcome) {
-                // Отметка — **после** показа: падение между ними оставляет обязательство `DUE`.
-                Delivery.SHOWN -> { reminder.deliveredAt(clock.instant()); shown++; settled += reminder }
+            if (outcome == Delivery.NOT_ALLOWED) {
                 // Показать нечем: обязательство ждёт листа приёмов, и будильника оно не попросит.
-                Delivery.NOT_ALLOWED -> blocked++
-                Delivery.SUBJECT_GONE -> { reminder.withdraw(); settled += reminder }
-                Delivery.FAILED -> { reminder.failedAt(clock.instant()); settled += reminder }
+                blocked++
+                continue
             }
+            if (settle(reminder.key, outcome)) shown += if (outcome == Delivery.SHOWN) 1 else 0
         }
-        reminders.saveAll(settled)
         forgetThePast(now)
 
-        val next = awaiting.mapNotNull { it.wakeAt(clock.instant()) }.minOrNull()
-        if (next == null) alarms.stopWaking() else alarms.wakeAt(next, exact = exactnessOf(awaiting, next))
+        // Будильник ставится по **свежему** чтению: за проход обязательства изменились.
+        val left = reminders.awaiting(NoticeDelivery.SYSTEM)
+        val next = left.mapNotNull { it.wakeAt(clock.instant()) }.minOrNull()
+        if (next == null) alarms.stopWaking() else alarms.wakeAt(next, exact = exactnessOf(left, next))
         val report = Report(shown = shown, dismissed = dismissed, blocked = blocked, nextAt = next)
         _state.update { it.copy(passes = it.passes + 1, lastReport = report, lastFailure = null, pushBlocked = blocked > 0) }
         return report
     }
+
+    /**
+     * Записать исход показа — **перечитав** обязательство своей транзакцией. Между чтением до сети
+     * и этой записью прошло до двух секунд: лечение могли отменить, человек мог отложить. Писать
+     * прочитанное тогда значило бы воскресить снятое и потерять отсрочку (F5, C1).
+     *
+     * Изменилось — не трогаем: решение приняли без нас, и оно свежее. Карточку, показанную зря,
+     * погасит следующий проход.
+     */
+    private suspend fun settle(key: com.kert0n.medapp.domain.notification.NotificationKey, outcome: Delivery): Boolean =
+        transactions.run {
+            val fresh = reminders.find(key) ?: return@run false
+            val at = clock.instant()
+            if (!fresh.isDue(at)) return@run false
+            when (outcome) {
+                Delivery.SHOWN -> fresh.deliveredAt(at)
+                Delivery.SUBJECT_GONE -> fresh.withdraw()
+                Delivery.FAILED -> fresh.failedAt(at)
+                Delivery.NOT_ALLOWED -> return@run false
+            }
+            reminders.saveAll(listOf(fresh))
+            true
+        }
 
     /** Точность просит тот, чей срок настал: напоминанию о приёме она нужна, остальному нет. */
     private fun exactnessOf(awaiting: List<Reminder>, next: java.time.Instant): Boolean =

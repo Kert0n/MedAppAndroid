@@ -137,14 +137,14 @@ class Scenarios(
     val freshness: FakeFreshness = FakeFreshness()
 ) {
     private val clock = java.time.Clock.fixed(now, java.time.ZoneOffset.UTC)
+    private val transactions = database.transactions()
     val reminderStore = com.kert0n.medapp.storage.notification.ReminderRoomRepository(database, database.reminders())
-    val reminderWithdrawal = com.kert0n.medapp.feature.notification.ReminderWithdrawal(reminderStore)
-    val reminderPromising = com.kert0n.medapp.feature.notification.ReminderPromising(reminderStore)
+    val reminderWithdrawal = com.kert0n.medapp.feature.notification.ReminderWithdrawal(reminderStore, transactions)
+    val reminderPromising = com.kert0n.medapp.feature.notification.ReminderPromising(reminderStore, transactions)
     private val packages = database.packageRepository()
     private val medKits = database.medKitRepository()
     private val courses = database.courseRepository()
     private val queue = database.queueService()
-    private val transactions = database.transactions()
 
     val packageAdding = com.kert0n.medapp.feature.packages.PackageAdding(packages, medKits, queue, transactions, clock)
     val courseCalendar = com.kert0n.medapp.feature.course.CourseCalendar(database.intakeRepository(), packages, reminderPromising, reminderWithdrawal)
@@ -197,14 +197,14 @@ class Scenarios(
     )
     val dailyRound = com.kert0n.medapp.feature.notification.DailyRound(courseUpkeep, notificationReconciliation, clock)
     val reminderAnswering = com.kert0n.medapp.feature.notification.ReminderAnswering(
-        intakeDeclining, reminderStore, reminderWithdrawal, notificationSettings, clock
+        intakeDeclining, reminderStore, reminderWithdrawal, notificationSettings, transactions, clock
     )
     /**
      * Владелец показа и будильника. В проверках его проход зовут явно: так видно, что показ —
      * отдельный шаг, а не побочное действие прохода дня.
      */
     val reminderOutbox = com.kert0n.medapp.feature.notification.ReminderOutbox(
-        reminderStore, notifier, reminders, freshness, clock,
+        reminderStore, notifier, reminders, freshness, transactions, clock,
         kotlinx.coroutines.CoroutineScope(kotlinx.coroutines.SupervisorJob() + kotlinx.coroutines.Dispatchers.Unconfined)
     )
 }

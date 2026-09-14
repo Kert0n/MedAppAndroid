@@ -48,6 +48,10 @@ class ReminderOutboxTest {
     private fun digest(day: LocalDate = LocalDate.of(2027, 3, 10), at: Instant = now.minusSeconds(600)) =
         Reminder(NotificationKey.digest(day), NotificationTarget.DayPlan(day), at)
 
+    /** Напоминание о приёме: только у него владелец доставки ходит за свежестью перед показом. */
+    private fun intake(id: Uuid = Uuid.random(), at: Instant = now.minusSeconds(600)) =
+        Reminder(NotificationKey.intake(id, NotificationKind.INTAKE_DUE), NotificationTarget.Intake(id), at)
+
     private fun coverage(course: Uuid = Uuid.random(), at: Instant = now.minusSeconds(600)) =
         Reminder(NotificationKey.reduction(course), NotificationTarget.CourseSources(course), at)
 
@@ -221,5 +225,52 @@ class ReminderOutboxTest {
         scenarios.reminderOutbox.pass()
 
         assertEquals(listOf(waiting.key), scenarios.notifier.shown.map { it.key })
+    }
+
+    /**
+     * **Гонка «показ против отмены».** Владелец доставки читает обязательства, идёт за свежестью —
+     * это до двух секунд, — и только потом показывает. За это время лечение могли отменить: отмена
+     * снимает обязательство своей транзакцией.
+     *
+     * Записать после показа то, что читали до сети, значит воскресить снятое: карточка останется
+     * висеть, а обязательство будет числиться сказанным. Перечитывать надо.
+     */
+    @Test
+    fun aWithdrawalDuringTheNetworkWaitIsNotOverwritten() = runTest {
+        val reminder = intake()
+        scenarios.reminderStore.saveAll(listOf(reminder))
+        scenarios.freshness.meanwhile = { scenarios.reminderWithdrawal.withdrawKeys(listOf(reminder.key)) }
+
+        scenarios.reminderOutbox.pass()
+
+        assertEquals(
+            "снятое обязательство воскрешено показом",
+            Reminder.State.WITHDRAWN,
+            requireNotNull(scenarios.reminderStore.find(reminder.key)).state
+        )
+    }
+
+    /**
+     * **Гонка «показ против отсрочки».** В том же окне человек мог нажать «Отложить» по прежней
+     * карточке этого пункта. Пометить обязательство сказанным значит потерять отсрочку: человек
+     * просил напомнить позже, а напоминание не придёт больше никогда.
+     */
+    @Test
+    fun aSnoozeDuringTheNetworkWaitIsNotLost() = runTest {
+        val reminder = intake()
+        scenarios.reminderStore.saveAll(listOf(reminder))
+        val later = now.plusSeconds(15 * 60)
+        scenarios.freshness.meanwhile = {
+            requireNotNull(scenarios.reminderStore.find(reminder.key)).let {
+                it.defer(later)
+                scenarios.reminderStore.saveAll(listOf(it))
+            }
+        }
+
+        scenarios.reminderOutbox.pass()
+
+        val after = requireNotNull(scenarios.reminderStore.find(reminder.key))
+        assertEquals("отсрочка потеряна: записано прочитанное до сети", later, after.dueAt)
+        assertEquals(Reminder.State.DUE, after.state)
     }
 }

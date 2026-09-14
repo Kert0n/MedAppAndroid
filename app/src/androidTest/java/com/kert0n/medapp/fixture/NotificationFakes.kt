@@ -61,12 +61,18 @@ class FakeSettings(var settings: NotificationSettings = NotificationSettings.DEF
     override suspend fun current(): NotificationSettings = settings
 }
 
-/** Свежесть, которой не нужна сеть: проверкам важно, что её спросили, а не что она принесла. */
-class FakeFreshness : Freshness {
+/**
+ * Свежесть, которой не нужна сеть: проверкам важно, что её спросили, а не что она принесла.
+ *
+ * [meanwhile] — то, что успевает случиться, пока владелец доставки ждёт заход. Это ровно окно, в
+ * котором он держит прочитанное до сети, и гонку в нём можно смоделировать точно, а не ожиданием.
+ */
+class FakeFreshness(var meanwhile: (suspend () -> Unit)? = null) : Freshness {
     var asked = 0
         private set
 
     override suspend fun refreshBriefly(within: java.time.Duration) {
         asked++
+        meanwhile?.invoke()
     }
 }

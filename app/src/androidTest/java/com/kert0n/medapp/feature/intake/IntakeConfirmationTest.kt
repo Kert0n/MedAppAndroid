@@ -80,8 +80,8 @@ class IntakeConfirmationTest {
 
     private val now: Instant = Instant.parse("2027-03-10T12:00:00Z")
     private val store by lazy { com.kert0n.medapp.storage.notification.ReminderRoomRepository(database, database.reminders()) }
-    private val withdrawal by lazy { com.kert0n.medapp.feature.notification.ReminderWithdrawal(store) }
-    private val promising by lazy { com.kert0n.medapp.feature.notification.ReminderPromising(store) }
+    private val withdrawal by lazy { com.kert0n.medapp.feature.notification.ReminderWithdrawal(store, database.transactions()) }
+    private val promising by lazy { com.kert0n.medapp.feature.notification.ReminderPromising(store, database.transactions()) }
     private val third: Uuid = Uuid.parse("00000000-0000-4000-8000-000000000063")
 
     @Before

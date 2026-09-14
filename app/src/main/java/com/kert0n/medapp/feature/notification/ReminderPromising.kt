@@ -1,6 +1,7 @@
 package com.kert0n.medapp.feature.notification
 
 import com.kert0n.medapp.domain.notification.Reminder
+import com.kert0n.medapp.queue.Transactions
 import com.kert0n.medapp.storage.notification.ReminderStorageRepository
 import javax.inject.Inject
 
@@ -15,20 +16,25 @@ import javax.inject.Inject
  * - что отозвали, но так и не сказали, — **воскрешаем**: повод вернулся раньше, чем мы успели
  *   забыть, и гасить его непоказанным было бы потерей.
  *
- * Зовётся внутри транзакции, которая завела повод: обязательство откатывается вместе с ним (F5).
+ * Читает и пишет **одной транзакцией**: прочитанное действительно ровно в её пределах (F5).
+ * Вложенность безопасна, поэтому шаг верен и внутри транзакции того, кто завёл повод, — и тогда
+ * обязательство откатывается вместе с ним.
  */
 class ReminderPromising @Inject constructor(
-    private val reminders: ReminderStorageRepository
+    private val reminders: ReminderStorageRepository,
+    private val transactions: Transactions
 ) {
 
     suspend fun promise(wanted: Collection<Reminder>) {
         if (wanted.isEmpty()) return
-        val known = reminders.findAll(wanted.map { it.key }).associateBy { it.key }
-        reminders.saveAll(
-            wanted.mapNotNull { fresh ->
-                val existing = known[fresh.key] ?: return@mapNotNull fresh
-                existing.takeIf { it.revivable() }?.apply { reviveAt(fresh.dueAt) }
-            }
-        )
+        transactions.run {
+            val known = reminders.findAll(wanted.map { it.key }).associateBy { it.key }
+            reminders.saveAll(
+                wanted.mapNotNull { fresh ->
+                    val existing = known[fresh.key] ?: return@mapNotNull fresh
+                    existing.takeIf { it.revivable() }?.apply { reviveAt(fresh.dueAt) }
+                }
+            )
+        }
     }
 }
