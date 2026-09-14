@@ -2,6 +2,7 @@ package com.kert0n.medapp.feature.notification
 
 import com.kert0n.medapp.domain.notification.NotificationKey
 import com.kert0n.medapp.domain.notification.NotificationKind
+import com.kert0n.medapp.domain.notification.NotificationSettings
 import com.kert0n.medapp.domain.notification.NotificationSettingsSource
 import com.kert0n.medapp.domain.notification.NotificationTarget
 import com.kert0n.medapp.domain.notification.Reminder
@@ -28,14 +29,17 @@ import kotlin.uuid.Uuid
  * отзывается. Курс отвечает за свои пункты, коробка — за срок, обеспечение — за нехватку, а
  * «спросить каждого и сложить» — работа сценария (H1).
  *
- * Сверяется то, что следует из **состояния**: сроки годности, предупреждения о нехватке и сводка.
- * Их нельзя копить — исправленный срок отменяет прежнее предупреждение, восстановленное
- * обеспечение снимает своё. Обязательства от **события** — приём, пропуск, сокращение — сверка не
- * отзывает: повод уже в прошлом, и пересчитать его из нынешнего состояния нечем. Исключение одно —
- * человек попросил молчать: выключенная настройка снимает обещанное своего вида и не даёт обещать
- * новое, включённая возвращает несказанное (D8).
+ * Сверяется то, что следует из **состояния**: сроки годности, предупреждения о нехватке, сводка,
+ * внимание к очереди и напоминания о плановых пунктах. Их нельзя копить — исправленный срок
+ * отменяет прежнее предупреждение, восстановленное обеспечение снимает своё, отвеченный пункт
+ * снимает напоминание. Обязательства от **события** — пропуск, сокращение — сверка не отзывает:
+ * повод уже в прошлом, и пересчитать его из нынешнего состояния нечем. Выключенная настройка
+ * снимает обещанное своего вида и не даёт обещать новое, включённая возвращает несказанное (D8).
  *
- * Показывать и будить сверка не умеет: это дело [ReminderOutbox], и он проснётся сам.
+ * Показывать и будить сверка не умеет: это дело [ReminderOutbox], и он проснётся сам. Когда
+ * сверять, решают другие: [NotificationUpkeep] — по сигналу изменившихся оснований, [DailyRound] —
+ * по смене дня, `SettingsChanging` — по решению человека; никто, кроме них, её не зовёт
+ * (`NotificationOwnershipTest`).
  */
 class NotificationReconciliation @Inject constructor(
     private val intakes: IntakeStorageRepository,
@@ -52,44 +56,41 @@ class NotificationReconciliation @Inject constructor(
     /**
      * Привести обещанное в соответствие с тем, что есть.
      *
-     * Считается **до** транзакции, а пишется в ней. Чтения здесь долгие — весь список пачек с
-     * проекциями, обеспечение каждого идущего лечения, его сокращения, — и держать под ними пишущую
-     * транзакцию значило бы запирать базу для очереди отправки и сценариев человека на всё это
-     * время. Запись же идёт одной: полусверенное состояние не должно пережить падение.
+     * Основания читаются и обязательства пишутся **одной транзакцией** (F5): решение, принятое по
+     * прочитанному до неё, легло бы поверх ответа человека, данного пока мы считали, — так сверка
+     * воскрешала напоминание о только что принятом пункте. Ответ, пришедший во время сверки, ждёт
+     * её замка и снимает напоминание сам. Настройки — не база: читаются до транзакции, а их
+     * смена зовёт сверку отдельно.
      *
-     * Считанное могло устареть, пока мы читали, — и это не беда: обещание заводится только
-     * недостающее, снимается только беспричинное, а следующий проход поправит.
+     * Без изменений сверка **не пишет ничего**: сигнал изменившейся таблицы будит владельца
+     * доставки, и лишняя запись давала бы лишний проход на каждую укладку снимка.
      */
     suspend fun reconcile(now: Instant, zone: ZoneId): Report {
-        val today = now.atZone(zone).toLocalDate()
         val current = settings.current()
-        val events = expiryDue(today, now) + coverageDue(now)
-        val digest = digest(today, zone, events.size)
-        val desired = events + listOfNotNull(digest, syncAttention(now))
-        val reductions = if (current.remoteChangeEnabled) reductionsDue(now) else emptyList()
-        // Лишнее — то, что было обещано по состоянию, а в нынешнем состоянии повода не имеет.
-        // Сводка, обещанная на другое время и ещё не сказанная, — тоже лишнее: человек перенёс её,
-        // и снятое здесь обещание ниже воскреснет с новым сроком.
-        val wanted = desired.mapTo(HashSet()) { it.key }
-        val stale = reminders.ofKinds(FROM_STATE)
-            .filter { it.key !in wanted || (digest != null && it.key == digest.key && it.state == Reminder.State.DUE && it.dueAt != digest.dueAt) }
-            .map { it.key }
-        // Напоминания о приёме и сообщения о чужом сокращении сверка держит в **обе** стороны:
-        // включены — обещаем, выключены — снимаем обещанное. Обещает приёмы и календарь, когда
-        // заводит пункт, чтобы не ждать прохода; `promise` идемпотентен, и два обещающих не спорят.
-        // Без обратного хода выключить и включить напоминания значило бы потерять их навсегда (C1).
-        val intakeDue = if (current.intakeRemindersEnabled) plannedReminders() else emptyList()
-        val silenced = buildList {
-            if (!current.intakeRemindersEnabled) addAll(reminders.ofKinds(listOf(NotificationKind.INTAKE_DUE)).map { it.key })
-            if (!current.remoteChangeEnabled) addAll(reminders.ofKinds(listOf(NotificationKind.COVERAGE_SHORT)).map { it.key })
-        }
-
-        transactions.run {
+        return transactions.run {
+            val today = now.atZone(zone).toLocalDate()
+            val events = expiryDue(today, now, current) + coverageDue(now, current)
+            val digest = digest(today, zone, events.size, current)
+            val desired = events + listOfNotNull(digest, syncAttention(now))
+            val reductions = if (current.remoteChangeEnabled) reductionsDue(now) else emptyList()
+            // Напоминания о приёме и сообщения о чужом сокращении сверка держит в **обе** стороны:
+            // включены — обещаем плановые, выключены — снимаем обещанное; пункт, переставший быть
+            // плановым, снимается и при включённых. Обещает пункты и календарь, когда заводит их,
+            // чтобы не ждать прохода; `promise` идемпотентен, и два обещающих не спорят.
+            val intakeDue = if (current.intakeRemindersEnabled) plannedReminders() else emptyList()
+            // Лишнее — то, что было обещано по состоянию, а в нынешнем состоянии повода не имеет.
+            // Сводка, обещанная на другое время и ещё не сказанная, — тоже лишнее: человек перенёс её,
+            // и снятое здесь обещание ниже воскреснет с новым сроком.
+            val wanted = (desired + intakeDue).mapTo(HashSet()) { it.key }
+            val stale = reminders.ofKinds(FROM_STATE)
+                .filter { it.key !in wanted || (digest != null && it.key == digest.key && it.state == Reminder.State.DUE && it.dueAt != digest.dueAt) }
+                .map { it.key }
+            val silenced = if (current.remoteChangeEnabled) emptyList() else reminders.ofKinds(listOf(NotificationKind.COVERAGE_SHORT)).map { it.key }
             // Сначала снять, потом обещать: воскрешение снятого даёт ему новый срок.
             withdrawal.withdrawKeys(stale + silenced)
             promising.promise(desired + reductions + intakeDue)
+            Report(promised = desired.size + intakeDue.size, withdrawn = stale.size + silenced.size)
         }
-        return Report(promised = desired.size + intakeDue.size, withdrawn = stale.size + silenced.size)
     }
 
     /**
@@ -123,17 +124,15 @@ class NotificationReconciliation @Inject constructor(
     /**
      * Обеспечение идущих лечений на момент [at] (PLAN D8): за `coverageThresholdDays` календарных
      * дней до первого необеспеченного пункта и в его день. Сокращение — событие, и живёт оно
-     * отдельно ([reductionsDue]). День берётся **в зоне курса** — той же, в которой стоит и пункт: день устройства
-     * у полуночи может быть уже другим. Обеспеченному курсу предупреждать нечего.
+     * отдельно ([reductionsDue]). День считает само обеспечение — в зоне курса, которую несёт.
+     * Обеспеченному курсу предупреждать нечего.
      */
-    suspend fun coverageDue(at: Instant): List<Reminder> {
-        val threshold = settings.current().coverageThresholdDays
+    suspend fun coverageDue(at: Instant, current: NotificationSettings? = null): List<Reminder> {
+        val threshold = (current ?: settings.current()).coverageThresholdDays
         val due = mutableListOf<Reminder>()
         for ((courseId, coverage) in courses.observeCoverages().first()) {
-            val zone = courses.findPlan(courseId)?.schedule?.zone ?: continue
-            val today = at.atZone(zone).toLocalDate()
             val firstUncoveredAt = coverage.firstUncoveredAt ?: continue
-            val kind = when (coverage.noticeOn(today, zone, threshold)) {
+            val kind = when (coverage.noticeOn(at, threshold)) {
                 CourseCoverage.Notice.AHEAD -> NotificationKind.COVERAGE_3D
                 CourseCoverage.Notice.END -> NotificationKind.COVERAGE_END
                 null -> continue
@@ -149,8 +148,8 @@ class NotificationReconciliation @Inject constructor(
      * последний день баннером в приложении. Этап — только сегодняшний: поздно подключённая коробка
      * залпа прошедших не получает; просроченной этапов нет.
      */
-    suspend fun expiryDue(today: LocalDate, at: Instant): List<Reminder> {
-        val sourcesEnabled = settings.current().expirySourceRemindersEnabled
+    suspend fun expiryDue(today: LocalDate, at: Instant, current: NotificationSettings? = null): List<Reminder> {
+        val sourcesEnabled = (current ?: settings.current()).expirySourceRemindersEnabled
         return packages.list(PackageQuery(), today).first().mapNotNull { pkg ->
             val expiresOn = pkg.facts.expiresOn ?: return@mapNotNull null
             val isSource = pkg.holdingCourseId != null && !pkg.availability.myAllocation.isZero
@@ -194,10 +193,11 @@ class NotificationReconciliation @Inject constructor(
 
     /**
      * Сводка дня — одно обещание, если есть о чём: события дня ([events]) или плановые пункты на
-     * сегодня. Пусто — сводки нет; выключена — тоже. Срок — желаемое время `digestAt`.
+     * сегодня. Пусто — сводки нет; выключена — тоже. Срок — желаемое время `digestAt`. Это
+     * уведомление-ссылка на экран плана на дату: содержания в шторке нет.
      */
-    suspend fun digest(today: LocalDate, zone: ZoneId, events: Int): Reminder? {
-        val settings = settings.current()
+    suspend fun digest(today: LocalDate, zone: ZoneId, events: Int, current: NotificationSettings? = null): Reminder? {
+        val settings = current ?: settings.current()
         if (!settings.digestEnabled) return null
         val dayStart = today.atStartOfDay(zone).toInstant()
         val dayEnd = today.plusDays(1).atStartOfDay(zone).toInstant()
@@ -225,7 +225,8 @@ class NotificationReconciliation @Inject constructor(
             NotificationKind.COVERAGE_3D,
             NotificationKind.COVERAGE_END,
             NotificationKind.DAILY_DIGEST,
-            NotificationKind.SYNC_ATTENTION
+            NotificationKind.SYNC_ATTENTION,
+            NotificationKind.INTAKE_DUE
         )
     }
 }

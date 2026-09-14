@@ -2,6 +2,7 @@ package com.kert0n.medapp.feature.notification
 
 import com.kert0n.medapp.domain.notification.NotificationKey
 import com.kert0n.medapp.domain.notification.NotificationKind
+import com.kert0n.medapp.domain.notification.Reminder
 import com.kert0n.medapp.queue.Transactions
 import com.kert0n.medapp.storage.notification.ReminderStorageRepository
 import javax.inject.Inject
@@ -36,11 +37,15 @@ class ReminderWithdrawal @Inject constructor(
         withdrawKeys(intakeIds.map { NotificationKey.intake(it, NotificationKind.INTAKE_DUE) })
     }
 
-    /** Снять названные обязательства: прочитать, перевести переходом и записать — одной транзакцией. */
+    /**
+     * Снять названные обязательства: прочитать, перевести переходом и записать — одной транзакцией.
+     * Уже отозванное не переписывается: сверка зовёт это на каждом проходе, и лишняя запись
+     * будила бы владельца доставки без повода.
+     */
     suspend fun withdrawKeys(keys: Collection<NotificationKey>) {
         if (keys.isEmpty()) return
         transactions.run {
-            reminders.saveAll(reminders.findAll(keys).onEach { it.withdraw() })
+            reminders.saveAll(reminders.findAll(keys).filter { it.state != Reminder.State.WITHDRAWN }.onEach { it.withdraw() })
         }
     }
 }

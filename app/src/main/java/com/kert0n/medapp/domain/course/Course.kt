@@ -221,7 +221,7 @@ class Course(
      * хватает (PLAN D5). Потребность — от назначенного числа доз, а не от окна календаря.
      */
     fun coverage(progress: CourseProgress, availability: Availability): CourseCoverage =
-        medicine.coverage(dose, remainingOccurrences(progress), availability)
+        medicine.coverage(dose, remainingOccurrences(progress), availability, schedule.zone)
 
     /**
      * Верхняя граница ползунка пачки в целых дозах: меньшее из того, что пачка даёт, и того, что
