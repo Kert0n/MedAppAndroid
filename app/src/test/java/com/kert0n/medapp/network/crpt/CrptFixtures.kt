@@ -19,7 +19,7 @@ object CrptFixtures {
           "category": "drugs",
           "code": "01046012345678902100000000000",
           "productName": "Ибупрофен таблетки покрытые пленочной оболочкой 200 мг №20",
-          "expireDate": 1804800600000,
+          "expireDate": 1804714200000,
           "screen": {
             "items": [
               {"itemType": "group_card", "images": ["https://example.invalid/1.png"]},

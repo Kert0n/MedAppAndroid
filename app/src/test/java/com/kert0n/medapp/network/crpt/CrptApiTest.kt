@@ -70,7 +70,7 @@ class CrptApiTest {
         assertEquals("drugs", body.category)
         assertEquals("таблетки, покрытые пленочной оболочкой", body.pharmacy?.form)
         assertEquals("ОАО «Синтез»", body.attributes["Производитель"])
-        assertEquals(1804800600000L, body.expireDate)
+        assertEquals(1804714200000L, body.expireDate)
     }
 
     /** `200` с признаком «не нашли» — нормальный ответ; `404` и `400` — тот же случай. */

@@ -31,6 +31,20 @@ class Vocabulary(units: Collection<QuantityUnit>, forms: Collection<DosageForm>)
 
     fun form(id: Uuid): DosageForm? = forms[id]
 
+    /**
+     * Какие формы словаря названы текстом [text] (PLAN H5): точное совпадение нормализованных
+     * имён — одна; иначе формы, чьё имя начинается с первого слова текста, — несколько, и выбирает
+     * человек; ничего похожего — ни одной. Пустой текст не называет ничего.
+     */
+    fun formsNamed(text: String): List<DosageForm> =
+        DosageForm.alternatives(text).flatMap { named(it) }.distinct()
+
+    private fun named(wanted: String): List<DosageForm> {
+        forms.values.firstOrNull { it.normalizedName == wanted }?.let { return listOf(it) }
+        val firstWord = wanted.substringBefore(' ')
+        return forms.values.filter { it.normalizedName == firstWord || it.normalizedName.startsWith("$firstWord ") }.sortedBy { it.normalizedName }
+    }
+
     override fun equals(other: Any?): Boolean =
         this === other || (other is Vocabulary && units == other.units && forms == other.forms)
 
