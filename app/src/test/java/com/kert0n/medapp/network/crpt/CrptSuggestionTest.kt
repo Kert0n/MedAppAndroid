@@ -1,6 +1,5 @@
 package com.kert0n.medapp.network.crpt
 
-import com.kert0n.medapp.domain.scan.FormSuggestion
 import com.kert0n.medapp.domain.value.DosageForm
 import com.kert0n.medapp.domain.value.Vocabulary
 import java.time.LocalDate
@@ -35,7 +34,7 @@ class CrptSuggestionTest {
 
         assertEquals("Цетрин", suggestion.name)
         assertEquals("таблетки покрытые пленочной оболочкой", suggestion.formText)
-        assertEquals(FormSuggestion.One(coated), suggestion.form)
+        assertEquals(coated, suggestion.form)
         assertEquals("Д-Р РЕДДИ`С ЛАБОРАТОРИС ЛТД.", suggestion.manufacturer)
         assertEquals("ИНДИЯ", suggestion.country)
         assertEquals(LocalDate.of(2028, 3, 31), suggestion.expiresOn?.lastDay)
@@ -56,7 +55,7 @@ class CrptSuggestionTest {
         val suggestion = dto(CrptFixtures.lozenge).toSuggestion(Vocabulary(emptyList(), listOf(tablets, coated, lozenges)))
 
         assertEquals("Доритрицин", suggestion.name)
-        assertEquals(FormSuggestion.One(lozenges), suggestion.form)
+        assertEquals(lozenges, suggestion.form)
         assertEquals("1.5 мг+1 мг+0.5 мг", suggestion.dosageText)
         assertEquals("ГЕРМАНИЯ", suggestion.country)
         assertEquals("МЕДИЦЕ ФАРМА ГМБХ & КО. КГ", suggestion.manufacturer)
@@ -70,25 +69,21 @@ class CrptSuggestionTest {
 
         assertFalse(suggestion.isMedicine)
         assertEquals("Крем для рук", suggestion.name)
-        assertEquals(FormSuggestion.One(cream), suggestion.form)
+        assertEquals(cream, suggestion.form)
         assertNull(suggestion.expiresOn)
         assertNull(suggestion.manufacturer)
     }
 
-    /**
-     * Форма, которой словарь не знает, — пусто, но текст реестра остаётся: человек его видит.
-     * «Таблетки» без точного имени в словаре — выбор из всех таблеток.
-     */
+    /** Форма, которой словарь не знает, — пусто, но текст реестра остаётся: человек его видит. */
     @Test
-    fun anUnknownFormStaysEmptyAndAnAmbiguousOneIsAChoice() {
+    fun anUnknownFormStaysEmptyWithItsText() {
         val unknown = dto("""{"codeFounded": true, "category": "drugs", "screen": {"items": [{"pharmacyData": {"form": "пластырь"}}]}}""").toSuggestion(words)
-        assertEquals(FormSuggestion.None, unknown.form)
+        assertNull(unknown.form)
         assertEquals("пластырь", unknown.formText)
 
-        val sublingual = DosageForm(Uuid.parse("00000000-0000-4000-8000-000000000104"), "таблетки подъязычные")
-        val withoutPlainTablets = Vocabulary(emptyList(), listOf(coated, sublingual, cream))
-        val ambiguous = dto("""{"codeFounded": true, "category": "drugs", "screen": {"items": [{"attrList": [{"label": "Форма выпуска", "value": "Таблетки"}]}]}}""")
-        assertEquals(FormSuggestion.Several(listOf(sublingual, coated)), ambiguous.toSuggestion(withoutPlainTablets).form)
+        val withoutPlainTablets = Vocabulary(emptyList(), listOf(coated, cream))
+        val other = dto("""{"codeFounded": true, "category": "drugs", "screen": {"items": [{"attrList": [{"label": "Форма выпуска", "value": "Таблетки"}]}]}}""")
+        assertNull(other.toSuggestion(withoutPlainTablets).form)
     }
 
     /** Без аптечного блока и атрибутов — только имя: остальное не придумывается. */
@@ -97,7 +92,7 @@ class CrptSuggestionTest {
         val suggestion = dto("""{"codeFounded": true, "category": "bio", "productName": "Омега-3"}""").toSuggestion(words)
 
         assertEquals("Омега-3", suggestion.name)
-        assertEquals(FormSuggestion.None, suggestion.form)
+        assertNull(suggestion.form)
         assertNull(suggestion.manufacturer)
         assertNull(suggestion.country)
         assertNull(suggestion.dosageText)

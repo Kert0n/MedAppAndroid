@@ -1,7 +1,6 @@
 package com.kert0n.medapp.network.crpt
 
 import com.kert0n.medapp.domain.scan.DataMatrixCode
-import com.kert0n.medapp.domain.scan.FormSuggestion
 import com.kert0n.medapp.domain.scan.PackageCodes
 import com.kert0n.medapp.domain.scan.PackageSuggestion
 import com.kert0n.medapp.domain.value.Vocabulary
@@ -40,7 +39,7 @@ internal fun CrptCheckNetworkDTO.toSuggestion(words: Vocabulary): PackageSuggest
     return PackageSuggestion(
         name = productName.orNullIfBlank() ?: pharmacy?.title.orNullIfBlank(),
         formText = formText,
-        form = formText?.let { FormSuggestion.of(words.formsNamed(it)) } ?: FormSuggestion.None,
+        form = formText?.let(words::formNamed),
         manufacturer = attributes[MANUFACTURER_LABEL] ?: attributes.byLabel(MANUFACTURER_ROOTS),
         country = chip(COUNTRY_CHIP) ?: attributes.byLabel(COUNTRY_ROOTS),
         expiresOn = expiresOn(),

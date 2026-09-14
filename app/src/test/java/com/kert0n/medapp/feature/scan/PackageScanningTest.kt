@@ -3,7 +3,6 @@ package com.kert0n.medapp.feature.scan
 import com.kert0n.medapp.domain.Unavailability
 import com.kert0n.medapp.domain.scan.CodeFormat
 import com.kert0n.medapp.domain.scan.DataMatrixCode
-import com.kert0n.medapp.domain.scan.FormSuggestion
 import com.kert0n.medapp.domain.scan.PackageCodes
 import com.kert0n.medapp.domain.scan.PackageSuggestion
 import com.kert0n.medapp.domain.scan.ScannedCode
@@ -25,7 +24,7 @@ class PackageScanningTest {
         }
     }
 
-    private val suggestion = PackageSuggestion(name = "Ибупрофен", form = FormSuggestion.None, isMedicine = true)
+    private val suggestion = PackageSuggestion(name = "Ибупрофен", isMedicine = true)
     private val text = "0104601234567890215ABCDE12345\u001d91EE11\u001d92dGVzdA=="
 
     @Test

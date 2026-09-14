@@ -3750,11 +3750,11 @@ data class DataMatrixCode(val text: String) {       // require: непустой
 }
 // Предложение, а не факт: всё необязательно, кроме isMedicine; Quantity/Dose здесь нет — превращать нечем.
 data class PackageSuggestion(
-    val name: String?, val form: FormSuggestion, val manufacturer: String?, val country: String?,
+    val name: String?, val formText: String?, val form: DosageForm?, val manufacturer: String?, val country: String?,
     val expiresOn: ExpiryDate?, val activeSubstance: String?, val dosageText: String?, val quantityText: String?,
     val isMedicine: Boolean
 )
-sealed interface FormSuggestion { One(form); Several(forms); None }   // экран: подставить / выбрать / оставить пустым
+// formText — как назвал реестр, всегда; form — форма словаря, которую узнали, либо ничего: догадок и выбора нет.
 interface PackageCodes { suspend fun lookup(code: DataMatrixCode): Lookup }  // Found(suggestion) / NotFound / Unavailable(reason)
 // feature/scan
 class PackageScanning { suspend fun lookup(code: ScannedCode): Outcome }    // Suggested / NotFound / Unsupported / Unavailable
@@ -3772,14 +3772,21 @@ dosage, quantity) и `attrList` (`label`/`value`). Форма — `pharmacyData.
 `Уголь активированный`: форма одна и та же, новых ключей нет, блоки могут отсутствовать (картинки,
 `receiptDate`); `expireDate` — полночь по Москве, которая в UTC ещё вчера; реестр вернул код с GS
 внутри как есть; составная дозировка «1.5 мг+1 мг+0.5 мг» приходит строкой). **Форма —
-двумя частями**: `formText` — как её назвал реестр, всегда, и `form` — что из этого узнал наш
-словарь. Словарь сервера и текст реестра получены разными путями, и совпадение имён — удача, а не
-правило (решение владельца 2026-09-14; референс форму со словарём не сопоставляет вовсе — хранит
-первое слово текста и классифицирует по основе «ТАБЛЕТК», «КАПСУЛ» ради значка). Поэтому
-`Vocabulary.formsNamed(text)`: нормализация (регистр, знаки, пробелы, «р-р» → «раствор»); точное
-совпадение имён — одна; иначе **кандидаты по основе первого слова** (`DosageForm.stem` — первые
-пять букв, не короче трёх: «таблетки», «таблетка», «табл.» — одна основа) — несколько, выбирает
-человек; ничего похожего — ни одной, и на экране остаётся текст реестра.
+двумя частями**: `formText` — как её назвал реестр, всегда, и `form` — та форма словаря, которую в
+этом тексте **узнали, либо ничего**. Словарь сервера и текст реестра получены разными путями, и
+дословное совпадение — удача, а не правило; догадок и выбора из похожих нет — либо даём то, что
+узнали, либо не даём (решения владельца 2026-09-14; референс форму со словарём не сопоставляет
+вовсе — хранит первое слово текста и классифицирует по основе ради значка). Узнаёт форму
+`Vocabulary.formNamed(text)` сравнением **основ слов** (`DosageForm.stems`) — те же случаи, что
+знал `scrapper/form_types.py`, приводивший справочник к словарю: регистр, «ё», знаки препинания;
+сокращения с чертой и с точкой («в/в», «в/м», «п/к», «п/о», «п/пл/о», «р-р», «д/», «таб.»,
+«капс.», «сусп.», «супп.», «пор.», «гран.», «лиоф.», «конц.», «амп.»); слова-наполнители («для»,
+«приготовления», «нанесения на», «лекарственные», «полости»); окончания («таблетки», «таблетка»,
+«покрытые», «покрытая» — одна основа: длинное слово без двух последних букв); всё от первого
+числа — дозировка, не форма. Совпадение — только целиком; косая черта между словами —
+альтернативы, узнана ровно одна — она. На встроенном словаре ни две формы не сливаются — это
+держит `BundledVocabularyFormsTest` (основа в пять букв склеила бы «внутривенного» с
+«внутримышечного»).
 
 **Бережно к чужому API** (решение владельца 2026-09-14: о циклах обновления неизвестно ничего,
 лишняя правка или трафик могут нас отрезать). Тесты ходят только в фикстуры (`CrptFixtures.found`
@@ -3975,7 +3982,7 @@ Base — всё, что работает без экранов: домен, хр
 | B16 | #27 `data/foreign-changes` | вопрос перед записью приёма (`Outcome.Warned`, просрочка по дню устройства); курс следует за коробкой одной дверью `CourseDao.followBox` — зажим под чужое изменение в транзакции укладки и сценариев, брони разницей `claimChangesSince`; источник в чужой единице/форме отключён с причиной (`CourseSource.fault`); сокращение — событие `CoverageReduction`; проба выхода Бориса | — |
 | B17 | #28 `platform/notifications` | домен уведомлений с портами `Notifier`/`ReminderAlarms`/`NotificationSettingsSource`; каналы, `SystemNotifier`, `DailyRound`/`DailyWorker`, `BootAndTimeReceiver`. Вторая часть: **обязательство `Reminder` в таблице `reminders`** вместо вычисления на лету, `ReminderOutbox` — единственный владелец показа и будильника, один будильник на ближайший срок, сверка вместо накопления, согласование после коммита сигналом `invalidationTracker`; «Принял» из шторки отложен в U5 (trampoline). Третья часть: правила перенесены на обязательство, исход показа — тип `Delivery`, работа без пушей. Четвёртая часть: **читает и пишет одна транзакция** — узкий шаг открывает её сам, владелец доставки перечитывает после похода в систему, `WriteContractTest` получил форму `IN_TRANSACTION` со списком владельцев; сверка вернула выключенные напоминания; «можно ли показать» спрашивается у канала вида | — |
 | B18 | #29 `platform/settings-account` | настройки одной величиной `AppSettings` в DataStore `settings` (`DataStoreSettings`), порт `SettingsStore` у вызывающих, домену — `StoredNotificationSettings`; интервал заходов — величина `SyncInterval` с пределами, `keepRegular(interval)`/`keepDaily(at)` сравнивают с тем, что стоит у системы, и обновляют ту же задачу; `SettingsChanging` — записать и применить; каждая настройка на что-то влияет (`remoteChangeEnabled` → `COVERAGE_SHORT`, `INTAKE_DUE` при выключенных не заводится нигде — `ReminderPromising`, смена `digestAt` действует в тот же день); `DevicePermissions`; решение «ключ утрачен» — `AccountReplacement`: `abandonServer` серверных полок, `DeviceAccount.replaceUnreadable`, `CredentialSource.forget`; `SYNC_ATTENTION` на канале `sync` | разбор #29: `StoredSyncOperation` тремя случаями, `SyncInterval` в минутах, `ksp.allWarningsAsErrors`, `NotificationTargetExtras` |
-| B19 | #30 `network/crpt-datamatrix` | `network/crpt`: `CrptApi` на отдельном клиенте без пропуска MedApp, терпимые DTO по живому ответу, `CrptPackageCodes`; `domain/scan`: `ScannedCode` с форматом от распознавателя, `DataMatrixCode` — код уходит байт в байт под `{FNC1}`, `PackageSuggestion` без `Quantity`/`Dose`, `FormSuggestion` тремя случаями, порт `PackageCodes`; `Vocabulary.formsNamed` с контролируемыми сокращениями; `feature/scan/PackageScanning`; `CrptProbe` — один запрос за запуск | — |
+| B19 | #30 `network/crpt-datamatrix` | `network/crpt`: `CrptApi` на отдельном клиенте без пропуска MedApp, терпимые DTO по живым ответам на четыре кода, `CrptPackageCodes`; `domain/scan`: `ScannedCode` с форматом от распознавателя, `DataMatrixCode` — код уходит байт в байт под `{FNC1}`, `PackageSuggestion` без `Quantity`/`Dose`, форма — текст реестра + узнанная форма словаря либо ничего, порт `PackageCodes`; `Vocabulary.formNamed` по основам слов (случаи `form_types.py`); `feature/scan/PackageScanning`; `CrptProbe` — по запросу на код; `attempt` вместо `runCatching` и `CancellationSafetyTest` | — |
 
 **Долги сделанных PR, названные и перенесённые:**
 
@@ -4491,7 +4498,7 @@ U5 коммит 4, и читать он будет тем же `NotificationTarg
 | 1 | `Клиент «Честного знака» не несёт пропуска MedApp` | `CrptApi`, DTO, `CrptCheck`: тело / «не найдено» (`200` без `codeFounded`, `404`, `400`) / недоступность |
 | 2 | `Код уходит без изменений` | `ScannedCode`, `CodeFormat`, `DataMatrixCode.wire` = `{FNC1}` + текст как есть |
 | 3 | `Срок годности из ответа — дата в явной зоне` | `expireDate` → `ExpiryDate` в `Europe/Moscow` |
-| 4 | `Непонятное остаётся незаполненным` | `PackageSuggestion`, `FormSuggestion`, `Vocabulary.formsNamed`, `CrptPackageCodes` |
+| 4 | `Непонятное остаётся незаполненным` | `PackageSuggestion` (`formText` + `form: DosageForm?`), `Vocabulary.formNamed` по основам слов, `CrptPackageCodes` |
 | 5 | `Код даёт предложение, а не факт` | порт `PackageCodes`, `PackageScanning`: не DataMatrix — `Unsupported` без запроса |
 | 6 | `Живой ответ CRPT спрошен пробой` + `Форма ответа снята с живого «Честного знака»` | `CrptProbe`; первый прогон из сети вне России — `451` (клиент знает: `SERVER_REFUSED_US`), второй из российской — `200`, фикстура с него, страна — фишкой `country` |
 | 7 | `PLAN отражает сканер` | H5, I2/I3, U2, J1, J4 |
@@ -4502,8 +4509,12 @@ U5 коммит 4, и читать он будет тем же `NotificationTarg
   — ведущий GS, `]d2`, пробелы, регистр не трогаются, пустой не принимается; `200` с
   `codeFounded=false`, `404`, `400` — `NotFound`; обрыв — `NO_CONNECTION`; `451`/`403` —
   `SERVER_REFUSED_US`; `502` и HTML — `SERVER_SILENT`; чужая форма ответа читается; `expireDate`
-  21:30Z → следующий день по Москве (**красная**: зона UTC); `formsNamed` — точное имя одна, «таб.»
-  раскрывается, первое слово — несколько, «капсулы/таблетки» — обе, незнакомое и пустое — ни одной;
+  21:30Z → следующий день по Москве (**красная**: зона UTC); `formNamed` — регистр, «ё», запятые,
+  окончания, дозировка после формы, сокращения «табл. п/пл/о», «р-р д/в/в», «Р-Р В/М», «капс.»,
+  наполнители «для приготовления», «нанесения на … полости» — та же форма; иная форма («таблетки
+  шипучие», «капли») — ничего, не догадка (**красная**: по первому слову); «капсулы/таблетки» — обе
+  узнаны, значит выбор, а не ответ — ничего; `BundledVocabularyFormsTest` — каждая форма словаря
+  узнаёт себя, ни две не сливаются (**красная**: основа в пять букв);
   предложение с живой фикстуры: имя, форма из словаря, «Производитель», страна-фишка, срок
   2028-03-31, дозировка и количество строками; `cosmetics` — не лекарство; голый ответ — только имя;
   `PackageScanning`: EAN-13, QR, пустой — `Unsupported` без запроса (**красная**: спрашивать по

@@ -8,15 +8,15 @@ import com.kert0n.medapp.domain.value.DosageForm
  * — сведения каталога, а не этой коробки, и экран показывает его с источником; дозировка и
  * количество — строки для глаз, полей `Quantity` и `Dose` здесь нет, и превратить «20 капсул в 2
  * блистерах» или «500 мг» в число нечем. Форма — двумя частями: [formText] — как её назвал
- * реестр, всегда, и [form] — что из этого узнал наш словарь; словари получены разными путями, и
- * совпадение — удача, а не правило, поэтому текст реестра человек видит в любом случае. Всё
- * необязательно, кроме [isMedicine]: категория вне лекарств — предупреждение, а не молчаливое
- * автозаполнение.
+ * реестр, всегда, и [form] — та форма словаря, которую в этом тексте узнали, либо ничего: словари
+ * получены разными путями, догадок и выбора из похожих нет, а текст реестра человек видит в любом
+ * случае. Всё необязательно, кроме [isMedicine]: категория вне лекарств — предупреждение, а не
+ * молчаливое автозаполнение.
  */
 data class PackageSuggestion(
     val name: String? = null,
     val formText: String? = null,
-    val form: FormSuggestion = FormSuggestion.None,
+    val form: DosageForm? = null,
     val manufacturer: String? = null,
     val country: String? = null,
     val expiresOn: ExpiryDate? = null,
@@ -25,25 +25,3 @@ data class PackageSuggestion(
     val quantityText: String? = null,
     val isMedicine: Boolean
 )
-
-/** Форма по тексту ответа — три случая, потому что экран делает три вещи: подставить, дать выбрать, оставить пустым. */
-sealed interface FormSuggestion {
-
-    data class One(val form: DosageForm) : FormSuggestion
-
-    data class Several(val forms: List<DosageForm>) : FormSuggestion {
-        init {
-            require(forms.size > 1) { "несколько — это больше одной" }
-        }
-    }
-
-    data object None : FormSuggestion
-
-    companion object {
-        fun of(forms: List<DosageForm>): FormSuggestion = when (forms.size) {
-            0 -> None
-            1 -> One(forms.single())
-            else -> Several(forms)
-        }
-    }
-}

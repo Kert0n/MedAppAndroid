@@ -32,20 +32,14 @@ class Vocabulary(units: Collection<QuantityUnit>, forms: Collection<DosageForm>)
     fun form(id: Uuid): DosageForm? = forms[id]
 
     /**
-     * Какие формы словаря названы текстом [text] (PLAN H5). Словарь и чужой текст получены разными
-     * путями, и совпадение имён — удача: точное совпадение нормализованных имён даёт одну форму,
-     * а иначе подбираются **кандидаты** по основе первого слова ([DosageForm.stem]) — и выбирает
-     * человек; ничего похожего — ни одной. Косая черта между словами — альтернативы, каждая ищется
-     * сама. Пустой текст не называет ничего.
+     * Какую форму словаря называет текст [text] (PLAN H5). Словарь и чужой текст получены разными
+     * путями, и дословное совпадение — удача; сравниваются основы слов ([DosageForm.stems]):
+     * совпали целиком — форма; нет — `null`: либо даём то, что узнали, либо не даём ничего,
+     * догадок и выбора из похожих нет (решение владельца 2026-09-14). Косая черта между словами —
+     * альтернативы: узнана ровно одна — она; обе — это выбор, а не ответ, `null`.
      */
-    fun formsNamed(text: String): List<DosageForm> =
-        DosageForm.alternatives(text).flatMap { named(it) }.distinct()
-
-    private fun named(wanted: String): List<DosageForm> {
-        forms.values.firstOrNull { it.normalizedName == wanted }?.let { return listOf(it) }
-        val stem = DosageForm.stem(wanted) ?: return emptyList()
-        return forms.values.filter { it.normalizedName.substringBefore(' ').startsWith(stem) }.sortedBy { it.normalizedName }
-    }
+    fun formNamed(text: String): DosageForm? =
+        DosageForm.alternatives(text).mapNotNull { wanted -> forms.values.firstOrNull { it.stems == wanted } }.distinct().singleOrNull()
 
     override fun equals(other: Any?): Boolean =
         this === other || (other is Vocabulary && units == other.units && forms == other.forms)
