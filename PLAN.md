@@ -4102,9 +4102,9 @@ Base — всё, что работает без экранов: домен, хр
 
 ## I3. Base-PR подробно
 
-Остался один Base-PR — **B21** (стеком на #31): разбор второго круга #31 показал, что очередь —
-единственный агрегат, чей автомат состояний живёт не у типа, а в SQL. После него критерий «Base
-готов» (I1) выполнен — у каждого экрана U2 есть сценарий и чтение. Новая инфраструктура появляется
+Оставшихся Base-PR нет: B20 закрыл долги, B21 (стеком на #31) вернул очереди переходы у типа —
+разбор второго круга #31 показал, что она была единственным агрегатом, чей автомат состояний жил в
+SQL. Критерий «Base готов» (I1) выполнен — у каждого экрана U2 есть сценарий и чтение. Новая инфраструктура появляется
 только новым Base-PR, а не внутри UI.
 
 ### B14 — приложение отвечает на вопросы о себе (#22, `data/reports-and-catalog`)
@@ -4716,7 +4716,7 @@ API», «`followBox`» — закрыто, «Отказ разобран», «С
 разрешений, баннер и лист 29 на экране — U5 (экраны); проверка статуса приёма в
 `SystemNotifier.textOf` не заводится — после коммита 3 обязательство принятого пункта невыразимо.
 
-### B21 — переходы операции у типа (#32, `queue/operation-transitions`, стеком на #31)
+### B21 — переходы операции у типа (#32, `queue/operation-transitions`, стеком на #31) — **сделан**
 
 **Болезнь:** `Package` и `Reminder` меняют состояние переходами — методами сущности, а хранение
 читает в транзакции и сохраняет. `SyncOperation` переходов не имеет: её автомат состояний живёт в
@@ -4752,13 +4752,13 @@ API», «`followBox`» — закрыто, «Отказ разобран», «С
 | # | коммит | содержание |
 |---|---|---|
 | 0 | `PLAN: B21 заведён — переходы операции у типа` | **сделан** — болезнь и зависимость |
-| 1 | `PLAN: B21 — переходы операции у типа` | модель до кода: C1, E2, I3; AGENTS — «когда» в порядке мышления, «ответ на разбор — не новая пачка» |
-| 2 | `Состояние операции знает свои переходы` | `SyncOperationState`, переходы `SyncOperation`; `SyncOperationStateTest` — таблица допустимости 6 статусов × 7 переходов, «закрытая второй раз — null», «неизвестный исход переживает повтор и умирает с переподготовкой», «`resent` из SENDING помечает неизвестный, из PENDING — нет», «ответ ровно после `answered`, стирается `closed`/`retried`», «причина ровно у `Refused`» |
-| 3 | `Строку очереди меняет одна дверь` | `SyncOperationDao.save`, шесть глаголов удалены; `QueueRoomStorage`, `SyncOperationRoomRepository`, `MedKitRoomRepository`, `QueueWorker`; тесты с сырыми глаголами — на фикстуру `update(entity)` или переходы. Красные: страж коммита 4 называет шесть `UPDATE`; `QueueRoomStorageTest.anUnreadableRowIsClosedLikeAReadableOne`; `TransactionBoundariesTest` — `answered`/`defer` в транзакции |
-| 4 | `Дверь одна, и это держит проверка` | `WriteContractTest`: `UPDATE sync_operations` в `app/src/main` — ровно `save` и `dismiss`; сравнение `SyncOperationStatus` с константой — только в `SyncOperationState`, `SyncOperationStatus.isClosed`, `StoredSyncOperation.needsDecision` |
-| 5 | `PLAN: итог B21` | I3 «сделан», эталон J1, I2 |
+| 1 | `PLAN: B21 — переходы операции у типа` | **сделан** — модель до кода: C1, E2, I3; AGENTS — «когда» в порядке мышления, «ответ на разбор — не новая пачка» |
+| 2 | `Состояние операции знает свои переходы` | **сделан** — `SyncOperationState`, переходы `SyncOperation`; `SyncOperationStateTest` — таблица допустимости 6 статусов × 7 переходов, «закрытая второй раз — null», «неизвестный исход переживает повтор и умирает с переподготовкой», «`resent` из SENDING помечает неизвестный, из PENDING — нет», «ответ ровно после `answered`, стирается `closed`/`retried`», «причина ровно у `Refused`» |
+| 3 | `Строку очереди меняет одна дверь` | **сделан** — `SyncOperationDao.save`, шесть глаголов удалены; `QueueRoomStorage`, `SyncOperationRoomRepository`, `MedKitRoomRepository`, `QueueWorker`; тесты с сырыми глаголами — на фикстуру `update(entity)` или переходы. Красные: страж коммита 4 называет шесть `UPDATE`; `QueueRoomStorageTest.anUnreadableRowIsClosedLikeAReadableOne`; `TransactionBoundariesTest` — `answered`/`defer` в транзакции |
+| 4 | `Дверь одна, и это держит проверка` | **сделан** — `WriteContractTest`: `UPDATE sync_operations` в `app/src/main` — ровно `save` и `dismiss`; сравнение `SyncOperationStatus` с константой — только в `SyncOperationState`, `SyncOperationStatus.isClosed`, `StoredSyncOperation.needsDecision` |
+| 5 | `PLAN: итог B21` | **сделан** — I3, эталон J1 (824 unit, 545 инструментальных), I2 |
 
-**Тесты.** Тесты до фиксов, красные прогоны — в описании #32. *Домен (`test/`)*:
+**Тесты.** Тесты до фиксов, красные прогоны — в описании #32: `QueueRoomStorageTest.anUnreadableRowIsClosedLikeAReadableOne` — «last_error expected null, but was:<учётка заменена>»; `QueueWriteDoorTest` — семь `UPDATE sync_operations`, три сравнения статуса мимо типа, `answered`/`defer` вне транзакции. *Домен (`test/`)*:
 `SyncOperationStateTest`. *Границы (`test/`)*: `WriteContractTest` — одна дверь. *База
 (`androidTest/`)*: `QueueRoomStorageTest` — нечитаемая и читаемая закрываются одинаково, каскад
 через переход, взятие/ответ/отсрочка — прежнее поведение через переходы; `SyncOperationDaoTest` —
@@ -5260,8 +5260,8 @@ ANDROID_SERIAL=emulator-5554 ./gradlew :app:connectedDebugAndroidTest -Pprobe
 и отдельными грепами их больше не смотрят.
 Эмулятор — уже запущенный `emulator-5554`, новых не поднимать. Итог инструментальных читать из
 `app/build/outputs/androidTest-results/connected/debug/TEST-*.xml`: `AssumptionViolatedException` у
-`RegistrationProbe` — пропуск, не провал. **Эталон после B20: 812 unit, 543
-инструментальных, 2 пропуска (`RegistrationProbe`, `CrptProbe`), 0 провалов** (после B19 — 788 и 506; после B18 — 764 и 505; после B17 — 752 и 475; после третьей части B17 было 747 и 468; после первой части B17 было 738 и 452 — журнал показов
+`RegistrationProbe` — пропуск, не провал. **Эталон после B21: 824 unit, 545
+инструментальных, 2 пропуска (`RegistrationProbe`, `CrptProbe`), 0 провалов** (после B20 — 813 и 544; после B19 — 788 и 506; после B18 — 764 и 505; после B17 — 752 и 475; после третьей части B17 было 747 и 468; после первой части B17 было 738 и 452 — журнал показов
 ушёл вместе со своими проверками, а обязательства принесли свои; после B16 — 730 и 422) —
 каждый PR записывает свой. **Эталон времени после B20** (`HundredMedKitsTest`, `BigLatest`, 100 полок /
 1 000 пачек / 50 лечений / год приёмов): список полок 1 мс, все лекарства 46 мс, снимок ста полок
