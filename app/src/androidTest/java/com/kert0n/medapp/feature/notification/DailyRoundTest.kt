@@ -83,9 +83,10 @@ class DailyRoundTest {
             .filter { it.state == com.kert0n.medapp.domain.notification.Reminder.State.DUE }
             .map { Uuid.parse(it.key.subject) }.toSet()
         assertEquals(byDay.filterKeys { it != start }.values.map { it.id }.toSet(), owed)
-        // Сказано: пропуск, срок источника за день, сводка. Приёмы ещё впереди — их черёд не настал.
-        assertEquals(setOf(NotificationKind.INTAKE_MISSED, NotificationKind.EXPIRY_SOURCE_1D, NotificationKind.DAILY_DIGEST), nextMorning.notifier.shown.map { it.kind }.toSet())
-        assertEquals(3, delivered.shown)
+        // Сказано: пропуск и срок источника за день. Приёмы ещё впереди, сводка — к своему часу.
+        assertEquals(setOf(NotificationKind.INTAKE_MISSED, NotificationKind.EXPIRY_SOURCE_1D), nextMorning.notifier.shown.map { it.kind }.toSet())
+        assertEquals(2, delivered.shown)
+        assertEquals(1, nextMorning.reminderStore.ofKinds(listOf(NotificationKind.DAILY_DIGEST)).size)
         // Будильник один, и он на ближайший невыполненный срок — сегодняшний приём в 09:00 МСК.
         assertEquals(byDay.getValue(start.plusDays(1)).plannedAt, nextMorning.reminders.wakeAt)
         assertTrue(nextMorning.reminders.exact)
@@ -94,7 +95,7 @@ class DailyRoundTest {
         val again = nextMorning.dailyRound.run()
         assertEquals(0, again.missed)
         assertEquals(0, nextMorning.reminderOutbox.pass().shown)
-        assertEquals(3, nextMorning.notifier.shown.size)
+        assertEquals(2, nextMorning.notifier.shown.size)
     }
 
     /** Без лечения и с годными коробками проход молчит, ничего не обещает и не будит — счастливый путь. */
@@ -105,9 +106,33 @@ class DailyRoundTest {
         val report = quiet.dailyRound.run()
         val delivered = quiet.reminderOutbox.pass()
 
-        assertEquals(DailyRound.Report(missed = 0, reminders = 0, raised = 0), report)
+        assertEquals(DailyRound.Report(missed = 0, promised = 0, withdrawn = 0), report)
         assertEquals(emptyList<Any>(), quiet.notifier.shown)
         assertEquals(ReminderOutbox.Report(shown = 0, dismissed = 0, nextAt = null), delivered)
         assertNull(quiet.reminders.wakeAt)
+    }
+
+    /**
+     * Сводка приходит не раньше своего часа (PLAN D8). Проход дня зовут и вход в приложение, и
+     * загрузка устройства — в 05:00 обещание есть, но его срок ещё впереди; в 09:00 оно наступает.
+     * Красная проверка: считать сроком сводки миг прохода — она вышла бы в пять утра, а в девять
+     * её подавил бы собственный журнал.
+     */
+    @Test
+    fun theDigestIsNotSaidBeforeItsHour() = runTest {
+        treated(Scenarios(database, Instant.parse("2027-03-10T05:00:00Z")))
+        val earlyMorning = Scenarios(database, Instant.parse("2027-03-11T02:00:00Z")) // 05:00 МСК
+
+        earlyMorning.dailyRound.run()
+        earlyMorning.reminderOutbox.pass()
+
+        val digest = earlyMorning.reminderStore
+            .ofKinds(listOf(NotificationKind.DAILY_DIGEST)).single()
+        assertEquals(Instant.parse("2027-03-11T09:00:00Z"), digest.dueAt) // 09:00 в зоне устройства (UTC)
+        assertEquals(0, earlyMorning.notifier.shown.count { it.kind == NotificationKind.DAILY_DIGEST })
+
+        val atNine = Scenarios(database, Instant.parse("2027-03-11T09:00:00Z"), notifier = earlyMorning.notifier)
+        atNine.reminderOutbox.pass()
+        assertEquals(1, atNine.notifier.shown.count { it.kind == NotificationKind.DAILY_DIGEST })
     }
 }

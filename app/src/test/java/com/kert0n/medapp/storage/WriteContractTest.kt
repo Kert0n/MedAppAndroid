@@ -89,6 +89,7 @@ class WriteContractTest {
         "CourseStorageRepository.observeCoverage" to (Shape.READ by "(Uuid): Flow<CourseCoverage>"),
         "CourseStorageRepository.observeCoverages" to (Shape.READ by "(): Flow<Map<Uuid, CourseCoverage>>"),
         "CourseStorageRepository.observeReductions" to (Shape.READ by "(Uuid): Flow<List<CoverageReduction>>"),
+        "CourseStorageRepository.reductionsSince" to (Shape.READ by "(Uuid, Instant): List<CoverageReduction>"),
         "CourseStorageRepository.observeRecords" to (Shape.READ by "(): Flow<List<CourseRecordProjection>>"),
         "CourseStorageRepository.observeRecord" to (Shape.READ by "(Uuid): Flow<CourseRecordProjection>"),
         "CourseStorageRepository.findDraft" to (Shape.READ by "(Uuid): CourseDraft"),

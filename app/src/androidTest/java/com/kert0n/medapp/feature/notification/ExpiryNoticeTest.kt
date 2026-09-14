@@ -21,13 +21,16 @@ import com.kert0n.medapp.fixture.pack
 import com.kert0n.medapp.fixture.packageRepository
 import com.kert0n.medapp.fixture.schedule
 import com.kert0n.medapp.fixture.tablets
+import com.kert0n.medapp.fixture.transactions
 import com.kert0n.medapp.storage.database.MedAppDatabase
+import com.kert0n.medapp.storage.notification.ReminderRoomRepository
 import java.time.Instant
 import java.time.LocalDate
 import kotlin.uuid.Uuid
 import kotlinx.coroutines.test.runTest
 import org.junit.After
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertTrue
 import org.junit.Before
 import org.junit.Test
 import org.junit.runner.RunWith
@@ -42,7 +45,7 @@ class ExpiryNoticeTest {
 
     private lateinit var database: MedAppDatabase
     private lateinit var scenarios: Scenarios
-    private lateinit var planning: NotificationPlanning
+    private lateinit var planning: NotificationReconciliation
     private val settings = FakeSettings()
     private val now: Instant = Instant.parse("2027-03-10T06:00:00Z")
     private val today = LocalDate.of(2027, 3, 10)
@@ -51,7 +54,7 @@ class ExpiryNoticeTest {
     fun setUp() = runTest {
         database = inMemoryDatabase()
         scenarios = Scenarios(database, now)
-        planning = NotificationPlanning(database.intakeRepository(), database.packageRepository(), database.courseRepository(), settings)
+        planning = NotificationReconciliation(database.intakeRepository(), database.packageRepository(), database.courseRepository(), ReminderRoomRepository(database, database.reminders()), settings, database.transactions())
     }
 
     @After
@@ -120,5 +123,30 @@ class ExpiryNoticeTest {
         settings.settings = NotificationSettings(expirySourceRemindersEnabled = false)
 
         assertEquals(mapOf(OTHER_PACK to (NotificationKind.EXPIRY_TODAY to NoticeDelivery.IN_APP_BANNER)), kindsOf(planning.expiryDue(today, now)))
+    }
+
+    /**
+     * Срок исправили — прежнее предупреждение отзывается, а не висит рядом с новым: сверка
+     * сравнивает обещанное с тем, что следует из нынешнего состояния (PLAN D8). Красная проверка:
+     * только заводить недостающее — в шторке остались бы два взаимоисключающих сообщения об одной
+     * коробке, и ключ прежнего помнился бы как показанный.
+     */
+    @Test
+    fun aCorrectedExpiryWithdrawsThePreviousNotice() = runTest {
+        box(PACK, "Источник", today.plusDays(3))
+        treatedFrom(PACK)
+        scenarios.notificationReconciliation.reconcile(now, java.time.ZoneOffset.UTC)
+        scenarios.reminderOutbox.pass()
+        val stale = scenarios.reminderStore.ofKinds(listOf(NotificationKind.EXPIRY_SOURCE_3D)).single()
+        assertEquals(com.kert0n.medapp.domain.notification.Reminder.State.SHOWN, stale.state)
+
+        // Человек поправил срок: коробка годна ещё месяц — предупреждать не о чем.
+        val corrected = requireNotNull(database.packageRepository().find(PACK)).facts.copy(expiresOn = ExpiryDate(today.plusMonths(1)))
+        database.packageRepository().describe(PACK, corrected)
+        scenarios.notificationReconciliation.reconcile(now, java.time.ZoneOffset.UTC)
+        scenarios.reminderOutbox.pass()
+
+        assertTrue(scenarios.notifier.dismissed.contains(stale.key))
+        assertEquals(emptyList<Any>(), scenarios.reminderStore.ofKinds(listOf(NotificationKind.EXPIRY_SOURCE_3D)))
     }
 }

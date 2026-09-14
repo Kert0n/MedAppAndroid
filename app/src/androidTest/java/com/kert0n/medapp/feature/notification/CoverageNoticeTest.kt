@@ -18,6 +18,7 @@ import com.kert0n.medapp.fixture.pack
 import com.kert0n.medapp.fixture.packageRepository
 import com.kert0n.medapp.fixture.schedule
 import com.kert0n.medapp.fixture.tablets
+import com.kert0n.medapp.fixture.transactions
 import com.kert0n.medapp.storage.database.MedAppDatabase
 import com.kert0n.medapp.storage.notification.ReminderRoomRepository
 import java.time.Clock
@@ -42,7 +43,7 @@ class CoverageNoticeTest {
 
     private lateinit var database: MedAppDatabase
     private lateinit var scenarios: Scenarios
-    private lateinit var planning: NotificationPlanning
+    private lateinit var planning: NotificationReconciliation
     private val settings = FakeSettings()
     private val now: Instant = Instant.parse("2027-03-10T06:00:00Z")
     private val today = LocalDate.of(2027, 3, 10)
@@ -51,7 +52,7 @@ class CoverageNoticeTest {
     fun setUp() = runTest {
         database = inMemoryDatabase()
         scenarios = Scenarios(database, now)
-        planning = NotificationPlanning(database.intakeRepository(), database.packageRepository(), database.courseRepository(), settings)
+        planning = NotificationReconciliation(database.intakeRepository(), database.packageRepository(), database.courseRepository(), ReminderRoomRepository(database, database.reminders()), settings, database.transactions())
         database.packageRepository().add(pack(id = PACK, quantity = tablets("20"), form = TABLET_FORM))
     }
 
@@ -77,29 +78,55 @@ class CoverageNoticeTest {
 
     private fun kinds(due: List<Reminder>) = due.map { it.kind }
 
-    /** Пересчёт до 8 таблеток: 4 дозы из 10 — событие сразу, «за три дня» на седьмой день, «в день» — на восьмой. */
+    /** Пересчёт до 8 таблеток: 4 дозы из 10 — «за три дня» на седьмой день, «в день» — на восьмой. */
     @Test
-    fun aReductionIsAnnouncedOnceAndTheGapIsAnnouncedByItsDate() = runTest {
-        val id = treated()
+    fun theGapIsAnnouncedByItsDate() = runTest {
+        treated()
         assertEquals(emptyList<NotificationKind>(), kinds(planning.coverageDue(now)))
 
         scenarios.packageAdjusting.adjust(PACK, PackageAdjusting.Action.Recount(seen = tablets("20"), actual = tablets("8")))
 
-        assertEquals(listOf(NotificationKind.COVERAGE_SHORT), kinds(planning.coverageDue(now)))
         // Первый необеспеченный — пятый пункт, 14 марта: за три дня — 11-го, в день — 14-го.
-        assertEquals(listOf(NotificationKind.COVERAGE_SHORT, NotificationKind.COVERAGE_3D), kinds(planning.coverageDue(now.plus(Duration.ofDays(1)))))
-        assertEquals(listOf(NotificationKind.COVERAGE_SHORT), kinds(planning.coverageDue(now.plus(Duration.ofDays(2)))))
-        assertEquals(listOf(NotificationKind.COVERAGE_SHORT, NotificationKind.COVERAGE_END), kinds(planning.coverageDue(now.plus(Duration.ofDays(4)))))
+        assertEquals(emptyList<NotificationKind>(), kinds(planning.coverageDue(now)))
+        assertEquals(listOf(NotificationKind.COVERAGE_3D), kinds(planning.coverageDue(now.plus(Duration.ofDays(1)))))
+        assertEquals(emptyList<NotificationKind>(), kinds(planning.coverageDue(now.plus(Duration.ofDays(2)))))
+        assertEquals(listOf(NotificationKind.COVERAGE_END), kinds(planning.coverageDue(now.plus(Duration.ofDays(4)))))
+    }
 
-        // Событие говорится один раз: повторная сверка заводит обязательство, которого ещё нет,
-        // а сказанное не трогает.
-        scenarios.reminderStore.raiseAll(planning.coverageDue(now))
+    /**
+     * Сокращение — событие, и говорится оно один раз: сверка заводит обязательство, которого ещё
+     * нет, а сказанное не трогает. Красная проверка прежнего устройства: перечитывать всю историю
+     * сокращений каждым проходом — и после выданного разрешения человек получал бы их залпом.
+     */
+    @Test
+    fun aReductionIsAnnouncedExactlyOnce() = runTest {
+        val id = treated()
+
+        scenarios.packageAdjusting.adjust(PACK, PackageAdjusting.Action.Recount(seen = tablets("20"), actual = tablets("8")))
+        planning.reconcile(now, ZoneOffset.UTC)
         scenarios.reminderOutbox.pass()
-        scenarios.reminderStore.raiseAll(planning.coverageDue(now))
+        planning.reconcile(now, ZoneOffset.UTC)
         scenarios.reminderOutbox.pass()
+
         val short = scenarios.notifier.shown.filter { it.kind == NotificationKind.COVERAGE_SHORT }
         assertEquals(1, short.size)
         assertEquals(id, (short.single().target as com.kert0n.medapp.domain.notification.NotificationTarget.CourseSources).courseId)
+    }
+
+    /**
+     * Сокращение старше срока хранения не воскресает: сказать о прошлогоднем событии нечего, а
+     * строку о нём владелец доставки давно прибрал (PLAN D8).
+     */
+    @Test
+    fun anAncientReductionIsNotResurrected() = runTest {
+        treated()
+        scenarios.packageAdjusting.adjust(PACK, PackageAdjusting.Action.Recount(seen = tablets("20"), actual = tablets("8")))
+        val muchLater = now.plus(Duration.ofDays(90))
+
+        planning.reconcile(muchLater, ZoneOffset.UTC)
+        scenarios.reminderOutbox.pass()
+
+        assertEquals(emptyList<NotificationKind>(), scenarios.notifier.shown.map { it.kind }.filter { it == NotificationKind.COVERAGE_SHORT })
     }
 
     /** Порог — из настроек: два дня вместо трёх. */
@@ -109,7 +136,7 @@ class CoverageNoticeTest {
         scenarios.packageAdjusting.adjust(PACK, PackageAdjusting.Action.Recount(seen = tablets("20"), actual = tablets("8")))
         settings.settings = com.kert0n.medapp.domain.notification.NotificationSettings(coverageThresholdDays = 2)
 
-        assertEquals(listOf(NotificationKind.COVERAGE_SHORT, NotificationKind.COVERAGE_3D), kinds(planning.coverageDue(now.plus(Duration.ofDays(2)))))
-        assertEquals(listOf(NotificationKind.COVERAGE_SHORT), kinds(planning.coverageDue(now.plus(Duration.ofDays(1)))))
+        assertEquals(listOf(NotificationKind.COVERAGE_3D), kinds(planning.coverageDue(now.plus(Duration.ofDays(2)))))
+        assertEquals(emptyList<NotificationKind>(), kinds(planning.coverageDue(now.plus(Duration.ofDays(1)))))
     }
 }

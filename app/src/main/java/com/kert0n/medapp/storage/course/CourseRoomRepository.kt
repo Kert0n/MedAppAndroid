@@ -66,6 +66,9 @@ class CourseRoomRepository @Inject constructor(
         return plans.associate { plan -> plan.course.id to plan.course.coverage(plan.progress, availability.getValue(plan.course.id)) }
     }
 
+    override suspend fun reductionsSince(courseId: Uuid, since: Instant): List<CoverageReduction> =
+        courses.reductionsSince(courseId, since).map { it.toDomain() }
+
     override fun observeReductions(courseId: Uuid): Flow<List<CoverageReduction>> =
         database.observing("coverage_reductions") { courses.reductionsOf(courseId).map { it.toDomain() } }
 

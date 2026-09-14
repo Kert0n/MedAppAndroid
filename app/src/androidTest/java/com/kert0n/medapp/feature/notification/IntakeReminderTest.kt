@@ -24,6 +24,7 @@ import com.kert0n.medapp.fixture.pack
 import com.kert0n.medapp.fixture.packageRepository
 import com.kert0n.medapp.fixture.schedule
 import com.kert0n.medapp.fixture.tablets
+import com.kert0n.medapp.fixture.transactions
 import com.kert0n.medapp.storage.database.MedAppDatabase
 import com.kert0n.medapp.storage.notification.ReminderRoomRepository
 import java.time.Clock
@@ -55,7 +56,7 @@ class IntakeReminderTest {
     private val notifier = FakeNotifier()
     private val reminders = FakeReminders()
     private val settings = FakeSettings()
-    private lateinit var planning: NotificationPlanning
+    private lateinit var planning: NotificationReconciliation
     private lateinit var store: com.kert0n.medapp.storage.notification.ReminderStorageRepository
     private lateinit var outbox: ReminderOutbox
 
@@ -63,7 +64,7 @@ class IntakeReminderTest {
     fun setUp() = runTest {
         database = inMemoryDatabase()
         scenarios = Scenarios(database, now)
-        planning = NotificationPlanning(database.intakeRepository(), database.packageRepository(), database.courseRepository(), settings)
+        planning = NotificationReconciliation(database.intakeRepository(), database.packageRepository(), database.courseRepository(), ReminderRoomRepository(database, database.reminders()), settings, database.transactions())
         store = ReminderRoomRepository(database, database.reminders())
         outbox = outboxAt(now)
         database.packageRepository().add(pack(id = PACK, quantity = tablets("20"), form = TABLET_FORM))
@@ -97,32 +98,36 @@ class IntakeReminderTest {
 
     private suspend fun intakes(id: Uuid) = database.intakeRepository().ofCourse(id).filterIsInstance<CourseIntake>().sortedBy { it.plannedAt }
 
+    /** Отвеченный пункт не напоминает: обещание снято тем же приёмом, а будильник — на следующий. */
     @Test
-    fun remindersCoverThirtySixHoursAndSkipAnsweredIntakes() = runTest {
+    fun anAnsweredIntakeOwesNothing() = runTest {
         val id = treated()
         val all = intakes(id)
-        scenarios.intakeConfirmation.confirm(all[0].id, PACK, dose("2"), now).confirmed()
 
-        val due = planning.remindersDue(now)
-        store.raiseAll(due)
+        scenarios.intakeConfirmation.confirm(all[0].id, PACK, dose("2"), now).confirmed()
         outbox.pass()
 
-        // 36 часов от 08:00 МСК — до 20:00 завтра: 21:00 сегодня и 09:00 завтра входят, 21:00 завтра —
-        // нет; принятый в 09:00 сегодня не напоминает.
-        assertEquals(listOf(all[1].id, all[2].id), due.map { (it.target as com.kert0n.medapp.domain.notification.NotificationTarget.Intake).intakeId })
-        assertTrue(due.all { it.exact && it.actions == listOf(NotificationAction.TAKE, NotificationAction.SKIP, NotificationAction.SNOOZE) })
-        // Будильник один — на ближайший из них; показывать пока нечего, их час не настал.
+        val owed = store.ofKinds(listOf(NotificationKind.INTAKE_DUE))
+        assertEquals(all.drop(1).map { it.id }.toSet(), owed.map { Uuid.parse(it.key.subject) }.toSet())
+        assertTrue(owed.all { it.exact && it.actions == listOf(NotificationAction.TAKE, NotificationAction.SKIP, NotificationAction.SNOOZE) })
+        // Будильник один — на ближайший оставшийся; показывать пока нечего, их час не настал.
         assertEquals(all[1].plannedAt, reminders.wakeAt)
         assertEquals(emptyList<Any>(), notifier.shown)
-        assertNull(planning.reminderFor(all[0].id))
-        assertEquals(all[1].id, (planning.reminderFor(all[1].id)?.target as com.kert0n.medapp.domain.notification.NotificationTarget.Intake).intakeId)
     }
 
+    /** Выключенные напоминания снимают и уже обещанное: человек попросил молчать (контракт B18). */
     @Test
-    fun disabledRemindersPlanNothing() = runTest {
+    fun disabledRemindersWithdrawWhatWasAlreadyOwed() = runTest {
         treated()
+        assertTrue(store.ofKinds(listOf(NotificationKind.INTAKE_DUE)).isNotEmpty())
+
         settings.settings = NotificationSettings(intakeRemindersEnabled = false)
-        assertEquals(emptyList<Any>(), planning.remindersDue(now))
+        planning.reconcile(now, ZoneOffset.UTC)
+        outbox.pass()
+
+        assertEquals(emptyList<Reminder>(), store.ofKinds(listOf(NotificationKind.INTAKE_DUE)))
+        // Будить остаётся не о приёмах: сводку человек не выключал, и её час впереди.
+        assertEquals(store.ofKinds(listOf(NotificationKind.DAILY_DIGEST)).single().dueAt, reminders.wakeAt)
     }
 
     /**
@@ -133,7 +138,7 @@ class IntakeReminderTest {
     fun whatWasSaidIsNotSaidAgainAndOnlyTheDeferredComesBack() = runTest {
         val id = treated()
         val first = intakes(id)[0]
-        val due = requireNotNull(planning.reminderFor(first.id))
+        val due = requireNotNull(store.find(NotificationKey.intake(first.id, NotificationKind.INTAKE_DUE)))
         val digestDay = LocalDate.of(2027, 3, 10)
         val digest = Reminder(NotificationKey.digest(digestDay), com.kert0n.medapp.domain.notification.NotificationTarget.DayPlan(digestDay), now)
         // Наступает обязательство в свой момент: владелец смотрит на срок, а не на список к показу.
