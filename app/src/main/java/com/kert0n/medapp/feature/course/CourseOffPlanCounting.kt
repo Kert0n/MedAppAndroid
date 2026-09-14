@@ -8,6 +8,7 @@ import com.kert0n.medapp.domain.course.Revision
 import com.kert0n.medapp.domain.intake.CourseIntake
 import com.kert0n.medapp.domain.value.Doses
 import com.kert0n.medapp.queue.Transactions
+import com.kert0n.medapp.queue.readThisTransaction
 import com.kert0n.medapp.storage.course.CourseReallocation
 import com.kert0n.medapp.storage.course.CourseStorageRepository
 import com.kert0n.medapp.storage.intake.IntakeStorageRepository
@@ -46,14 +47,14 @@ class CourseOffPlanCounting @Inject constructor(
         calendar.missOverdue(before, now)
         val course = before.setTakenOffPlan(total, packages.availabilityFor(before), now)
         if (course === before) return@run Outcome.Set(before.projection())
-        check(courses.reallocate(CourseReallocation(course, expected))) { "план прочитан этой же транзакцией" }
+        courses.reallocate(CourseReallocation(course, expected)).readThisTransaction("план")
         following.announceClaims(before, course, now)
 
         val ofCourse = intakes.ofCourse(courseId).filterIsInstance<CourseIntake>()
         val progress = CourseProgress.of(ofCourse)
         val completion = CourseCompletion(course, progress)
         if (completion.reached) {
-            val amended = checkNotNull(courses.findRecord(courseId)) { "запись эпизода прочитана этой же транзакцией" }
+            val amended = courses.findRecord(courseId).readThisTransaction("запись эпизода")
             closing.close(course, CourseCompletion.Closing.of(amended, CourseRecord.Outcome.COMPLETED, ofCourse, now), now)
             return@run Outcome.Finished
         }

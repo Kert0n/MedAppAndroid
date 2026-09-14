@@ -7,6 +7,7 @@ import com.kert0n.medapp.queue.QueueService
 import com.kert0n.medapp.queue.QueuedCommand
 import com.kert0n.medapp.queue.Transactions
 import com.kert0n.medapp.queue.pack.PackageSyncCommand
+import com.kert0n.medapp.queue.readThisTransaction
 import com.kert0n.medapp.storage.pack.PackageStorageRepository
 import java.time.Clock
 import javax.inject.Inject
@@ -52,9 +53,9 @@ class PackageDescribing @Inject constructor(
             null
         }
         queue.change(pkg.medKit, listOfNotNull(description), now) {
-            check(packages.describe(pkg.id, facts)) { "пачка прочитана этой же транзакцией" }
+            packages.describe(pkg.id, facts).readThisTransaction("пачка")
             description?.let {
-                check(packages.mark(pkg.id, PackageStatus.CHANGING, by = it.id)) { "пачка прочитана этой же транзакцией" }
+                packages.mark(pkg.id, PackageStatus.CHANGING, by = it.id).readThisTransaction("пачка")
             }
             true
         }

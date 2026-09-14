@@ -12,6 +12,7 @@ import com.kert0n.medapp.domain.value.DosageForm
 import com.kert0n.medapp.domain.value.Dose
 import com.kert0n.medapp.domain.value.Doses
 import com.kert0n.medapp.queue.Transactions
+import com.kert0n.medapp.queue.readThisTransaction
 import com.kert0n.medapp.storage.course.CourseStorageRepository
 import com.kert0n.medapp.storage.intake.IntakeStorageRepository
 import com.kert0n.medapp.storage.pack.PackageStorageRepository
@@ -71,7 +72,7 @@ class CourseAmendment @Inject constructor(
         if (!courses.amend(course, expected)) return@run Outcome.Stale
 
         if (completion.reached) {
-            val amended = checkNotNull(courses.findRecord(id)) { "запись эпизода записана этой же транзакцией" }
+            val amended = courses.findRecord(id).readThisTransaction("запись эпизода")
             val ofCourse = intakes.ofCourse(id).filterIsInstance<CourseIntake>()
             closing.close(course, CourseCompletion.Closing.of(amended, CourseRecord.Outcome.COMPLETED, ofCourse, now), now)
             return@run Outcome.Finished

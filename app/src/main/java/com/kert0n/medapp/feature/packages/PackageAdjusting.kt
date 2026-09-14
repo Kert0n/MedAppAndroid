@@ -9,6 +9,7 @@ import com.kert0n.medapp.queue.QueueService
 import com.kert0n.medapp.queue.QueuedCommand
 import com.kert0n.medapp.queue.Transactions
 import com.kert0n.medapp.queue.pack.PackageSyncCommand
+import com.kert0n.medapp.queue.readThisTransaction
 import com.kert0n.medapp.storage.pack.PackageAdjustment
 import com.kert0n.medapp.storage.pack.PackageStorageRepository
 import java.time.Clock
@@ -57,7 +58,7 @@ class PackageAdjusting @Inject constructor(
             is Action.Dispose -> PackageAdjustment.Disposal(pkg.id, action.amount)
         }
         val ended = adjustment.applyTo(pkg) is PackageAfter.Ended
-        check(packages.adjust(adjustment, at = now)) { "пачка прочитана этой же транзакцией" }
+        packages.adjust(adjustment, at = now).readThisTransaction("пачка")
         return ended
     }
 
@@ -72,7 +73,7 @@ class PackageAdjusting @Inject constructor(
         }
         val announced = QueuedCommand(Uuid.random(), command)
         queue.change(pkg.medKit, listOf(announced), now) {
-            check(packages.mark(pkg.id, PackageStatus.CHANGING, by = announced.id)) { "пачка прочитана этой же транзакцией" }
+            packages.mark(pkg.id, PackageStatus.CHANGING, by = announced.id).readThisTransaction("пачка")
             true
         }
         // Коробка кончится, когда полка согласится: до ответа строка живёт, и терять её нечем.

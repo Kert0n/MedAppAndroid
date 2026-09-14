@@ -8,6 +8,7 @@ import com.kert0n.medapp.queue.QueueService
 import com.kert0n.medapp.queue.QueuedCommand
 import com.kert0n.medapp.queue.Transactions
 import com.kert0n.medapp.queue.pack.PackageSyncCommand
+import com.kert0n.medapp.queue.readThisTransaction
 import com.kert0n.medapp.storage.course.CourseStorageRepository
 import com.kert0n.medapp.storage.medkit.MedKitStorageRepository
 import com.kert0n.medapp.storage.pack.PackageAdjustment
@@ -117,12 +118,12 @@ class PackageRelocation @Inject constructor(
     internal suspend fun carryHome(pkg: Package, to: MedKitRef, at: Instant, by: Uuid) {
         place(pkg, to, at)
         packages.saveClaims(pkg.id, null)
-        check(packages.mark(pkg.id, PackageStatus.CHANGING, by = by)) { "пачка прочитана этой же транзакцией" }
+        packages.mark(pkg.id, PackageStatus.CHANGING, by = by).readThisTransaction("пачка")
     }
 
     /** Только место: переход пачки к прочитанному состоянию, без команд. */
     internal suspend fun place(pkg: Package, to: MedKitRef, at: Instant) {
-        check(packages.adjust(PackageAdjustment.Transfer(pkg.id, to), at = at)) { "пачка прочитана этой же транзакцией" }
+        packages.adjust(PackageAdjustment.Transfer(pkg.id, to), at = at).readThisTransaction("пачка")
     }
 
     /** Местная коробка на общей полке: рассказать о ней серверу, а с ней — о выделении курса. */

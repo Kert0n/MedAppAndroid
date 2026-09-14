@@ -9,6 +9,7 @@ import com.kert0n.medapp.queue.QueueService
 import com.kert0n.medapp.queue.QueuedCommand
 import com.kert0n.medapp.queue.Transactions
 import com.kert0n.medapp.queue.pack.claimChangesSince
+import com.kert0n.medapp.queue.readThisTransaction
 import com.kert0n.medapp.storage.course.CourseStorageRepository
 import com.kert0n.medapp.storage.pack.PackageStorageRepository
 import java.time.Instant
@@ -61,7 +62,7 @@ class CourseFollowing @Inject constructor(
             val required = compatible.remainingDoses(plan.progress)
             val clamped = compatible.clamped(required, availability, at)
             if (clamped === course) continue
-            check(courses.updateSources(clamped, course.revision)) { "план прочитан этой же транзакцией" }
+            courses.updateSources(clamped, course.revision).readThisTransaction("план")
             // Обеспеченных доз стало меньше — событие (PLAN D5). До — выделенное прежним курсом:
             // после каждого зажима выделение и есть обеспечение; после — обеспечение нового.
             val coveredBefore = minOf(course.allocatedDosesTotal, required)
@@ -80,7 +81,7 @@ class CourseFollowing @Inject constructor(
             else -> draft.faultSource(ref, fault, at)
         }
         if (followed === draft) return
-        check(courses.saveDraft(followed, draft.revision)) { "черновик прочитан этой же транзакцией" }
+        courses.saveDraft(followed, draft.revision).readThisTransaction("черновик")
     }
 
     /**

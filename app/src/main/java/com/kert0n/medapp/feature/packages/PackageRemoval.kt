@@ -6,6 +6,7 @@ import com.kert0n.medapp.queue.QueueService
 import com.kert0n.medapp.queue.QueuedCommand
 import com.kert0n.medapp.queue.Transactions
 import com.kert0n.medapp.queue.pack.PackageSyncCommand
+import com.kert0n.medapp.queue.readThisTransaction
 import com.kert0n.medapp.storage.pack.PackageStorageRepository
 import java.time.Clock
 import java.time.Instant
@@ -47,7 +48,7 @@ class PackageRemoval @Inject constructor(
 
     /** Шаг внутри чужой транзакции — коробка уходит по решению человека, следа не остаётся (D7). */
     internal suspend fun discard(pkg: Package, at: Instant) {
-        check(packages.end(pkg.ended(), at)) { "пачка прочитана этой же транзакцией" }
+        packages.end(pkg.ended(), at).readThisTransaction("пачка")
     }
 
     /**

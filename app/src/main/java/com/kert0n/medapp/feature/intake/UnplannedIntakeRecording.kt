@@ -13,6 +13,7 @@ import com.kert0n.medapp.queue.Transactions
 import com.kert0n.medapp.queue.intake.IntakeAccounting
 import com.kert0n.medapp.queue.intake.IntakeSyncState
 import com.kert0n.medapp.queue.pack.PackageSyncCommand
+import com.kert0n.medapp.queue.readThisTransaction
 import com.kert0n.medapp.storage.course.CourseStorageRepository
 import com.kert0n.medapp.storage.intake.IntakeOutcome
 import com.kert0n.medapp.storage.intake.IntakeStorageRepository
@@ -56,7 +57,7 @@ class UnplannedIntakeRecording @Inject constructor(
         if (spendsLocally && !pkg.quantity.covers(amount)) return@run Outcome.Rejected(IntakeRejected.Reason.INSUFFICIENT)
         // Занятое — моё выделение и чужие брони, посчитанные от того же числа, которое человек
         // видит на экране: решает он по нему (PLAN D4).
-        val seen = checkNotNull(packages.projection(pkg.id)) { "пачка прочитана этой же транзакцией" }.availability
+        val seen = packages.projection(pkg.id).readThisTransaction("пачка").availability
         val free = seen.freeForAnyone
         // Вопросы — после отказов и до записи, все разом: человек отвечает один раз (PLAN D6).
         val warnings = listOfNotNull(
@@ -77,7 +78,7 @@ class UnplannedIntakeRecording @Inject constructor(
         // Местному расходу везти нечего: сервер о коробке не знает — расскажет о ней её создание (E6).
         val commands = if (spendsLocally) emptyList() else listOf(consume)
         val recorded = queue.change(pkg.medKit, commands, now) { intakes.record(outcome) }
-        check(recorded) { "пачка прочитана этой же транзакцией" }
+        recorded.readThisTransaction("пачка")
 
         // Что осталось — то же, что увидит человек: на своей полке расход уже списан, на общей он
         // лежит в проекции командой. Ноль — коробка кончилась или кончится по ответу, и её теряет

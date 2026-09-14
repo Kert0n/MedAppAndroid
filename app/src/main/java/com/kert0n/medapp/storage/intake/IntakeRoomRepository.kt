@@ -7,6 +7,7 @@ import com.kert0n.medapp.domain.intake.IntakeProjection
 import com.kert0n.medapp.queue.intake.IntakeSyncState
 import com.kert0n.medapp.domain.intake.UnplannedIntake
 import androidx.room.withTransaction
+import com.kert0n.medapp.queue.readThisTransaction
 import com.kert0n.medapp.storage.course.CourseDao
 import com.kert0n.medapp.storage.course.toSourceStorageEntities
 import com.kert0n.medapp.storage.course.toStorageEntity as toCourseStorageEntity
@@ -117,13 +118,11 @@ class IntakeRoomRepository @Inject constructor(
             }
         }
         outcome.reallocation?.let { (course, expected) ->
-            check(
-                courses.updateAllocations(
-                    course.toCourseStorageEntity(),
-                    course.medicine.toSourceStorageEntities(course.id),
-                    expected
-                )
-            ) { "план прочитан этой же транзакцией" }
+            courses.updateAllocations(
+                course.toCourseStorageEntity(),
+                course.medicine.toSourceStorageEntities(course.id),
+                expected
+            ).readThisTransaction("план")
         }
         true
     }

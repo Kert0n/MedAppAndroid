@@ -78,7 +78,7 @@ class MedKit(
      * когда уехало и её содержимое, — снимает пометку [settled].
      */
     fun published(): MedKit {
-        check(publication == Publication.LOCAL) { "аптечка уже на сервере" }
+        requireLocal()
         check(status == MedKitStatus.PUBLISHING) { "на сервере оказывается публикуемая аптечка, а не $status" }
         return MedKit(
             id = id,
@@ -103,8 +103,8 @@ class MedKit(
      * не публикуют и не убирают (PLAN E5).
      */
     fun markPublishing(): MedKit {
-        check(publication == Publication.LOCAL) { "аптечка уже на сервере" }
-        check(status.allowsDecision) { "об аптечке уже принято решение: $status" }
+        requireLocal()
+        requireDecidable()
         return changed(status = MedKitStatus.PUBLISHING)
     }
 
@@ -113,8 +113,18 @@ class MedKit(
      * остальным. До ответа аптечка видна, но выведена из оборота (PLAN E6).
      */
     fun markRemoving(): MedKit {
-        check(status.allowsDecision) { "об аптечке уже принято решение: $status" }
+        requireDecidable()
         return changed(status = MedKitStatus.REMOVING)
+    }
+
+    /** На сервер аптечка попадает один раз: обратной дороги нет (E5). */
+    private fun requireLocal() {
+        check(publication == Publication.LOCAL) { "аптечка уже на сервере" }
+    }
+
+    /** Одно решение об аптечке за раз: помеченную второй раз не публикуют и не убирают (PLAN E5). */
+    private fun requireDecidable() {
+        check(status.allowsDecision) { "об аптечке уже принято решение: $status" }
     }
 
     /** Полка ответила, а решать больше нечего: пометка снимается. */
