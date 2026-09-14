@@ -1,5 +1,6 @@
 package com.kert0n.medapp.fixture
 
+import com.kert0n.medapp.feature.notification.NotificationUpkeep
 import com.kert0n.medapp.feature.notification.ReminderOutbox
 import java.time.Clock
 import java.time.ZoneOffset
@@ -12,8 +13,8 @@ import kotlinx.coroutines.withTimeoutOrNull
 
 /**
  * Механизмы, которые в приложении живут с процессом, — **запущенные**, как в `MedApp.onCreate`:
- * владелец доставки следит за таблицей обязательств, и показ приходит сам, по сигналу после
- * коммита. Проверка через механизм отличается от проверки через `pass()`: она доказывает не
+ * владелец доставки следит за таблицей обязательств, сверка — за их основаниями, и показ приходит
+ * сам, по сигналу после коммита. Проверка через механизм отличается от проверки через `pass()`: она доказывает не
  * «проход умеет», а «изменение данных → фиксация → пробуждение → системный результат», включая
  * ответ человека, который вклинился посередине.
  *
@@ -28,6 +29,17 @@ class Mechanisms(scenarios: Scenarios, at: java.time.Instant) : AutoCloseable {
         scenarios.reminderStore, scenarios.notifier, scenarios.reminders, scenarios.freshness,
         scenarios.transactions, Clock.fixed(at, ZoneOffset.UTC), scope
     ).also { it.start() }
+
+    val upkeep: NotificationUpkeep = NotificationUpkeep(
+        scenarios.reminderStore, scenarios.notificationReconciliation, Clock.fixed(at, ZoneOffset.UTC), scope
+    ).also { it.start() }
+
+    init {
+        // Наблюдатели таблиц регистрируются в своих корутинах: запись, сделанная раньше, чем они
+        // встали, сигнала не даст. В приложении это неважно — начальный проход есть, — а проверка
+        // ждёт именно сигнала, поэтому даёт механизмам встать.
+        kotlinx.coroutines.runBlocking { delay(300) }
+    }
 
     /** Дождаться условия или упасть с именем того, чего ждали. */
     suspend fun await(what: String, timeoutMillis: Long = 5_000, condition: suspend () -> Boolean) {

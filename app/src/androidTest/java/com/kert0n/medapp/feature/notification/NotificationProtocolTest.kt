@@ -4,11 +4,9 @@ import androidx.test.ext.junit.runners.AndroidJUnit4
 import com.kert0n.medapp.domain.value.Doses
 import com.kert0n.medapp.domain.intake.CourseIntake
 import com.kert0n.medapp.domain.intake.IntakeStatus
-import com.kert0n.medapp.domain.notification.Delivery
 import com.kert0n.medapp.domain.notification.NotificationKey
 import com.kert0n.medapp.domain.notification.NotificationKind
 import com.kert0n.medapp.domain.notification.NotificationTarget
-import com.kert0n.medapp.domain.notification.Notifier
 import com.kert0n.medapp.domain.notification.Reminder
 import com.kert0n.medapp.domain.pack.ExpiryDate
 import com.kert0n.medapp.feature.course.CourseDrafting
@@ -175,23 +173,18 @@ class NotificationProtocolTest {
     fun cleanupSparesAnObligationRevivedMeanwhile() = runBlocking {
         val reminder = intake(now.plusSeconds(600))
         var revived = false
-        val reviving = object : Notifier {
-            override suspend fun show(reminder: Reminder) = Delivery.SHOWN
-            override suspend fun dismiss(key: NotificationKey) {
+        scenarios.notifier.onDismiss = { key ->
+            if (key == reminder.key) {
                 scenarios.reminderPromising.promise(listOf(intake(reminder.dueAt, (reminder.target as NotificationTarget.Intake).intakeId)))
                 revived = true
             }
         }
-        val outbox = ReminderOutbox(
-            scenarios.reminderStore, reviving, scenarios.reminders, scenarios.freshness, scenarios.transactions,
-            java.time.Clock.fixed(now, ZoneOffset.UTC), CoroutineScope(SupervisorJob() + Dispatchers.IO)
-        )
         scenarios.reminderStore.saveAll(listOf(reminder))
         scenarios.reminderWithdrawal.withdrawKeys(listOf(reminder.key))
 
-        outbox.pass()
+        mechanisms.await("гашение отозванного") { revived }
+        mechanisms.settle()
 
-        assertTrue("гашение не воскрешало — проверка сторожила бы пустоту", revived)
         val left = scenarios.reminderStore.find(reminder.key)
         assertNotNull("воскрешённое обязательство удалено уборкой", left)
         assertEquals(Reminder.State.DUE, left!!.state)

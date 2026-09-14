@@ -25,6 +25,12 @@ class FakeNotifier(var allowed: Boolean = true) : Notifier {
     /** Ключи, у которых повода больше нет: текст собрать не из чего. */
     val vanished = mutableSetOf<NotificationKey>()
 
+    /**
+     * Что успевает случиться, пока система гасит карточку: владелец доставки в этот миг держит
+     * прочитанное до системы, и гонку в этом окне можно смоделировать точно.
+     */
+    var onDismiss: (suspend (NotificationKey) -> Unit)? = null
+
     override suspend fun show(reminder: Reminder): Delivery {
         if (reminder.key in failing) error("показ сорвался: ${reminder.key}")
         if (!allowed) return Delivery.NOT_ALLOWED
@@ -35,6 +41,7 @@ class FakeNotifier(var allowed: Boolean = true) : Notifier {
 
     override suspend fun dismiss(key: NotificationKey) {
         dismissed += key
+        onDismiss?.invoke(key)
     }
 }
 

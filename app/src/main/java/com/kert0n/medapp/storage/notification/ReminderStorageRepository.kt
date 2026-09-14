@@ -21,6 +21,13 @@ interface ReminderStorageRepository {
     /** Сигнал после коммита: обязательства изменились — кто-то должен их исполнить. */
     fun changes(): Flow<Unit>
 
+    /**
+     * Сигнал после коммита: изменились **основания** обязательств — коробки, лечения, пункты,
+     * очередь, — и обещанное надо сверить с ними заново. Какие это таблицы, знает хранение;
+     * сами обязательства сюда не входят, иначе сверка будила бы себя своей же записью.
+     */
+    fun groundsChanged(): Flow<Unit>
+
     suspend fun find(key: NotificationKey): Reminder?
 
     suspend fun findAll(keys: Collection<NotificationKey>): List<Reminder>

@@ -22,6 +22,9 @@ class ReminderRoomRepository @Inject constructor(
     override fun changes(): Flow<Unit> =
         database.invalidationTracker.createFlow("reminders", emitInitialState = false).map { }
 
+    override fun groundsChanged(): Flow<Unit> =
+        database.invalidationTracker.createFlow(*GROUNDS, emitInitialState = false).map { }
+
     override suspend fun find(key: NotificationKey): Reminder? = reminders.find(key.stored)?.toDomain()
 
     override suspend fun findAll(keys: Collection<NotificationKey>): List<Reminder> =
@@ -45,6 +48,17 @@ class ReminderRoomRepository @Inject constructor(
         if (keys.isNotEmpty()) reminders.deleteAll(keys.map { it.stored })
     }
 }
+
+/**
+ * Таблицы, из которых сверка выводит обещанное: годность и назначение — коробки, обеспечение —
+ * лечение с пунктами, бронями и очередью, сокращения, внимание к очереди; словарь — потому что по
+ * нему собираются проекции. `reminders` здесь нет намеренно.
+ */
+private val GROUNDS = arrayOf(
+    "packages", "package_details", "claims", "med_kits",
+    "courses", "course_sources", "course_times", "active_package_assignments", "coverage_reductions",
+    "intakes", "sync_operations", "quantity_units", "form_types"
+)
 
 /** Ключ строкой: вид и предмет вместе, чтобы разные этапы одного события не склеивались. */
 private val NotificationKey.stored: String get() = "${kind.name}:$subject"

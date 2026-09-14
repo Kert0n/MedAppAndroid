@@ -142,6 +142,7 @@ class WriteContractTest {
         "IntakeStorageRepository.materialise" to (Shape.CREATION by "(List<CourseIntake>): List<Uuid>"),
         "IntakeStorageRepository.prunePlanned" to (Shape.NAMED_FIELDS by "(Uuid, Set<ScheduledOccurrence>): List<Uuid>"),
         "ReminderStorageRepository.changes" to (Shape.READ by "(): Flow<Unit>"),
+        "ReminderStorageRepository.groundsChanged" to (Shape.READ by "(): Flow<Unit>"),
         "ReminderStorageRepository.find" to (Shape.READ by "(NotificationKey): Reminder"),
         "ReminderStorageRepository.findAll" to (Shape.READ by "(Collection<NotificationKey>): List<Reminder>"),
         "ReminderStorageRepository.awaiting" to (Shape.READ by "(NoticeDelivery): List<Reminder>"),

@@ -6,6 +6,7 @@ import androidx.work.Configuration
 import com.kert0n.medapp.platform.connectivity.SyncTriggers
 import com.kert0n.medapp.platform.notifications.NotificationChannels
 import com.kert0n.medapp.feature.notification.DailySchedule
+import com.kert0n.medapp.feature.notification.NotificationUpkeep
 import com.kert0n.medapp.feature.notification.ReminderOutbox
 import com.kert0n.medapp.di.ApplicationScope
 import com.kert0n.medapp.feature.settings.SettingsStore
@@ -46,6 +47,9 @@ class MedApp : Application(), Configuration.Provider {
     lateinit var reminderOutbox: ReminderOutbox
 
     @Inject
+    lateinit var notificationUpkeep: NotificationUpkeep
+
+    @Inject
     lateinit var settings: SettingsStore
 
     @Inject
@@ -65,6 +69,8 @@ class MedApp : Application(), Configuration.Provider {
         outbox.start()
         // Владелец показа и будильника: в таблице могло остаться с прошлого запуска (PLAN D8).
         reminderOutbox.start()
+        // Сверка обещанного — по сигналу изменившихся оснований, а не по вызову из сценария (PLAN D8).
+        notificationUpkeep.start()
         triggers.start()
         // Задачи планировщика — по настройкам, и с теми же настройками они не пересоздаются;
         // проход дня — к желаемому времени сводки, вход в приложение зовёт его сразу (SyncTriggers).
