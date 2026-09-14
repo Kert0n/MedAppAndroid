@@ -44,14 +44,21 @@ class NotificationReconciliation @Inject constructor(
 ) {
 
     /**
-     * Привести обещанное в соответствие с тем, что есть. Одной транзакцией: полусверенное
-     * состояние не должно пережить падение.
+     * Привести обещанное в соответствие с тем, что есть.
+     *
+     * Считается **до** транзакции, а пишется в ней. Чтения здесь долгие — весь список пачек с
+     * проекциями, обеспечение каждого идущего лечения, его сокращения, — и держать под ними пишущую
+     * транзакцию значило бы запирать базу для очереди отправки и сценариев человека на всё это
+     * время. Запись же идёт одной: полусверенное состояние не должно пережить падение.
+     *
+     * Считанное могло устареть, пока мы читали, — и это не беда: обещание заводится только
+     * недостающее, снимается только беспричинное, а следующий проход поправит.
      */
-    suspend fun reconcile(now: Instant, zone: ZoneId): Report = transactions.run {
+    suspend fun reconcile(now: Instant, zone: ZoneId): Report {
         val today = now.atZone(zone).toLocalDate()
         val events = expiryDue(today, now) + coverageDue(now)
         val desired = events + listOfNotNull(digest(today, zone, events.size))
-        promising.promise(desired + reductionsDue(now))
+        val reductions = reductionsDue(now)
         // Лишнее — то, что было обещано по состоянию, а в нынешнем состоянии повода не имеет.
         val wanted = desired.mapTo(HashSet()) { it.key }
         val stale = reminders.ofKinds(FROM_STATE).map { it.key }.filterNot { it in wanted }
@@ -61,8 +68,12 @@ class NotificationReconciliation @Inject constructor(
         } else {
             reminders.ofKinds(listOf(NotificationKind.INTAKE_DUE)).map { it.key }
         }
-        withdrawal.withdrawKeys(stale + silenced)
-        Report(promised = desired.size, withdrawn = stale.size + silenced.size)
+
+        transactions.run {
+            promising.promise(desired + reductions)
+            withdrawal.withdrawKeys(stale + silenced)
+        }
+        return Report(promised = desired.size, withdrawn = stale.size + silenced.size)
     }
 
     /** Сколько обещано по нынешнему состоянию и сколько снято как потерявшее повод. */
