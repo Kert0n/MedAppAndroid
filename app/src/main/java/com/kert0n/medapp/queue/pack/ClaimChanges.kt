@@ -11,11 +11,12 @@ import com.kert0n.medapp.domain.course.Course
  */
 fun Course.claimChangesSince(before: Course): List<PackageSyncCommand> =
     (before.sources.map { it.pkg } + sources.map { it.pkg }).distinct().mapNotNull { pkg ->
-        val was = before.allocatedOf(pkg)
-        val now = allocatedOf(pkg)
+        // Броней нет и у отвязанной, и у пачки с нулём: снимать одинаково нечего.
+        val was = before.allocatedOf(pkg)?.takeUnless { it.isZero }
+        val now = allocatedOf(pkg)?.takeUnless { it.isZero }
         when {
             was == now -> null
-            now == null || now.isZero -> PackageSyncCommand.ReleaseClaim(pkg.id)
+            now == null -> PackageSyncCommand.ReleaseClaim(pkg.id)
             else -> PackageSyncCommand.SetClaim(pkg.id, now)
         }
     }

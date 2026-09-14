@@ -159,11 +159,9 @@ class CourseDraft(
         return changed(medicine = moved, revision = revision.next(), updatedAt = at)
     }
 
-    fun allocate(pkg: PackageRef, doses: Doses, at: Instant): CourseDraft = changed(
-        medicine = medicine.allocate(pkg, doses),
-        revision = revision.next(),
-        updatedAt = at
-    )
+    /** Выделение пачке; отключённому источнику — отказ его причиной (PLAN D5). */
+    fun allocate(pkg: PackageRef, doses: Doses, at: Instant): Result<CourseDraft> =
+        medicine.allocate(pkg, doses).map { changed(medicine = it, revision = revision.next(), updatedAt = at) }
 
     /**
      * Верхняя граница ползунка пачки. Пока доза не задана, границы нет: выделять нечего, и ноль

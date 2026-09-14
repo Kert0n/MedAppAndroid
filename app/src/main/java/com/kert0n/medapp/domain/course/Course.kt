@@ -172,7 +172,7 @@ class Course(
      * факт, и пункт им не закрывается (PLAN D5). Правило о составе препарата живёт на курсе,
      * а не у того, кто записывает приём.
      */
-    fun isSource(pkg: PackageRef): Boolean = medicine.holds(pkg)
+    fun isSource(pkg: PackageRef): Boolean = medicine.usable(pkg)
 
     /**
      * Пачки действующего курса менять можно: это не изменение дозы или календаря (PLAN D5).
@@ -212,11 +212,9 @@ class Course(
         return changed(medicine = moved, revision = revision.next(), updatedAt = at)
     }
 
-    fun allocate(pkg: PackageRef, doses: Doses, at: Instant): Course = changed(
-        medicine = medicine.allocate(pkg, doses),
-        revision = revision.next(),
-        updatedAt = at
-    )
+    /** Выделение пачке; отключённому источнику — отказ его причиной (PLAN D5). */
+    fun allocate(pkg: PackageRef, doses: Doses, at: Instant): Result<Course> =
+        medicine.allocate(pkg, doses).map { changed(medicine = it, revision = revision.next(), updatedAt = at) }
 
     /**
      * Обеспечение курса: на сколько из оставшихся доз хватит пачек препарата и с какого приёма не

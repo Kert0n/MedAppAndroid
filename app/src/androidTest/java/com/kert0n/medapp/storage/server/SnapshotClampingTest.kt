@@ -1,5 +1,6 @@
 package com.kert0n.medapp.storage.server
 
+import com.kert0n.medapp.feature.course.SourceEditing
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import com.kert0n.medapp.domain.course.Course
 import com.kert0n.medapp.domain.course.CourseSource
@@ -228,10 +229,11 @@ class SnapshotClampingTest {
 
         scenarios.packageAdjusting.adjust(PACK, PackageAdjusting.Action.Recount(seen = tablets("25"), actual = tablets("8")))
 
-        val fromMe = reductions(id).last()
-        assertEquals(2, reductions(id).size)
-        assertEquals(Doses(6), fromMe.coveredBefore)
-        assertEquals(Doses(4), fromMe.coveredAfter)
+        // Оба события — одним мигом фиксированных часов, и порядок по времени между ними не определён.
+        val recorded = reductions(id)
+        assertEquals(2, recorded.size)
+        val fromMe = recorded.single { it.coveredBefore == Doses(6) && it.coveredAfter == Doses(4) }
+        assertEquals(PACK, fromMe.packageId)
     }
 
     /** Мой приём по плану уменьшает выделение на принятое — это не сокращение. */
@@ -243,5 +245,47 @@ class SnapshotClampingTest {
         scenarios.intakeConfirmation.confirm(first.id, PACK, dose("2"), now).confirmed()
 
         assertEquals(emptyList<CoverageReduction>(), reductions(id))
+    }
+
+    /**
+     * Зажим тронул и вторую пачку курса — с местной полки: команда ей не ставится вовсе, а команда
+     * первой едет полке первой (красная проверка: слать всё полке коробки из снимка — команда
+     * местной коробке встала бы в очередь общей полки).
+     */
+    @Test
+    fun eachClaimCommandGoesToItsOwnPackagesShelf() = runTest {
+        val id = treated()
+        val home = Uuid.random()
+        database.packageRepository().add(pack(id = home, name = "Домашняя", quantity = tablets("20"), form = TABLET_FORM))
+        val plan = plan(id)
+        // Вторая пачка сверх потребности: зажим снимет лишнее с конца — с неё.
+        scenarios.sourceEditing.save(id, plan.revision, listOf(SourceEditing.Source(PACK, Doses(10)), SourceEditing.Source(home, Doses(2))))
+        val before = database.syncOperations().all().size
+
+        lay(snapshot("12"))
+
+        val after = database.syncOperations().all().drop(before)
+            .map { (it.toDomain(VOCABULARY) as StoredSyncOperation.Readable).operation to it.operation.medKitId }
+        assertEquals(listOf(PackageSyncCommand.SetClaim(PACK, tablets("12"))), after.map { it.first.command })
+        assertEquals(listOf(SHARED_KIT), after.map { it.second })
+        assertEquals(Doses(6), plan(id).sources.first { it.pkg.id == PACK }.allocatedDoses)
+    }
+
+    /** Форму сменил сам человек: дверь та же, источник отключён, из него больше не принимают. */
+    @Test
+    fun aFormChangedByTheHumanDisablesTheSourceToo() = runTest {
+        val id = treated()
+        val facts = requireNotNull(database.packageRepository().find(PACK)).facts
+
+        scenarios.packageDescribing.describe(PACK, facts.copy(shared = facts.shared.copy(form = CAPSULE_FORM)))
+
+        assertEquals(CourseSource.Fault.FORM_MISMATCH, plan(id).sources.single().fault)
+        val first = database.intakeRepository().ofCourse(id).filterIsInstance<CourseIntake>().minBy { it.plannedAt }
+        assertEquals(
+            com.kert0n.medapp.feature.intake.IntakeConfirmation.Outcome.Rejected(com.kert0n.medapp.domain.intake.IntakeRejected.Reason.PACKAGE_NOT_A_SOURCE),
+            scenarios.intakeConfirmation.confirm(first.id, PACK, dose("2"), now)
+        )
+        val edit = scenarios.sourceEditing.save(id, plan(id).revision, listOf(SourceEditing.Source(PACK, Doses(3))))
+        assertEquals(SourceEditing.Outcome.Rejected(com.kert0n.medapp.domain.course.CourseRejected.Reason.FORM_MISMATCH), edit)
     }
 }

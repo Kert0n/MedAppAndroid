@@ -9,7 +9,6 @@ import com.kert0n.medapp.queue.SnapshotStorage
 import com.kert0n.medapp.storage.course.CourseDao
 import com.kert0n.medapp.storage.database.MedAppDatabase
 import com.kert0n.medapp.storage.medkit.MedKitDao
-import com.kert0n.medapp.queue.pack.claimChangesSince
 import com.kert0n.medapp.storage.course.followBox
 import com.kert0n.medapp.storage.intake.IntakeDao
 import com.kert0n.medapp.storage.medkit.loseAccess
@@ -81,12 +80,8 @@ class SnapshotRoomStorage @Inject constructor(
             if (removed || medKits.find(resolved.pack.medKit.id) == null) continue
             packages.applySnapshot(resolved, observedAt = at)
             // Курс следует за коробкой той же транзакцией: чужой расход или бронь зажимают
-            // выделения, и бронь уезжает разницей (PLAN D5, E4).
-            for (followed in courses.followBox(packageId, packages, intakes, queue, words, at)) {
-                for (command in followed.after.claimChangesSince(followed.before)) {
-                    queue.enqueue(Uuid.random(), command, at, medKitId = resolved.pack.medKit.id)
-                }
-            }
+            // выделения, и бронь уезжает разницей — каждая своей пачке (PLAN D5, E4).
+            queue.enqueueClaimChanges(courses.followBox(packageId, packages, intakes, queue, words, at), packages, at)
         }
         // «Сервер знал, и ждать нечего» посчитано до запроса, а применяется после него — и за это
         // время человек мог унести коробку домой, пометить её или сделать её полку местной.

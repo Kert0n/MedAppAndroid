@@ -126,7 +126,8 @@ class IntakeConfirmation @Inject constructor(
                 val seen = checkNotNull(packages.projection(pkg.id)) { "пачка прочитана этой же транзакцией" }.availability
                 val availableAfter = seen.availableToMe.minusOrZero(amount.quantity)
                 val doses = course.dosesAfterIntake(pkg.ref, amount, availableAfter)
-                if (doses == allocated) null else CourseReallocation(course.allocate(pkg.ref, doses, now), course.revision)
+                // Пачка — источник, из которого принимают (проверено выше), и выделение ей законно.
+                if (doses == allocated) null else CourseReallocation(course.allocate(pkg.ref, doses, now).getOrThrow(), course.revision)
             }
         }
         val claimAfter = when {

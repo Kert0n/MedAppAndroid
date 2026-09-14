@@ -98,4 +98,18 @@ class CourseSourceFaultTest {
         assertEquals(CourseRejected.Reason.UNIT_MISMATCH, (refused as CourseRejected).reason)
         assertNotNull(draft.restoreSource(tablets, LATER).activate(LATER).getOrNull())
     }
+
+    /** Отключённый — не источник: из него не принимают, и выделить ему нечего — отказ причиной, а не падение. */
+    @Test
+    fun aFaultedSourceIsNotASourceAndTakesNoAllocation() {
+        val course = activeCourse(sources = listOf(source(tablets, 5), source(capsules, 0)))
+            .faultSource(capsules, CourseSource.Fault.FORM_MISMATCH, LATER)
+
+        assertEquals(false, course.isSource(capsules))
+        assertEquals(true, course.isSource(tablets))
+        val refused = course.allocate(capsules, Doses(2), LATER).exceptionOrNull()
+        assertEquals(CourseRejected.Reason.FORM_MISMATCH, (refused as CourseRejected).reason)
+        assertNotNull(course.allocate(capsules, Doses(0), LATER).getOrNull())
+        assertNotNull(course.allocate(tablets, Doses(3), LATER).getOrNull())
+    }
 }

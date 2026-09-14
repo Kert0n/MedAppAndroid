@@ -90,11 +90,20 @@ class CourseMedicine(sources: List<CourseSource> = emptyList()) {
         return withSources(moved)
     }
 
-    /** Задаёт выделение пачки в целых дозах; верхнюю границу называет [maxDoses]. */
-    internal fun allocate(pkg: PackageRef, doses: Doses): CourseMedicine {
+    /**
+     * Задаёт выделение пачки в целых дозах; верхнюю границу называет [maxDoses]. Отключённому
+     * источнику выделить нечего — отказ его причиной, а не падение на правиле «отключённый ничего
+     * не держит» (PLAN D5).
+     */
+    internal fun allocate(pkg: PackageRef, doses: Doses): Result<CourseMedicine> {
         requireHolds(pkg)
-        return withSources(sources.map { if (it.pkg == pkg) it.copy(allocatedDoses = doses) else it })
+        val fault = faultOf(pkg)
+        if (fault != null && !doses.isNone) return Result.failure(CourseRejected(fault.rejection))
+        return Result.success(withSources(sources.map { if (it.pkg == pkg) it.copy(allocatedDoses = doses) else it }))
     }
+
+    /** Источник, из которого можно принимать: в составе **и** исправен. Отключённый — не источник (PLAN D5). */
+    internal fun usable(pkg: PackageRef): Boolean = sources.any { it.pkg == pkg && it.isUsable }
 
     /**
      * Источник отключается с причиной: выделение — ноль, место в составе остаётся, чтобы человек

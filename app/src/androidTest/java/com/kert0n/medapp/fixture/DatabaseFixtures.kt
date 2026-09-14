@@ -137,7 +137,9 @@ class Scenarios(database: MedAppDatabase, now: java.time.Instant) {
     private val transactions = database.transactions()
 
     val packageAdding = com.kert0n.medapp.feature.packages.PackageAdding(packages, medKits, queue, transactions, clock)
-    val packageDescribing = com.kert0n.medapp.feature.packages.PackageDescribing(packages, queue, transactions, clock)
+    val courseCalendar = com.kert0n.medapp.feature.course.CourseCalendar(database.intakeRepository(), packages)
+    val courseClamping = com.kert0n.medapp.feature.course.CourseClamping(courses, packages, courseCalendar, queue)
+    val packageDescribing = com.kert0n.medapp.feature.packages.PackageDescribing(packages, courseClamping, queue, transactions, clock)
     val packageRemoval = com.kert0n.medapp.feature.packages.PackageRemoval(
         packages, queue, transactions, clock
     )
@@ -152,8 +154,6 @@ class Scenarios(database: MedAppDatabase, now: java.time.Instant) {
         medKits, packages, packageRelocation, queue, transactions, clock
     )
     val courseDrafting = com.kert0n.medapp.feature.course.CourseDrafting(courses, packages, transactions, clock)
-    val courseCalendar = com.kert0n.medapp.feature.course.CourseCalendar(database.intakeRepository(), packages)
-    val courseClamping = com.kert0n.medapp.feature.course.CourseClamping(courses, packages, courseCalendar, queue)
     val packageAdjusting = com.kert0n.medapp.feature.packages.PackageAdjusting(packages, courseClamping, queue, transactions, clock)
     val unplannedIntakeRecording = com.kert0n.medapp.feature.intake.UnplannedIntakeRecording(
         database.intakeRepository(), courses, packages, courseClamping, queue, transactions, clock

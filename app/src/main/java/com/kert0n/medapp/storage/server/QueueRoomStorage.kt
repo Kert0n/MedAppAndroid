@@ -31,7 +31,6 @@ import com.kert0n.medapp.storage.course.CourseDao
 import com.kert0n.medapp.storage.database.MedAppDatabase
 import com.kert0n.medapp.storage.intake.IntakeDao
 import com.kert0n.medapp.storage.medkit.MedKitDao
-import com.kert0n.medapp.queue.pack.claimChangesSince
 import com.kert0n.medapp.storage.course.followBox
 import com.kert0n.medapp.storage.medkit.loseAccess
 import com.kert0n.medapp.storage.pack.PackageDao
@@ -384,18 +383,11 @@ class QueueRoomStorage @Inject constructor(
 
     /**
      * Курс следует за коробкой той же транзакцией, что кладёт ответ сервера: чужой расход или бронь,
-     * увиденные ответом, зажимают выделения, и бронь уезжает разницей (PLAN D5, E4). Полке,
-     * серверу не отвечающей, команды не ставятся — унесённую домой коробку зажим не трогает.
+     * увиденные ответом, зажимают выделения, и бронь уезжает разницей — каждая своей пачке и её
+     * полке (PLAN D5, E4).
      */
-    private suspend fun followTheBox(packageId: Uuid, words: Vocabulary, at: Instant) {
-        val shelf = packages.find(packageId)?.let { it.pack.medKitRow(it.medKit).toRef() } ?: return
-        for (followed in courses.followBox(packageId, packages, intakes, queue, words, at)) {
-            if (!shelf.answersToServer) continue
-            for (command in followed.after.claimChangesSince(followed.before)) {
-                queue.enqueue(Uuid.random(), command, at, medKitId = shelf.id)
-            }
-        }
-    }
+    private suspend fun followTheBox(packageId: Uuid, words: Vocabulary, at: Instant) =
+        queue.enqueueClaimChanges(courses.followBox(packageId, packages, intakes, queue, words, at), packages, at)
 
     /** Зависимость значит «нужен эффект»: не будет его у родителя — не будет и у зависимых, и у их зависимых. */
     private suspend fun cascade(id: Uuid, effect: Settlement.Effect.Cascade) {
