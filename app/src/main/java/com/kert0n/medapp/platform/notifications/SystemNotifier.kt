@@ -55,6 +55,14 @@ class SystemNotifier @Inject constructor(
             ContextCompat.checkSelfPermission(context, Manifest.permission.POST_NOTIFICATIONS) != PackageManager.PERMISSION_GRANTED
         ) return Delivery.NOT_ALLOWED
         if (!NotificationManagerCompat.from(context).areNotificationsEnabled()) return Delivery.NOT_ALLOWED
+        // Разрешение приложению — ещё не разрешение этому разговору: каналов четыре, и человек
+        // выключает их по отдельности (PLAN D8). Выключенный канал молчит, а `notify` об этом не
+        // скажет — спрашиваем канал **этого вида**.
+        val channel = context.getSystemService(android.app.NotificationManager::class.java)
+            .getNotificationChannel(notification.channel.id)
+        if (channel == null || channel.importance == android.app.NotificationManager.IMPORTANCE_NONE) {
+            return Delivery.NOT_ALLOWED
+        }
         // Текст собирается из чтений по идентификаторам цели: не нашлось — повода больше нет.
         val text = textOf(notification) ?: return Delivery.SUBJECT_GONE
         val builder = NotificationCompat.Builder(context, notification.channel.id)

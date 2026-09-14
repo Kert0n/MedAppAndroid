@@ -175,4 +175,32 @@ class SystemNotifierTest {
 
         assertEquals(null, manager.getNotificationChannel("sync"))
     }
+
+    /**
+     * Канал выключен, а приложение — нет. Каналов у нас четыре, и человек выключает их по
+     * отдельности (D8): он мог оставить сводку и запретить приёмы. `areNotificationsEnabled()`
+     * отвечает про приложение и об этом не знает — `notify()` молчит, а мы пишем «сказано».
+     */
+    @Test
+    fun aBlockedChannelIsNotAllowed() = runTest {
+        if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.TIRAMISU) {
+            InstrumentationRegistry.getInstrumentation().uiAutomation
+                .grantRuntimePermission(context.packageName, Manifest.permission.POST_NOTIFICATIONS)
+        }
+        val channel = NotificationChannel.EXPIRY.id
+        try {
+            manager.deleteNotificationChannel(channel)
+            manager.createNotificationChannel(
+                android.app.NotificationChannel(channel, "Сроки годности", android.app.NotificationManager.IMPORTANCE_NONE)
+            )
+
+            assertEquals(
+                com.kert0n.medapp.domain.notification.Delivery.NOT_ALLOWED,
+                notifier.show(planned)
+            )
+        } finally {
+            manager.deleteNotificationChannel(channel)
+            NotificationChannels(context).ensure()
+        }
+    }
 }
