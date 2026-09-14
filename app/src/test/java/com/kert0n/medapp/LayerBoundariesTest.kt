@@ -118,6 +118,32 @@ class LayerBoundariesTest {
         assertEquals(emptyList<String>(), named)
     }
 
+    /**
+     * Сценарий отвечает на вход исходом, а не падением (PLAN D6, F5). Правило одно на `feature/`:
+     * то, что пришло **снаружи** — идентификатор с экрана, из шторки, из ответа сервера, — может
+     * пропасть, пока его несли, и на это есть исход (`Gone`, `GONE`, `Rejected`); то, что прочитано
+     * **этой же транзакцией** или следует из уже прочитанного, — инвариант, и его держит `check`.
+     * Поэтому `requireNotNull` в сценарии не бывает вовсе, а у `checkNotNull` текст называет
+     * инвариант: «прочитан(а) этой же транзакцией», «записан(а)», «у … есть …».
+     */
+    @Test
+    fun aScenarioAnswersAMissingInputWithAnOutcome() {
+        val invariant = Regex("этой же транзакцией|записан|^у .+ есть ")
+        val offenders = sources.resolve("feature").walkTopDown()
+            .filter { it.extension == "kt" }
+            .flatMap { file ->
+                file.readLines().withIndex()
+                    .filter { (_, line) -> "requireNotNull(" in line || "checkNotNull(" in line }
+                    .filterNot { (_, line) ->
+                        "checkNotNull(" in line && CHECK_MESSAGE.find(line)?.groupValues?.get(1)?.contains(invariant) == true
+                    }
+                    .map { (index, line) -> "${file.relativeTo(sources).invariantSeparatorsPath}:${index + 1}: ${line.trim()}" }
+            }
+            .toList()
+
+        assertEquals("пропавший вход сценария — исход, а не падение", emptyList<String>(), offenders)
+    }
+
     /** Чей это файл: самый длинный подходящий ключ, чтобы `app/navigation` не считался `app`. */
     private fun File.root(): String? {
         val path = relativeTo(sources).path
@@ -131,5 +157,6 @@ class LayerBoundariesTest {
 
     private companion object {
         val NAMED = Regex("""com\.kert0n\.medapp\.([a-z]+)\.""")
+        val CHECK_MESSAGE = Regex("""checkNotNull\(.*\)\s*\{\s*"([^"]*)"""")
     }
 }

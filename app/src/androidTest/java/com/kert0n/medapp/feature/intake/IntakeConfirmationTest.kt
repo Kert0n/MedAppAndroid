@@ -279,6 +279,21 @@ class IntakeConfirmationTest {
         assertEquals(tablets("20"), requireNotNull(packages.find(PACK)).quantity)
     }
 
+    /**
+     * Пункта, который назвал экран или шторка, уже нет — расписание перестроили, пока карточка
+     * висела. Это исход, а не падение: записано ничего, коробка цела (PLAN D6, F5).
+     */
+    @Test
+    fun aVanishedIntakeIsAnOutcomeNotACrash() = runTest {
+        activate()
+
+        val outcome = confirmation.confirm(Uuid.random(), PACK, dose("2"), FIRST_PLANNED_AT)
+
+        assertEquals(IntakeConfirmation.Outcome.Gone, outcome)
+        assertEquals(IntakeStatus.PLANNED, requireNotNull(intakes.find(INTAKE)).status)
+        assertEquals(tablets("20"), requireNotNull(packages.find(PACK)).quantity)
+    }
+
     /** Когда приняли, называет человек: вчерашний факт по открытому эпизоду записывается как есть. */
     @Test
     fun yesterdaysIntakeIsAcceptedWhileTheEpisodeIsOpen() = runTest {

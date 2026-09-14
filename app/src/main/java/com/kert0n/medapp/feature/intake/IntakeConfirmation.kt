@@ -56,8 +56,9 @@ class IntakeConfirmation @Inject constructor(
     /**
      * Принято [amount] из пачки [packageId] в момент [at], который называет человек: сейчас или
      * вчера — проверка одна и та же. Отказ — [Outcome.Rejected], и тогда не записано ничего;
-     * вопрос — [Outcome.Warned], тоже без записи, пока человек не ответит [acknowledged]. Повтор
-     * по уже принятому пункту ничего не меняет и отвечает тем, что записано.
+     * вопрос — [Outcome.Warned], тоже без записи, пока человек не ответит [acknowledged]; пункта
+     * уже нет — [Outcome.Gone]. Повтор по уже принятому пункту ничего не меняет и отвечает тем,
+     * что записано.
      */
     suspend fun confirm(
         intakeId: Uuid,
@@ -69,7 +70,8 @@ class IntakeConfirmation @Inject constructor(
 
     private suspend fun write(intakeId: Uuid, packageId: Uuid, amount: Dose, at: Instant, acknowledged: Boolean): Outcome {
         val now = clock.instant()
-        val intake = requireNotNull(intakes.find(intakeId) as? CourseIntake) { "подтверждается пункт курса" }
+        // Идентификатор пришёл снаружи — с экрана или из шторки: пропавший пункт — исход, не падение.
+        val intake = intakes.find(intakeId) as? CourseIntake ?: return Outcome.Gone
         val record = checkNotNull(courses.findRecord(intake.courseId)) { "у пункта курса есть запись эпизода" }
         if (intake.status == IntakeStatus.TAKEN) {
             val sync = checkNotNull(intakes.syncStateOf(intake.id)) { "принятый пункт записан" }
@@ -183,5 +185,11 @@ class IntakeConfirmation @Inject constructor(
         data class Warned(val warnings: List<IntakeWarning>) : Outcome
 
         data class Rejected(val reason: IntakeRejected.Reason) : Outcome
+
+        /**
+         * Пункта, названного снаружи, уже нет: расписание перестроили, пока экран или шторка его
+         * показывали. Записано ничего; экран закрывается молча (PLAN D6).
+         */
+        data object Gone : Outcome
     }
 }
