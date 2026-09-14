@@ -569,7 +569,8 @@ UUID и проверяем принадлежность; недоступнос�
 | **Условная запись не молчит** | условные записи портов отвечают `Boolean`, и два вызывающих его не читали (`updateAllocations` в записи приёма, `end` в удалении коробки) | `@CheckResult` на условных записях портов и DAO-расширений, lint `CheckResult` — ошибка сборки; `WriteContractTest` держит, что у каждой условной записи есть аннотация | разбор #31: F5 «ноль строк незаконен» держалось вниманием — сборка держит крепче |
 | **Бронь ставит один владелец** | `claimChangesSince` — правило, а команды брони ставили пятеро, трое считали разницу заново | `CourseFollowing.announceClaims(before, after, at, except)` — единственный, кто ставит `SetClaim`/`ReleaseClaim`; начало — от `Course.unallocated()`, конец — к нему; `ClaimOwnershipTest` держит | разбор #31: правка правила брони не доходила до изменения и начала лечения |
 | **Вход сценария — исход** | `IntakeConfirmation.confirm` бросал на пункте, которого уже нет; соседи отвечали `GONE` | что пришло снаружи (идентификатор с экрана, из шторки) — исход; что прочитано этой же транзакцией — `check`. `confirm` → `Outcome.Gone`; `LayerBoundariesTest` держит: `requireNotNull`/`checkNotNull` в `feature/` — только об инвариантах | разбор #31: устаревшая карточка «Принял» после перестройки расписания роняла приложение |
-| **Растущие таблицы — по индексу** | сверка на каждое изменение оснований сканировала `coverage_reductions` и `intakes` целиком | индексы `coverage_reductions(at)`, `intakes(status, scheduled_at)`; `HundredMedKitsTest` прогоняет запросы сверки и прохода через `EXPLAIN QUERY PLAN` — `SCAN` по неубывающим таблицам (`intakes`, `coverage_reductions`, `sync_operations`, `reminders`) запрещён | разбор #31 (CodeRabbit): сверка теперь частая, и её цена росла с историей |
+| **Растущие таблицы — по индексу** | сверка на каждое изменение оснований сканировала `coverage_reductions`, `intakes` и `sync_operations` целиком (`NOT IN` индексом не идёт) | индексы `coverage_reductions(at)`, `intakes(status, scheduled_at)`, `sync_operations(med_kit_id)`; `outstanding()` называет состояния списком; `HundredMedKitsTest` прогоняет запросы сверки и прохода через `EXPLAIN QUERY PLAN` — `SCAN` по неубывающим таблицам (`intakes`, `coverage_reductions`, `sync_operations`) запрещён; `reminders` давнее забывает сама (`Reminder.RETENTION`), `packages` — законный список всех коробок | разбор #31 (CodeRabbit): сверка теперь частая, и её цена росла с историей |
+| **Правило — на своём типе** | греп AGENTS «повтор правила внутри слоя» по B20 не гонялся: «аптечка уже на сервере», «об аптечке уже принято решение», «пачка уже лежит в этой аптечке» — по два раза; F5 «прочитано этой же транзакцией — ноль строк незаконен» — двадцатью `check` по сценариям | `MedKit.requireLocal/requireDecidable`, `Package.relocated`; `queue/ReadThisTransaction` — `Boolean.readThisTransaction(subject)` для условной записи, `T?.readThisTransaction(subject)` для повторного чтения; греп — обязательный шаг после каждого коммита | разбор #31: правило без своего типа расползается копиями, и копии расходятся |
 
 ## C2. Чего в первой законченной версии нет
 
@@ -4623,8 +4624,8 @@ API», «`followBox`» — закрыто, «Отказ разобран», «С
 | 18 | `Условная запись не молчит` | `@CheckResult` + lint-ошибка; `WriteContractTest`; два места с `check` |
 | 19 | `Бронь разницей ставит один владелец` | `announceClaims` у всех; `Course.unallocated()`; `ClaimOwnershipTest` |
 | 20 | `Пропавший пункт — исход, а не падение` | `IntakeConfirmation.Outcome.Gone`; `LayerBoundariesTest` о `requireNotNull` в `feature/` |
-| 21 | `Правило аптечки и переноса — на своём типе` | `MedKit.requireLocal/requireDecidable`, `Package.relocated` |
-| 22 | `Сверка читает растущие таблицы по индексу` | индексы, `3.json`, `MIGRATION_2_3`, `EXPLAIN QUERY PLAN` в масштабе |
+| 21 | `Правило аптечки, переноса и F5 — на своём типе` | `MedKit.requireLocal/requireDecidable`, `Package.relocated`, `queue/ReadThisTransaction` вместо двадцати `check` |
+| 22 | `Сверка читает растущие таблицы по индексу` | три индекса, `3.json`, `MIGRATION_2_3`, `outstanding()` списком, `EXPLAIN QUERY PLAN` в масштабе |
 
 **Тесты.** Тесты дефектов пишутся **до** фиксов, их красный прогон записан в описании PR.
 - *Домен (`test/`)*: `CourseCoverage.zone`/`noticeOn(at, threshold)`; `Reminder.projection()`;
@@ -5165,13 +5166,14 @@ ANDROID_SERIAL=emulator-5554 ./gradlew :app:connectedDebugAndroidTest -Pprobe
 и отдельными грепами их больше не смотрят.
 Эмулятор — уже запущенный `emulator-5554`, новых не поднимать. Итог инструментальных читать из
 `app/build/outputs/androidTest-results/connected/debug/TEST-*.xml`: `AssumptionViolatedException` у
-`RegistrationProbe` — пропуск, не провал. **Эталон после B20: 802 unit, 536
+`RegistrationProbe` — пропуск, не провал. **Эталон после B20: 812 unit, 543
 инструментальных, 2 пропуска (`RegistrationProbe`, `CrptProbe`), 0 провалов** (после B19 — 788 и 506; после B18 — 764 и 505; после B17 — 752 и 475; после третьей части B17 было 747 и 468; после первой части B17 было 738 и 452 — журнал показов
 ушёл вместе со своими проверками, а обязательства принесли свои; после B16 — 730 и 422) —
 каждый PR записывает свой. **Эталон времени после B20** (`HundredMedKitsTest`, `BigLatest`, 100 полок /
 1 000 пачек / 50 лечений / год приёмов): список полок 1 мс, все лекарства 46 мс, снимок ста полок
-915 мс, отчёты 32–52 мс, сверка 104 мс, проход доставки 7 мс; бюджеты в тесте — с запасом не меньше
-втрое; сверка — 51 запрос независимо от числа лечений. Тесты поднимают `HiltTestApplication` и
+900 мс, отчёты 32–52 мс, сверка 105 мс, проход доставки 6 мс; бюджеты в тесте — с запасом не меньше
+втрое; сверка — 51 запрос независимо от числа лечений, и ни один её запрос не перебирает
+растущую таблицу (`EXPLAIN QUERY PLAN`). Тесты поднимают `HiltTestApplication` и
 падений на старте не видят: после правки графа Hilt/WorkManager и после правки схемы запускается
 настоящий `MedApp` на эмуляторе (`adb shell pm clear com.kert0n.medapp`, затем
 `am start -n com.kert0n.medapp/.app.MainActivity`, `logcat` без `FATAL`, `SyncWorker` — `SUCCESS`).
