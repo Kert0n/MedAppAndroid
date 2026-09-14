@@ -59,7 +59,7 @@ class IntakeReminderTest {
     fun setUp() = runTest {
         database = inMemoryDatabase()
         scenarios = Scenarios(database, now)
-        planning = NotificationPlanning(database.intakeRepository(), settings)
+        planning = NotificationPlanning(database.intakeRepository(), database.packageRepository(), settings)
         delivery = NotificationDelivery(notifier, reminders, NotificationLogRoomRepository(database.notificationLog()), Clock.fixed(now, ZoneOffset.UTC))
         database.packageRepository().add(pack(id = PACK, quantity = tablets("20"), form = TABLET_FORM))
     }

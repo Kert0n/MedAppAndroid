@@ -9,7 +9,12 @@ import com.kert0n.medapp.domain.notification.NotificationKind
 import com.kert0n.medapp.domain.notification.NotificationSettingsSource
 import com.kert0n.medapp.domain.notification.NotificationTarget
 import com.kert0n.medapp.domain.notification.PlannedNotification
+import com.kert0n.medapp.domain.pack.ExpiryDate
 import com.kert0n.medapp.storage.intake.IntakeStorageRepository
+import com.kert0n.medapp.storage.pack.PackageQuery
+import com.kert0n.medapp.storage.pack.PackageStorageRepository
+import java.time.LocalDate
+import kotlinx.coroutines.flow.first
 import java.time.Duration
 import java.time.Instant
 import javax.inject.Inject
@@ -22,8 +27,35 @@ import kotlin.uuid.Uuid
  */
 class NotificationPlanning @Inject constructor(
     private val intakes: IntakeStorageRepository,
+    private val packages: PackageStorageRepository,
     private val settings: NotificationSettingsSource
 ) {
+
+    /**
+     * Годность на день [today] (PLAN D8): коробкам, из которых курс берёт (назначены идущему курсу
+     * с выделением больше нуля), — за три дня и за день системным уведомлением; всем живым — в
+     * последний день баннером в приложении. Этап — только сегодняшний: поздно подключённая коробка
+     * залпа прошедших не получает; просроченной этапов нет.
+     */
+    suspend fun expiryDue(today: LocalDate, at: Instant): List<PlannedNotification> {
+        val sourcesEnabled = settings.current().expirySourceRemindersEnabled
+        return packages.list(PackageQuery(), today).first().mapNotNull { pkg ->
+            val expiresOn = pkg.facts.expiresOn ?: return@mapNotNull null
+            val isSource = pkg.holdingCourseId != null && !pkg.availability.myAllocation.isZero
+            val kind = when (expiresOn.stageOn(today)) {
+                ExpiryDate.Stage.SOURCE_3D -> NotificationKind.EXPIRY_SOURCE_3D.takeIf { isSource && sourcesEnabled }
+                ExpiryDate.Stage.SOURCE_1D -> NotificationKind.EXPIRY_SOURCE_1D.takeIf { isSource && sourcesEnabled }
+                ExpiryDate.Stage.TODAY -> NotificationKind.EXPIRY_TODAY
+                null -> null
+            } ?: return@mapNotNull null
+            PlannedNotification(
+                key = NotificationKey.expiry(pkg.id, expiresOn, kind),
+                dueAt = at,
+                target = NotificationTarget.PackageCard(pkg.id),
+                delivery = if (kind == NotificationKind.EXPIRY_TODAY) NoticeDelivery.IN_APP_BANNER else NoticeDelivery.SYSTEM
+            )
+        }
+    }
 
     /**
      * Напоминания о приёмах на ближайшие [REMINDER_HORIZON]: будильники ставятся на них, а не на
