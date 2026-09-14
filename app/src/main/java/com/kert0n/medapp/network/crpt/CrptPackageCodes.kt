@@ -11,8 +11,9 @@ import javax.inject.Inject
 /**
  * «Честный знак» как исполнитель порта домена (PLAN H5, H1): ответ переводится в предложение
  * полей, коды и форма ответа за границу сети не уходят. Форма сопоставляется со словарём по
- * снимку: словарь только растёт, и дочитывать его ради подсказки незачем. Отсутствующее не
- * придумывается: чего в ответе нет, того нет и в предложении.
+ * снимку: словарь только растёт, и дочитывать его ради подсказки незачем; текст формы из реестра
+ * остаётся рядом — словари получены разными путями, и совпадение имён не обещано. Отсутствующее
+ * не придумывается: чего в ответе нет, того нет и в предложении.
  */
 class CrptPackageCodes @Inject constructor(
     private val api: CrptApi,
@@ -38,6 +39,7 @@ internal fun CrptCheckNetworkDTO.toSuggestion(words: Vocabulary): PackageSuggest
     val formText = pharmacy?.form.orNullIfBlank() ?: attributes[FORM_LABEL]
     return PackageSuggestion(
         name = productName.orNullIfBlank() ?: pharmacy?.title.orNullIfBlank(),
+        formText = formText,
         form = formText?.let { FormSuggestion.of(words.formsNamed(it)) } ?: FormSuggestion.None,
         manufacturer = attributes[MANUFACTURER_LABEL] ?: attributes.byLabel(MANUFACTURER_ROOTS),
         country = chip(COUNTRY_CHIP) ?: attributes.byLabel(COUNTRY_ROOTS),

@@ -34,6 +34,7 @@ class CrptSuggestionTest {
         val suggestion = dto(CrptFixtures.found).toSuggestion(words)
 
         assertEquals("Цетрин", suggestion.name)
+        assertEquals("таблетки покрытые пленочной оболочкой", suggestion.formText)
         assertEquals(FormSuggestion.One(coated), suggestion.form)
         assertEquals("Д-Р РЕДДИ`С ЛАБОРАТОРИС ЛТД.", suggestion.manufacturer)
         assertEquals("ИНДИЯ", suggestion.country)
@@ -74,11 +75,15 @@ class CrptSuggestionTest {
         assertNull(suggestion.manufacturer)
     }
 
-    /** Форма, которой словарь не знает, — пусто; «Таблетки» без точного имени в словаре — выбор из всех таблеток. */
+    /**
+     * Форма, которой словарь не знает, — пусто, но текст реестра остаётся: человек его видит.
+     * «Таблетки» без точного имени в словаре — выбор из всех таблеток.
+     */
     @Test
     fun anUnknownFormStaysEmptyAndAnAmbiguousOneIsAChoice() {
-        val unknown = dto("""{"codeFounded": true, "category": "drugs", "screen": {"items": [{"pharmacyData": {"form": "пластырь"}}]}}""")
-        assertEquals(FormSuggestion.None, unknown.toSuggestion(words).form)
+        val unknown = dto("""{"codeFounded": true, "category": "drugs", "screen": {"items": [{"pharmacyData": {"form": "пластырь"}}]}}""").toSuggestion(words)
+        assertEquals(FormSuggestion.None, unknown.form)
+        assertEquals("пластырь", unknown.formText)
 
         val sublingual = DosageForm(Uuid.parse("00000000-0000-4000-8000-000000000104"), "таблетки подъязычные")
         val withoutPlainTablets = Vocabulary(emptyList(), listOf(coated, sublingual, cream))
