@@ -29,6 +29,7 @@ import kotlinx.coroutines.test.runTest
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertSame
+import kotlinx.coroutines.cancel
 import org.junit.Test
 
 /**
@@ -114,6 +115,38 @@ class SynchronizationTest {
         val worker = QueueWorker(storage, NoTransport, vocabulary, resolver, clock)
         val snapshots = SnapshotApplier(api, Nothing(), vocabulary, resolver, clock)
         return Synchronization(worker, snapshots, backlog, schedule, clock, scope)
+    }
+
+    /**
+     * Сервер молчит дольше, чем напоминание готово ждать: ответ — «не успели», без ошибки, а заход
+     * доживает и его итог достаётся следующему (PLAN D8). Время здесь настоящее: сеть у `MockEngine`
+     * идёт своими потоками, и виртуальные часы `runTest` убежали бы вперёд неё.
+     */
+    @Test
+    fun aBriefRefreshGivesUpWaitingButNotTheRound() = kotlinx.coroutines.runBlocking {
+        val calls = java.util.Collections.synchronizedList(ArrayList<String>())
+        val gate = CompletableDeferred<Unit>()
+        val scope = kotlinx.coroutines.CoroutineScope(kotlinx.coroutines.SupervisorJob() + kotlinx.coroutines.Dispatchers.Default)
+        val synchronization = synchronization(calls, gate = gate, scope = scope)
+
+        val brief = synchronization.refreshBriefly(java.time.Duration.ofMillis(300))
+
+        assertNull(brief)
+        // Сервер ответил позже — заход дошёл до конца, и следующий повод получает его итог.
+        gate.complete(Unit)
+        val later = synchronization.synchronize()
+        assertEquals(listOf("очередь", "снимок"), calls.toList())
+        assertEquals(now, later.finishedAt)
+        scope.cancel()
+    }
+
+    /** Сервер быстрый — напоминание дождалось свежего снимка. */
+    @Test
+    fun aBriefRefreshReturnsTheRoundWhenItIsInTime() = kotlinx.coroutines.runBlocking {
+        val scope = kotlinx.coroutines.CoroutineScope(kotlinx.coroutines.SupervisorJob() + kotlinx.coroutines.Dispatchers.Default)
+        val brief = synchronization(java.util.Collections.synchronizedList(ArrayList()), scope = scope).refreshBriefly(java.time.Duration.ofSeconds(5))
+        assertEquals(now, brief?.finishedAt)
+        scope.cancel()
     }
 
     /**

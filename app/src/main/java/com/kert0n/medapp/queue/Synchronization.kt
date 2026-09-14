@@ -2,6 +2,7 @@ package com.kert0n.medapp.queue
 
 import com.kert0n.medapp.di.ApplicationScope
 import java.time.Clock
+import java.time.Duration
 import java.time.Instant
 import javax.inject.Inject
 import javax.inject.Singleton
@@ -11,7 +12,9 @@ import kotlinx.coroutines.NonCancellable
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.async
 import kotlinx.coroutines.flow.update
+import kotlinx.coroutines.withTimeoutOrNull
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
@@ -74,6 +77,16 @@ class Synchronization @Inject constructor(
     /** Повод без ожидания: вход в приложение, появившаяся связь. Итог — в [state]. */
     fun request() {
         scope.launch { runCatching { synchronize() } }
+    }
+
+    /**
+     * Свежесть, насколько успели (PLAN D8, E4): напоминание о приёме ждёт захода не дольше [within]
+     * и показывается с тем, что есть, а заход **не отменяется** — доживает в своём scope, и его итог
+     * достанется следующему, кто спросит. `null` — не успели.
+     */
+    suspend fun refreshBriefly(within: Duration): Round? {
+        val round = scope.async { runCatching { synchronize() }.getOrNull() }
+        return withTimeoutOrNull(within.toMillis()) { round.await() }
     }
 
     private suspend fun roundTrip(): Round {
