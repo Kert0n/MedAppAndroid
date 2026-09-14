@@ -1,5 +1,6 @@
 package com.kert0n.medapp.storage.server
 
+import com.kert0n.medapp.domain.value.Attempts
 import com.kert0n.medapp.domain.intake.IntakeStatus
 import com.kert0n.medapp.domain.pack.PackageStatus
 import com.kert0n.medapp.fixture.medKitRepository
@@ -187,7 +188,7 @@ class QueueRoomStorageTest {
         assertEquals(SyncOperationStatus.APPLIED, stored.operation.status)
         // Счёт попыток — вход задержки повтора, и только он: закрытой операции повторяться
         // незачем, поэтому закрытие его не двигает (PLAN E2, E3).
-        assertEquals(0, stored.operation.attempts)
+        assertEquals(Attempts(0), stored.operation.attempts)
         assertEquals(IntakeAccounting.REMOTE_APPLIED, requireNotNull(database.intakes().findEntity(INTAKE)).accounting)
         assertEquals(IntakeStatus.TAKEN, requireNotNull(database.intakes().findEntity(INTAKE)).status)
         assertTrue(storage.ready(at.plusSeconds(600)).isEmpty())
@@ -387,7 +388,7 @@ class QueueRoomStorageTest {
         assertNull(stored.operation.prepared)
         // Запрос сброшен — сброшен и факт о нём; счёт попыток остаётся у операции как вход задержки.
         assertFalse(stored.operation.outcomeUnknown)
-        assertEquals(1, stored.operation.attempts)
+        assertEquals(Attempts(1), stored.operation.attempts)
         assertEquals(tablets("17"), requireNotNull(database.packages().find(PACK)).toDomain(VOCABULARY).quantity)
         // Заново — уже по свежему состоянию, а не по прежнему запросу.
         val again = (storage.take(operation, null, at.plusSeconds(2)) as Take.Sending).operation.prepared
@@ -441,7 +442,7 @@ class QueueRoomStorageTest {
         assertEquals(IntakeAccounting.REMOTE_REFUSED, requireNotNull(database.intakes().findEntity(INTAKE)).accounting)
         assertEquals(com.kert0n.medapp.fixture.millilitres("17"), requireNotNull(database.packages().find(PACK)).toDomain(VOCABULARY).quantity)
         // Отправки не было вовсе: подготовка закрыла операцию сама, и попытке взяться неоткуда.
-        assertEquals(0, stored.operation.attempts)
+        assertEquals(Attempts(0), stored.operation.attempts)
     }
 
     /**
@@ -457,14 +458,14 @@ class QueueRoomStorageTest {
 
         storage.settle(operation, Delivery.Retry("обрыв", notBefore = at.plusSeconds(30)), at)
         val retried = (requireNotNull(database.syncOperations().find(operation)).toDomain(VOCABULARY) as StoredSyncOperation.Readable).operation
-        assertEquals(1, retried.attempts)
+        assertEquals(Attempts(1), retried.attempts)
 
         storage.take(operation, null, at.plusSeconds(31))
         storage.settle(operation, Delivery.Applied(PackageState.Present(snapshot)), at.plusSeconds(32))
 
         val closed = (requireNotNull(database.syncOperations().find(operation)).toDomain(VOCABULARY) as StoredSyncOperation.Readable).operation
         assertEquals(SyncOperationStatus.APPLIED, closed.status)
-        assertEquals(1, closed.attempts)
+        assertEquals(Attempts(1), closed.attempts)
     }
 
     /** Полученный ответ записан до применения: он в базе, операция готова к закрытию без сети. */
@@ -479,7 +480,7 @@ class QueueRoomStorageTest {
         val stored = (requireNotNull(database.syncOperations().find(operation)).toDomain(VOCABULARY) as StoredSyncOperation.Readable).operation
         assertEquals(SyncOperationStatus.ANSWERED, stored.status)
         assertEquals(RawResponse(200, snapshotJson), stored.answer)
-        assertEquals(1, stored.attempts)
+        assertEquals(Attempts(1), stored.attempts)
         assertEquals(listOf(operation), storage.ready(at.plusSeconds(600)).map { it.id })
         assertNull(storage.take(operation, null, at.plusSeconds(3)))
 

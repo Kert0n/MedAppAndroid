@@ -4,6 +4,8 @@ import com.kert0n.medapp.domain.pack.PackageRef
 import com.kert0n.medapp.domain.value.Doses
 import com.kert0n.medapp.domain.value.Quantity
 import java.time.Instant
+import java.time.LocalDate
+import java.time.ZoneId
 import java.util.Objects
 
 /**
@@ -44,6 +46,25 @@ class CourseCoverage(
         "CourseCoverage(нужно $requiredDoses, обеспечено $coveredDoses)"
 
     val missingDoses: Doses get() = requiredDoses - coveredDoses
+
+    /**
+     * Какое предупреждение о нехватке наступает в день [today] в зоне курса (PLAN D8): за три
+     * календарных дня до первого необеспеченного пункта и в его день. Обеспеченному курсу
+     * предупреждать нечего.
+     */
+    fun noticeOn(today: LocalDate, zone: ZoneId, thresholdDays: Long = 3): Notice? {
+        val uncoveredOn = firstUncoveredAt?.atZone(zone)?.toLocalDate() ?: return null
+        // День исчерпания — первым: при пороге 0 обе даты совпадают, и сказать надо то, что
+        // ближе к правде, — «заканчивается», а не «скоро закончится».
+        return when (today) {
+            uncoveredOn -> Notice.END
+            uncoveredOn.minusDays(thresholdDays) -> Notice.AHEAD
+            else -> null
+        }
+    }
+
+    /** Предупреждения о нехватке: заранее и в день исчерпания. */
+    enum class Notice { AHEAD, END }
 
     val isFullyCovered: Boolean get() = missingDoses.isNone
 

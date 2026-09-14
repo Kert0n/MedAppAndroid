@@ -1,7 +1,9 @@
 package com.kert0n.medapp.queue
 
 import com.kert0n.medapp.di.ApplicationScope
+import com.kert0n.medapp.domain.notification.Freshness
 import java.time.Clock
+import java.time.Duration
 import java.time.Instant
 import javax.inject.Inject
 import javax.inject.Singleton
@@ -11,7 +13,9 @@ import kotlinx.coroutines.NonCancellable
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.async
 import kotlinx.coroutines.flow.update
+import kotlinx.coroutines.withTimeoutOrNull
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
@@ -38,7 +42,7 @@ class Synchronization @Inject constructor(
     private val schedule: SyncSchedule,
     private val clock: Clock,
     @ApplicationScope private val scope: CoroutineScope
-) {
+) : Freshness {
 
     private val guard = Mutex()
     private var running: CompletableDeferred<Round>? = null
@@ -74,6 +78,21 @@ class Synchronization @Inject constructor(
     /** Повод без ожидания: вход в приложение, появившаяся связь. Итог — в [state]. */
     fun request() {
         scope.launch { runCatching { synchronize() } }
+    }
+
+    /**
+     * Свежесть, насколько успели (PLAN D8, E4): напоминание о приёме ждёт захода не дольше [within]
+     * и показывается с тем, что есть, а заход **не отменяется** — доживает в своём scope, и его итог
+     * достанется следующему, кто спросит. `null` — не успели.
+     */
+    override suspend fun refreshBriefly(within: Duration) {
+        awaitBriefly(within)
+    }
+
+    /** То же, но с итогом — проверкам важно, дождались ли захода. */
+    suspend fun awaitBriefly(within: Duration): Round? {
+        val round = scope.async { runCatching { synchronize() }.getOrNull() }
+        return withTimeoutOrNull(within.toMillis()) { round.await() }
     }
 
     private suspend fun roundTrip(): Round {

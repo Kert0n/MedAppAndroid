@@ -22,8 +22,8 @@ import com.kert0n.medapp.storage.pack.PackageDao
 import com.kert0n.medapp.storage.pack.PackageDetailsStorageEntity
 import com.kert0n.medapp.storage.pack.PackageRecordStorageEntity
 import com.kert0n.medapp.storage.pack.PackageStorageEntity
-import com.kert0n.medapp.storage.server.NotificationLogDao
-import com.kert0n.medapp.storage.server.NotificationLogStorageEntity
+import com.kert0n.medapp.storage.notification.ReminderDao
+import com.kert0n.medapp.storage.notification.ReminderStorageEntity
 import com.kert0n.medapp.storage.server.SyncOperationDao
 import com.kert0n.medapp.storage.server.SyncOperationDependencyStorageEntity
 import com.kert0n.medapp.storage.server.SyncOperationStorageEntity
@@ -57,7 +57,7 @@ import com.kert0n.medapp.storage.value.VocabularyDao
         IntakeStorageEntity::class,
         SyncOperationStorageEntity::class,
         SyncOperationDependencyStorageEntity::class,
-        NotificationLogStorageEntity::class
+        ReminderStorageEntity::class
     ],
     version = MedAppDatabase.VERSION,
     exportSchema = true
@@ -75,7 +75,7 @@ abstract class MedAppDatabase : RoomDatabase() {
 
     abstract fun syncOperations(): SyncOperationDao
 
-    abstract fun notificationLog(): NotificationLogDao
+    abstract fun reminders(): ReminderDao
 
     abstract fun vocabulary(): VocabularyDao
 
@@ -141,6 +141,27 @@ abstract class MedAppDatabase : RoomDatabase() {
                 connection.execSQL(
                     "ALTER TABLE `med_kits` ADD COLUMN `status` TEXT NOT NULL DEFAULT 'ACTIVE'"
                 )
+                // Журнал показов версии 2 знал только «это уже показывали». Его место занимают
+                // обязательства: что обещано сказать, на какой момент и в каком состоянии (PLAN D8).
+                // Показанное не переносится — потеря журнала стоит одного лишнего показа, а
+                // сроков и состояний в нём всё равно нет.
+                connection.execSQL("DROP TABLE IF EXISTS `notification_log`")
+                // Обязательства перед человеком: что обещано сказать и в каком это состоянии (PLAN D8).
+                connection.execSQL(
+                    """
+                    CREATE TABLE IF NOT EXISTS `reminders` (
+                        `key` TEXT NOT NULL, `kind` TEXT NOT NULL, `delivery` TEXT NOT NULL, `subject` TEXT NOT NULL,
+                        `target_kind` TEXT NOT NULL, `target_id` TEXT, `target_date` TEXT,
+                        `due_at` INTEGER NOT NULL, `state` TEXT NOT NULL, `shown_at` INTEGER,
+                        `not_before` INTEGER, `attempts` INTEGER NOT NULL DEFAULT 0,
+                        PRIMARY KEY(`key`)
+                    )
+                    """.trimIndent()
+                )
+                connection.execSQL("CREATE INDEX IF NOT EXISTS `index_reminders_due_at` ON `reminders` (`due_at`)")
+                connection.execSQL("CREATE INDEX IF NOT EXISTS `index_reminders_state` ON `reminders` (`state`)")
+                connection.execSQL("CREATE INDEX IF NOT EXISTS `index_reminders_shown_at` ON `reminders` (`shown_at`)")
+                connection.execSQL("CREATE INDEX IF NOT EXISTS `index_reminders_delivery` ON `reminders` (`delivery`)")
                 // Сокращение обеспечения — событие; держится за то, что остаётся навсегда (PLAN D5).
                 connection.execSQL(
                     """

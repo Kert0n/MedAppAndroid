@@ -24,6 +24,7 @@ import com.kert0n.medapp.storage.course.CourseStorageRepository
 import com.kert0n.medapp.storage.intake.IntakeOutcome
 import com.kert0n.medapp.storage.intake.IntakeStorageRepository
 import com.kert0n.medapp.storage.pack.PackageStorageRepository
+import com.kert0n.medapp.feature.notification.ReminderWithdrawal
 import java.time.Clock
 import java.time.Instant
 import javax.inject.Inject
@@ -48,6 +49,7 @@ class IntakeConfirmation @Inject constructor(
     private val queue: QueueService,
     private val closing: CourseClosing,
     private val calendar: CourseCalendar,
+    private val reminders: ReminderWithdrawal,
     private val clock: Clock
 ) {
 
@@ -150,6 +152,9 @@ class IntakeConfirmation @Inject constructor(
         val recorded = queue.change(pkg.medKit, commands, now) { intakes.record(outcome) }
         check(recorded) { "пункт и пачка прочитаны этой же транзакцией" }
 
+        // Ответ дан — напоминать больше нечего. Той же транзакцией: откат уносит отзыв вместе с
+        // приёмом, а гасит карточку владелец доставки уже после коммита (PLAN D8, F5).
+        reminders.withdraw(intakeId)
         if (finished) {
             // Снятие брони с этой пачки уже уехало зависимым от расхода — второй раз не ставится.
             closing.close(course, completion.close(record, intakes.ofCourse(course.id).filterIsInstance<CourseIntake>(), now), now, except = pkg.ref)

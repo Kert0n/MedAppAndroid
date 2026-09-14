@@ -1,0 +1,99 @@
+package com.kert0n.medapp.storage.notification
+
+import com.kert0n.medapp.domain.notification.NoticeDelivery
+import com.kert0n.medapp.domain.notification.NotificationKey
+import com.kert0n.medapp.domain.notification.NotificationKind
+import com.kert0n.medapp.domain.notification.NotificationTarget
+import com.kert0n.medapp.domain.notification.Reminder
+import com.kert0n.medapp.domain.value.Attempts
+import com.kert0n.medapp.storage.database.MedAppDatabase
+import java.time.Instant
+import java.time.LocalDate
+import javax.inject.Inject
+import kotlin.uuid.Uuid
+import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.map
+
+class ReminderRoomRepository @Inject constructor(
+    private val database: MedAppDatabase,
+    private val reminders: ReminderDao
+) : ReminderStorageRepository {
+
+    override fun changes(): Flow<Unit> =
+        database.invalidationTracker.createFlow("reminders", emitInitialState = false).map { }
+
+    override suspend fun find(key: NotificationKey): Reminder? = reminders.find(key.stored)?.toDomain()
+
+    override suspend fun findAll(keys: Collection<NotificationKey>): List<Reminder> =
+        if (keys.isEmpty()) emptyList() else reminders.findAll(keys.map { it.stored }).map { it.toDomain() }
+
+    override suspend fun awaiting(delivery: NoticeDelivery): List<Reminder> =
+        reminders.awaiting(delivery.name).map { it.toDomain() }
+
+    override suspend fun withdrawn(): List<Reminder> = reminders.withdrawn().map { it.toDomain() }
+
+    override suspend fun stale(before: Instant): List<Reminder> = reminders.olderThan(before).map { it.toDomain() }
+
+    override suspend fun ofKinds(kinds: Collection<NotificationKind>): List<Reminder> =
+        reminders.ofKinds(kinds.map { it.name }).map { it.toDomain() }
+
+    override suspend fun saveAll(reminders: Collection<Reminder>) {
+        if (reminders.isNotEmpty()) this.reminders.saveAll(reminders.map { it.toStorageEntity() })
+    }
+
+    override suspend fun deleteAll(keys: Collection<NotificationKey>) {
+        if (keys.isNotEmpty()) reminders.deleteAll(keys.map { it.stored })
+    }
+}
+
+/** Ключ строкой: вид и предмет вместе, чтобы разные этапы одного события не склеивались. */
+private val NotificationKey.stored: String get() = "${kind.name}:$subject"
+
+private fun Reminder.toStorageEntity() = ReminderStorageEntity(
+    key = key.stored,
+    kind = key.kind.name,
+    delivery = delivery.name,
+    subject = key.subject,
+    targetKind = target.stored,
+    targetId = target.id,
+    targetDate = (target as? NotificationTarget.DayPlan)?.date,
+    dueAt = dueAt,
+    state = state.name,
+    shownAt = shownAt,
+    notBefore = notBefore,
+    attempts = attempts.count
+)
+
+private fun ReminderStorageEntity.toDomain() = Reminder(
+    key = NotificationKey(NotificationKind.valueOf(kind), subject),
+    target = targetOf(targetKind, targetId, targetDate),
+    dueAt = dueAt,
+    state = Reminder.State.valueOf(state),
+    shownAt = shownAt,
+    notBefore = notBefore,
+    attempts = Attempts(attempts)
+)
+
+private val NotificationTarget.stored: String
+    get() = when (this) {
+        is NotificationTarget.Intake -> "INTAKE"
+        is NotificationTarget.PackageCard -> "PACKAGE"
+        is NotificationTarget.CourseSources -> "COURSE_SOURCES"
+        is NotificationTarget.DayPlan -> "DAY_PLAN"
+    }
+
+private val NotificationTarget.id: Uuid?
+    get() = when (this) {
+        is NotificationTarget.Intake -> intakeId
+        is NotificationTarget.PackageCard -> packageId
+        is NotificationTarget.CourseSources -> courseId
+        is NotificationTarget.DayPlan -> null
+    }
+
+private fun targetOf(kind: String, id: Uuid?, date: LocalDate?): NotificationTarget = when (kind) {
+    "INTAKE" -> NotificationTarget.Intake(requireNotNull(id) { "у цели-пункта есть идентификатор" })
+    "PACKAGE" -> NotificationTarget.PackageCard(requireNotNull(id) { "у цели-коробки есть идентификатор" })
+    "COURSE_SOURCES" -> NotificationTarget.CourseSources(requireNotNull(id) { "у цели-лечения есть идентификатор" })
+    "DAY_PLAN" -> NotificationTarget.DayPlan(requireNotNull(date) { "у цели-дня есть дата" })
+    else -> error("незнакомая цель уведомления: $kind")
+}

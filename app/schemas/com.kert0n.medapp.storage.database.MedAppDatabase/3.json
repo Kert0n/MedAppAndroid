@@ -2,7 +2,7 @@
   "formatVersion": 1,
   "database": {
     "version": 3,
-    "identityHash": "4521675d56341e7890766c26b37b8faa",
+    "identityHash": "2ac426696572a7c44fe16a608a3a632c",
     "entities": [
       {
         "tableName": "quantity_units",
@@ -1516,18 +1516,12 @@
         ]
       },
       {
-        "tableName": "notification_log",
-        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`key` TEXT NOT NULL, `delivery` TEXT NOT NULL, `kind` TEXT NOT NULL, `shown_at` INTEGER NOT NULL, PRIMARY KEY(`key`, `delivery`))",
+        "tableName": "reminders",
+        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`key` TEXT NOT NULL, `kind` TEXT NOT NULL, `delivery` TEXT NOT NULL, `subject` TEXT NOT NULL, `target_kind` TEXT NOT NULL, `target_id` TEXT, `target_date` TEXT, `due_at` INTEGER NOT NULL, `state` TEXT NOT NULL, `shown_at` INTEGER, `not_before` INTEGER, `attempts` INTEGER NOT NULL DEFAULT 0, PRIMARY KEY(`key`))",
         "fields": [
           {
             "fieldPath": "key",
             "columnName": "key",
-            "affinity": "TEXT",
-            "notNull": true
-          },
-          {
-            "fieldPath": "delivery",
-            "columnName": "delivery",
             "affinity": "TEXT",
             "notNull": true
           },
@@ -1538,35 +1532,112 @@
             "notNull": true
           },
           {
-            "fieldPath": "shownAt",
-            "columnName": "shown_at",
+            "fieldPath": "delivery",
+            "columnName": "delivery",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "subject",
+            "columnName": "subject",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "targetKind",
+            "columnName": "target_kind",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "targetId",
+            "columnName": "target_id",
+            "affinity": "TEXT"
+          },
+          {
+            "fieldPath": "targetDate",
+            "columnName": "target_date",
+            "affinity": "TEXT"
+          },
+          {
+            "fieldPath": "dueAt",
+            "columnName": "due_at",
             "affinity": "INTEGER",
             "notNull": true
+          },
+          {
+            "fieldPath": "state",
+            "columnName": "state",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "shownAt",
+            "columnName": "shown_at",
+            "affinity": "INTEGER"
+          },
+          {
+            "fieldPath": "notBefore",
+            "columnName": "not_before",
+            "affinity": "INTEGER"
+          },
+          {
+            "fieldPath": "attempts",
+            "columnName": "attempts",
+            "affinity": "INTEGER",
+            "notNull": true,
+            "defaultValue": "0"
           }
         ],
         "primaryKey": {
           "autoGenerate": false,
           "columnNames": [
-            "key",
-            "delivery"
+            "key"
           ]
         },
         "indices": [
           {
-            "name": "index_notification_log_shown_at",
+            "name": "index_reminders_due_at",
+            "unique": false,
+            "columnNames": [
+              "due_at"
+            ],
+            "orders": [],
+            "createSql": "CREATE INDEX IF NOT EXISTS `index_reminders_due_at` ON `${TABLE_NAME}` (`due_at`)"
+          },
+          {
+            "name": "index_reminders_state",
+            "unique": false,
+            "columnNames": [
+              "state"
+            ],
+            "orders": [],
+            "createSql": "CREATE INDEX IF NOT EXISTS `index_reminders_state` ON `${TABLE_NAME}` (`state`)"
+          },
+          {
+            "name": "index_reminders_shown_at",
             "unique": false,
             "columnNames": [
               "shown_at"
             ],
             "orders": [],
-            "createSql": "CREATE INDEX IF NOT EXISTS `index_notification_log_shown_at` ON `${TABLE_NAME}` (`shown_at`)"
+            "createSql": "CREATE INDEX IF NOT EXISTS `index_reminders_shown_at` ON `${TABLE_NAME}` (`shown_at`)"
+          },
+          {
+            "name": "index_reminders_delivery",
+            "unique": false,
+            "columnNames": [
+              "delivery"
+            ],
+            "orders": [],
+            "createSql": "CREATE INDEX IF NOT EXISTS `index_reminders_delivery` ON `${TABLE_NAME}` (`delivery`)"
           }
         ]
       }
     ],
     "setupQueries": [
       "CREATE TABLE IF NOT EXISTS room_master_table (id INTEGER PRIMARY KEY,identity_hash TEXT)",
-      "INSERT OR REPLACE INTO room_master_table (id,identity_hash) VALUES(42, '4521675d56341e7890766c26b37b8faa')"
+      "INSERT OR REPLACE INTO room_master_table (id,identity_hash) VALUES(42, '2ac426696572a7c44fe16a608a3a632c')"
     ]
   }
 }

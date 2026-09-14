@@ -39,8 +39,15 @@ interface CourseStorageRepository {
     /** То же по всем идущим лечениям сразу — списку курсов, где нехватка видна значком (H3 №13). */
     fun observeCoverages(): Flow<Map<Uuid, CourseCoverage>>
 
-    /** Сокращения обеспечения эпизода по времени — карточке курса и уведомлениям (PLAN D5, D8). */
+    /** Сокращения обеспечения эпизода по времени — карточке курса (PLAN D5). */
     fun observeReductions(courseId: Uuid): Flow<List<CoverageReduction>>
+
+    /**
+     * Сокращения не старше [since] — сверке уведомлений (PLAN D8). Окно есть, потому что событие
+     * прошлого года сказать уже нечего, а история курса растёт: перечитывать её целиком каждым
+     * проходом значило бы платить за неё вечно.
+     */
+    suspend fun reductionsSince(courseId: Uuid, since: Instant): List<CoverageReduction>
 
     suspend fun findDraft(id: Uuid): CourseDraft?
 

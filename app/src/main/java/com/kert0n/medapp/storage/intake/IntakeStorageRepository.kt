@@ -42,7 +42,8 @@ interface IntakeStorageRepository {
      * Материализация окна: повторный проход не заводит второй такой же пункт — тождество даёт
      * курс и исходные дата и время (PLAN F4). Возвращает число заведённых пунктов.
      */
-    suspend fun materialise(planned: List<CourseIntake>): Int
+    /** Какие пункты завелись этим проходом: повторная материализация окна их не повторяет. */
+    suspend fun materialise(planned: List<CourseIntake>): List<Uuid>
 
     suspend fun plannedBefore(until: Instant): List<CourseIntake>
 
@@ -52,7 +53,8 @@ interface IntakeStorageRepository {
      * материализованный пункт стал лишним. Он не факт — отвеченные пункты не трогаются никогда.
      * Возвращает число убранных.
      */
-    suspend fun prunePlanned(courseId: Uuid, keep: Set<ScheduledOccurrence>): Int
+    /** Какие плановые пункты ушли: о них больше не напоминают. */
+    suspend fun prunePlanned(courseId: Uuid, keep: Set<ScheduledOccurrence>): List<Uuid>
 
     /**
      * Ответ на приём целиком: условный переход статуса, локальный остаток, пересчитанные

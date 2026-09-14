@@ -44,7 +44,7 @@ class SyncOperationStorageRow(
                 groupId = operation.groupId,
                 dependsOn = dependencies.mapTo(LinkedHashSet()) { it.dependsOnId },
                 status = operation.status,
-                attempts = operation.attempts,
+                attempts = com.kert0n.medapp.domain.value.Attempts(operation.attempts),
                 lastError = operation.lastError,
                 lastTriedAt = operation.lastTriedAt,
                 answer = operation.answerStatus?.let { RawResponse(it, operation.answerBody.orEmpty()) },

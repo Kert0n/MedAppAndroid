@@ -1,5 +1,6 @@
 package com.kert0n.medapp.storage.server
 
+import com.kert0n.medapp.domain.value.Attempts
 import android.database.sqlite.SQLiteConstraintException
 import com.kert0n.medapp.fixture.HOME_KIT
 import com.kert0n.medapp.fixture.INTAKE
@@ -232,6 +233,7 @@ class SyncOperationDaoTest {
         assertEquals(SyncOperationStatus.PENDING, stored.status)
         assertEquals("нет ответа", stored.lastError)
         assertEquals(at, stored.lastTriedAt)
+        // Здесь читается строка, а не операция: у строки число попыток так и лежит числом.
         assertEquals(1, stored.attempts)
     }
 
@@ -264,7 +266,7 @@ class SyncOperationDaoTest {
         queue.reprepare(first, "устарело", createdAt, notBefore = null)
         val reprepared = readable(first)
         assertEquals(false, reprepared.outcomeUnknown)
-        assertEquals(3, reprepared.attempts)
+        assertEquals(Attempts(3), reprepared.attempts)
     }
 
     /** Операция, застигнутая в отправке, — полёт, о котором никто не рассказал: исход неизвестен. */

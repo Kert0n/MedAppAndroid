@@ -105,7 +105,7 @@ class HistoryDaoTest {
 
         val pruned = repository.prunePlanned(COURSE, keep = emptySet())
 
-        assertEquals(1, pruned)
+        assertEquals(listOf(OTHER_INTAKE), pruned)
         assertNotNull(intakes.find(INTAKE))
         assertEquals(null, intakes.find(OTHER_INTAKE))
     }

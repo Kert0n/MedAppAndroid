@@ -8,6 +8,7 @@ import com.kert0n.medapp.queue.Transactions
 import com.kert0n.medapp.storage.course.CourseStorageRepository
 import com.kert0n.medapp.storage.intake.IntakeOutcome
 import com.kert0n.medapp.storage.intake.IntakeStorageRepository
+import com.kert0n.medapp.feature.notification.ReminderWithdrawal
 import java.time.Clock
 import java.time.Instant
 import javax.inject.Inject
@@ -27,6 +28,7 @@ class IntakeDeclining @Inject constructor(
     private val intakes: IntakeStorageRepository,
     private val courses: CourseStorageRepository,
     private val calendar: CourseCalendar,
+    private val reminders: ReminderWithdrawal,
     private val transactions: Transactions,
     private val clock: Clock
 ) {
@@ -42,6 +44,9 @@ class IntakeDeclining @Inject constructor(
         // человека пропал бы. Остальное прошлое — следом, до достройки окна (F4).
         val declined = intakes.record(IntakeOutcome(intake.miss(at), expected = setOf(IntakeStatus.PLANNED), recordedAt = now))
         if (!declined) return@run Outcome.ALREADY_ANSWERED
+        // Ответ дан — напоминать больше нечего. Той же транзакцией: откат уносит отзыв вместе с
+        // ответом, а гасит карточку владелец доставки уже после коммита (PLAN D8, F5).
+        reminders.withdraw(intakeId)
         calendar.missOverdue(course, now)
         // Доза уехала вперёд: окно календаря достраивается на один пункт (F4).
         calendar.extend(course, now)

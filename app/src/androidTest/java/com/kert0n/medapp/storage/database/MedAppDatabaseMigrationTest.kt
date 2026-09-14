@@ -48,6 +48,39 @@ class MedAppDatabaseMigrationTest {
         helper.runMigrationsAndValidate(name, MedAppDatabase.VERSION, true).close()
     }
 
+    /**
+     * Таблица, созданная переходом, совпадает с той, что заводит схема, — **по определению колонок**,
+     * а не только по именам. Room сравнивает умолчания лишь тогда, когда их объявляет сущность,
+     * поэтому `DEFAULT` в переходе и его отсутствие в схеме проходят мимо `runMigrationsAndValidate`
+     * молча — и расходятся дальше сами по себе.
+     */
+    @Test
+    fun theMigratedTablesMatchTheCreatedOnes() {
+        fun columns(database: androidx.sqlite.db.SupportSQLiteDatabase, table: String): List<String> =
+            database.query("PRAGMA table_info(`$table`)").use { cursor ->
+                buildList {
+                    while (cursor.moveToNext()) {
+                        add(
+                            listOf("name", "type", "notnull", "dflt_value", "pk")
+                                .joinToString(" ") { column -> cursor.getString(cursor.getColumnIndexOrThrow(column)) ?: "-" }
+                        )
+                    }
+                }
+            }
+
+        val file = "migrate-columns.db"
+        helper.createDatabase(file, 2).close()
+        val migrated = helper.runMigrationsAndValidate(file, 3, true, MedAppDatabase.MIGRATION_2_3)
+        val fromMigration = columns(migrated, "reminders")
+        migrated.close()
+
+        val fresh = helper.createDatabase("created-columns.db", 3)
+        val fromSchema = columns(fresh, "reminders")
+        fresh.close()
+
+        assertEquals("переход и схема описывают `reminders` по-разному", fromSchema, fromMigration)
+    }
+
     /** Очередь версии 1 переезжает в версию 2 вместе со строкой; исход старой отправки — известен. */
     @Test
     fun queueOfVersionOneSurvivesTheMoveToVersionTwo() {

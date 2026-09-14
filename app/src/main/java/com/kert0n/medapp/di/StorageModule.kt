@@ -11,6 +11,8 @@ import com.kert0n.medapp.storage.pack.PackageStorageRepository
 import com.kert0n.medapp.storage.server.QueueBacklogRoomStorage
 import com.kert0n.medapp.storage.server.QueueRoomStorage
 import com.kert0n.medapp.storage.server.SnapshotRoomStorage
+import com.kert0n.medapp.storage.notification.ReminderRoomRepository
+import com.kert0n.medapp.storage.notification.ReminderStorageRepository
 import com.kert0n.medapp.storage.server.SyncOperationRoomRepository
 import com.kert0n.medapp.storage.server.SyncOperationStorageRepository
 import com.kert0n.medapp.network.value.VocabularyStore
@@ -97,4 +99,8 @@ abstract class StorageModule {
     @Binds
     @Singleton
     abstract fun vocabularyStore(implementation: VocabularyRoomRepository): VocabularyStore
+
+    @Binds
+    @Singleton
+    abstract fun reminders(implementation: ReminderRoomRepository): ReminderStorageRepository
 }
