@@ -98,6 +98,6 @@ class DailyRoundTest {
 
         assertEquals(DailyRound.Report(missed = 0, reminders = 0, shown = 0), report)
         assertEquals(emptyList<Any>(), quiet.notifier.shown)
-        assertEquals(0, database.notificationLog().ofKind(NotificationKind.DAILY_DIGEST.name).size)
+        assertEquals(0, database.reminders().ofKinds(listOf(NotificationKind.DAILY_DIGEST.name)).size)
     }
 }

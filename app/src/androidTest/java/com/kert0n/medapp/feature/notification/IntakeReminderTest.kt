@@ -5,6 +5,7 @@ import com.kert0n.medapp.domain.intake.CourseIntake
 import com.kert0n.medapp.domain.notification.NotificationAction
 import com.kert0n.medapp.domain.notification.NotificationKey
 import com.kert0n.medapp.domain.notification.NotificationKind
+import com.kert0n.medapp.domain.notification.Reminder
 import com.kert0n.medapp.domain.notification.NotificationSettings
 import com.kert0n.medapp.domain.value.Doses
 import com.kert0n.medapp.feature.course.CourseDrafting
@@ -24,7 +25,7 @@ import com.kert0n.medapp.fixture.packageRepository
 import com.kert0n.medapp.fixture.schedule
 import com.kert0n.medapp.fixture.tablets
 import com.kert0n.medapp.storage.database.MedAppDatabase
-import com.kert0n.medapp.storage.server.NotificationLogRoomRepository
+import com.kert0n.medapp.storage.notification.ReminderRoomRepository
 import java.time.Clock
 import java.time.Instant
 import java.time.LocalDate
@@ -42,7 +43,8 @@ import org.junit.runner.RunWith
 
 /**
  * Напоминание о приёме: будильники — на ближайшие 36 часов по плановым пунктам, отвеченный пункт
- * не напоминает, напоминание показывается каждым будильником, остальное — один раз (PLAN D8, C1).
+ * не напоминает, сказанное второй раз не говорится, а повтор бывает только у отложенного —
+ * у него другой срок (PLAN D8, C1).
  */
 @RunWith(AndroidJUnit4::class)
 class IntakeReminderTest {
@@ -61,7 +63,7 @@ class IntakeReminderTest {
         database = inMemoryDatabase()
         scenarios = Scenarios(database, now)
         planning = NotificationPlanning(database.intakeRepository(), database.packageRepository(), database.courseRepository(), settings)
-        delivery = NotificationDelivery(notifier, reminders, NotificationLogRoomRepository(database.notificationLog()), Clock.fixed(now, ZoneOffset.UTC))
+        delivery = NotificationDelivery(notifier, reminders, ReminderRoomRepository(database, database.reminders()), Clock.fixed(now, ZoneOffset.UTC))
         database.packageRepository().add(pack(id = PACK, quantity = tablets("20"), form = TABLET_FORM))
     }
 
@@ -112,28 +114,50 @@ class IntakeReminderTest {
         assertEquals(emptyList<Any>(), planning.remindersDue(now))
     }
 
-    /** Напоминание о приёме показывается каждым будильником (отложенное придёт снова); остальное — один раз по журналу. */
+    /**
+     * Сказанное второй раз не говорится: обещание исполнено. Повтор бывает только у отложенного —
+     * у него другой срок, и обязательство снова наступает (PLAN D8).
+     */
     @Test
-    fun theReminderRepeatsButEverythingElseIsShownOnce() = runTest {
+    fun whatWasSaidIsNotSaidAgainAndOnlyTheDeferredComesBack() = runTest {
         val id = treated()
-        val reminder = requireNotNull(planning.reminderFor(intakes(id)[1].id))
-        val digest = reminder.copy(key = NotificationKey.digest(LocalDate.of(2027, 3, 10)), target = com.kert0n.medapp.domain.notification.NotificationTarget.DayPlan(LocalDate.of(2027, 3, 10)), actions = emptyList())
+        val first = intakes(id)[0]
+        val due = requireNotNull(planning.reminderFor(first.id))
+        val digestDay = LocalDate.of(2027, 3, 10)
+        val digest = Reminder(NotificationKey.digest(digestDay), com.kert0n.medapp.domain.notification.NotificationTarget.DayPlan(digestDay), now)
+        // Наступает обязательство в свой момент: доставка смотрит на срок, а не на список к показу.
+        val atIntake = NotificationDelivery(
+            notifier, reminders, ReminderRoomRepository(database, database.reminders()),
+            Clock.fixed(first.plannedAt, ZoneOffset.UTC)
+        )
 
-        assertEquals(2, delivery.deliver(listOf(reminder, digest)))
-        assertEquals(1, delivery.deliver(listOf(reminder, digest)))
+        assertEquals(2, atIntake.deliver(listOf(due, digest)))
+        assertEquals(0, atIntake.deliver(listOf(due, digest)))
 
+        // Человек отложил — обязательство наступает снова, и о нём говорят второй раз.
+        scenarios.reminderAnswering.snooze(first.id)
+        assertEquals(1, atIntake.deliver(listOf(due, digest)))
         assertEquals(3, notifier.shown.size)
         assertEquals(1, notifier.shown.count { it.kind == NotificationKind.DAILY_DIGEST })
     }
 
-    /** Без разрешения показа нет — и в журнал ничего не пишется: разрешат — покажем. */
+    /**
+     * Без разрешения показа нет — и обязательство остаётся невыполненным: разрешат, и следующий
+     * проход скажет. Раньше повод не пережил бы отказа — его негде было держать (PLAN D8).
+     */
     @Test
-    fun aRefusedShowingIsNotRemembered() = runTest {
-        val id = treated()
-        val digest = requireNotNull(planning.reminderFor(intakes(id)[1].id)).copy(key = NotificationKey.digest(LocalDate.of(2027, 3, 10)))
+    fun aRefusedShowingLeavesTheObligationStanding() = runTest {
+        treated()
+        val digestDay = LocalDate.of(2027, 3, 10)
+        val digest = Reminder(NotificationKey.digest(digestDay), com.kert0n.medapp.domain.notification.NotificationTarget.DayPlan(digestDay), now)
+        val store = ReminderRoomRepository(database, database.reminders())
+
         notifier.allowed = false
         assertEquals(0, delivery.deliver(listOf(digest)))
+        assertEquals(Reminder.State.DUE, requireNotNull(store.find(digest.key)).state)
+
         notifier.allowed = true
         assertEquals(1, delivery.deliver(listOf(digest)))
+        assertEquals(Reminder.State.SHOWN, requireNotNull(store.find(digest.key)).state)
     }
 }

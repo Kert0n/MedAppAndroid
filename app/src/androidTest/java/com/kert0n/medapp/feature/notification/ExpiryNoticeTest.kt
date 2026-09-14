@@ -75,7 +75,7 @@ class ExpiryNoticeTest {
         scenarios.courseActivation.activate(draft.id, draft.revision)
     }
 
-    private fun kindsOf(due: List<com.kert0n.medapp.domain.notification.PlannedNotification>) =
+    private fun kindsOf(due: List<com.kert0n.medapp.domain.notification.Reminder>) =
         due.associate { (it.target as NotificationTarget.PackageCard).packageId to (it.kind to it.delivery) }
 
     @Test

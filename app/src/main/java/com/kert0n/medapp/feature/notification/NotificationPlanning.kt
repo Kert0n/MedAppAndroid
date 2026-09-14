@@ -2,13 +2,11 @@ package com.kert0n.medapp.feature.notification
 
 import com.kert0n.medapp.domain.intake.CourseIntake
 import com.kert0n.medapp.domain.intake.IntakeStatus
-import com.kert0n.medapp.domain.notification.NoticeDelivery
-import com.kert0n.medapp.domain.notification.NotificationAction
 import com.kert0n.medapp.domain.notification.NotificationKey
 import com.kert0n.medapp.domain.notification.NotificationKind
 import com.kert0n.medapp.domain.notification.NotificationSettingsSource
 import com.kert0n.medapp.domain.notification.NotificationTarget
-import com.kert0n.medapp.domain.notification.PlannedNotification
+import com.kert0n.medapp.domain.notification.Reminder
 import com.kert0n.medapp.domain.course.CourseCoverage
 import com.kert0n.medapp.domain.pack.ExpiryDate
 import com.kert0n.medapp.storage.course.CourseStorageRepository
@@ -41,14 +39,14 @@ class NotificationPlanning @Inject constructor(
      * его день. День берётся **в зоне курса** — той же, в которой стоит и пункт: день устройства
      * у полуночи может быть уже другим. Обеспеченному курсу предупреждать нечего.
      */
-    suspend fun coverageDue(at: Instant): List<PlannedNotification> {
+    suspend fun coverageDue(at: Instant): List<Reminder> {
         val threshold = settings.current().coverageThresholdDays
-        val due = mutableListOf<PlannedNotification>()
+        val due = mutableListOf<Reminder>()
         for ((courseId, coverage) in courses.observeCoverages().first()) {
             val zone = courses.findPlan(courseId)?.schedule?.zone ?: continue
             val today = at.atZone(zone).toLocalDate()
             for (reduction in courses.observeReductions(courseId).first()) {
-                due += PlannedNotification(NotificationKey.reduction(reduction.id), reduction.at, NotificationTarget.CourseSources(courseId), NoticeDelivery.SYSTEM)
+                due += Reminder(NotificationKey.reduction(reduction.id), NotificationTarget.CourseSources(courseId), reduction.at)
             }
             val firstUncoveredAt = coverage.firstUncoveredAt ?: continue
             val kind = when (coverage.noticeOn(today, zone, threshold)) {
@@ -56,7 +54,7 @@ class NotificationPlanning @Inject constructor(
                 CourseCoverage.Notice.END -> NotificationKind.COVERAGE_END
                 null -> continue
             }
-            due += PlannedNotification(NotificationKey.coverage(courseId, firstUncoveredAt, kind), at, NotificationTarget.CourseSources(courseId), NoticeDelivery.SYSTEM)
+            due += Reminder(NotificationKey.coverage(courseId, firstUncoveredAt, kind), NotificationTarget.CourseSources(courseId), at)
         }
         return due
     }
@@ -67,7 +65,7 @@ class NotificationPlanning @Inject constructor(
      * последний день баннером в приложении. Этап — только сегодняшний: поздно подключённая коробка
      * залпа прошедших не получает; просроченной этапов нет.
      */
-    suspend fun expiryDue(today: LocalDate, at: Instant): List<PlannedNotification> {
+    suspend fun expiryDue(today: LocalDate, at: Instant): List<Reminder> {
         val sourcesEnabled = settings.current().expirySourceRemindersEnabled
         return packages.list(PackageQuery(), today).first().mapNotNull { pkg ->
             val expiresOn = pkg.facts.expiresOn ?: return@mapNotNull null
@@ -78,11 +76,10 @@ class NotificationPlanning @Inject constructor(
                 ExpiryDate.Stage.TODAY -> NotificationKind.EXPIRY_TODAY
                 null -> null
             } ?: return@mapNotNull null
-            PlannedNotification(
+            Reminder(
                 key = NotificationKey.expiry(pkg.id, expiresOn, kind),
-                dueAt = at,
                 target = NotificationTarget.PackageCard(pkg.id),
-                delivery = if (kind == NotificationKind.EXPIRY_TODAY) NoticeDelivery.IN_APP_BANNER else NoticeDelivery.SYSTEM
+                dueAt = at
             )
         }
     }
@@ -91,7 +88,7 @@ class NotificationPlanning @Inject constructor(
      * Напоминания о приёмах на ближайшие [REMINDER_HORIZON]: будильники ставятся на них, а не на
      * всё 60-дневное окно календаря (C1). Выключенные напоминания — пустой список.
      */
-    suspend fun remindersDue(now: Instant): List<PlannedNotification> {
+    suspend fun remindersDue(now: Instant): List<Reminder> {
         if (!settings.current().intakeRemindersEnabled) return emptyList()
         return intakes.plannedBefore(now.plus(REMINDER_HORIZON))
             .filter { !it.plannedAt.isBefore(now.minus(GRACE)) }
@@ -99,36 +96,34 @@ class NotificationPlanning @Inject constructor(
     }
 
     /** Пункты, ставшие пропуском неответом (их называет проход календаря), — уведомлением каждому (PLAN D8). */
-    fun missed(intakeIds: List<Uuid>, at: Instant): List<PlannedNotification> = intakeIds.map { id ->
-        PlannedNotification(NotificationKey.intake(id, NotificationKind.INTAKE_MISSED), at, NotificationTarget.Intake(id), NoticeDelivery.SYSTEM)
+    fun missed(intakeIds: List<Uuid>, at: Instant): List<Reminder> = intakeIds.map { id ->
+        Reminder(NotificationKey.intake(id, NotificationKind.INTAKE_MISSED), NotificationTarget.Intake(id), at)
     }
 
     /**
      * Сводка дня — одно уведомление, если есть о чём: события дня ([events]) или плановые пункты на
      * сегодня. Пусто — сводки нет; выключена — тоже.
      */
-    suspend fun digest(today: LocalDate, zone: ZoneId, events: Int, at: Instant): PlannedNotification? {
+    suspend fun digest(today: LocalDate, zone: ZoneId, events: Int, at: Instant): Reminder? {
         if (!settings.current().digestEnabled) return null
         val dayEnd = today.plusDays(1).atStartOfDay(zone).toInstant()
         val plannedToday = intakes.plannedBefore(dayEnd).any { it.slot.localDate == today }
         if (events == 0 && !plannedToday) return null
-        return PlannedNotification(NotificationKey.digest(today), at, NotificationTarget.DayPlan(today), NoticeDelivery.SYSTEM)
+        return Reminder(NotificationKey.digest(today), NotificationTarget.DayPlan(today), at)
     }
 
     /** Напоминание об одном пункте — когда сработал его будильник; пункт уже отвечен — `null`. */
-    suspend fun reminderFor(intakeId: Uuid): PlannedNotification? {
+    suspend fun reminderFor(intakeId: Uuid): Reminder? {
         if (!settings.current().intakeRemindersEnabled) return null
         val intake = intakes.find(intakeId) as? CourseIntake ?: return null
         if (intake.status != IntakeStatus.PLANNED) return null
         return reminder(intake)
     }
 
-    private fun reminder(intake: CourseIntake) = PlannedNotification(
+    private fun reminder(intake: CourseIntake) = Reminder(
         key = NotificationKey.intake(intake.id, NotificationKind.INTAKE_DUE),
-        dueAt = intake.plannedAt,
         target = NotificationTarget.Intake(intake.id),
-        delivery = NoticeDelivery.SYSTEM,
-        actions = listOf(NotificationAction.TAKE, NotificationAction.SKIP, NotificationAction.SNOOZE)
+        dueAt = intake.plannedAt
     )
 
     companion object {

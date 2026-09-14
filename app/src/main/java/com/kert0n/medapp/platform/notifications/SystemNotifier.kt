@@ -16,7 +16,7 @@ import com.kert0n.medapp.domain.notification.NotificationKey
 import com.kert0n.medapp.domain.notification.NotificationKind
 import com.kert0n.medapp.domain.notification.NotificationTarget
 import com.kert0n.medapp.domain.notification.Notifier
-import com.kert0n.medapp.domain.notification.PlannedNotification
+import com.kert0n.medapp.domain.notification.Reminder
 import com.kert0n.medapp.platform.notifications.NotificationChannels.Companion.id
 import com.kert0n.medapp.storage.course.CourseStorageRepository
 import com.kert0n.medapp.storage.intake.IntakeStorageRepository
@@ -31,7 +31,7 @@ import kotlin.uuid.Uuid
 import kotlinx.coroutines.flow.first
 
 /**
- * Системное уведомление из [PlannedNotification]: текст — из строк, данные — из чтений хранения,
+ * Системное уведомление из [Reminder]: текст — из строк, данные — из чтений хранения,
  * пара `tag = subject`, `id = kind` — из ключа (PLAN D8). В `PendingIntent` едут только
  * идентификаторы: что открыть по ним, решает приложение (G3, H3). Без разрешения на уведомления
  * показа нет — и об этом отвечается `false`, а не молчанием, чтобы журнал не записал непоказанное.
@@ -44,7 +44,7 @@ class SystemNotifier @Inject constructor(
     private val packages: PackageStorageRepository
 ) : Notifier {
 
-    override suspend fun show(notification: PlannedNotification): Boolean {
+    override suspend fun show(notification: Reminder): Boolean {
         // Проверка стоит здесь, а не в отдельном методе: lint видит её только рядом с `notify`.
         // `POST_NOTIFICATIONS` — разрешение только с Android 13; ниже его нет, и спрашивать надо систему.
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU &&
@@ -74,7 +74,7 @@ class SystemNotifier @Inject constructor(
     private class Text(val title: String, val body: String)
 
     /** Данные для текста — чтением по идентификаторам из цели; повода больше нет — показывать нечего. */
-    private suspend fun textOf(notification: PlannedNotification): Text? = when (val target = notification.target) {
+    private suspend fun textOf(notification: Reminder): Text? = when (val target = notification.target) {
         is NotificationTarget.Intake -> {
             val intake = intakes.find(target.intakeId) as? com.kert0n.medapp.domain.intake.CourseIntake ?: return null
             val title = courses.findRecord(intake.courseId)?.title ?: return null
@@ -129,7 +129,7 @@ class SystemNotifier @Inject constructor(
      * Открыть приложение по цели: только идентификаторы и дата в extras (G3). Платформа не знает
      * экранов и их Activity (H1) — открывается то, что пакет объявил точкой входа.
      */
-    private fun openIntent(notification: PlannedNotification): PendingIntent {
+    private fun openIntent(notification: Reminder): PendingIntent {
         val intent = requireNotNull(context.packageManager.getLaunchIntentForPackage(context.packageName)) { "у приложения есть точка входа" }
             .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_SINGLE_TOP)
         when (val target = notification.target) {

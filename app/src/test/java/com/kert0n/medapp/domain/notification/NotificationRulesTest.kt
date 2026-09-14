@@ -87,9 +87,12 @@ class NotificationRulesTest {
     fun onlyTheIntakeReminderIsExact() {
         assertTrue(NotificationKind.INTAKE_DUE.exact)
         assertFalse(NotificationKind.entries.filter { it != NotificationKind.INTAKE_DUE }.any { it.exact })
-        val planned = PlannedNotification(NotificationKey.digest(lastDay), Instant.EPOCH, NotificationTarget.DayPlan(lastDay), NoticeDelivery.SYSTEM)
+        val planned = Reminder(NotificationKey.digest(lastDay), NotificationTarget.DayPlan(lastDay), Instant.EPOCH)
         assertFalse(planned.exact)
         assertEquals(NotificationChannel.DIGEST, planned.channel)
+        assertEquals(NoticeDelivery.SYSTEM, planned.delivery)
+        // Баннер — свойство вида, а не решение вызывающего: только последний день годности (D8).
+        assertEquals(NoticeDelivery.IN_APP_BANNER, NotificationKind.EXPIRY_TODAY.delivery)
         assertEquals(NotificationChannel.Importance.HIGH, NotificationChannel.INTAKES.importance)
     }
 

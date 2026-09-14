@@ -129,9 +129,18 @@ class WriteContractTest {
         "IntakeStorageRepository.record" to (Shape.ACTION by "(IntakeOutcome): Boolean"),
         "IntakeStorageRepository.materialise" to (Shape.CREATION by "(List<CourseIntake>): Integer"),
         "IntakeStorageRepository.prunePlanned" to (Shape.NAMED_FIELDS by "(Uuid, Set<ScheduledOccurrence>): Integer"),
-        "NotificationLogStorageRepository.wasShown" to (Shape.READ by "(NotificationKey, NoticeDelivery): Boolean"),
-        "NotificationLogStorageRepository.remember" to (Shape.NAMED_FIELDS by "(NotificationKey, NoticeDelivery, Instant): Unit"),
-        "NotificationLogStorageRepository.forget" to (Shape.NAMED_FIELDS by "(NotificationKey): Unit")
+        "ReminderStorageRepository.changes" to (Shape.READ by "(): Flow<Unit>"),
+        "ReminderStorageRepository.raiseAll" to (Shape.CREATION by "(Collection<Reminder>): Unit"),
+        "ReminderStorageRepository.find" to (Shape.READ by "(NotificationKey): Reminder"),
+        "ReminderStorageRepository.due" to (Shape.READ by "(Instant): List<Reminder>"),
+        "ReminderStorageRepository.nextDueAt" to (Shape.READ by "(): Instant"),
+        "ReminderStorageRepository.withdrawn" to (Shape.READ by "(): List<Reminder>"),
+        "ReminderStorageRepository.ofKinds" to (Shape.READ by "(Collection<? extends NotificationKind>): List<Reminder>"),
+        "ReminderStorageRepository.defer" to (Shape.NAMED_FIELDS by "(NotificationKey, Instant): Unit"),
+        "ReminderStorageRepository.markShown" to (Shape.NAMED_FIELDS by "(NotificationKey, Instant): Unit"),
+        "ReminderStorageRepository.withdraw" to (Shape.NAMED_FIELDS by "(Collection<NotificationKey>): Unit"),
+        "ReminderStorageRepository.forget" to (Shape.NAMED_FIELDS by "(Collection<NotificationKey>): Unit"),
+        "ReminderStorageRepository.forgetShownBefore" to (Shape.NAMED_FIELDS by "(Instant): Unit")
     )
 
     /**
@@ -146,7 +155,7 @@ class WriteContractTest {
         MedKitStorageRepository::class.java,
         IntakeStorageRepository::class.java,
         com.kert0n.medapp.storage.report.ReportStorageRepository::class.java,
-        com.kert0n.medapp.storage.server.NotificationLogStorageRepository::class.java
+        com.kert0n.medapp.storage.notification.ReminderStorageRepository::class.java
     )
 
     /**

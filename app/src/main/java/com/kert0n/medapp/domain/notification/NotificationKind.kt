@@ -18,6 +18,21 @@ enum class NotificationKind(val channel: NotificationChannel) {
 
     /** Точный будильник нужен только напоминанию о приёме: остальное — календарные события дня. */
     val exact: Boolean get() = this == INTAKE_DUE
+
+    /**
+     * Системным уведомлением или баннером внутри приложения — свойство вида, а не решение
+     * вызывающего: баннер бывает только у последнего дня годности (PLAN D8).
+     */
+    val delivery: NoticeDelivery
+        get() = if (this == EXPIRY_TODAY) NoticeDelivery.IN_APP_BANNER else NoticeDelivery.SYSTEM
+
+    /** Что можно сделать прямо с карточки: отвечают только напоминанию о приёме. */
+    val actions: List<NotificationAction>
+        get() = if (this == INTAKE_DUE) {
+            listOf(NotificationAction.TAKE, NotificationAction.SKIP, NotificationAction.SNOOZE)
+        } else {
+            emptyList()
+        }
 }
 
 /**

@@ -7,7 +7,7 @@ package com.kert0n.medapp.domain.notification
 interface Notifier {
 
     /** Показано или нет: без разрешения на уведомления показ невозможен, и журнал об этом не пишется. */
-    suspend fun show(notification: PlannedNotification): Boolean
+    suspend fun show(reminder: Reminder): Boolean
 
     suspend fun dismiss(key: NotificationKey)
 }

@@ -188,14 +188,14 @@ class Scenarios(
     val intakeConfirmation = com.kert0n.medapp.feature.intake.IntakeConfirmation(
         database.intakeRepository(), courses, packages, transactions, queue, courseClosing, courseCalendar, reminderWithdrawal, clock
     )
-    val notificationLog = com.kert0n.medapp.storage.server.NotificationLogRoomRepository(database.notificationLog())
+    val reminderStore = com.kert0n.medapp.storage.notification.ReminderRoomRepository(database, database.reminders())
     val notificationPlanning = com.kert0n.medapp.feature.notification.NotificationPlanning(
         database.intakeRepository(), packages, courses, notificationSettings
     )
-    val notificationDelivery = com.kert0n.medapp.feature.notification.NotificationDelivery(notifier, reminders, notificationLog, clock)
+    val notificationDelivery = com.kert0n.medapp.feature.notification.NotificationDelivery(notifier, reminders, reminderStore, clock)
     val dailyRound = com.kert0n.medapp.feature.notification.DailyRound(courseUpkeep, notificationPlanning, notificationDelivery, clock)
     val reminderAnswering = com.kert0n.medapp.feature.notification.ReminderAnswering(
-        database.intakeRepository(), intakeConfirmation, intakeDeclining, reminders, notificationSettings, clock
+        database.intakeRepository(), intakeConfirmation, intakeDeclining, reminders, reminderStore, notificationSettings, clock
     )
 }
 

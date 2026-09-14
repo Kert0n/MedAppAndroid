@@ -12,7 +12,7 @@ import com.kert0n.medapp.domain.notification.NotificationChannel
 import com.kert0n.medapp.domain.notification.NotificationKey
 import com.kert0n.medapp.domain.notification.NotificationKind
 import com.kert0n.medapp.domain.notification.NotificationTarget
-import com.kert0n.medapp.domain.notification.PlannedNotification
+import com.kert0n.medapp.domain.notification.Reminder
 import com.kert0n.medapp.fixture.PACK
 import com.kert0n.medapp.fixture.courseRepository
 import com.kert0n.medapp.fixture.inMemoryDatabase
@@ -48,11 +48,10 @@ class SystemNotifierTest {
     private lateinit var notifier: SystemNotifier
 
     private val expiry = ExpiryDate(LocalDate.of(2027, 3, 31))
-    private val planned = PlannedNotification(
+    private val planned = Reminder(
         key = NotificationKey.expiry(PACK, expiry, NotificationKind.EXPIRY_SOURCE_3D),
-        dueAt = Instant.parse("2027-03-28T09:00:00Z"),
         target = NotificationTarget.PackageCard(PACK),
-        delivery = NoticeDelivery.SYSTEM
+        dueAt = Instant.parse("2027-03-28T09:00:00Z")
     )
 
     @Before
@@ -128,7 +127,7 @@ class SystemNotifierTest {
     /** Повода больше нет — показывать нечего: коробки нет, и `false` без исключения. */
     @Test
     fun aVanishedSubjectIsNotShown() = runTest {
-        val gone = planned.copy(target = NotificationTarget.PackageCard(kotlin.uuid.Uuid.random()))
+        val gone = Reminder(planned.key, NotificationTarget.PackageCard(kotlin.uuid.Uuid.random()), planned.dueAt)
         assertFalse(notifier.show(gone))
     }
 }

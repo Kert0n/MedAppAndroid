@@ -5,6 +5,7 @@ import com.kert0n.medapp.domain.notification.NotificationKey
 import com.kert0n.medapp.domain.notification.NotificationKind
 import com.kert0n.medapp.domain.notification.NotificationSettingsSource
 import com.kert0n.medapp.domain.notification.ReminderAlarms
+import com.kert0n.medapp.storage.notification.ReminderStorageRepository
 import com.kert0n.medapp.feature.intake.IntakeConfirmation
 import com.kert0n.medapp.feature.intake.IntakeDeclining
 import com.kert0n.medapp.storage.intake.IntakeStorageRepository
@@ -25,6 +26,7 @@ class ReminderAnswering @Inject constructor(
     private val confirmation: IntakeConfirmation,
     private val declining: IntakeDeclining,
     private val alarms: ReminderAlarms,
+    private val reminders: ReminderStorageRepository,
     private val settings: NotificationSettingsSource,
     private val clock: Clock
 ) {
@@ -43,10 +45,16 @@ class ReminderAnswering @Inject constructor(
         IntakeDeclining.Outcome.EPISODE_CLOSED, IntakeDeclining.Outcome.GONE -> Response.OpenApp
     }
 
-    /** Сдвигается только будильник — не `plannedAt` и не граница `MISSED` (PLAN D8). */
+    /**
+     * Сдвигается срок **обязательства** — не `plannedAt` и не граница `MISSED` (PLAN D8). Сдвиг
+     * лежит в таблице, поэтому переживает и проход дня, и перезагрузку: будильник — исполнитель
+     * сохранённого срока, а не его хранилище.
+     */
     suspend fun snooze(intakeId: Uuid): Response {
         val at = clock.instant().plus(Duration.ofMinutes(settings.current().snoozeMinutes.toLong()))
-        alarms.schedule(NotificationKey.intake(intakeId, NotificationKind.INTAKE_DUE), at)
+        val key = NotificationKey.intake(intakeId, NotificationKind.INTAKE_DUE)
+        reminders.defer(key, at)
+        alarms.schedule(key, at)
         return Response.Snoozed(at)
     }
 

@@ -2,7 +2,7 @@ package com.kert0n.medapp.feature.notification
 
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import com.kert0n.medapp.domain.notification.NotificationKind
-import com.kert0n.medapp.domain.notification.PlannedNotification
+import com.kert0n.medapp.domain.notification.Reminder
 import com.kert0n.medapp.domain.value.Doses
 import com.kert0n.medapp.feature.course.CourseDrafting
 import com.kert0n.medapp.feature.packages.PackageAdjusting
@@ -19,7 +19,7 @@ import com.kert0n.medapp.fixture.packageRepository
 import com.kert0n.medapp.fixture.schedule
 import com.kert0n.medapp.fixture.tablets
 import com.kert0n.medapp.storage.database.MedAppDatabase
-import com.kert0n.medapp.storage.server.NotificationLogRoomRepository
+import com.kert0n.medapp.storage.notification.ReminderRoomRepository
 import java.time.Clock
 import java.time.Duration
 import java.time.Instant
@@ -75,7 +75,7 @@ class CoverageNoticeTest {
         return draft.id
     }
 
-    private fun kinds(due: List<PlannedNotification>) = due.map { it.kind }
+    private fun kinds(due: List<Reminder>) = due.map { it.kind }
 
     /** Пересчёт до 8 таблеток: 4 дозы из 10 — событие сразу, «за три дня» на седьмой день, «в день» — на восьмой. */
     @Test
@@ -92,7 +92,7 @@ class CoverageNoticeTest {
         assertEquals(listOf(NotificationKind.COVERAGE_SHORT, NotificationKind.COVERAGE_END), kinds(planning.coverageDue(now.plus(Duration.ofDays(4)))))
 
         // Событие показывается один раз: повтор планирования журнал отсеивает.
-        val delivery = NotificationDelivery(scenarios.notifier, scenarios.reminders, NotificationLogRoomRepository(database.notificationLog()), Clock.fixed(now, ZoneOffset.UTC))
+        val delivery = NotificationDelivery(scenarios.notifier, scenarios.reminders, ReminderRoomRepository(database, database.reminders()), Clock.fixed(now, ZoneOffset.UTC))
         assertEquals(1, delivery.deliver(planning.coverageDue(now)))
         assertEquals(0, delivery.deliver(planning.coverageDue(now)))
         assertEquals(id, (scenarios.notifier.shown.single().target as com.kert0n.medapp.domain.notification.NotificationTarget.CourseSources).courseId)

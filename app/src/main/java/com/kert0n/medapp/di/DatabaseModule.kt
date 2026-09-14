@@ -9,7 +9,7 @@ import com.kert0n.medapp.storage.database.MedAppDatabase
 import com.kert0n.medapp.storage.intake.IntakeDao
 import com.kert0n.medapp.storage.medkit.MedKitDao
 import com.kert0n.medapp.storage.pack.PackageDao
-import com.kert0n.medapp.storage.server.NotificationLogDao
+import com.kert0n.medapp.storage.notification.ReminderDao
 import com.kert0n.medapp.storage.server.SyncOperationDao
 import com.kert0n.medapp.storage.template.PackageTemplateDao
 import com.kert0n.medapp.storage.value.VocabularyDao
@@ -76,5 +76,5 @@ object DatabaseModule {
     fun syncOperationDao(database: MedAppDatabase): SyncOperationDao = database.syncOperations()
 
     @Provides
-    fun notificationLogDao(database: MedAppDatabase): NotificationLogDao = database.notificationLog()
+    fun reminderDao(database: MedAppDatabase): ReminderDao = database.reminders()
 }
