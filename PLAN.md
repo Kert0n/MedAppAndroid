@@ -555,6 +555,8 @@ UUID и проверяем принадлежность; недоступнос�
 | **Переход — в транзакции, которая прочитала** | обязательство читали в одном месте, меняли переходом и писали целиком: `@Insert(REPLACE)`, последний записавший побеждает | каждый узкий шаг сам открывает транзакцию вокруг «прочитать → изменить → записать»; владелец доставки **перечитывает** обязательство после показа, а не пишет прочитанное до сети | решение владельца 2026-09-14. Отмена курса снимала напоминание, а «Отложить», прочитавшее его секундой раньше, воскрешало снятое; показ затирал отсрочку, сделанную пока мы ходили в сеть. Механизм для этого в проекте уже есть — им защищены `followBox` и сценарии человека (F5); второй, редакцию, заводить незачем |
 | **Выключенные напоминания** | сверка снимала обязательства на приёмы и на этом всё | сверка владеет **обоими** направлениями: включены — `INTAKE_DUE` на плановые пункты входит в её желаемый набор, выключены — снимается | разбор третьей части: обещал календарь, снимала сверка — и пункты оставались снятыми навсегда. Снимать, а не «просто не показывать», потому что «не хочу напоминаний» — не то же, что «нечем показать»: оставленное обязательство попало бы в лист приёмов без пушей, и приложение приставало бы ровно тем, о чём просили молчать |
 | **«Можно ли показать» — вопрос каналу** | `areNotificationsEnabled()`: ответ про всё приложение | спрашивается канал **этого вида**: нет канала или `IMPORTANCE_NONE` — `NOT_ALLOWED` | каналов четыре, и человек выключает их по отдельности (D8). Выключенный канал — `notify()` молчит, а мы писали «сказано» |
+| **Повреждённый файл настроек** | — | читается умолчаниями D8 и **не переписывается чтением** — `ReplaceFileCorruptionHandler` нет; заново файл кладёт только запись человека | довод G2 наполовину: молча стирать нельзя, но умолчания настроек, в отличие от учётки, ничего не теряют — а запись человека и есть решение о всём наборе (B18) |
+| **Учётка заменяется решением** | «ключ утрачен» — состояние экрана без действия | `AccountReplacement.decide()`: сначала местное (серверные полки — утратой доступа, их очередь — `ACCESS_LOST`), потом новая учётка; читаемую учётку сценарий не трогает | G2: вторая учётка поверх локальных данных — только решением человека; старые брони снять нечем, и команд снятия не ставится (B18) |
 | **`followBox` как владелец реакций** | — | признано и **не чинится**: последовательность бизнес-реакций на изменение коробки живёт расширением DAO | у него три владельца транзакции, два из них в `storage` и до `feature` не дотягиваются; перенос — отдельная работа. Поэтому `COVERAGE_SHORT` заводит сверка запросом «сокращения без обязательства», а не новая реакция в DAO |
 
 ## C2. Чего в первой законченной версии нет
@@ -1842,9 +1844,8 @@ enum class NotificationKind {
     INTAKE_DUE, INTAKE_MISSED,
     EXPIRY_SOURCE_3D, EXPIRY_SOURCE_1D, EXPIRY_TODAY,
     COVERAGE_SHORT, COVERAGE_3D, COVERAGE_END,
-    DAILY_DIGEST
-    // SYNC_ATTENTION заводится в B18 вместе с экраном синхронизации: вида, который никто не
-    // создаёт, в перечислении нет.
+    DAILY_DIGEST,
+    SYNC_ATTENTION                        // очередь ждёт решения человека: отвергнутое или нечитаемое
 }
 enum class NoticeDelivery { SYSTEM, IN_APP_BANNER }
 
@@ -1860,6 +1861,7 @@ data class NotificationKey(val kind: NotificationKind, val subject: String) {
         ): NotificationKey
         fun reduction(reductionId: Uuid): NotificationKey
         fun digest(date: LocalDate): NotificationKey
+        fun sync(): NotificationKey                         // одно обязательство на всю очередь
     }
 }
 sealed interface NotificationTarget {
@@ -1867,6 +1869,7 @@ sealed interface NotificationTarget {
     data class PackageCard(val packageId: Uuid) : NotificationTarget
     data class CourseSources(val courseId: Uuid) : NotificationTarget
     data class DayPlan(val date: LocalDate) : NotificationTarget
+    data object SyncStatus : NotificationTarget            // экран №28, без данных
 }
 
 // Обязательство сказать человеку — сущность: тождество `key`, состояние меняют переходы.
@@ -1902,15 +1905,47 @@ class Reminder(
 enum class Delivery { SHOWN, NOT_ALLOWED, SUBJECT_GONE, FAILED }
 enum class NotificationAction { SKIP, SNOOZE }   // TAKE — U5 (см. C1 «Принял из шторки»)
 data class NotificationSettings(
-    val intakeRemindersEnabled: Boolean = true,
+    val intakeRemindersEnabled: Boolean = true,   // INTAKE_DUE не заводится нигде (ReminderPromising), обещанное снимается
     val snoozeMinutes: Int = 15,
     val expirySourceRemindersEnabled: Boolean = true,
     val coverageThresholdDays: Long = 3,
     val digestEnabled: Boolean = true,
-    val digestAt: LocalTime = LocalTime.of(9, 0),
-    val remoteChangeEnabled: Boolean = true
+    val digestAt: LocalTime = LocalTime.of(9, 0),  // смена в тот же день переносит несказанную сводку
+    val remoteChangeEnabled: Boolean = true       // COVERAGE_SHORT: выключено — не обещается, несказанное снимается
 )
+
+// feature/settings — всё, что человек решил, одной величиной; порт у вызывающих, исполняет платформа.
+data class AppSettings(
+    val notifications: NotificationSettings = NotificationSettings.DEFAULT,
+    val syncInterval: SyncInterval = SyncInterval.DEFAULT   // queue/: 15 мин ≤ x ≤ 8 ч, по умолчанию час (E4)
+)
+interface SettingsStore {
+    fun observe(): Flow<AppSettings>
+    suspend fun current(): AppSettings
+    suspend fun save(settings: AppSettings): SettingsSaved   // SAVED / LOST — записать не удалось
+}
+// Сценарий: записать, затем применить — интервал планировщику, время сводки ежедневному проходу,
+// уведомления — сверке. Единственный, кто пишет настройки.
+class SettingsChanging { suspend fun change(settings: AppSettings): Outcome /* SAVED, NOT_SAVED */ }
+
+// platform/settings — состояние системы, а не наши данные: только читается, меняет его человек.
+data class PermissionStates(val notifications: Boolean, val exactAlarms: Boolean, val camera: CameraAccess)
+enum class CameraAccess { GRANTED, DENIED, ABSENT }   // без камеры — ручной ввод (T-45)
+interface DevicePermissions { fun current(): PermissionStates }
 ```
+
+**Настройки хранятся в DataStore `settings`** (`platform/settings/DataStoreSettings`), и один
+экземпляр исполняет оба порта: доменный `NotificationSettingsSource` — для сверки и ответов из
+шторки — и `SettingsStore` — для экрана 27, `SyncWorker` и постановки задач при старте. Каждая
+настройка на что-то влияет, иначе экран показывает переключатель-обман: `intakeRemindersEnabled`
+проверяется в одном узком шаге `ReminderPromising.promise` — `INTAKE_DUE` при выключенных
+напоминаниях не заводится, откуда бы ни пришёл, а не живёт до следующей сверки; `remoteChangeEnabled`
+держит `COVERAGE_SHORT` в обе стороны, как и напоминания; смена `digestAt` в тот же день делает
+сводку, обещанную на другое время и ещё не сказанную, **лишней** — сверка снимает и заводит её
+заново одним проходом (порядок: сначала снять, потом обещать — воскрешение даёт новый срок).
+**Повреждённый файл настроек** читается умолчаниями и **не переписывается чтением**
+(`ReplaceFileCorruptionHandler` нет); заново его кладёт только запись человека — она и есть решение
+о всём наборе (C1).
 
 `reminders(key, delivery, kind, target, due_at, state, shown_at)` хранит **обязательства**: что
 обещано сказать, на какой момент и в каком состоянии. Разные этапы (`3D`, `1D`, день события),
@@ -2023,10 +2058,12 @@ data class NotificationSettings(
 | `expiry`   | DEFAULT  | 3 и 1 день до годности упаковки-источника |
 | `coverage` | DEFAULT  | нехватка и исчерпание обеспечения         |
 | `digest`   | LOW      | сводка                                    |
+| `sync`     | DEFAULT  | `SYNC_ATTENTION` — очередь ждёт решения   |
 
-Канал `sync` («требуется решение по синхронизации») заводится в B18 вместе с `SYNC_ATTENTION` и
-экраном №28: канал, который никогда ничего не показывает, человек видит в системных настройках как
-обман.
+`SYNC_ATTENTION` — обязательство **от состояния**, одно на всю очередь: сверка обещает его, пока в
+`observeOutstanding()` есть отвергнутое или нечитаемое, и снимает, когда не осталось. Ведёт на экран
+№28 без данных в намерении. Канал заведён вместе с видом: канал, который никогда ничего не
+показывает, человек видит в системных настройках как обман.
 
 `INTAKE_DUE`: `AlarmManager`, `setExactAndAllowWhileIdle`, проверка `canScheduleExactAlarms()`;
 разрешение `SCHEDULE_EXACT_ALARM` запрашивается через системные настройки. При отказе — неточные
@@ -2607,8 +2644,12 @@ Backoff: начальная задержка 2 секунды, удвоение 
 | ручное обновление, напоминание о приёме (D8) | экран и обработчик будильника зовут `Synchronization` |
 
 Раз в час, а не раз в сутки: журнал повторов сервера живёт не дольше суток (B6), и
-недоставленное должно успеть уйти раньше. Интервал станет настройкой от 15 минут до 8 часов (H3
-№27, B18, U11). **Место — очередь и платформа, вопреки прежнему H1.** Координатор зовёт работника
+недоставленное должно успеть уйти раньше. Интервал — настройка `SyncInterval` (`queue/`, величина с
+пределами): от 15 минут — меньше планировщик не умеет — до 8 часов, чтобы недоставленное трижды
+успело уйти за сутки журнала; по умолчанию час (H3 №27, U11). `SyncSchedule.keepRegular(interval)`
+сам сравнивает с тем, что стоит у системы: тот же интервал ничего не пересоздаёт, другой —
+обновляет ту же уникальную задачу, а не ставит вторую; `SyncWorker` считает «человек заходил» от
+половины выбранного интервала. **Место — очередь и платформа, вопреки прежнему H1.** Координатор зовёт работника
 очереди, а сеть про очередь не знает — поэтому он в `queue/` рядом с `SnapshotApplier`; воркер и
 поводы — Android, и живут в `platform/`, видя очередь через координатор, а она их — через порт
 `SyncSchedule`. Фоновая задача не обещает точного времени. Ошибка чтения не стирает
@@ -3134,6 +3175,16 @@ payload понятен нынешнему разбору (`readableSince`). Пе
 - **Утрата пароля необратима**: восстановить его нечем. Старые серверные брони снять нечем — они
   останутся у других участников, пока те не удалят аптечку. Локальные курсы, история и локальные
   аптечки при этом целы; общие придётся подключить заново по приглашению.
+- **Решение «начать с новой учёткой» — сценарий `feature/account/AccountReplacement.decide()`**,
+  и зовёт его только подтверждение человека (экран 1, U11). Порядок: сначала местное — все полки,
+  стоящие у сервера, уходят утратой доступа той же дверью, что «полки не стало в снимке»
+  (`MedKitStorageRepository.abandonServer`: их незакрытые операции закрываются `ACCESS_LOST` тем же
+  переходом, что у 404, коробки — своим концом со следом, курсы теряют источники, брони **не
+  трогаются** — снимать их некому); потом сеть — `DeviceAccount.replaceUnreadable()` стирает
+  нечитаемое и заводит новую учётку обычной регистрацией. Старая учётка мертва независимо от связи,
+  поэтому отказ сети после местной части ничего не портит: повтор идёт через `AppStart` теми же
+  придуманными данными (`Pending`), а второй `abandonServer` не находит ни одной полки. Учётку,
+  которая читается, `replaceUnreadable` не трогает: решать тут нечего.
 
 ## G3. Прочее
 
@@ -3195,7 +3246,7 @@ com.kert0n.medapp                         есть · [B17] — появится
 │   │          PackageQueueState, QueuedCommand, QueueStorage, Transactions, QueueTransport,
 │   │          QueueHttpTransport, QueueWorker, QueueOutbox, QueueService, PackageSnapshotResolver,
 │   │          Settlement; чтение полного снимка — SnapshotApplier и его порт SnapshotStorage;
-│   │          заход синхронизации — Synchronization, порты QueueBacklog и SyncSchedule
+│   │          заход синхронизации — Synchronization, порты QueueBacklog и SyncSchedule, SyncInterval
 │   ├─ pack/ — команды и подготовка запроса по прочитанному состоянию
 │   ├─ medkit/ — команды аптечки: публикация, удаление у всех, выход (E5, E6)
 │   └─ intake/ — IntakeAccounting, IntakeSyncState: где расход приёма и какой операцией уехал
@@ -3211,7 +3262,9 @@ com.kert0n.medapp                         есть · [B17] — появится
 │              credentials/ (Keystore); notifications/ (каналы, SystemNotifier,
 │              AlarmManagerReminders — один будильник, ReminderWakeReceiver,
 │              NotificationActionReceiver, DailyWorker, BootAndTimeReceiver,
-│              DefaultNotificationSettings); [B18] settings/ (DataStore, разрешения)
+│              DefaultNotificationSettings — до B18); settings/ (DataStoreSettings — файл
+│              `settings`, исполняет SettingsStore и NotificationSettingsSource; DevicePermissions —
+│              состояние разрешений и камеры)
 ├─ feature/    сценарии — целое действие человека одной транзакцией: bootstrap/ (AppStart),
 │              medkits/ (MedKitKeeping, MedKitRemoval, MedKitPublishing, MedKitJoining,
 │              MedKitInvitation), packages/ (PackageAdding, PackageDescribing, PackageAdjusting,
@@ -3221,8 +3274,9 @@ com.kert0n.medapp                         есть · [B17] — появится
 │              UnplannedIntakeRecording, IntakeDeclining), template/ (TemplateSearching),
 │              notification/ (NotificationReconciliation — что должно быть обещано, ReminderOutbox —
 │              единственный владелец показа и будильника, ReminderAnswering, DailyRound,
-│              порт DailySchedule);
-│              [B18] account/; [B19] scan/
+│              порт DailySchedule); settings/ (AppSettings, порт SettingsStore, SettingsChanging —
+│              записать и применить); account/ (AccountReplacement — решение «ключ утрачен»);
+│              [B19] scan/
 ├─ presentation/ представление, по понятиям: value/, pack/, medkit/, bootstrap/ — DTO состояния,
 │              мапперы из проекций, разбор ввода, ViewModel; ParsedInput, ScreenState в корне.
 │              Пишут UI-PR; `bootstrap/` появилось с оболочкой и живёт по тем же правилам
