@@ -79,7 +79,7 @@ class SynchronizationTest {
 
     private class Schedule : SyncSchedule {
         val comeBacks = ArrayList<Instant>()
-        override fun keepRegular() = Unit
+        override suspend fun keepRegular(interval: SyncInterval) = Unit
         override fun comeBackFor(dueAt: Instant) {
             comeBacks += dueAt
         }

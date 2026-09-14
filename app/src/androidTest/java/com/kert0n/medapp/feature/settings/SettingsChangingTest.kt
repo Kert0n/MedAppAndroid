@@ -7,6 +7,9 @@ import com.kert0n.medapp.domain.notification.Reminder
 import com.kert0n.medapp.domain.value.Doses
 import com.kert0n.medapp.feature.course.CourseDrafting
 import com.kert0n.medapp.fixture.PACK
+import com.kert0n.medapp.fixture.FakeDailySchedule
+import com.kert0n.medapp.fixture.FakeSettingsStore
+import com.kert0n.medapp.fixture.FakeSyncSchedule
 import com.kert0n.medapp.fixture.Scenarios
 import com.kert0n.medapp.fixture.TABLET_FORM
 import com.kert0n.medapp.fixture.dose
@@ -15,6 +18,7 @@ import com.kert0n.medapp.fixture.packageRepository
 import com.kert0n.medapp.fixture.pack
 import com.kert0n.medapp.fixture.schedule
 import com.kert0n.medapp.fixture.tablets
+import com.kert0n.medapp.queue.SyncInterval
 import com.kert0n.medapp.storage.database.MedAppDatabase
 import java.time.Clock
 import java.time.Duration
@@ -22,8 +26,6 @@ import java.time.Instant
 import java.time.LocalDate
 import java.time.LocalTime
 import java.time.ZoneOffset
-import kotlinx.coroutines.flow.Flow
-import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.test.runTest
 import org.junit.After
 import org.junit.Assert.assertEquals
@@ -33,8 +35,9 @@ import org.junit.Test
 import org.junit.runner.RunWith
 
 /**
- * Изменение настроек записывается и применяется сразу (PLAN D8): выключенные напоминания снимают
- * обещанное тем же вызовом, а не следующим проходом дня; что не легло — не применяется.
+ * Изменение настроек записывается и применяется сразу (PLAN D8, E4): выключенные напоминания
+ * снимают обещанное тем же вызовом, а не следующим проходом дня; интервал уходит планировщику,
+ * время сводки — ежедневному проходу; что не изменилось — не трогается; что не легло — не применяется.
  */
 @RunWith(AndroidJUnit4::class)
 class SettingsChangingTest {
@@ -43,13 +46,15 @@ class SettingsChangingTest {
     private lateinit var scenarios: Scenarios
     private val now: Instant = Instant.parse("2027-03-10T05:00:00Z")
     private val store = FakeSettingsStore()
+    private val sync = FakeSyncSchedule()
+    private val daily = FakeDailySchedule()
     private lateinit var changing: SettingsChanging
 
     @Before
     fun setUp() = runTest {
         database = inMemoryDatabase()
         scenarios = Scenarios(database, now)
-        changing = SettingsChanging(store, scenarios.notificationReconciliation, Clock.fixed(now, ZoneOffset.UTC))
+        changing = SettingsChanging(store, sync, daily, scenarios.notificationReconciliation, Clock.fixed(now, ZoneOffset.UTC))
         database.packageRepository().add(pack(id = PACK, quantity = tablets("20"), form = TABLET_FORM))
     }
 
@@ -101,27 +106,36 @@ class SettingsChangingTest {
         assertEquals("сверка позвана, хотя настройки не легли", setOf(Reminder.State.DUE), states)
     }
 
-    /** Только интервал: сверка уведомлений не нужна, и обещанное не трогается. */
+    /** Только интервал: он уходит планировщику; сверка не нужна, обещанное и проход дня не трогаются. */
     @Test
-    fun changingOnlyTheIntervalLeavesRemindersAlone() = runTest {
+    fun changingOnlyTheIntervalGoesToTheSchedulerAlone() = runTest {
         treated()
         val owed = scenarios.reminderStore.ofKinds(listOf(NotificationKind.INTAKE_DUE)).size
         scenarios.notificationSettings.settings = NotificationSettings(intakeRemindersEnabled = false)
+        val interval = SyncInterval(Duration.ofHours(2))
 
-        changing.change(AppSettings(syncInterval = com.kert0n.medapp.queue.SyncInterval(Duration.ofHours(2))))
+        changing.change(AppSettings(syncInterval = interval))
 
+        assertEquals(listOf(interval), sync.kept)
+        assertEquals(emptyList<LocalTime>(), daily.kept)
         assertEquals(owed, scenarios.reminderStore.ofKinds(listOf(NotificationKind.INTAKE_DUE)).size)
     }
-}
 
-class FakeSettingsStore(var saved: AppSettings = AppSettings.DEFAULT, var lost: Boolean = false) : SettingsStore {
-    private val flow = MutableStateFlow(saved)
-    override fun observe(): Flow<AppSettings> = flow
-    override suspend fun current(): AppSettings = saved
-    override suspend fun save(settings: AppSettings): SettingsSaved {
-        if (lost) return SettingsSaved.LOST
-        saved = settings
-        flow.value = settings
-        return SettingsSaved.SAVED
+    /** Время сводки — ежедневному проходу; интервал при этом не трогается. */
+    @Test
+    fun aNewDigestTimeGoesToTheDailySchedule() = runTest {
+        changing.change(AppSettings(notifications = NotificationSettings(digestAt = LocalTime.of(18, 0))))
+
+        assertEquals(listOf(LocalTime.of(18, 0)), daily.kept)
+        assertEquals(emptyList<SyncInterval>(), sync.kept)
+    }
+
+    /** Те же настройки — ничего не применяется: применять нечего. */
+    @Test
+    fun unchangedSettingsApplyNothing() = runTest {
+        changing.change(AppSettings.DEFAULT)
+
+        assertEquals(emptyList<SyncInterval>(), sync.kept)
+        assertEquals(emptyList<LocalTime>(), daily.kept)
     }
 }

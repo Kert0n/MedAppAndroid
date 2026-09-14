@@ -8,8 +8,11 @@ import java.time.LocalTime
  */
 interface DailySchedule {
 
-    /** Ежедневный проход к [at]; повторный вызов расписание не сдвигает. */
-    fun keepDaily(at: LocalTime)
+    /**
+     * Ежедневный проход к [at]. То же время ничего не пересоздаёт; другое переставляет ту же
+     * задачу к новому времени, а не ставит вторую (PLAN D8).
+     */
+    suspend fun keepDaily(at: LocalTime)
 
     /** Проход сейчас — при связи или без неё: он локальный. */
     fun runNow()

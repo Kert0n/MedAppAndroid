@@ -104,16 +104,32 @@ class DailyWorkerTest {
 
     /** Ежедневная задача одна: повторная постановка её не сдвигает; «сейчас» — отдельная разовая. */
     @Test
-    fun theDailyWorkIsOneAndKept() {
+    fun theDailyWorkIsOneAndKept() = runBlocking {
         val schedule = WorkManagerDailySchedule({ work }, clock)
 
         schedule.keepDaily(LocalTime.of(9, 0))
+        val before = work.getWorkInfosForUniqueWork(WorkManagerDailySchedule.DAILY).get().single()
         schedule.keepDaily(LocalTime.of(9, 0))
         schedule.runNow()
 
         val daily = work.getWorkInfosForUniqueWork(WorkManagerDailySchedule.DAILY).get()
         assertEquals(1, daily.size)
+        assertEquals(before.id, daily.single().id)
         assertTrue(daily.single().state == WorkInfo.State.ENQUEUED || daily.single().state == WorkInfo.State.RUNNING)
         assertEquals(1, work.getWorkInfosForUniqueWork(WorkManagerDailySchedule.NOW).get().size)
+    }
+
+    /** Новое время сводки переставляет задачу: она по-прежнему одна и помечена новым временем, а не прежним. */
+    @Test
+    fun aNewDigestTimeMovesTheDailyWork() = runBlocking {
+        val schedule = WorkManagerDailySchedule({ work }, clock)
+        schedule.keepDaily(LocalTime.of(9, 0))
+
+        schedule.keepDaily(LocalTime.of(18, 0))
+
+        val daily = work.getWorkInfosForUniqueWork(WorkManagerDailySchedule.DAILY).get().filter { !it.state.isFinished }
+        assertEquals(1, daily.size)
+        assertTrue("задача не помечена новым временем", daily.single().tags.any { it.endsWith("18:00") })
+        assertTrue("задача всё ещё помечена прежним временем", daily.single().tags.none { it.endsWith("09:00") })
     }
 }
