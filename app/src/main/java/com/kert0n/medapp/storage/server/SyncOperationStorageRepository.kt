@@ -1,7 +1,6 @@
 package com.kert0n.medapp.storage.server
 
 import androidx.annotation.CheckResult
-import com.kert0n.medapp.queue.RefusalReason
 import com.kert0n.medapp.queue.SyncCommand
 import com.kert0n.medapp.queue.SyncOperation
 import com.kert0n.medapp.queue.StoredSyncOperation
@@ -27,15 +26,6 @@ interface SyncOperationStorageRepository {
     suspend fun find(id: Uuid): SyncOperation?
 
     suspend fun withStatus(status: SyncOperationStatus): List<SyncOperation>
-
-    suspend fun settle(
-        id: Uuid,
-        status: SyncOperationStatus,
-        lastError: String? = null,
-        at: Instant? = null,
-        attempted: Boolean = false,
-        refusalReason: RefusalReason? = null
-    )
 
     /**
      * Что ещё касается человека — экрану состояния синхронизации (PLAN H3 №28): незакрытые

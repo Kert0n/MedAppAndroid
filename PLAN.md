@@ -572,6 +572,7 @@ UUID и проверяем принадлежность; недоступнос�
 | **Растущие таблицы — по индексу** | сверка на каждое изменение оснований сканировала `coverage_reductions`, `intakes` и `sync_operations` целиком (`NOT IN` индексом не идёт) | индексы `coverage_reductions(at)`, `intakes(status, scheduled_at)`, `sync_operations(med_kit_id)`; `outstanding()` называет состояния списком; `HundredMedKitsTest` прогоняет запросы сверки и прохода через `EXPLAIN QUERY PLAN` — `SCAN` по неубывающим таблицам (`intakes`, `coverage_reductions`, `sync_operations`) запрещён; `reminders` давнее забывает сама (`Reminder.RETENTION`), `packages` — законный список всех коробок | разбор #31 (CodeRabbit): сверка теперь частая, и её цена росла с историей |
 | **Цикл владельца — сначала наблюдатель** | `OutboxLoop` ставил начальный проход из `run()`, а наблюдатель сигналов вставал в соседней корутине: коммит между чтением начального прохода и постановкой наблюдателя терял сигнал до чужого повода | начальный проход ставится **из первого значения потока** — того самого, что означает «наблюдатель встал»; `run()` сам ничего не ставит. Порядок «наблюдатель → начальный проход → сигналы → остановка» — одно место, и у проверок то же: ожидание с именем (`fixture/await`), scope механизмов у одного владельца (`Mechanisms`) | разбор #31, второй круг: три из четырёх замечаний — в коде ответа на первый круг. У модели было «кто» (владелец, сигнал), но не «когда» |
 | **Закрытие зависимой — тем же переходом** | `Settlement.Effect.Cascade(status, …)` нёс сырой статус, и каскад сам кодировал колонки закрытия: `last_error = SUPERSEDED` и у `ACCESS_LOST`, где причины нет | `Cascade(close: Transition.Close, accounting)`: зависимая закрывается тем же `Close`, что и своя, одной дверью хранения; «закрытие в незакрытый статус и отказ без причины не выражаются» держит и каскад | разбор #31, второй круг: копия правила закрытия разошлась. Первый шаг к B21 — переходы операции у типа |
+| **Переходы операции — у типа** | `SyncOperation` переходов не имела: автомат состояний очереди жил в шести SQL-глаголах `SyncOperationDao` (`freeze`, `markSending`, `answered`, `defer`, `settle`, `reprepare`) — у каждого свой `WHERE status IN (…)` и свой набор колонок — и у двенадцати вызывающих в пяти файлах двух слоёв, передававших сырые значения колонок | `queue/SyncOperationState` — величина состояния отправки с переходами `frozen / resent / answered / deferred / closed(Close) / retried / reprepared`, предусловие каждого — по статусу, неприменимый — `null`; `SyncOperation` держит её и `prepared`; нечитаемая строка (`Stale`/`Unreadable`) несёт то же состояние и закрывается тем же переходом. Хранение: `find` в транзакции → переход → **один** условный `SyncOperationDao.save` (`WHERE id = :id AND status = :was`); `dismiss` — не переход, а отметка человека. Страж: `UPDATE sync_operations` в `app/src/main` — ровно `save` и `dismiss` | разбор #31, оба круга: ромб дважды, `SUPERSEDED` в `last_error` у `ACCESS_LOST`, «учётка заменена» мимо `Transition.Close` — копии одного правила, разошедшиеся. `Package` и `Reminder` меняются переходами, и находок по ним нет; очередь была единственным агрегатом с автоматом в SQL (B21) |
 | **Правило — на своём типе** | греп AGENTS «повтор правила внутри слоя» по B20 не гонялся: «аптечка уже на сервере», «об аптечке уже принято решение», «пачка уже лежит в этой аптечке» — по два раза; F5 «прочитано этой же транзакцией — ноль строк незаконен» — двадцатью `check` по сценариям | `MedKit.requireLocal/requireDecidable`, `Package.relocated`; `queue/ReadThisTransaction` — `Boolean.readThisTransaction(subject)` для условной записи, `T?.readThisTransaction(subject)` для повторного чтения; греп — обязательный шаг после каждого коммита | разбор #31: правило без своего типа расползается копиями, и копии расходятся |
 
 ## C2. Чего в первой законченной версии нет
@@ -2430,6 +2431,28 @@ class SyncOperation(
     val refusalReason: RefusalReason?   // ровно у REFUSED: почему сервер делать не будет
 )
 
+// queue — состояние отправки: величина с переходами (B21). Предусловия — ровно те, что стояли в
+// WHERE шести SQL-глаголов; неприменимый переход — null («закрытая второй раз не закрывается»).
+// Инварианты держит тип: ответ ⇔ ANSWERED; причина ⇔ REFUSED; outcomeUnknown ⇒ hasRequest.
+data class SyncOperationState(
+    val status: SyncOperationStatus, val attempts: Attempts, val lastError: String?, val lastTriedAt: Instant?,
+    val answer: RawResponse?, val notBefore: Instant?, val outcomeUnknown: Boolean, val refusalReason: RefusalReason?,
+    val hasRequest: Boolean             // запрос заморожен (prepared_* заполнены)
+) {
+    fun frozen(at): SyncOperationState?                      // PENDING|SENDING, !hasRequest → SENDING, hasRequest
+    fun resent(): SyncOperationState?                        // PENDING|SENDING, hasRequest → SENDING; unknown |= (был SENDING)
+    fun answered(answer, at): SyncOperationState?            // SENDING → ANSWERED, answer, lastTriedAt
+    fun deferred(reason, at, notBefore): SyncOperationState? // ANSWERED → attempts + 1, lastError, lastTriedAt, notBefore
+    fun closed(close: Transition.Close, at): SyncOperationState?   // !isClosed → close.status, lastError = reason?.name, refusalReason, answer = null, notBefore = null
+    fun retried(reason, at, attempted, outcomeUnknown, notBefore): SyncOperationState? // !isClosed → PENDING, answer = null, attempts += attempted, unknown = old || new
+    fun reprepared(reason, at, notBefore): SyncOperationState?     // SENDING|ANSWERED → PENDING, hasRequest = false, unknown = false, answer = null
+}
+// SyncOperation держит state и prepared; status/attempts/… — делегаты; переходы — обёртки: taken(request, at),
+// resent(), answered(…), deferred(…), closed(…), retried(…), reprepared(…) → SyncOperation?; awaitsApplication.
+// StoredSyncOperation.Stale/Unreadable несут state: закрываются тем же переходом, словарь для этого не нужен.
+// Хранение — одна дверь: SyncOperationDao.save(id, state, prepared, was) — UPDATE … WHERE id = :id AND status = :was;
+// dismiss — отметка человека, не переход.
+
 // queue — служба: работник, outbox и два интерфейса; транзакция принадлежит хранению
 interface QueueStorage {           // реализует хранение (storage/server/QueueRoomStorage)
     fun changes(): Flow<Unit>      // таблица операций изменилась — после коммита по определению
@@ -2518,7 +2541,8 @@ PR 6 (#9)). `QueueService.change` открывает транзакцию, пр�
 зависимости `APPLIED`, более ранней незакрытой по той же пачке нет. Второй офлайн-приём той же пачки
 ждёт, пока первый не закрыт, и готовится по его ответу. После смерти процесса `SENDING` уходит снова
 тем же запросом, а `ANSWERED` закрывается из записанного ответа без сети. Исполнитель один
-(`@Singleton` + `Mutex`), взятие и закрытие условны по статусу, а снимок не откатывает версию.
+(`@Singleton` + `Mutex`), взятие и закрытие условны по статусу — предусловие у перехода типа, и хранение
+пишет только строку, которую прочитало (`save … WHERE status = :was`), — а снимок не откатывает версию.
 
 Зависимости — **множество**, а не список: порядок между ними ничего не значит, и повтор тоже,
 а список потребовал бы проверки уникальности там, где её выражает тип.
@@ -4078,8 +4102,10 @@ Base — всё, что работает без экранов: домен, хр
 
 ## I3. Base-PR подробно
 
-Оставшихся Base-PR нет: B20 закрыл долги, и критерий «Base готов» (I1) выполнен — у каждого экрана
-U2 есть сценарий и чтение. Новая инфраструктура появляется только новым Base-PR, а не внутри UI.
+Оставшихся Base-PR нет: B20 закрыл долги, B21 (стеком на #31) вернул очереди переходы у типа —
+разбор второго круга #31 показал, что она была единственным агрегатом, чей автомат состояний жил в
+SQL. Критерий «Base готов» (I1) выполнен — у каждого экрана U2 есть сценарий и чтение. Новая инфраструктура появляется
+только новым Base-PR, а не внутри UI.
 
 ### B14 — приложение отвечает на вопросы о себе (#22, `data/reports-and-catalog`)
 
@@ -4690,6 +4716,55 @@ API», «`followBox`» — закрыто, «Отказ разобран», «С
 разрешений, баннер и лист 29 на экране — U5 (экраны); проверка статуса приёма в
 `SystemNotifier.textOf` не заводится — после коммита 3 обязательство принятого пункта невыразимо.
 
+### B21 — переходы операции у типа (#32, `queue/operation-transitions`, стеком на #31) — **сделан**
+
+**Болезнь:** `Package` и `Reminder` меняют состояние переходами — методами сущности, а хранение
+читает в транзакции и сохраняет. `SyncOperation` переходов не имеет: её автомат состояний живёт в
+шести SQL-глаголах `SyncOperationDao` (`freeze`, `markSending`, `answered`, `defer`, `settle`,
+`reprepare`), у каждого свой `WHERE status IN (…)` и свой набор колонок, и у двенадцати вызывающих
+в пяти файлах двух слоёв, передающих сырые значения колонок. Ромб зависимых дважды, `SUPERSEDED` в
+`last_error` у `ACCESS_LOST`, «учётка заменена» строкой журнала мимо `Transition.Close` — копии
+одного правила, разошедшиеся (разбор #31, оба круга). Нарушение инварианта AGENTS «состояние
+меняют только переходы» в собственном корне `queue/`. **Зависит от:** B20 (#31).
+
+**Модель:** C1 «Переходы операции — у типа»; E2 — `SyncOperationState` и переходы. Порядок мышления:
+
+1. *Вещь.* Операция — одна команда серверу и её судьба: ждёт → отправляется → ответ записан →
+   применена / отказана / доступ утрачен, либо вернулась ждать (повтор тем же запросом,
+   переподготовка). Неизменное — `id`, `command`, `sequence`, `createdAt`, `payloadVersion`,
+   `groupId`, `dependsOn`; меняется **состояние отправки**. «Разобрано человеком» — факт о
+   закрытой строке, не состояние отправки. Строка бывает нечитаемой командой (чужая версия
+   payload), но состояние читается всегда — оно в колонках без словаря.
+2. *DDD.* `SyncOperationState` — величина с переходами; `SyncOperation` — сущность, держит её и
+   `prepared`; `StoredSyncOperation.Stale/Unreadable` несут состояние. Хранение читает в
+   транзакции, зовёт переход и пишет одной дверью; порты `QueueStorage` по форме прежние;
+   сырой `SyncOperationStorageRepository.settle(id, status, …)` уходит — в `main` его не звали.
+3. *Целевая модель.* Переходы — E2. `QueueRoomStorage.take` — `taken`/`resent` и `save`
+   (повторного `find` нет); `answered`/`defer` — в транзакции; `settle` — `closed`/`retried`/
+   `reprepared` у читаемой, `closed` у нечитаемой (`row.state`, сырые `prepared_*` колонки как
+   есть); каскад — `entity.toState().closed(close, at)`; `MedKitRoomRepository.abandonServer` —
+   нечитаемые тем же `QueueStorage.settle(Settlement(Close.AccessLost))`; `QueueWorker` —
+   `awaitsApplication` вместо сравнения статусов. Сознательно меняется: `last_tried_at` у
+   зависимой — момент каскада (было `NULL`); `last_error` у нечитаемой при смене учётки — `null`,
+   как у читаемой (было «учётка заменена»).
+4. Экранов нет.
+
+| # | коммит | содержание |
+|---|---|---|
+| 0 | `PLAN: B21 заведён — переходы операции у типа` | **сделан** — болезнь и зависимость |
+| 1 | `PLAN: B21 — переходы операции у типа` | **сделан** — модель до кода: C1, E2, I3; AGENTS — «когда» в порядке мышления, «ответ на разбор — не новая пачка» |
+| 2 | `Состояние операции знает свои переходы` | **сделан** — `SyncOperationState`, переходы `SyncOperation`; `SyncOperationStateTest` — таблица допустимости 6 статусов × 7 переходов, «закрытая второй раз — null», «неизвестный исход переживает повтор и умирает с переподготовкой», «`resent` из SENDING помечает неизвестный, из PENDING — нет», «ответ ровно после `answered`, стирается `closed`/`retried`», «причина ровно у `Refused`» |
+| 3 | `Строку очереди меняет одна дверь` | **сделан** — `SyncOperationDao.save`, шесть глаголов удалены; `QueueRoomStorage`, `SyncOperationRoomRepository`, `MedKitRoomRepository`, `QueueWorker`; тесты с сырыми глаголами — на фикстуру `update(entity)` или переходы. Красные: страж коммита 4 называет шесть `UPDATE`; `QueueRoomStorageTest.anUnreadableRowIsClosedLikeAReadableOne`; `TransactionBoundariesTest` — `answered`/`defer` в транзакции |
+| 4 | `Дверь одна, и это держит проверка` | **сделан** — `WriteContractTest`: `UPDATE sync_operations` в `app/src/main` — ровно `save` и `dismiss`; сравнение `SyncOperationStatus` с константой — только в `SyncOperationState`, `SyncOperationStatus.isClosed`, `StoredSyncOperation.needsDecision` |
+| 5 | `PLAN: итог B21` | **сделан** — I3, эталон J1 (824 unit, 545 инструментальных), I2 |
+
+**Тесты.** Тесты до фиксов, красные прогоны — в описании #32: `QueueRoomStorageTest.anUnreadableRowIsClosedLikeAReadableOne` — «last_error expected null, but was:<учётка заменена>»; `QueueWriteDoorTest` — семь `UPDATE sync_operations`, три сравнения статуса мимо типа, `answered`/`defer` вне транзакции. *Домен (`test/`)*:
+`SyncOperationStateTest`. *Границы (`test/`)*: `WriteContractTest` — одна дверь. *База
+(`androidTest/`)*: `QueueRoomStorageTest` — нечитаемая и читаемая закрываются одинаково, каскад
+через переход, взятие/ответ/отсрочка — прежнее поведение через переходы; `SyncOperationDaoTest` —
+`save` пишет только строку в прочитанном статусе (`was` не совпал — ноль строк);
+`TransactionBoundariesTest`. *Сквозные*: `SyncStoriesTest`, `SharedMedKitProbe` (`-Pprobe`) — регресс.
+
 ## I4. Зависимости Base
 
 | PR | зависит от |
@@ -4702,6 +4777,7 @@ API», «`followBox`» — закрыто, «Отказ разобран», «С
 | B18 | B17 |
 | B19 | B14 |
 | B20 | B14 – B19 |
+| B21 | B20 |
 
 ---
 
@@ -5184,8 +5260,8 @@ ANDROID_SERIAL=emulator-5554 ./gradlew :app:connectedDebugAndroidTest -Pprobe
 и отдельными грепами их больше не смотрят.
 Эмулятор — уже запущенный `emulator-5554`, новых не поднимать. Итог инструментальных читать из
 `app/build/outputs/androidTest-results/connected/debug/TEST-*.xml`: `AssumptionViolatedException` у
-`RegistrationProbe` — пропуск, не провал. **Эталон после B20: 812 unit, 543
-инструментальных, 2 пропуска (`RegistrationProbe`, `CrptProbe`), 0 провалов** (после B19 — 788 и 506; после B18 — 764 и 505; после B17 — 752 и 475; после третьей части B17 было 747 и 468; после первой части B17 было 738 и 452 — журнал показов
+`RegistrationProbe` — пропуск, не провал. **Эталон после B21: 824 unit, 545
+инструментальных, 2 пропуска (`RegistrationProbe`, `CrptProbe`), 0 провалов** (после B20 — 813 и 544; после B19 — 788 и 506; после B18 — 764 и 505; после B17 — 752 и 475; после третьей части B17 было 747 и 468; после первой части B17 было 738 и 452 — журнал показов
 ушёл вместе со своими проверками, а обязательства принесли свои; после B16 — 730 и 422) —
 каждый PR записывает свой. **Эталон времени после B20** (`HundredMedKitsTest`, `BigLatest`, 100 полок /
 1 000 пачек / 50 лечений / год приёмов): список полок 1 мс, все лекарства 46 мс, снимок ста полок

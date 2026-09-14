@@ -24,6 +24,11 @@ import kotlin.uuid.Uuid
  * [refusalReason] — почему сервер делать не будет: значение, а не текст журнала, и есть оно ровно
  * у [SyncOperationStatus.REFUSED] (PLAN E2). Экран берёт по нему слова, а [lastError] остаётся
  * журналу.
+ *
+ * Состояние отправки — [state], и меняется оно только его переходами (C1 «Переходы операции — у
+ * типа»): [taken], [resent], [answered], [deferred], [closed], [retried], [reprepared] отдают
+ * операцию после перехода либо `null`, если из нынешнего статуса он невозможен. Тождество —
+ * команда, номер и зависимости — переходом не меняется.
  */
 class SyncOperation(
     val id: Uuid,
@@ -46,18 +51,45 @@ class SyncOperation(
     /** Своя копия: множество, оставшееся у вызывающего, меняло бы порядок отправки очереди. */
     val dependsOn: Set<Uuid> = dependsOn.toSet()
 
+    /** Состояние отправки; его инварианты — ответ ⇔ `ANSWERED`, причина ⇔ `REFUSED` — держит оно само. */
+    val state: SyncOperationState = SyncOperationState(
+        status, attempts, lastError, lastTriedAt, answer, notBefore, outcomeUnknown, refusalReason, hasRequest = prepared != null
+    )
+
     init {
         require(sequence >= 0) { "номер в очереди не бывает отрицательным: $sequence" }
         require(payloadVersion >= 1) { "версия payload начинается с единицы" }
         require(id !in dependsOn) { "операция не зависит от себя самой" }
-        require((answer != null) == (status == SyncOperationStatus.ANSWERED)) {
-            "записанный ответ бывает ровно у операции, которая его получила и ещё не закрыта"
-        }
-        require(!outcomeUnknown || prepared != null) { "неизвестный исход бывает только у отправленного запроса" }
-        require((refusalReason != null) == (status == SyncOperationStatus.REFUSED)) {
-            "причина отказа есть ровно у отказанной операции: $status и $refusalReason друг другу не пара"
-        }
     }
+
+    /** Ответ записан и ещё не применён: закрывается из него, сервер о нём больше не спрашивают. */
+    val awaitsApplication: Boolean get() = state.awaitsApplication
+
+    /** Запрос заморожен по свежему состоянию и уходит: только у ещё не подготовленной. */
+    fun taken(request: PreparedRequest): SyncOperation? = state.frozen()?.let { with(it, request) }
+
+    /** Замороженный запрос уходит снова; застали в отправке — исход прошлого полёта неизвестен. */
+    fun resent(): SyncOperation? = state.resent()?.let { with(it, prepared) }
+
+    fun answered(answer: RawResponse, at: Instant): SyncOperation? = state.answered(answer, at)?.let { with(it, prepared) }
+
+    fun deferred(reason: String, at: Instant, notBefore: Instant): SyncOperation? =
+        state.deferred(reason, at, notBefore)?.let { with(it, prepared) }
+
+    fun closed(close: Settlement.Transition.Close, at: Instant): SyncOperation? = state.closed(close, at)?.let { with(it, prepared) }
+
+    fun retried(reason: String, at: Instant, attempted: Boolean, outcomeUnknown: Boolean, notBefore: Instant?): SyncOperation? =
+        state.retried(reason, at, attempted, outcomeUnknown, notBefore)?.let { with(it, prepared) }
+
+    /** Запрос сброшен и готовится заново под тем же номером. */
+    fun reprepared(reason: String, at: Instant, notBefore: Instant?): SyncOperation? =
+        state.reprepared(reason, at, notBefore)?.let { with(it, null) }
+
+    private fun with(state: SyncOperationState, prepared: PreparedRequest?): SyncOperation = SyncOperation(
+        id, command, sequence, createdAt, payloadVersion, prepared, groupId, dependsOn,
+        state.status, state.attempts, state.lastError, state.lastTriedAt, state.answer, state.notBefore,
+        state.outcomeUnknown, state.refusalReason
+    )
 
     override fun equals(other: Any?): Boolean =
         this === other || (

@@ -2,6 +2,7 @@ package com.kert0n.medapp.feature.operation
 
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import com.kert0n.medapp.fixture.INTAKE
+import com.kert0n.medapp.fixture.settle
 import com.kert0n.medapp.fixture.PACK
 import com.kert0n.medapp.fixture.Scenarios
 import com.kert0n.medapp.fixture.TABLET_FORM

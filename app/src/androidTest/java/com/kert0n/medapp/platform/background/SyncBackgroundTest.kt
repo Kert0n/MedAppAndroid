@@ -14,6 +14,7 @@ import androidx.work.testing.TestListenableWorkerBuilder
 import androidx.work.testing.WorkManagerTestInitHelper
 import androidx.work.workDataOf
 import com.kert0n.medapp.fixture.INTAKE
+import com.kert0n.medapp.fixture.settle
 import com.kert0n.medapp.fixture.PACK
 import com.kert0n.medapp.feature.settings.AppSettings
 import com.kert0n.medapp.fixture.FakeSettingsStore
