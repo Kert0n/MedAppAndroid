@@ -15,6 +15,7 @@ import com.kert0n.medapp.fixture.PACK
 import com.kert0n.medapp.fixture.Scenarios
 import com.kert0n.medapp.fixture.TABLET_FORM
 import com.kert0n.medapp.fixture.confirmed
+import com.kert0n.medapp.fixture.courseRepository
 import com.kert0n.medapp.fixture.dose
 import com.kert0n.medapp.fixture.inMemoryDatabase
 import com.kert0n.medapp.fixture.intakeRepository
@@ -59,7 +60,7 @@ class IntakeReminderTest {
     fun setUp() = runTest {
         database = inMemoryDatabase()
         scenarios = Scenarios(database, now)
-        planning = NotificationPlanning(database.intakeRepository(), database.packageRepository(), settings)
+        planning = NotificationPlanning(database.intakeRepository(), database.packageRepository(), database.courseRepository(), settings)
         delivery = NotificationDelivery(notifier, reminders, NotificationLogRoomRepository(database.notificationLog()), Clock.fixed(now, ZoneOffset.UTC))
         database.packageRepository().add(pack(id = PACK, quantity = tablets("20"), form = TABLET_FORM))
     }

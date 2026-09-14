@@ -13,6 +13,7 @@ import com.kert0n.medapp.fixture.OTHER_PACK
 import com.kert0n.medapp.fixture.PACK
 import com.kert0n.medapp.fixture.Scenarios
 import com.kert0n.medapp.fixture.TABLET_FORM
+import com.kert0n.medapp.fixture.courseRepository
 import com.kert0n.medapp.fixture.dose
 import com.kert0n.medapp.fixture.inMemoryDatabase
 import com.kert0n.medapp.fixture.intakeRepository
@@ -50,7 +51,7 @@ class ExpiryNoticeTest {
     fun setUp() = runTest {
         database = inMemoryDatabase()
         scenarios = Scenarios(database, now)
-        planning = NotificationPlanning(database.intakeRepository(), database.packageRepository(), settings)
+        planning = NotificationPlanning(database.intakeRepository(), database.packageRepository(), database.courseRepository(), settings)
     }
 
     @After

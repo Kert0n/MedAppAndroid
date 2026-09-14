@@ -9,7 +9,9 @@ import com.kert0n.medapp.domain.notification.NotificationKind
 import com.kert0n.medapp.domain.notification.NotificationSettingsSource
 import com.kert0n.medapp.domain.notification.NotificationTarget
 import com.kert0n.medapp.domain.notification.PlannedNotification
+import com.kert0n.medapp.domain.course.CourseCoverage
 import com.kert0n.medapp.domain.pack.ExpiryDate
+import com.kert0n.medapp.storage.course.CourseStorageRepository
 import com.kert0n.medapp.storage.intake.IntakeStorageRepository
 import com.kert0n.medapp.storage.pack.PackageQuery
 import com.kert0n.medapp.storage.pack.PackageStorageRepository
@@ -28,8 +30,33 @@ import kotlin.uuid.Uuid
 class NotificationPlanning @Inject constructor(
     private val intakes: IntakeStorageRepository,
     private val packages: PackageStorageRepository,
+    private val courses: CourseStorageRepository,
     private val settings: NotificationSettingsSource
 ) {
+
+    /**
+     * Обеспечение идущих лечений на день [today] (PLAN D8): сокращение — событием, сразу и один раз
+     * на событие; за `coverageThresholdDays` календарных дней до первого необеспеченного пункта и в
+     * его день — по дате в зоне курса. Обеспеченному курсу предупреждать нечего.
+     */
+    suspend fun coverageDue(today: LocalDate, at: Instant): List<PlannedNotification> {
+        val threshold = settings.current().coverageThresholdDays
+        val due = mutableListOf<PlannedNotification>()
+        for ((courseId, coverage) in courses.observeCoverages().first()) {
+            val zone = courses.findPlan(courseId)?.schedule?.zone ?: continue
+            for (reduction in courses.observeReductions(courseId).first()) {
+                due += PlannedNotification(NotificationKey.reduction(reduction.id), reduction.at, NotificationTarget.CourseSources(courseId), NoticeDelivery.SYSTEM)
+            }
+            val firstUncoveredAt = coverage.firstUncoveredAt ?: continue
+            val kind = when (coverage.noticeOn(today, zone, threshold)) {
+                CourseCoverage.Notice.AHEAD -> NotificationKind.COVERAGE_3D
+                CourseCoverage.Notice.END -> NotificationKind.COVERAGE_END
+                null -> continue
+            }
+            due += PlannedNotification(NotificationKey.coverage(courseId, firstUncoveredAt, kind), at, NotificationTarget.CourseSources(courseId), NoticeDelivery.SYSTEM)
+        }
+        return due
+    }
 
     /**
      * Годность на день [today] (PLAN D8): коробкам, из которых курс берёт (назначены идущему курсу
