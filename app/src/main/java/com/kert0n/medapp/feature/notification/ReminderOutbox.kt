@@ -105,6 +105,8 @@ class ReminderOutbox @Inject constructor(
         } catch (failure: Exception) {
             // Сбой прохода — тоже срок: мы вернёмся, а не замолчим до входа в приложение (E4).
             _state.update { it.copy(passes = it.passes + 1, lastFailure = failure.toString()) }
+            // Переставляется только приблизительная: точная остаётся той, что была, — срок приёма
+            // сбой прохода не двигает.
             val retryAt = clock.instant().plus(RETRY_AFTER_FAILURE)
             attempt { alarms.wakeAt(retryAt, exact = false) }
             Report(shown = 0, dismissed = 0, blocked = 0, nextAt = retryAt)
@@ -140,10 +142,16 @@ class ReminderOutbox @Inject constructor(
         }
         forgetThePast(now)
 
-        // Будильник ставится по **свежему** чтению: за проход обязательства изменились.
+        // Постановки ставятся по **свежему** чтению: за проход обязательства изменились. Их две —
+        // точная и приблизительная, каждая на ближайший срок своей точности: приблизительную
+        // система вправе задержать, и точный приём за ней не ждёт (D8).
         val left = reminders.awaiting(NoticeDelivery.SYSTEM)
-        val next = left.mapNotNull { it.wakeAt(clock.instant()) }.minOrNull()
-        if (next == null) alarms.stopWaking() else alarms.wakeAt(next, exact = exactnessOf(left, next))
+        val at = clock.instant()
+        val nextExact = left.filter { it.exact }.mapNotNull { it.wakeAt(at) }.minOrNull()
+        val nextInexact = left.filterNot { it.exact }.mapNotNull { it.wakeAt(at) }.minOrNull()
+        keep(nextExact, exact = true)
+        keep(nextInexact, exact = false)
+        val next = listOfNotNull(nextExact, nextInexact).minOrNull()
         val report = Report(shown = shown, dismissed = dismissed, blocked = blocked, nextAt = next)
         _state.update { it.copy(passes = it.passes + 1, lastReport = report, lastFailure = null, pushBlocked = blocked > 0) }
         return report
@@ -180,9 +188,10 @@ class ReminderOutbox @Inject constructor(
     /** Исход записан — либо обязательство изменилось, пока система показывала, и показ устарел. */
     private enum class Settled { RECORDED, OUTDATED }
 
-    /** Точность просит тот, чей срок настал: напоминанию о приёме она нужна, остальному нет. */
-    private fun exactnessOf(awaiting: List<Reminder>, next: java.time.Instant): Boolean =
-        awaiting.any { it.exact && it.wakeAt(next) == null && it.dueAt <= next }
+    /** Постановка названной точности — на срок, если он есть; иначе снимается. */
+    private suspend fun keep(at: Instant?, exact: Boolean) {
+        if (at == null) alarms.stopWaking(exact) else alarms.wakeAt(at, exact)
+    }
 
     /**
      * Повода больше нет: гасим показанное и забываем. Система не откатывается вместе с базой (F5),
