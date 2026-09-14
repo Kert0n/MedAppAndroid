@@ -18,7 +18,6 @@ import com.kert0n.medapp.queue.pack.PackageSyncCommand
 import com.kert0n.medapp.storage.course.CourseStorageRepository
 import com.kert0n.medapp.storage.intake.IntakeStorageRepository
 import com.kert0n.medapp.storage.pack.PackageStorageRepository
-import com.kert0n.medapp.feature.notification.ReminderWithdrawal
 import java.time.Clock
 import javax.inject.Inject
 import kotlin.uuid.Uuid
@@ -41,21 +40,12 @@ class CourseAmendment @Inject constructor(
     private val calendar: CourseCalendar,
     private val closing: CourseClosing,
     private val queue: QueueService,
-    private val reminders: ReminderWithdrawal,
     private val transactions: Transactions,
     private val clock: Clock
 ) {
 
     /** Изменения [changes] по порядку: ложатся все или ни одно. [expected] — редакция, которую видел экран. */
-    suspend fun amend(id: Uuid, expected: Revision, changes: List<Change>): Outcome {
-        val cancelled = mutableListOf<Uuid>()
-        val outcome = transactions.run { amend(id, expected, changes, cancelled) }
-        // После фиксации: пункты законченного лечения больше не напоминают о себе (PLAN D8).
-        reminders.withdrawAll(cancelled)
-        return outcome
-    }
-
-    private suspend fun amend(id: Uuid, expected: Revision, changes: List<Change>, cancelled: MutableList<Uuid>): Outcome = transactions.run {
+    suspend fun amend(id: Uuid, expected: Revision, changes: List<Change>): Outcome = transactions.run {
         val record = courses.findRecord(id) ?: return@run Outcome.Gone
         if (!record.isOpen) return@run Outcome.AlreadyFinished
         val before = courses.openPlan(id)
@@ -86,7 +76,7 @@ class CourseAmendment @Inject constructor(
         if (completion.reached) {
             val amended = checkNotNull(courses.findRecord(id)) { "запись эпизода записана этой же транзакцией" }
             val ofCourse = intakes.ofCourse(id).filterIsInstance<CourseIntake>()
-            cancelled += closing.close(course, CourseCompletion.Closing.of(amended, CourseRecord.Outcome.COMPLETED, ofCourse, now), now)
+            closing.close(course, CourseCompletion.Closing.of(amended, CourseRecord.Outcome.COMPLETED, ofCourse, now), now)
             return@run Outcome.Finished
         }
         calendar.replan(course, now)

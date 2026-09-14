@@ -21,7 +21,8 @@ import kotlin.uuid.Uuid
 class CourseClosing @Inject constructor(
     private val courses: CourseStorageRepository,
     private val packages: PackageStorageRepository,
-    private val queue: QueueService
+    private val queue: QueueService,
+    private val reminders: com.kert0n.medapp.feature.notification.ReminderWithdrawal
 ) {
 
     /**
@@ -37,8 +38,11 @@ class CourseClosing @Inject constructor(
             val released = QueuedCommand(Uuid.random(), PackageSyncCommand.ReleaseClaim(pkg.id))
             queue.change(pkg.medKit, listOf(released), at) { true }
         }
-        // Отменённые пункты больше не напоминают о себе — но снимать будильники и гасить показанное
-        // сценарий будет после фиксации: система не откатывается вместе с базой (PLAN D8, F5).
-        return closing.cancelled.map { it.id }
+        // Отменённые пункты больше не напоминают о себе: обязательство отзывается **этой же**
+        // транзакцией, а гасит карточки и переставляет будильник владелец доставки — после
+        // фиксации, по сигналу изменившейся таблицы (PLAN D8, F5).
+        val cancelled = closing.cancelled.map { it.id }
+        reminders.withdrawAll(cancelled)
+        return cancelled
     }
 }

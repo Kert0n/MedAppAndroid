@@ -10,7 +10,12 @@ import com.kert0n.medapp.domain.pack.PackageAvailability
 import com.kert0n.medapp.domain.value.Doses
 import com.kert0n.medapp.domain.value.Quantity
 import com.kert0n.medapp.storage.intake.IntakeOutcome
+import com.kert0n.medapp.domain.notification.NotificationKey
+import com.kert0n.medapp.domain.notification.NotificationKind
+import com.kert0n.medapp.domain.notification.NotificationTarget
+import com.kert0n.medapp.domain.notification.Reminder
 import com.kert0n.medapp.storage.intake.IntakeStorageRepository
+import com.kert0n.medapp.storage.notification.ReminderStorageRepository
 import com.kert0n.medapp.storage.pack.PackageStorageRepository
 import java.time.Duration
 import java.time.Instant
@@ -29,7 +34,8 @@ import kotlin.uuid.Uuid
  */
 class CourseCalendar @Inject constructor(
     private val intakes: IntakeStorageRepository,
-    private val packages: PackageStorageRepository
+    private val packages: PackageStorageRepository,
+    private val reminders: ReminderStorageRepository
 ) {
 
     /**
@@ -45,7 +51,7 @@ class CourseCalendar @Inject constructor(
         val window = remaining.filter { it.at.isBefore(now.plus(WINDOW)) }
         if (window.isEmpty()) return 0
         val order = course.spendOrder(Doses(window.size), availabilityOf(course))
-        val planned = window.mapIndexed { index, slot ->
+        val materialised = window.mapIndexed { index, slot ->
             CourseIntake(
                 id = Uuid.random(),
                 courseId = course.id,
@@ -55,7 +61,12 @@ class CourseCalendar @Inject constructor(
                 plannedPackage = order[index]
             )
         }
-        return intakes.materialise(planned)
+        val fresh = intakes.materialise(materialised)
+        // Завёлся пункт — завелось и обещание напомнить о нём. Той же транзакцией: система не
+        // откатывается вместе с базой, а таблица откатывается (PLAN D8, F5).
+        val born = fresh.toSet()
+        reminders.raiseAll(materialised.filter { it.id in born }.map { it.reminder() })
+        return fresh.size
     }
 
     /**
@@ -68,7 +79,11 @@ class CourseCalendar @Inject constructor(
         val started = intakes.ofCourse(course.id).filterIsInstance<CourseIntake>()
             .filter { it.status == IntakeStatus.PLANNED && it.plannedAt.isBefore(now) }
             .map { it.slot }
-        return intakes.prunePlanned(course.id, remaining + started)
+        val gone = intakes.prunePlanned(course.id, remaining + started)
+        // Пункта больше нет — и напоминать о нём нечего: перестройка расписания уносит обещание
+        // вместе с пунктом, а не оставляет будильник на удалённом (PLAN D8).
+        reminders.withdraw(gone.map { NotificationKey.intake(it, NotificationKind.INTAKE_DUE) })
+        return gone.size
     }
 
     /**
@@ -99,10 +114,16 @@ class CourseCalendar @Inject constructor(
         val today = now.atZone(zone).toLocalDate()
         val overdue = intakes.ofCourse(course.id).filterIsInstance<CourseIntake>()
             .filter { it.status == IntakeStatus.PLANNED && it.slot.localDate.isBefore(today) }
-        return overdue.filter { intake ->
+        val missed = overdue.filter { intake ->
             val endOfDay = intake.slot.localDate.plusDays(1).atStartOfDay(zone).toInstant()
             intakes.record(IntakeOutcome(intake.miss(endOfDay), expected = setOf(IntakeStatus.PLANNED), recordedAt = now))
         }.map { it.id }
+        // Пропуск — повод сказать, и обязательство заводится **той же транзакцией**, что и переход:
+        // иначе непоказанное терялось бы навсегда, ведь пересчитать его из состояния нельзя —
+        // проход, назвавший пункт пропуском, был один (PLAN D8). А напоминать о нём больше нечего.
+        reminders.raiseAll(missed.map { Reminder(NotificationKey.intake(it, NotificationKind.INTAKE_MISSED), NotificationTarget.Intake(it), now) })
+        reminders.withdraw(missed.map { NotificationKey.intake(it, NotificationKind.INTAKE_DUE) })
+        return missed
     }
 
     /**
@@ -134,4 +155,8 @@ class CourseCalendar @Inject constructor(
         /** На сколько вперёд лежат плановые пункты: достраивает их `CourseUpkeep` (PLAN F4). */
         val WINDOW: Duration = Duration.ofDays(60)
     }
+
+    /** Обещание напомнить об этом пункте: срок — его плановый момент. */
+    private fun CourseIntake.reminder() =
+        Reminder(NotificationKey.intake(id, NotificationKind.INTAKE_DUE), NotificationTarget.Intake(id), plannedAt)
 }

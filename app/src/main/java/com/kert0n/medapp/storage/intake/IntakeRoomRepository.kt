@@ -55,9 +55,11 @@ class IntakeRoomRepository @Inject constructor(
     override suspend fun save(recorded: RecordedIntake) =
         intakes.upsert(recorded.intake.toStorageEntity(recorded.sync))
 
-    override suspend fun materialise(planned: List<CourseIntake>): Int =
+    override suspend fun materialise(planned: List<CourseIntake>): List<Uuid> =
         intakes.insertPlannedIfMissing(planned.map { it.toStorageEntity() })
-            .count { it != -1L }
+            .withIndex()
+            .filter { (_, rowId) -> rowId != -1L }
+            .map { (index, _) -> planned[index].id }
 
     override suspend fun plannedBefore(until: Instant): List<CourseIntake> =
         intakes.plannedBefore(until).let { rows ->
@@ -65,13 +67,14 @@ class IntakeRoomRepository @Inject constructor(
             rows.map { it.toDomain(words) as CourseIntake }
         }
 
-    override suspend fun prunePlanned(courseId: Uuid, keep: Set<ScheduledOccurrence>): Int = database.withTransaction {
+    override suspend fun prunePlanned(courseId: Uuid, keep: Set<ScheduledOccurrence>): List<Uuid> = database.withTransaction {
         // Тождество пункта — назначенные дата и время (PLAN F4), по ним и сверяется.
         val kept = keep.mapTo(HashSet()) { it.slot }
         val extra = intakes.plannedOf(courseId)
             .filter { (it.scheduledOn to it.scheduledTime) !in kept }
             .map { it.id }
-        extra.chunkedForQuery().sumOf { intakes.deletePlanned(it) }
+        extra.chunkedForQuery().forEach { intakes.deletePlanned(it) }
+        extra
     }
 
     override suspend fun record(outcome: IntakeOutcome): Boolean = database.withTransaction {

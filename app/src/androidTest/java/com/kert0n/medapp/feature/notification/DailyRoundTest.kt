@@ -78,11 +78,11 @@ class DailyRoundTest {
         val byDay = database.intakeRepository().ofCourse(id).filterIsInstance<CourseIntake>().associate { it.slot.localDate to it }
         assertEquals(IntakeStatus.MISSED, byDay.getValue(start).status)
         assertEquals(1, report.missed)
-        // Обязательства на приёмы — сегодняшний и завтрашний (36 часов), не вчерашний.
-        assertEquals(
-            setOf(byDay.getValue(start.plusDays(1)).id, byDay.getValue(start.plusDays(2)).id),
-            nextMorning.reminderStore.ofKinds(listOf(NotificationKind.INTAKE_DUE)).map { Uuid.parse(it.key.subject) }.toSet()
-        )
+        // Обещание живёт у пункта: у каждого планового своё, у вчерашнего пропущенного — снято.
+        val owed = nextMorning.reminderStore.ofKinds(listOf(NotificationKind.INTAKE_DUE))
+            .filter { it.state == com.kert0n.medapp.domain.notification.Reminder.State.DUE }
+            .map { Uuid.parse(it.key.subject) }.toSet()
+        assertEquals(byDay.filterKeys { it != start }.values.map { it.id }.toSet(), owed)
         // Сказано: пропуск, срок источника за день, сводка. Приёмы ещё впереди — их черёд не настал.
         assertEquals(setOf(NotificationKind.INTAKE_MISSED, NotificationKind.EXPIRY_SOURCE_1D, NotificationKind.DAILY_DIGEST), nextMorning.notifier.shown.map { it.kind }.toSet())
         assertEquals(3, delivered.shown)

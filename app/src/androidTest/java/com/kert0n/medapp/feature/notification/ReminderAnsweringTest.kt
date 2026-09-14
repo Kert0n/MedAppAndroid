@@ -195,7 +195,7 @@ class ReminderAnsweringTest {
         }
         val cancellation = com.kert0n.medapp.feature.course.CourseCancellation(
             database.courseRepository(), database.intakeRepository(), scenarios.courseCalendar, scenarios.courseClosing,
-            scenarios.reminderWithdrawal, failingAfterWork, Clock.fixed(now, ZoneOffset.UTC)
+            failingAfterWork, Clock.fixed(now, ZoneOffset.UTC)
         )
 
         val failure = runCatching { cancellation.cancel(id) }.exceptionOrNull()

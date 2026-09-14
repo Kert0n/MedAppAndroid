@@ -89,7 +89,15 @@ class DailyWorkerTest {
         val statuses = database.intakeRepository().ofCourse(draft.id).filterIsInstance<CourseIntake>().associate { it.slot.localDate to it.status }
         assertEquals(IntakeStatus.MISSED, statuses[LocalDate.of(2027, 3, 10)])
         assertEquals(IntakeStatus.PLANNED, statuses[LocalDate.of(2027, 3, 11)])
-        assertEquals(2, today.reminderStore.ofKinds(listOf(com.kert0n.medapp.domain.notification.NotificationKind.INTAKE_DUE)).size)
+        // Обещание у каждого планового пункта, и ни одного у вчерашнего пропущенного.
+        val stillPlanned = database.intakeRepository().ofCourse(draft.id).filterIsInstance<CourseIntake>()
+            .filter { it.status == IntakeStatus.PLANNED }.map { it.id }.toSet()
+        assertEquals(
+            stillPlanned,
+            today.reminderStore.ofKinds(listOf(com.kert0n.medapp.domain.notification.NotificationKind.INTAKE_DUE))
+                .filter { it.state == com.kert0n.medapp.domain.notification.Reminder.State.DUE }
+                .map { kotlin.uuid.Uuid.parse(it.key.subject) }.toSet()
+        )
         today.reminderOutbox.pass()
         assertTrue(today.notifier.shown.any { it.kind == com.kert0n.medapp.domain.notification.NotificationKind.INTAKE_MISSED })
     }

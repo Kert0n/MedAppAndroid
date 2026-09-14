@@ -33,11 +33,7 @@ class IntakeDeclining @Inject constructor(
     private val clock: Clock
 ) {
 
-    suspend fun decline(intakeId: Uuid, at: Instant): Outcome = write(intakeId, at)
-        // После фиксации: ответ дан — напоминать больше нечего (PLAN D8, F5).
-        .also { if (it == Outcome.DECLINED) reminders.withdraw(intakeId) }
-
-    private suspend fun write(intakeId: Uuid, at: Instant): Outcome = transactions.run {
+    suspend fun decline(intakeId: Uuid, at: Instant): Outcome = transactions.run {
         val intake = intakes.find(intakeId) as? CourseIntake ?: return@run Outcome.GONE
         val record = courses.findRecord(intake.courseId) ?: return@run Outcome.GONE
         if (!record.isOpen) return@run Outcome.EPISODE_CLOSED
@@ -48,6 +44,9 @@ class IntakeDeclining @Inject constructor(
         // человека пропал бы. Остальное прошлое — следом, до достройки окна (F4).
         val declined = intakes.record(IntakeOutcome(intake.miss(at), expected = setOf(IntakeStatus.PLANNED), recordedAt = now))
         if (!declined) return@run Outcome.ALREADY_ANSWERED
+        // Ответ дан — напоминать больше нечего. Той же транзакцией: откат уносит отзыв вместе с
+        // ответом, а гасит карточку владелец доставки уже после коммита (PLAN D8, F5).
+        reminders.withdraw(intakeId)
         calendar.missOverdue(course, now)
         // Доза уехала вперёд: окно календаря достраивается на один пункт (F4).
         calendar.extend(course, now)

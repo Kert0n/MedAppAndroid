@@ -94,10 +94,12 @@ class CoverageNoticeTest {
         // Событие говорится один раз: повторная сверка заводит обязательство, которого ещё нет,
         // а сказанное не трогает.
         scenarios.reminderStore.raiseAll(planning.coverageDue(now))
-        assertEquals(1, scenarios.reminderOutbox.pass().shown)
+        scenarios.reminderOutbox.pass()
         scenarios.reminderStore.raiseAll(planning.coverageDue(now))
-        assertEquals(0, scenarios.reminderOutbox.pass().shown)
-        assertEquals(id, (scenarios.notifier.shown.single().target as com.kert0n.medapp.domain.notification.NotificationTarget.CourseSources).courseId)
+        scenarios.reminderOutbox.pass()
+        val short = scenarios.notifier.shown.filter { it.kind == NotificationKind.COVERAGE_SHORT }
+        assertEquals(1, short.size)
+        assertEquals(id, (short.single().target as com.kert0n.medapp.domain.notification.NotificationTarget.CourseSources).courseId)
     }
 
     /** Порог — из настроек: два дня вместо трёх. */

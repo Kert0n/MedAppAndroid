@@ -11,7 +11,6 @@ import com.kert0n.medapp.queue.Transactions
 import com.kert0n.medapp.storage.course.CourseReallocation
 import com.kert0n.medapp.storage.course.CourseStorageRepository
 import com.kert0n.medapp.storage.intake.IntakeStorageRepository
-import com.kert0n.medapp.feature.notification.ReminderWithdrawal
 import java.time.Clock
 import javax.inject.Inject
 import kotlin.uuid.Uuid
@@ -32,20 +31,11 @@ class CourseOffPlanCounting @Inject constructor(
     private val calendar: CourseCalendar,
     private val clamping: CourseClamping,
     private val closing: CourseClosing,
-    private val reminders: ReminderWithdrawal,
     private val transactions: Transactions,
     private val clock: Clock
 ) {
 
-    suspend fun set(courseId: Uuid, expected: Revision, total: Doses): Outcome {
-        val cancelled = mutableListOf<Uuid>()
-        val outcome = transactions.run { set(courseId, expected, total, cancelled) }
-        // После фиксации: пункты законченного лечения больше не напоминают о себе (PLAN D8).
-        reminders.withdrawAll(cancelled)
-        return outcome
-    }
-
-    private suspend fun set(courseId: Uuid, expected: Revision, total: Doses, cancelled: MutableList<Uuid>): Outcome = transactions.run {
+    suspend fun set(courseId: Uuid, expected: Revision, total: Doses): Outcome = transactions.run {
         val record = courses.findRecord(courseId) ?: return@run Outcome.Gone
         if (!record.isOpen) return@run Outcome.AlreadyFinished
         val before = courses.openPlan(courseId)
@@ -62,7 +52,7 @@ class CourseOffPlanCounting @Inject constructor(
         val completion = CourseCompletion(course, progress)
         if (completion.reached) {
             val amended = checkNotNull(courses.findRecord(courseId)) { "запись эпизода прочитана этой же транзакцией" }
-            cancelled += closing.close(course, CourseCompletion.Closing.of(amended, CourseRecord.Outcome.COMPLETED, ofCourse, now), now)
+            closing.close(course, CourseCompletion.Closing.of(amended, CourseRecord.Outcome.COMPLETED, ofCourse, now), now)
             return@run Outcome.Finished
         }
         // Доз впереди стало меньше — лишние плановые пункты не факты и уходят.
