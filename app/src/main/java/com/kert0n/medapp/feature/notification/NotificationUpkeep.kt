@@ -1,73 +1,67 @@
 package com.kert0n.medapp.feature.notification
 
 import com.kert0n.medapp.di.ApplicationScope
+import com.kert0n.medapp.queue.OutboxLoop
 import com.kert0n.medapp.storage.notification.ReminderStorageRepository
 import java.time.Clock
-import java.util.concurrent.atomic.AtomicBoolean
+import java.time.Duration
 import javax.inject.Inject
 import javax.inject.Singleton
-import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
-import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
-import kotlinx.coroutines.flow.asStateFlow
-import kotlinx.coroutines.flow.update
-import kotlinx.coroutines.launch
+import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.stateIn
 
 /**
  * **Когда сверять** — и только это (PLAN D8). Обещанное следует из состояния коробок, лечений,
  * пунктов и очереди; изменилось состояние — обещанное надо сверить, кто бы его ни изменил:
  * человек правкой срока, снимок чужим расходом, работник закрытием операции. Повод приходит
  * сигналом [ReminderStorageRepository.groundsChanged] после коммита, поэтому сценарий после своей
- * транзакции ничего не зовёт — тот же механизм, что у [ReminderOutbox] и `QueueOutbox` (F5).
+ * транзакции ничего не зовёт — цикл тот же, что у [ReminderOutbox] и `QueueOutbox` ([OutboxLoop]):
+ * сигналы сворачиваются, сбой сверки записан и повторяется по сроку, а не ждёт чужого сигнала.
  *
- * Сигналы сворачиваются: сколько бы таблиц ни изменилось одной укладкой, сверка одна. Начального
- * прохода нет — вход в приложение зовёт [DailyRound], и он же остаётся поводом **времени**: смена
- * дня таблиц не меняет. Что должно быть обещано, решает [NotificationReconciliation]; показывать и
- * будить умеет только [ReminderOutbox].
+ * Начального прохода нет — вход в приложение зовёт [DailyRound], и он же остаётся поводом
+ * **времени**: смена дня таблиц не меняет. Что должно быть обещано, решает
+ * [NotificationReconciliation]; показывать и будить умеет только [ReminderOutbox].
  */
 @Singleton
 class NotificationUpkeep @Inject constructor(
-    private val reminders: ReminderStorageRepository,
+    reminders: ReminderStorageRepository,
     private val reconciliation: NotificationReconciliation,
     private val clock: Clock,
-    @ApplicationScope private val scope: CoroutineScope
+    @ApplicationScope scope: CoroutineScope
 ) {
 
-    private val started = AtomicBoolean(false)
+    private val lastReport = MutableStateFlow<NotificationReconciliation.Report?>(null)
 
-    /** Просьбы о сверке сворачиваются: сколько бы сигналов ни пришло, следующая сверка одна. */
-    private val wake = Channel<Unit>(Channel.CONFLATED)
-
-    private val _state = MutableStateFlow(State())
+    private val loop = OutboxLoop(reminders.groundsChanged(), RETRY_AFTER_FAILURE, clock, scope, initialPass = false) {
+        lastReport.value = reconciliation.reconcile(clock.instant(), clock.zone)
+        null
+    }
 
     /** Сколько сверок было и чем кончилась последняя — для экрана состояния (PLAN H3 №28). */
-    val state: StateFlow<State> = _state.asStateFlow()
+    val state: StateFlow<State> = combine(loop.state, lastReport) { loop, report ->
+        State(sweeps = loop.passes, lastReport = report, lastFailure = loop.lastFailure, nextRunAt = loop.nextRunAt)
+    }.stateIn(scope, SharingStarted.Eagerly, State())
+
+    /** Наблюдатель оснований встал — для проверок, которые ждут именно сигнала. */
+    val ready: StateFlow<Boolean> get() = loop.ready
 
     /** Один раз на процесс: повторный вызов ничего не делает. */
-    fun start() {
-        if (!started.compareAndSet(false, true)) return
-        scope.launch { reminders.groundsChanged().collect { wake.trySend(Unit) } }
-        scope.launch { for (signal in wake) sweep() }
-    }
+    fun start() = loop.start()
 
-    private suspend fun sweep() {
-        try {
-            val report = reconciliation.reconcile(clock.instant(), clock.zone)
-            _state.update { it.copy(sweeps = it.sweeps + 1, lastReport = report, lastFailure = null) }
-        } catch (cancelled: CancellationException) {
-            throw cancelled
-        } catch (failure: Exception) {
-            // Сбой сверки не роняет процесс: он записан, а следующий сигнал или проход дня повторит.
-            _state.update { it.copy(sweeps = it.sweeps + 1, lastFailure = failure.toString()) }
-        }
-    }
-
-    /** Сколько сверок по сигналу было, чем кончилась последняя. */
+    /** Сколько сверок по сигналу было, чем кончилась последняя и когда повтор после сбоя. */
     data class State(
         val sweeps: Int = 0,
         val lastReport: NotificationReconciliation.Report? = null,
-        val lastFailure: String? = null
+        val lastFailure: String? = null,
+        val nextRunAt: java.time.Instant? = null
     )
+
+    companion object {
+        /** Сбой сверки — тоже срок: не позже этого она повторяется сама (довод `QueueOutbox`). */
+        val RETRY_AFTER_FAILURE: Duration = Duration.ofMinutes(1)
+    }
 }

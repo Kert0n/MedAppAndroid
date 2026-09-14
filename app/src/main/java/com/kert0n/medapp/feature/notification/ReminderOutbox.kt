@@ -10,21 +10,19 @@ import com.kert0n.medapp.domain.notification.Reminder
 import com.kert0n.medapp.domain.notification.NotificationKey
 import com.kert0n.medapp.domain.notification.Notifier
 import com.kert0n.medapp.domain.notification.ReminderAlarms
+import com.kert0n.medapp.queue.OutboxLoop
 import com.kert0n.medapp.storage.notification.ReminderStorageRepository
+import kotlinx.coroutines.flow.update
 import java.time.Clock
 import java.time.Duration
 import java.time.Instant
-import java.util.concurrent.atomic.AtomicBoolean
 import javax.inject.Inject
 import javax.inject.Singleton
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
-import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
-import kotlinx.coroutines.flow.update
-import kotlinx.coroutines.launch
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 
@@ -50,45 +48,29 @@ class ReminderOutbox @Inject constructor(
     @ApplicationScope private val scope: CoroutineScope
 ) {
 
-    private val started = AtomicBoolean(false)
-
     /** Проход один за раз: цикл и приёмник будильника не показывают одно и то же дважды. */
     private val passes = Mutex()
-
-    /** Просьбы о проходе сворачиваются: сколько бы сигналов ни пришло, следующий проход один. */
-    private val wake = Channel<Unit>(Channel.CONFLATED)
 
     private val _state = MutableStateFlow(State())
 
     /** Что происходит с доставкой — для экрана состояния (PLAN H3 №28). */
     val state: StateFlow<State> = _state.asStateFlow()
 
+    /**
+     * Цикл владельца (PLAN C1 «Цикл владельца — один»): сигнал таблицы после коммита → проход →
+     * срок следующего. Срок — ближайшая постановка: в процессе таймер приходит сам, а из мёртвого
+     * процесса будит будильник, который проход ставит тот же.
+     */
+    private val loop = OutboxLoop(reminders.changes(), RETRY_AFTER_FAILURE, clock, scope) { pass().nextAt }
+
+    /** Наблюдатель таблицы встал — для проверок, которые ждут именно сигнала. */
+    val ready: StateFlow<Boolean> get() = loop.ready
+
     /** Один раз на процесс: повторный вызов ничего не делает. */
-    fun start() {
-        if (!started.compareAndSet(false, true)) return
-        scope.launch { reminders.changes().collect { wake.trySend(Unit) } }
-        scope.launch { run() }
-    }
+    fun start() = loop.start()
 
     /** Повод без ожидания: сработал будильник, вошли в приложение, загрузилось устройство. */
-    fun runNow() {
-        if (wake.trySend(Unit).isSuccess) return
-        scope.launch { attempt { pass() } }
-    }
-
-    private suspend fun run() {
-        wake.trySend(Unit)
-        for (signal in wake) {
-            try {
-                pass()
-            } catch (cancelled: CancellationException) {
-                throw cancelled
-            } catch (failure: Exception) {
-                // Сбой прохода не роняет процесс: он записан в состоянии, и следующий повод повторит.
-                _state.update { it.copy(lastFailure = failure.toString()) }
-            }
-        }
-    }
+    fun runNow() = loop.runNow()
 
     /**
      * Один проход: погасить отозванное, сказать наступившее, прибрать давнее и переставить
@@ -96,7 +78,8 @@ class ReminderOutbox @Inject constructor(
      * карточке был свежим, насколько успели (PLAN D8, E4).
      *
      * Под замком: два входа — цикл и приёмник будильника — не должны идти одновременно, иначе один
-     * покажет то, что другой уже пометил сказанным.
+     * покажет то, что другой уже пометил сказанным. Сбой прохода не бросает наружу: он записан,
+     * а возврат назначен — будильником, чтобы пережить смерть процесса, и сроком в отчёте.
      */
     suspend fun pass(): Report = passes.withLock {
         try {
@@ -116,10 +99,11 @@ class ReminderOutbox @Inject constructor(
 
     private suspend fun attempt(): Report {
         var dismissed = dismissWithdrawn()
-        val now = clock.instant()
         // Ожидание свежести — окно до двух секунд, и прочитанное до него устаревает: человек
-        // успевает отложить, лечение — отмениться. Показывается то, что наступило **после** него.
-        if (due(now).any { it.kind == NotificationKind.INTAKE_DUE }) freshness.refreshBriefly(REFRESH_WAIT)
+        // успевает отложить, лечение — отмениться, а срок — наступить. Показывается то, что
+        // наступило **после** него, и «сейчас» берётся после него же.
+        if (due(clock.instant()).any { it.kind == NotificationKind.INTAKE_DUE }) freshness.refreshBriefly(REFRESH_WAIT)
+        val now = clock.instant()
         val due = due(now)
 
         var shown = 0

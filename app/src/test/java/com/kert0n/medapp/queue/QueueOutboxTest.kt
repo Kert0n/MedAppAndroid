@@ -25,6 +25,7 @@ import java.time.ZoneOffset
 import kotlin.uuid.Uuid
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.onStart
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.test.advanceTimeBy
 import kotlinx.coroutines.test.runCurrent
@@ -55,7 +56,8 @@ class QueueOutboxTest {
         val operations = mutableMapOf<Uuid, SyncOperation>()
         val settled = mutableListOf<Settlement>()
 
-        override fun changes(): Flow<Unit> = signals
+        // Первое значение — «наблюдатель встал», как у настоящего хранилища (OutboxLoop).
+        override fun changes(): Flow<Unit> = signals.onStart { emit(Unit) }
         override suspend fun ready(now: Instant): List<StoredSyncOperation> {
             reads++
             if (broken) throw IllegalStateException("база недоступна")

@@ -22,10 +22,10 @@ class ReminderRoomRepository @Inject constructor(
 ) : ReminderStorageRepository {
 
     override fun changes(): Flow<Unit> =
-        database.invalidationTracker.createFlow("reminders", emitInitialState = false).map { }
+        database.invalidationTracker.createFlow("reminders", emitInitialState = true).map { }
 
     override fun groundsChanged(): Flow<Unit> =
-        database.invalidationTracker.createFlow(*GROUNDS, emitInitialState = false).map { }
+        database.invalidationTracker.createFlow(*GROUNDS, emitInitialState = true).map { }
 
     override suspend fun find(key: NotificationKey): Reminder? = reminders.find(key.stored)?.toDomain()
 

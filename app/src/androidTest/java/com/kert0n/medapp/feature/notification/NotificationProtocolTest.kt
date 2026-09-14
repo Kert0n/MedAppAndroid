@@ -239,6 +239,57 @@ class NotificationProtocolTest {
     }
 
     /**
+     * **Наступившее за время ожидания свежести показывается тем же проходом.** «Сейчас» берётся
+     * после ожидания: пока ждали сеть, срок пункта наступил, и он должен уйти в шторку сейчас, а не
+     * ждать следующего повода — иначе первый проход процесса, у которого будильника ещё нет,
+     * оставил бы его висеть.
+     */
+    @Test
+    fun whatBecomesDueDuringTheRefreshIsShownInTheSamePass() = runBlocking {
+        val clock = com.kert0n.medapp.fixture.TickingClock(now)
+        val outbox = ReminderOutbox(
+            scenarios.reminderStore, scenarios.notifier, scenarios.reminders, scenarios.freshness, scenarios.transactions,
+            clock, CoroutineScope(SupervisorJob() + Dispatchers.IO)
+        )
+        val ripe = intake(now)                       // уже наступил — ради него и ждут свежесть
+        val ripening = intake(now.plusSeconds(2))    // наступит, пока ждут
+        scenarios.reminderStore.saveAll(listOf(ripe, ripening))
+        scenarios.freshness.meanwhile = { clock.now = now.plusSeconds(3) }
+
+        outbox.pass()
+
+        assertTrue("наступившее за время ожидания не показано", scenarios.notifier.shown.any { it.key == ripening.key })
+    }
+
+    /**
+     * **Сбой сверки повторяется сам.** Сверка живёт от сигнала оснований; если она упала, а
+     * оснований больше никто не трогает, обещанное осталось бы несверенным до прохода дня. Цикл
+     * владельца записывает сбой и назначает срок повтора.
+     */
+    @Test
+    fun aFailedSweepSchedulesItsOwnRetry() = runBlocking {
+        val failing = object : com.kert0n.medapp.domain.notification.NotificationSettingsSource {
+            var failures = 0
+            override suspend fun current(): com.kert0n.medapp.domain.notification.NotificationSettings {
+                failures++
+                error("настройки не прочитались")
+            }
+        }
+        val reconciliation = NotificationReconciliation(
+            database.intakeRepository(), database.packageRepository(), database.courseRepository(), scenarios.reminderStore,
+            database.queueRepository(), scenarios.reminderPromising, scenarios.reminderWithdrawal, failing, scenarios.transactions
+        )
+        val upkeep = NotificationUpkeep(scenarios.reminderStore, reconciliation, java.time.Clock.fixed(now, ZoneOffset.UTC), CoroutineScope(SupervisorJob() + Dispatchers.IO))
+        upkeep.start()
+        mechanisms.await("наблюдатель оснований встал") { upkeep.ready.value }
+
+        database.packageRepository().add(pack(form = TABLET_FORM, quantity = tablets("20")))
+
+        mechanisms.await("сверка сорвалась") { upkeep.state.value.lastFailure != null }
+        assertEquals("повтор после сбоя не назначен", now.plus(NotificationUpkeep.RETRY_AFTER_FAILURE), upkeep.state.value.nextRunAt)
+    }
+
+    /**
      * **Повторная сверка молчит.** Сверку зовёт сигнал таблиц-оснований; если бы сверка без
      * изменений что-то писала, сигнал `reminders` будил бы владельца доставки, а тот — никого, но
      * каждая укладка снимка давала бы лишний проход. Вторая сверка подряд не пишет ни строки.

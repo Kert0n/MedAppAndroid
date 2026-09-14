@@ -57,6 +57,7 @@ import kotlin.uuid.Uuid
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.flow.collectIndexed
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.runBlocking
@@ -552,11 +553,14 @@ class QueueRoomStorageTest {
     @Test
     fun theChangeSignalArrivesAfterTheOuterTransactionCommits() = runBlocking {
         val seen = CompletableDeferred<List<Uuid>>()
+        val subscribed = CompletableDeferred<Unit>()
         val watcher = launch(Dispatchers.IO) {
-            storage.changes().first()
-            seen.complete(storage.ready(at.plusSeconds(1)).map { it.id })
+            // Первое значение — «наблюдатель встал», второе — изменение (OutboxLoop).
+            storage.changes().collectIndexed { index, _ ->
+                if (index == 0) subscribed.complete(Unit) else if (!seen.isCompleted) seen.complete(storage.ready(at.plusSeconds(1)).map { it.id })
+            }
         }
-        delay(300) // подписка на таблицу успела встать
+        withTimeout(5_000) { subscribed.await() }
 
         database.transactions().run {
             storage.enqueue(QueuedCommand(operation, PackageSyncCommand.Consume(PACK, dose("3"), INTAKE)), HOME_KIT, at)

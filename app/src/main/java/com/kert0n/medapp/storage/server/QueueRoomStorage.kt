@@ -68,9 +68,9 @@ class QueueRoomStorage @Inject constructor(
     private val following: Provider<PackageFollowing>
 ) : QueueStorage {
 
-    /** Room сообщает об изменении таблицы после коммита — то, что outbox и должен услышать. */
+    /** Room сообщает об изменении таблицы после коммита — то, что outbox и должен услышать; первое значение — наблюдатель встал. */
     override fun changes(): Flow<Unit> =
-        database.invalidationTracker.createFlow("sync_operations", emitInitialState = false).map { }
+        database.invalidationTracker.createFlow("sync_operations", emitInitialState = true).map { }
 
     override suspend fun enqueue(queued: QueuedCommand, shelf: Uuid, at: Instant): SyncOperation =
         queue.enqueue(queued.id, queued.command, at, queued.groupId, queued.dependsOn, medKitId = shelf)
