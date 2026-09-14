@@ -4,7 +4,7 @@ import java.time.LocalTime
 
 /**
  * Что человек решил об уведомлениях (PLAN D8). Умолчания — здесь; где они хранятся и как
- * меняются — забота платформы за портом [NotificationSettingsSource] (B18).
+ * меняются — забота платформы за портом [NotificationSettingsSource].
  */
 data class NotificationSettings(
     val intakeRemindersEnabled: Boolean = true,
