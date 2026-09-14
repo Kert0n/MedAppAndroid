@@ -5,9 +5,18 @@ import com.kert0n.medapp.domain.medkit.MedKit
 import com.kert0n.medapp.domain.medkit.MedKitContents
 import com.kert0n.medapp.domain.medkit.MedKitProjection
 import com.kert0n.medapp.domain.medkit.MedKitStatus
+import com.kert0n.medapp.queue.Delivery
+import com.kert0n.medapp.queue.QueueStorage
+import com.kert0n.medapp.queue.StoredSyncOperation
+import com.kert0n.medapp.queue.SyncOperationStatus
+import com.kert0n.medapp.queue.settlement
+import com.kert0n.medapp.storage.course.CourseDao
 import com.kert0n.medapp.storage.database.MedAppDatabase
 import com.kert0n.medapp.storage.database.observing
+import com.kert0n.medapp.storage.pack.PackageDao
 import com.kert0n.medapp.storage.pack.toStorageEntity
+import com.kert0n.medapp.storage.server.SyncOperationDao
+import com.kert0n.medapp.storage.value.VocabularyDao
 import java.time.Instant
 import java.time.LocalDate
 import javax.inject.Inject
@@ -17,8 +26,32 @@ import kotlinx.coroutines.flow.map
 
 class MedKitRoomRepository @Inject constructor(
     private val database: MedAppDatabase,
-    private val medKits: MedKitDao
+    private val medKits: MedKitDao,
+    private val packages: PackageDao,
+    private val courses: CourseDao,
+    private val queue: SyncOperationDao,
+    private val queueStorage: QueueStorage,
+    private val vocabulary: VocabularyDao
 ) : MedKitStorageRepository {
+
+    override suspend fun abandonServer(at: Instant): Int = database.withTransaction {
+        val words = vocabulary.snapshot()
+        val gone = medKits.all().filter { it.publication == MedKit.Publication.PUBLISHED }
+        for (shelf in gone) {
+            // Сначала очередь: закрытие командой применяет свои эффекты — унесённая домой коробка
+            // остаётся у человека, — и только потом полка уходит вместе с тем, что на ней осталось.
+            for (row in queue.unclosedRowsOfMedKit(shelf.id)) {
+                when (val stored = row.toDomain(words)) {
+                    is StoredSyncOperation.Readable ->
+                        queueStorage.settle(stored.id, Delivery.AccessLost.settlement(stored.operation.command), at)
+                    is StoredSyncOperation.Unreadable ->
+                        queue.settle(stored.id, SyncOperationStatus.ACCESS_LOST, "учётка заменена", at)
+                }
+            }
+            medKits.loseAccess(shelf.id, packages, courses, words, at)
+        }
+        gone.size
+    }
 
     /**
      * Полки и их содержимое — одним снимком: список, где свежие полки стоят со старым счётом

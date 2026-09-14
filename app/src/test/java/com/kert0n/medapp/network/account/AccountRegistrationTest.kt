@@ -45,6 +45,14 @@ class AccountRegistrationTest {
             (account as? StoredAccount.Pending)?.let { account = StoredAccount.Present(it.credentials) }
             return CredentialsSaved.SAVED
         }
+
+        var forgotten = 0
+        override suspend fun forget(): CredentialsSaved {
+            if (!writable) return CredentialsSaved.LOST
+            forgotten++
+            account = StoredAccount.Absent
+            return CredentialsSaved.SAVED
+        }
     }
 
     private val requests = mutableListOf<String>()
@@ -113,6 +121,59 @@ class AccountRegistrationTest {
         assertEquals(StoredAccount.Present(kept), stored.account)
         assertTrue("повтор той же учёткой", bodies.single().contains("$login"))
         assertEquals(listOf("POST /v1/auth/register", "POST /v1/auth/token"), requests)
+    }
+
+    /** Решение человека о нечитаемой учётке: сохранённое стирается, и знакомство идёт заново новыми данными. */
+    @Test
+    fun replacingTheUnreadableForgetsItAndRegistersAnew() = runTest {
+        val stored = Memory(StoredAccount.Unreadable)
+
+        assertEquals(AccountRegistration.Outcome.Ready, registration(stored).replaceUnreadable())
+
+        assertEquals(1, stored.forgotten)
+        val account = (stored.account as StoredAccount.Present).credentials
+        assertTrue("новые данные уехали на сервер", bodies.single().contains("${account.login}"))
+        assertEquals(listOf("POST /v1/auth/register"), requests)
+    }
+
+    /**
+     * Повтор решения после потерянного ответа: придуманное уже на устройстве, стирать его нельзя —
+     * сервер, возможно, его знает, — и повтор идёт **теми же** данными, а не третьими.
+     */
+    @Test
+    fun repeatingTheDecisionAfterALostAnswerKeepsTheInventedCredentials() = runTest {
+        val kept = AccountCredentials(login, password)
+        val stored = Memory(StoredAccount.Pending(kept))
+
+        val outcome = registration(stored, register = HttpStatusCode.Conflict).replaceUnreadable()
+
+        assertEquals(AccountRegistration.Outcome.Ready, outcome)
+        assertEquals(0, stored.forgotten)
+        assertEquals(StoredAccount.Present(kept), stored.account)
+        assertTrue("повтор той же учёткой", bodies.single().contains("$login"))
+    }
+
+    /** Читаемую учётку решение не трогает: ни стирания, ни запроса. */
+    @Test
+    fun aReadableAccountIsNotReplaced() = runTest {
+        val kept = AccountCredentials(login, password)
+        val stored = Memory(StoredAccount.Present(kept))
+
+        assertEquals(AccountRegistration.Outcome.Ready, registration(stored).replaceUnreadable())
+
+        assertEquals(0, stored.forgotten)
+        assertEquals(StoredAccount.Present(kept), stored.account)
+        assertEquals(emptyList<String>(), requests)
+    }
+
+    /** Стереть не удалось — на устройстве по-прежнему нечитаемое, и завести поверх него нечего. */
+    @Test
+    fun anUnreadableThatCannotBeForgottenIsNotStored() = runTest {
+        val stored = Memory(StoredAccount.Unreadable, writable = false)
+
+        assertEquals(AccountRegistration.Outcome.NotStored, registration(stored).replaceUnreadable())
+
+        assertEquals(emptyList<String>(), requests)
     }
 
     /** Логин занят чужой учёткой: пропуск не выдан, и новых данных поверх не придумывают. */

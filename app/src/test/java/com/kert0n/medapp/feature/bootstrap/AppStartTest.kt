@@ -27,6 +27,7 @@ class AppStartTest {
             asked++
             return readiness
         }
+        override suspend fun replaceUnreadable(): AccountReadiness = error("начало работы решений не принимает")
     }
 
     private class Library(

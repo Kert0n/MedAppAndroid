@@ -326,6 +326,7 @@ class MedAppApiTest {
                 StoredAccount.Present(AccountCredentials(kit, "k"))
             override suspend fun save(credentials: AccountCredentials) = CredentialsSaved.SAVED
             override suspend fun confirm() = CredentialsSaved.SAVED
+            override suspend fun forget() = CredentialsSaved.SAVED
         }
         val result = api(tokens = AccessTokens(stored)) { line ->
             if (line == "POST /v1/auth/token") HttpStatusCode.ServiceUnavailable to "" else routes[line]

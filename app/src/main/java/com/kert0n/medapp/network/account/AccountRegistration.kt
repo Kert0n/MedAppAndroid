@@ -16,8 +16,8 @@ import kotlinx.coroutines.sync.withLock
  * сервер отвечает «такая уже есть». Своя ли это учётка, показывает пропуск по тем же данным.
  *
  * Нечитаемую учётку поверх не перерегистрируют — это решение человека, потому что брони на старой
- * уже не снять. Регистрация одна на всех вызывающих: два экрана, спросившие одновременно, не
- * заведут двух учёток.
+ * уже не снять; приняв его, [replaceUnreadable] стирает нечитаемое и знакомится заново. Регистрация
+ * одна на всех вызывающих: два экрана, спросившие одновременно, не заведут двух учёток.
  */
 @Singleton
 class AccountRegistration @Inject constructor(
@@ -46,7 +46,22 @@ class AccountRegistration @Inject constructor(
 
     private val mutex = Mutex()
 
-    suspend fun ensure(): Outcome = mutex.withLock {
+    suspend fun ensure(): Outcome = mutex.withLock { known() }
+
+    /**
+     * Человек решил начать с новой учёткой (PLAN G2). Стирается только **нечитаемая**: у придуманной
+     * и не подтверждённой сервер, возможно, уже есть, и повтор идёт теми же данными; читаемую не
+     * трогают вовсе. Не удалось стереть — на устройстве по-прежнему нечитаемое, и завести поверх
+     * него нечего.
+     */
+    suspend fun replaceUnreadable(): Outcome = mutex.withLock {
+        if (credentials.read() == StoredAccount.Unreadable && credentials.forget() == CredentialsSaved.LOST) {
+            return@withLock Outcome.NotStored
+        }
+        known()
+    }
+
+    private suspend fun known(): Outcome =
         when (val stored = credentials.read()) {
             is StoredAccount.Present -> Outcome.Ready
             StoredAccount.Unreadable -> Outcome.Unreadable
@@ -60,7 +75,6 @@ class AccountRegistration @Inject constructor(
                 }
             }
         }
-    }
 
     private suspend fun register(account: AccountCredentials): Outcome =
         when (val registered = api.register(account, registrationToken)) {

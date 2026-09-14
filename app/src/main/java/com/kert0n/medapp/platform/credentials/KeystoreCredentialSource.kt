@@ -5,12 +5,14 @@ import androidx.datastore.preferences.core.Preferences
 import androidx.datastore.preferences.core.booleanPreferencesKey
 import androidx.datastore.preferences.core.edit
 import androidx.datastore.preferences.core.stringPreferencesKey
+import com.kert0n.medapp.di.CredentialsFile
 import com.kert0n.medapp.di.CredentialsStore
 import com.kert0n.medapp.di.IoDispatcher
 import com.kert0n.medapp.network.account.AccountCredentials
 import com.kert0n.medapp.network.account.CredentialSource
 import com.kert0n.medapp.network.account.CredentialsSaved
 import com.kert0n.medapp.network.account.StoredAccount
+import java.io.File
 import java.io.IOException
 import java.security.GeneralSecurityException
 import java.security.ProviderException
@@ -33,9 +35,12 @@ import kotlinx.coroutines.withContext
  * сброс хранилища не должен выглядеть приглашением зарегистрироваться заново. Повреждённый файл
  * DataStore попадает в тот же случай, и обработчика, который молча заменил бы его пустым, здесь
  * нет: пустой файл — это «учётки нет», то есть приглашение завести вторую поверх локальных данных.
+ * Стирает сохранённое только [forget] — по решению человека, и повреждённый файл он стирает
+ * целиком: править его нечем.
  */
 class KeystoreCredentialSource @Inject constructor(
     @CredentialsStore private val store: DataStore<Preferences>,
+    @CredentialsFile private val file: File,
     private val key: KeystoreKey,
     @IoDispatcher private val io: CoroutineDispatcher
 ) : CredentialSource {
@@ -91,6 +96,16 @@ class KeystoreCredentialSource @Inject constructor(
             CredentialsSaved.SAVED
         } catch (_: IOException) {
             CredentialsSaved.LOST
+        }
+    }
+
+    override suspend fun forget(): CredentialsSaved = withContext(io) {
+        try {
+            store.edit { it.clear() }
+            CredentialsSaved.SAVED
+        } catch (_: IOException) {
+            // Файл не читается — и правка поверх него невозможна: он стирается целиком.
+            if (!file.exists() || file.delete()) CredentialsSaved.SAVED else CredentialsSaved.LOST
         }
     }
 
