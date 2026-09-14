@@ -140,7 +140,7 @@ class Scenarios(
     private val transactions = database.transactions()
     val reminderStore = com.kert0n.medapp.storage.notification.ReminderRoomRepository(database, database.reminders())
     val reminderWithdrawal = com.kert0n.medapp.feature.notification.ReminderWithdrawal(reminderStore, transactions)
-    val reminderPromising = com.kert0n.medapp.feature.notification.ReminderPromising(reminderStore, transactions)
+    val reminderPromising = com.kert0n.medapp.feature.notification.ReminderPromising(reminderStore, notificationSettings, transactions)
     private val packages = database.packageRepository()
     private val medKits = database.medKitRepository()
     private val courses = database.courseRepository()

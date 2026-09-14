@@ -116,6 +116,20 @@ class IntakeReminderTest {
         assertEquals(emptyList<Any>(), notifier.shown)
     }
 
+    /**
+     * Выключенные напоминания не заводятся вовсе — и календарём тоже: пункт нового курса не должен
+     * напоминать до ближайшей сверки. Красная проверка: снять проверку настройки в
+     * `ReminderPromising` — обязательства появились бы, и до сверки шторка их показала бы.
+     */
+    @Test
+    fun disabledRemindersAreNotPromisedByTheCalendarEither() = runTest {
+        scenarios.notificationSettings.settings = NotificationSettings(intakeRemindersEnabled = false)
+
+        treated()
+
+        assertEquals(emptyList<Reminder>(), store.ofKinds(listOf(NotificationKind.INTAKE_DUE)))
+    }
+
     /** Выключенные напоминания снимают и уже обещанное: человек попросил молчать (контракт B18). */
     @Test
     fun disabledRemindersWithdrawWhatWasAlreadyOwed() = runTest {

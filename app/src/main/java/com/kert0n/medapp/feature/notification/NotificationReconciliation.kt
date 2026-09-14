@@ -28,7 +28,9 @@ import kotlin.uuid.Uuid
  * Сверяется то, что следует из **состояния**: сроки годности, предупреждения о нехватке и сводка.
  * Их нельзя копить — исправленный срок отменяет прежнее предупреждение, восстановленное
  * обеспечение снимает своё. Обязательства от **события** — приём, пропуск, сокращение — сверка не
- * отзывает: повод уже в прошлом, и пересчитать его из нынешнего состояния нечем.
+ * отзывает: повод уже в прошлом, и пересчитать его из нынешнего состояния нечем. Исключение одно —
+ * человек попросил молчать: выключенная настройка снимает обещанное своего вида и не даёт обещать
+ * новое, включённая возвращает несказанное (D8).
  *
  * Показывать и будить сверка не умеет: это дело [ReminderOutbox], и он проснётся сам.
  */
@@ -56,27 +58,32 @@ class NotificationReconciliation @Inject constructor(
      */
     suspend fun reconcile(now: Instant, zone: ZoneId): Report {
         val today = now.atZone(zone).toLocalDate()
+        val current = settings.current()
         val events = expiryDue(today, now) + coverageDue(now)
-        val desired = events + listOfNotNull(digest(today, zone, events.size))
-        val reductions = reductionsDue(now)
+        val digest = digest(today, zone, events.size)
+        val desired = events + listOfNotNull(digest)
+        val reductions = if (current.remoteChangeEnabled) reductionsDue(now) else emptyList()
         // Лишнее — то, что было обещано по состоянию, а в нынешнем состоянии повода не имеет.
+        // Сводка, обещанная на другое время и ещё не сказанная, — тоже лишнее: человек перенёс её,
+        // и снятое здесь обещание ниже воскреснет с новым сроком.
         val wanted = desired.mapTo(HashSet()) { it.key }
-        val stale = reminders.ofKinds(FROM_STATE).map { it.key }.filterNot { it in wanted }
-        // Напоминания о приёме сверка держит в **обе** стороны: включены — обещаем на каждый
-        // плановый пункт, выключены — снимаем обещанное. Обещает их и календарь, когда заводит
-        // пункт, чтобы не ждать прохода; `promise` идемпотентен, и два обещающих не спорят. Без
-        // обратного хода выключить и включить напоминания значило бы потерять их навсегда (C1).
-        val remindersEnabled = settings.current().intakeRemindersEnabled
-        val intakeDue = if (remindersEnabled) plannedReminders() else emptyList()
-        val silenced = if (remindersEnabled) {
-            emptyList()
-        } else {
-            reminders.ofKinds(listOf(NotificationKind.INTAKE_DUE)).map { it.key }
+        val stale = reminders.ofKinds(FROM_STATE)
+            .filter { it.key !in wanted || (digest != null && it.key == digest.key && it.state == Reminder.State.DUE && it.dueAt != digest.dueAt) }
+            .map { it.key }
+        // Напоминания о приёме и сообщения о чужом сокращении сверка держит в **обе** стороны:
+        // включены — обещаем, выключены — снимаем обещанное. Обещает приёмы и календарь, когда
+        // заводит пункт, чтобы не ждать прохода; `promise` идемпотентен, и два обещающих не спорят.
+        // Без обратного хода выключить и включить напоминания значило бы потерять их навсегда (C1).
+        val intakeDue = if (current.intakeRemindersEnabled) plannedReminders() else emptyList()
+        val silenced = buildList {
+            if (!current.intakeRemindersEnabled) addAll(reminders.ofKinds(listOf(NotificationKind.INTAKE_DUE)).map { it.key })
+            if (!current.remoteChangeEnabled) addAll(reminders.ofKinds(listOf(NotificationKind.COVERAGE_SHORT)).map { it.key })
         }
 
         transactions.run {
-            promising.promise(desired + reductions + intakeDue)
+            // Сначала снять, потом обещать: воскрешение снятого даёт ему новый срок.
             withdrawal.withdrawKeys(stale + silenced)
+            promising.promise(desired + reductions + intakeDue)
         }
         return Report(promised = desired.size + intakeDue.size, withdrawn = stale.size + silenced.size)
     }

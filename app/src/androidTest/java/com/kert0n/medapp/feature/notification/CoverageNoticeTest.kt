@@ -129,6 +129,31 @@ class CoverageNoticeTest {
         assertEquals(emptyList<NotificationKind>(), scenarios.notifier.shown.map { it.kind }.filter { it == NotificationKind.COVERAGE_SHORT })
     }
 
+    /**
+     * О чужом сокращении говорят, пока человек этого хочет (PLAN D8): выключено — не обещается,
+     * обещанное и несказанное снимается; включено — несказанное возвращается.
+     */
+    @Test
+    fun remoteChangeNoticesFollowTheSetting() = runTest {
+        treated()
+        scenarios.packageAdjusting.adjust(PACK, PackageAdjusting.Action.Recount(seen = tablets("20"), actual = tablets("8")))
+        settings.settings = com.kert0n.medapp.domain.notification.NotificationSettings(remoteChangeEnabled = false)
+
+        planning.reconcile(now, ZoneOffset.UTC)
+        assertEquals(emptyList<Reminder>(), scenarios.reminderStore.ofKinds(listOf(NotificationKind.COVERAGE_SHORT)))
+
+        settings.settings = com.kert0n.medapp.domain.notification.NotificationSettings(remoteChangeEnabled = true)
+        planning.reconcile(now, ZoneOffset.UTC)
+        val promised = scenarios.reminderStore.ofKinds(listOf(NotificationKind.COVERAGE_SHORT)).single()
+        assertEquals(Reminder.State.DUE, promised.state)
+
+        settings.settings = com.kert0n.medapp.domain.notification.NotificationSettings(remoteChangeEnabled = false)
+        planning.reconcile(now, ZoneOffset.UTC)
+        assertEquals(Reminder.State.WITHDRAWN, scenarios.reminderStore.ofKinds(listOf(NotificationKind.COVERAGE_SHORT)).single().state)
+        scenarios.reminderOutbox.pass()
+        assertEquals(0, scenarios.notifier.shown.count { it.kind == NotificationKind.COVERAGE_SHORT })
+    }
+
     /** Порог — из настроек: два дня вместо трёх. */
     @Test
     fun theThresholdComesFromTheSettings() = runTest {
