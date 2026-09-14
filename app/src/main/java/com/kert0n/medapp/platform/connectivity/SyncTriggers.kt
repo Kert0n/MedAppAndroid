@@ -7,7 +7,7 @@ import androidx.lifecycle.DefaultLifecycleObserver
 import androidx.lifecycle.LifecycleOwner
 import androidx.lifecycle.ProcessLifecycleOwner
 import com.kert0n.medapp.di.ApplicationScope
-import com.kert0n.medapp.feature.notification.DailySchedule
+import com.kert0n.medapp.feature.notification.DailyRound
 import com.kert0n.medapp.queue.Synchronization
 import dagger.hilt.android.qualifiers.ApplicationContext
 import java.util.concurrent.atomic.AtomicBoolean
@@ -29,7 +29,7 @@ import kotlinx.coroutines.launch
 class SyncTriggers @Inject constructor(
     @ApplicationContext private val context: Context,
     private val synchronization: Synchronization,
-    private val daily: DailySchedule,
+    private val daily: DailyRound,
     @ApplicationScope private val scope: CoroutineScope
 ) {
 
@@ -40,9 +40,11 @@ class SyncTriggers @Inject constructor(
         if (!started.compareAndSet(false, true)) return
         ProcessLifecycleOwner.get().lifecycle.addObserver(object : DefaultLifecycleObserver {
             override fun onStart(owner: LifecycleOwner) {
-                // Календарь сети не ждёт: неответ и окно пунктов приводятся в порядок сразу (PLAN F4).
-                // Вход в приложение — проход дня: календарь, будильники, что наступило сегодня (PLAN D8).
-                daily.runNow()
+                // Календарь сети не ждёт и планировщика тоже: неответ, окно пунктов и сверка
+                // обязательств делаются **в процессе**, здесь и сейчас (PLAN F4, D8). Через
+                // WorkManager это откладывалось до его очереди, а быстрый повторный вход
+                // политикой REPLACE отменял незаконченный проход.
+                scope.launch { runCatching { daily.run() } }
                 synchronization.request()
             }
         })
