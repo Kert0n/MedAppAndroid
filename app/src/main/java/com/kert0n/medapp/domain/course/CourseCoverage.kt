@@ -54,9 +54,11 @@ class CourseCoverage(
      */
     fun noticeOn(today: LocalDate, zone: ZoneId, thresholdDays: Long = 3): Notice? {
         val uncoveredOn = firstUncoveredAt?.atZone(zone)?.toLocalDate() ?: return null
+        // День исчерпания — первым: при пороге 0 обе даты совпадают, и сказать надо то, что
+        // ближе к правде, — «заканчивается», а не «скоро закончится».
         return when (today) {
-            uncoveredOn.minusDays(thresholdDays) -> Notice.AHEAD
             uncoveredOn -> Notice.END
+            uncoveredOn.minusDays(thresholdDays) -> Notice.AHEAD
             else -> null
         }
     }

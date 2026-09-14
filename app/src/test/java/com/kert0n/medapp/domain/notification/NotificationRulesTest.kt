@@ -78,6 +78,8 @@ class NotificationRulesTest {
         assertEquals(CourseCoverage.Notice.AHEAD, coverage.noticeOn(uncoveredOn.minusDays(3), MOSCOW))
         assertEquals(CourseCoverage.Notice.END, coverage.noticeOn(uncoveredOn, MOSCOW))
         assertNull(coverage.noticeOn(uncoveredOn.minusDays(1), MOSCOW))
+        // Порог 0 — «только в день»: день исчерпания остаётся исчерпанием, а не «скоро».
+        assertEquals(CourseCoverage.Notice.END, coverage.noticeOn(uncoveredOn, MOSCOW, thresholdDays = 0))
         // Полностью обеспеченному предупреждать нечего.
         val covered = activeCourse(totalDoses = 3, sources = listOf(source(PACK, 3))).coverage(CourseProgress.none, availability(PACK to tablets("20")))
         assertNull(covered.noticeOn(uncoveredOn, MOSCOW))
