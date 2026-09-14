@@ -37,6 +37,8 @@ class NotificationReconciliation @Inject constructor(
     private val packages: PackageStorageRepository,
     private val courses: CourseStorageRepository,
     private val reminders: ReminderStorageRepository,
+    private val promising: ReminderPromising,
+    private val withdrawal: ReminderWithdrawal,
     private val settings: NotificationSettingsSource,
     private val transactions: Transactions
 ) {
@@ -49,18 +51,17 @@ class NotificationReconciliation @Inject constructor(
         val today = now.atZone(zone).toLocalDate()
         val events = expiryDue(today, now) + coverageDue(now)
         val desired = events + listOfNotNull(digest(today, zone, events.size))
-        reminders.raiseAll(desired + reductionsDue(now))
+        promising.promise(desired + reductionsDue(now))
         // Лишнее — то, что было обещано по состоянию, а в нынешнем состоянии повода не имеет.
         val wanted = desired.mapTo(HashSet()) { it.key }
         val stale = reminders.ofKinds(FROM_STATE).map { it.key }.filterNot { it in wanted }
-        reminders.withdraw(stale)
         // Выключенные напоминания снимают и уже обещанное: человек попросил молчать (B18).
         val silenced = if (settings.current().intakeRemindersEnabled) {
             emptyList()
         } else {
             reminders.ofKinds(listOf(NotificationKind.INTAKE_DUE)).map { it.key }
         }
-        reminders.withdraw(silenced)
+        withdrawal.withdrawKeys(stale + silenced)
         Report(promised = desired.size, withdrawn = stale.size + silenced.size)
     }
 
@@ -74,7 +75,7 @@ class NotificationReconciliation @Inject constructor(
      */
     private suspend fun reductionsDue(at: Instant): List<Reminder> =
         courses.observeCoverages().first().keys.flatMap { courseId ->
-            courses.reductionsSince(courseId, at.minus(ReminderOutbox.RETENTION)).map { reduction ->
+            courses.reductionsSince(courseId, at.minus(Reminder.RETENTION)).map { reduction ->
                 Reminder(NotificationKey.reduction(reduction.id), NotificationTarget.CourseSources(courseId), reduction.at)
             }
         }

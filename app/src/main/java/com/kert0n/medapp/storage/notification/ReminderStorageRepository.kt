@@ -4,14 +4,16 @@ import com.kert0n.medapp.domain.notification.NoticeDelivery
 import com.kert0n.medapp.domain.notification.NotificationKey
 import com.kert0n.medapp.domain.notification.NotificationKind
 import com.kert0n.medapp.domain.notification.Reminder
-import java.time.Instant
 import kotlinx.coroutines.flow.Flow
 
 /**
  * Обязательства перед человеком (PLAN D8): что обещано сказать, на какой момент и в каком
- * состоянии. Порт хранения — доменных переходов здесь нет, есть действия над строками.
+ * состоянии. Порт **только пишет и читает** — решает всё сама сущность: наступило ли, к какому
+ * моменту будить, что делать после неуспеха, можно ли забыть (C1 «Правила обязательства — на
+ * обязательстве»). Глагольных `markShown`, `defer`, `withdraw` здесь нет намеренно: правило,
+ * записанное запросом, разъезжается с тем, о чём оно говорит.
  *
- * Заводится обязательство **той же транзакцией, что и его повод**, а системные действия делает
+ * Пишется обязательство **той же транзакцией, что и его повод**, а системные действия делает
  * владелец доставки, разбуженный [changes] уже после коммита (F5).
  */
 interface ReminderStorageRepository {
@@ -19,31 +21,27 @@ interface ReminderStorageRepository {
     /** Сигнал после коммита: обязательства изменились — кто-то должен их исполнить. */
     fun changes(): Flow<Unit>
 
-    /** Завести недостающие. Уже обещанное не трогается: отложенный человеком срок переживает сверку. */
-    suspend fun raiseAll(reminders: Collection<Reminder>)
-
     suspend fun find(key: NotificationKey): Reminder?
 
-    /** Наступившее и ещё не сказанное — этим способом доставки. */
-    suspend fun due(now: Instant, delivery: NoticeDelivery): List<Reminder>
+    suspend fun findAll(keys: Collection<NotificationKey>): List<Reminder>
 
-    /** Самое раннее невыполненное: к нему и будят процесс. `null` — будить незачем. */
-    suspend fun nextDue(delivery: NoticeDelivery): Reminder?
+    /**
+     * Всё невыполненное этим способом доставки — и наступившее, и будущее. Что из него наступило и
+     * к чему будить, решает [Reminder]; запрос таких вопросов не задаёт.
+     */
+    suspend fun awaiting(delivery: NoticeDelivery): List<Reminder>
 
-    /** Отозванное, но ещё висящее в шторке. */
+    /** Отозванное: его надо погасить в системе и забыть. */
     suspend fun withdrawn(): List<Reminder>
+
+    /** Строки старше названного момента — грубый отбор; забывать ли, решает [Reminder]. */
+    suspend fun stale(before: java.time.Instant): List<Reminder>
 
     /** Всё обещанное этих видов — чтобы сверка знала, что уже обещано, и отозвала лишнее. */
     suspend fun ofKinds(kinds: Collection<NotificationKind>): List<Reminder>
 
-    suspend fun defer(key: NotificationKey, until: Instant)
+    /** Записать состояние целиком: обязательство прочитали, изменили переходом и вернули. */
+    suspend fun saveAll(reminders: Collection<Reminder>)
 
-    suspend fun markShown(key: NotificationKey, at: Instant)
-
-    suspend fun withdraw(keys: Collection<NotificationKey>)
-
-    suspend fun forget(keys: Collection<NotificationKey>)
-
-    /** Сказанное давно забывается: иначе таблица растёт всю жизнь установки. */
-    suspend fun forgetShownBefore(before: Instant)
+    suspend fun deleteAll(keys: Collection<NotificationKey>)
 }

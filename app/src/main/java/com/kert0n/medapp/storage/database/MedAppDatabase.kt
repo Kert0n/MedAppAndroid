@@ -153,6 +153,7 @@ abstract class MedAppDatabase : RoomDatabase() {
                         `key` TEXT NOT NULL, `kind` TEXT NOT NULL, `delivery` TEXT NOT NULL, `subject` TEXT NOT NULL,
                         `target_kind` TEXT NOT NULL, `target_id` TEXT, `target_date` TEXT,
                         `due_at` INTEGER NOT NULL, `state` TEXT NOT NULL, `shown_at` INTEGER,
+                        `not_before` INTEGER, `attempts` INTEGER NOT NULL DEFAULT 0,
                         PRIMARY KEY(`key`)
                     )
                     """.trimIndent()

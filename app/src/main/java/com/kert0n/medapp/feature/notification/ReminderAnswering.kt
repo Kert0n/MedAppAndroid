@@ -23,6 +23,7 @@ import kotlin.uuid.Uuid
 class ReminderAnswering @Inject constructor(
     private val declining: IntakeDeclining,
     private val reminders: ReminderStorageRepository,
+    private val withdrawal: ReminderWithdrawal,
     private val settings: NotificationSettingsSource,
     private val clock: Clock
 ) {
@@ -32,7 +33,7 @@ class ReminderAnswering @Inject constructor(
         IntakeDeclining.Outcome.DECLINED, IntakeDeclining.Outcome.ALREADY_ANSWERED -> Response.Done
         // Курса или пункта больше нет — напоминать не о чем, и говорить человеку нечего.
         IntakeDeclining.Outcome.EPISODE_CLOSED, IntakeDeclining.Outcome.GONE -> {
-            reminders.withdraw(listOf(NotificationKey.intake(intakeId, NotificationKind.INTAKE_DUE)))
+            withdrawal.withdraw(intakeId)
             Response.Done
         }
     }
@@ -44,7 +45,11 @@ class ReminderAnswering @Inject constructor(
      */
     suspend fun snooze(intakeId: Uuid): Response {
         val at = clock.instant().plus(Duration.ofMinutes(settings.current().snoozeMinutes.toLong()))
-        reminders.defer(NotificationKey.intake(intakeId, NotificationKind.INTAKE_DUE), at)
+        val key = NotificationKey.intake(intakeId, NotificationKind.INTAKE_DUE)
+        reminders.find(key)?.let { reminder ->
+            reminder.defer(at)
+            reminders.saveAll(listOf(reminder))
+        }
         return Response.Snoozed(at)
     }
 

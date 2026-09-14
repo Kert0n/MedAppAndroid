@@ -2,7 +2,7 @@
   "formatVersion": 1,
   "database": {
     "version": 3,
-    "identityHash": "bf47e3f2147b0fe180173e38c21fc579",
+    "identityHash": "69706e82e2a613977257f1c55fb44ff9",
     "entities": [
       {
         "tableName": "quantity_units",
@@ -1517,7 +1517,7 @@
       },
       {
         "tableName": "reminders",
-        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`key` TEXT NOT NULL, `kind` TEXT NOT NULL, `delivery` TEXT NOT NULL, `subject` TEXT NOT NULL, `target_kind` TEXT NOT NULL, `target_id` TEXT, `target_date` TEXT, `due_at` INTEGER NOT NULL, `state` TEXT NOT NULL, `shown_at` INTEGER, PRIMARY KEY(`key`))",
+        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`key` TEXT NOT NULL, `kind` TEXT NOT NULL, `delivery` TEXT NOT NULL, `subject` TEXT NOT NULL, `target_kind` TEXT NOT NULL, `target_id` TEXT, `target_date` TEXT, `due_at` INTEGER NOT NULL, `state` TEXT NOT NULL, `shown_at` INTEGER, `not_before` INTEGER, `attempts` INTEGER NOT NULL, PRIMARY KEY(`key`))",
         "fields": [
           {
             "fieldPath": "key",
@@ -1575,6 +1575,17 @@
             "fieldPath": "shownAt",
             "columnName": "shown_at",
             "affinity": "INTEGER"
+          },
+          {
+            "fieldPath": "notBefore",
+            "columnName": "not_before",
+            "affinity": "INTEGER"
+          },
+          {
+            "fieldPath": "attempts",
+            "columnName": "attempts",
+            "affinity": "INTEGER",
+            "notNull": true
           }
         ],
         "primaryKey": {
@@ -1625,7 +1636,7 @@
     ],
     "setupQueries": [
       "CREATE TABLE IF NOT EXISTS room_master_table (id INTEGER PRIMARY KEY,identity_hash TEXT)",
-      "INSERT OR REPLACE INTO room_master_table (id,identity_hash) VALUES(42, 'bf47e3f2147b0fe180173e38c21fc579')"
+      "INSERT OR REPLACE INTO room_master_table (id,identity_hash) VALUES(42, '69706e82e2a613977257f1c55fb44ff9')"
     ]
   }
 }

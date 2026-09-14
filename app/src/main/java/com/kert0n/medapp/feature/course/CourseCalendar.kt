@@ -15,7 +15,8 @@ import com.kert0n.medapp.domain.notification.NotificationKind
 import com.kert0n.medapp.domain.notification.NotificationTarget
 import com.kert0n.medapp.domain.notification.Reminder
 import com.kert0n.medapp.storage.intake.IntakeStorageRepository
-import com.kert0n.medapp.storage.notification.ReminderStorageRepository
+import com.kert0n.medapp.feature.notification.ReminderPromising
+import com.kert0n.medapp.feature.notification.ReminderWithdrawal
 import com.kert0n.medapp.storage.pack.PackageStorageRepository
 import java.time.Duration
 import java.time.Instant
@@ -35,7 +36,8 @@ import kotlin.uuid.Uuid
 class CourseCalendar @Inject constructor(
     private val intakes: IntakeStorageRepository,
     private val packages: PackageStorageRepository,
-    private val reminders: ReminderStorageRepository
+    private val promising: ReminderPromising,
+    private val withdrawal: ReminderWithdrawal
 ) {
 
     /**
@@ -65,7 +67,7 @@ class CourseCalendar @Inject constructor(
         // Завёлся пункт — завелось и обещание напомнить о нём. Той же транзакцией: система не
         // откатывается вместе с базой, а таблица откатывается (PLAN D8, F5).
         val born = fresh.toSet()
-        reminders.raiseAll(materialised.filter { it.id in born }.map { it.reminder() })
+        promising.promise(materialised.filter { it.id in born }.map { it.reminder() })
         return fresh.size
     }
 
@@ -82,7 +84,7 @@ class CourseCalendar @Inject constructor(
         val gone = intakes.prunePlanned(course.id, remaining + started)
         // Пункта больше нет — и напоминать о нём нечего: перестройка расписания уносит обещание
         // вместе с пунктом, а не оставляет будильник на удалённом (PLAN D8).
-        reminders.withdraw(gone.map { NotificationKey.intake(it, NotificationKind.INTAKE_DUE) })
+        withdrawal.withdrawAll(gone)
         return gone.size
     }
 
@@ -121,8 +123,8 @@ class CourseCalendar @Inject constructor(
         // Пропуск — повод сказать, и обязательство заводится **той же транзакцией**, что и переход:
         // иначе непоказанное терялось бы навсегда, ведь пересчитать его из состояния нельзя —
         // проход, назвавший пункт пропуском, был один (PLAN D8). А напоминать о нём больше нечего.
-        reminders.raiseAll(missed.map { Reminder(NotificationKey.intake(it, NotificationKind.INTAKE_MISSED), NotificationTarget.Intake(it), now) })
-        reminders.withdraw(missed.map { NotificationKey.intake(it, NotificationKind.INTAKE_DUE) })
+        promising.promise(missed.map { Reminder(NotificationKey.intake(it, NotificationKind.INTAKE_MISSED), NotificationTarget.Intake(it), now) })
+        withdrawal.withdrawTheReminder(missed)
         return missed
     }
 

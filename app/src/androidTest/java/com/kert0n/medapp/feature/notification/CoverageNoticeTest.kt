@@ -52,7 +52,7 @@ class CoverageNoticeTest {
     fun setUp() = runTest {
         database = inMemoryDatabase()
         scenarios = Scenarios(database, now)
-        planning = NotificationReconciliation(database.intakeRepository(), database.packageRepository(), database.courseRepository(), ReminderRoomRepository(database, database.reminders()), settings, database.transactions())
+        planning = NotificationReconciliation(database.intakeRepository(), database.packageRepository(), database.courseRepository(), scenarios.reminderStore, scenarios.reminderPromising, scenarios.reminderWithdrawal, settings, database.transactions())
         database.packageRepository().add(pack(id = PACK, quantity = tablets("20"), form = TABLET_FORM))
     }
 

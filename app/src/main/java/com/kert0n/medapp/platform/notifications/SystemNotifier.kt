@@ -11,6 +11,7 @@ import androidx.core.app.NotificationManagerCompat
 import androidx.core.content.ContextCompat
 import com.kert0n.medapp.R
 import com.kert0n.medapp.domain.intake.IntakeProjection
+import com.kert0n.medapp.domain.notification.Delivery
 import com.kert0n.medapp.domain.notification.NotificationAction
 import com.kert0n.medapp.domain.notification.NotificationKey
 import com.kert0n.medapp.domain.notification.NotificationKind
@@ -31,7 +32,10 @@ import kotlin.uuid.Uuid
 import kotlinx.coroutines.flow.first
 
 /**
- * Системное уведомление из [Reminder]: текст — из строк, данные — из чтений хранения,
+ * Системное уведомление из [Reminder]. Чем кончился показ, отвечается значением [Delivery]: «нет
+ * разрешения» и «повода больше нет» — разные случаи, и владелец доставки поступает с ними
+ * по-разному (PLAN D8, C1).
+ * текст — из строк, данные — из чтений хранения,
  * пара `tag = subject`, `id = kind` — из ключа (PLAN D8). В `PendingIntent` едут только
  * идентификаторы: что открыть по ним, решает приложение (G3, H3). Без разрешения на уведомления
  * показа нет — и об этом отвечается `false`, а не молчанием, чтобы журнал не записал непоказанное.
@@ -44,14 +48,15 @@ class SystemNotifier @Inject constructor(
     private val packages: PackageStorageRepository
 ) : Notifier {
 
-    override suspend fun show(notification: Reminder): Boolean {
+    override suspend fun show(notification: Reminder): Delivery {
         // Проверка стоит здесь, а не в отдельном методе: lint видит её только рядом с `notify`.
         // `POST_NOTIFICATIONS` — разрешение только с Android 13; ниже его нет, и спрашивать надо систему.
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU &&
             ContextCompat.checkSelfPermission(context, Manifest.permission.POST_NOTIFICATIONS) != PackageManager.PERMISSION_GRANTED
-        ) return false
-        if (!NotificationManagerCompat.from(context).areNotificationsEnabled()) return false
-        val text = textOf(notification) ?: return false
+        ) return Delivery.NOT_ALLOWED
+        if (!NotificationManagerCompat.from(context).areNotificationsEnabled()) return Delivery.NOT_ALLOWED
+        // Текст собирается из чтений по идентификаторам цели: не нашлось — повода больше нет.
+        val text = textOf(notification) ?: return Delivery.SUBJECT_GONE
         val builder = NotificationCompat.Builder(context, notification.channel.id)
             .setSmallIcon(R.drawable.ic_notification_medication)
             .setContentTitle(text.title)
@@ -64,7 +69,7 @@ class SystemNotifier @Inject constructor(
             actionIntent(intake, action, notification.key)?.let { builder.addAction(0, context.getString(action.label), it) }
         }
         NotificationManagerCompat.from(context).notify(notification.key.subject, notification.kind.ordinal, builder.build())
-        return true
+        return Delivery.SHOWN
     }
 
     override suspend fun dismiss(key: NotificationKey) {

@@ -1,6 +1,7 @@
 package com.kert0n.medapp.domain.notification
 
 import com.kert0n.medapp.fixture.INTAKE
+import java.time.Duration
 import java.time.Instant
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
@@ -62,16 +63,77 @@ class ReminderTest {
         assertEquals(at, reminder.shownAt)
     }
 
-    /** Первый показ побеждает: повтор момента не двигает. */
+    /**
+     * Журнал помнит **последний** показ, а не первый. Прежде побеждал первый, и это уничтожало
+     * живое обязательство: отложенное говорят снова, а срок хранения по-прежнему отсчитывался от
+     * первого раза — строку забывали, пока человек ещё ждал напоминания.
+     */
     @Test
-    fun theJournalKeepsTheFirstShowing() {
+    fun theJournalKeepsTheLastShowing() {
         val reminder = reminder()
         reminder.deliveredAt(at)
-        reminder.defer(at.plusSeconds(60))
+        val later = at.plusSeconds(60)
+        reminder.defer(later)
 
-        reminder.deliveredAt(at.plusSeconds(60))
+        reminder.deliveredAt(later)
 
-        assertEquals(at, reminder.shownAt)
+        assertEquals(later, reminder.shownAt)
+    }
+
+    /**
+     * Сбой — не отказ: повод жив, и мы вернёмся, но не сейчас же. Задержка растёт с попытками,
+     * иначе проход крутился бы вокруг несказанного без передышки.
+     */
+    @Test
+    fun aFailureMovesTheMomentForwardAndGrowsWithAttempts() {
+        val reminder = reminder()
+
+        reminder.failedAt(at)
+        val first = requireNotNull(reminder.wakeAt(at))
+        assertTrue(first.isAfter(at))
+        assertFalse(reminder.isDue(at))
+
+        reminder.failedAt(first)
+        val second = requireNotNull(reminder.wakeAt(first))
+        assertTrue("вторая задержка должна быть длиннее первой", Duration.between(first, second) > Duration.between(at, first))
+    }
+
+    /**
+     * Наступившее и несказанное будильника **не просит**: сказать ему мешает не время. Будильник на
+     * прошедший момент система исполняет немедленно — и устройство будилось бы без конца.
+     */
+    @Test
+    fun whatIsDueAndUnsaidAsksForNoAlarm() {
+        val reminder = reminder()
+
+        assertEquals(at, reminder.wakeAt(at.minusSeconds(1)))
+        assertNull(reminder.wakeAt(at))
+        assertNull(reminder.wakeAt(at.plusSeconds(3600)))
+    }
+
+    /** Отозванное и несказанное возвращается, когда повод вернулся; сказанное — уже нет. */
+    @Test
+    fun onlyAnUnshownWithdrawalCanBeRevived() {
+        val unshown = reminder().apply { withdraw() }
+        assertTrue(unshown.revivable())
+        unshown.reviveAt(at.plusSeconds(120))
+        assertEquals(Reminder.State.DUE, unshown.state)
+
+        val said = reminder().apply { deliveredAt(at); withdraw() }
+        assertFalse(said.revivable())
+        assertTrue(runCatching { said.reviveAt(at) }.isFailure)
+    }
+
+    /** Давнее забывается; свежее — нет. Иначе таблица растёт всю жизнь установки. */
+    @Test
+    fun whatIsOldEnoughIsForgotten() {
+        val longPast = at.plus(Reminder.RETENTION).plusSeconds(1)
+
+        assertFalse(reminder().forgettable(at))
+        assertTrue("наступившее, но так и не сказанное, тоже стареет", reminder().forgettable(longPast))
+        assertTrue(reminder().apply { withdraw() }.forgettable(at))
+        assertFalse(reminder().apply { deliveredAt(at) }.forgettable(at))
+        assertTrue(reminder().apply { deliveredAt(at) }.forgettable(longPast))
     }
 
     /** Повода больше нет: отозванное не наступает и не откладывается. */

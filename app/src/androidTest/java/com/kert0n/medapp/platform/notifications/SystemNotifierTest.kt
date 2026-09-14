@@ -96,14 +96,14 @@ class SystemNotifierTest {
         if (!granted()) {
             // Без разрешения показ не проходит; что висит в шторке с прежней установки, показ не трогает.
             val before = manager.activeNotifications.count { it.tag == planned.key.subject }
-            assertFalse(notifier.show(planned))
+            assertEquals(com.kert0n.medapp.domain.notification.Delivery.NOT_ALLOWED, notifier.show(planned))
             assertEquals(before, manager.activeNotifications.count { it.tag == planned.key.subject })
             InstrumentationRegistry.getInstrumentation().uiAutomation
                 .grantRuntimePermission(context.packageName, Manifest.permission.POST_NOTIFICATIONS)
             manager.cancelAll()
         }
 
-        assertTrue(notifier.show(planned))
+        assertEquals(com.kert0n.medapp.domain.notification.Delivery.SHOWN, notifier.show(planned))
 
         val shown = requireNotNull(awaitShown(planned.key.subject)) { "уведомление не показано" }
         assertEquals(NotificationKind.EXPIRY_SOURCE_3D.ordinal, shown.id)
@@ -124,11 +124,19 @@ class SystemNotifierTest {
         return manager.activeNotifications.firstOrNull { it.tag == tag }
     }
 
-    /** Повода больше нет — показывать нечего: коробки нет, и `false` без исключения. */
+    /**
+     * Повода больше нет — показывать нечего, и это **не** отказ в разрешении: владелец доставки
+     * такое обязательство снимает, а не ждёт с ним человека (PLAN D8, C1).
+     */
     @Test
     fun aVanishedSubjectIsNotShown() = runTest {
+        if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.TIRAMISU) {
+            InstrumentationRegistry.getInstrumentation().uiAutomation
+                .grantRuntimePermission(context.packageName, Manifest.permission.POST_NOTIFICATIONS)
+        }
         val gone = Reminder(planned.key, NotificationTarget.PackageCard(kotlin.uuid.Uuid.random()), planned.dueAt)
-        assertFalse(notifier.show(gone))
+
+        assertEquals(com.kert0n.medapp.domain.notification.Delivery.SUBJECT_GONE, notifier.show(gone))
     }
 
     /**
@@ -147,5 +155,22 @@ class SystemNotifierTest {
             0
         )
         assertTrue("приёмник действий объявлен внутренним", declared.none { it.activityInfo.exported })
+    }
+
+    /**
+     * Канал, который приложение перестало объявлять, система держит у себя дальше: у того, кто
+     * ставил прежнюю сборку, в настройках остаётся переключатель «Синхронизация», не способный
+     * ничего показать. Заведение каналов должно убирать за собой.
+     */
+    @Test
+    fun aChannelWeNoLongerDeclareIsRemoved() {
+        val manager = context.getSystemService(android.app.NotificationManager::class.java)
+        manager.createNotificationChannel(
+            android.app.NotificationChannel("sync", "Синхронизация", android.app.NotificationManager.IMPORTANCE_LOW)
+        )
+
+        NotificationChannels(context).ensure()
+
+        assertEquals(null, manager.getNotificationChannel("sync"))
     }
 }

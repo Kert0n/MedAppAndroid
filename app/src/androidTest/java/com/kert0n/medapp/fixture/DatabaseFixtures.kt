@@ -139,6 +139,7 @@ class Scenarios(
     private val clock = java.time.Clock.fixed(now, java.time.ZoneOffset.UTC)
     val reminderStore = com.kert0n.medapp.storage.notification.ReminderRoomRepository(database, database.reminders())
     val reminderWithdrawal = com.kert0n.medapp.feature.notification.ReminderWithdrawal(reminderStore)
+    val reminderPromising = com.kert0n.medapp.feature.notification.ReminderPromising(reminderStore)
     private val packages = database.packageRepository()
     private val medKits = database.medKitRepository()
     private val courses = database.courseRepository()
@@ -146,7 +147,7 @@ class Scenarios(
     private val transactions = database.transactions()
 
     val packageAdding = com.kert0n.medapp.feature.packages.PackageAdding(packages, medKits, queue, transactions, clock)
-    val courseCalendar = com.kert0n.medapp.feature.course.CourseCalendar(database.intakeRepository(), packages, reminderStore)
+    val courseCalendar = com.kert0n.medapp.feature.course.CourseCalendar(database.intakeRepository(), packages, reminderPromising, reminderWithdrawal)
     val courseClamping = com.kert0n.medapp.feature.course.CourseClamping(courses, packages, courseCalendar, queue)
     val packageDescribing = com.kert0n.medapp.feature.packages.PackageDescribing(packages, courseClamping, queue, transactions, clock)
     val packageRemoval = com.kert0n.medapp.feature.packages.PackageRemoval(
@@ -191,11 +192,12 @@ class Scenarios(
         database.intakeRepository(), courses, packages, transactions, queue, courseClosing, courseCalendar, reminderWithdrawal, clock
     )
     val notificationReconciliation = com.kert0n.medapp.feature.notification.NotificationReconciliation(
-        database.intakeRepository(), packages, courses, reminderStore, notificationSettings, transactions
+        database.intakeRepository(), packages, courses, reminderStore, reminderPromising, reminderWithdrawal,
+        notificationSettings, transactions
     )
     val dailyRound = com.kert0n.medapp.feature.notification.DailyRound(courseUpkeep, notificationReconciliation, clock)
     val reminderAnswering = com.kert0n.medapp.feature.notification.ReminderAnswering(
-        intakeDeclining, reminderStore, notificationSettings, clock
+        intakeDeclining, reminderStore, reminderWithdrawal, notificationSettings, clock
     )
     /**
      * Владелец показа и будильника. В проверках его проход зовут явно: так видно, что показ —

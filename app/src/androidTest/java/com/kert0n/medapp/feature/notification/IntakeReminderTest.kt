@@ -64,7 +64,7 @@ class IntakeReminderTest {
     fun setUp() = runTest {
         database = inMemoryDatabase()
         scenarios = Scenarios(database, now)
-        planning = NotificationReconciliation(database.intakeRepository(), database.packageRepository(), database.courseRepository(), ReminderRoomRepository(database, database.reminders()), settings, database.transactions())
+        planning = NotificationReconciliation(database.intakeRepository(), database.packageRepository(), database.courseRepository(), scenarios.reminderStore, scenarios.reminderPromising, scenarios.reminderWithdrawal, settings, database.transactions())
         store = ReminderRoomRepository(database, database.reminders())
         outbox = outboxAt(now)
         database.packageRepository().add(pack(id = PACK, quantity = tablets("20"), form = TABLET_FORM))
@@ -143,7 +143,7 @@ class IntakeReminderTest {
         val digest = Reminder(NotificationKey.digest(digestDay), com.kert0n.medapp.domain.notification.NotificationTarget.DayPlan(digestDay), now)
         // Наступает обязательство в свой момент: владелец смотрит на срок, а не на список к показу.
         val atIntake = outboxAt(first.plannedAt)
-        store.raiseAll(listOf(due, digest))
+        store.saveAll(listOf(due, digest))
 
         assertEquals(2, atIntake.pass().shown)
         assertEquals(0, atIntake.pass().shown)
@@ -164,7 +164,7 @@ class IntakeReminderTest {
         treated()
         val digestDay = LocalDate.of(2027, 3, 10)
         val digest = Reminder(NotificationKey.digest(digestDay), com.kert0n.medapp.domain.notification.NotificationTarget.DayPlan(digestDay), now)
-        store.raiseAll(listOf(digest))
+        store.saveAll(listOf(digest))
 
         notifier.allowed = false
         assertEquals(0, outbox.pass().shown)

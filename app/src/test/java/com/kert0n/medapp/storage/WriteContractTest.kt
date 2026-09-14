@@ -131,17 +131,15 @@ class WriteContractTest {
         "IntakeStorageRepository.materialise" to (Shape.CREATION by "(List<CourseIntake>): List<Uuid>"),
         "IntakeStorageRepository.prunePlanned" to (Shape.NAMED_FIELDS by "(Uuid, Set<ScheduledOccurrence>): List<Uuid>"),
         "ReminderStorageRepository.changes" to (Shape.READ by "(): Flow<Unit>"),
-        "ReminderStorageRepository.raiseAll" to (Shape.CREATION by "(Collection<Reminder>): Unit"),
         "ReminderStorageRepository.find" to (Shape.READ by "(NotificationKey): Reminder"),
-        "ReminderStorageRepository.due" to (Shape.READ by "(Instant, NoticeDelivery): List<Reminder>"),
-        "ReminderStorageRepository.nextDue" to (Shape.READ by "(NoticeDelivery): Reminder"),
+        "ReminderStorageRepository.findAll" to (Shape.READ by "(Collection<NotificationKey>): List<Reminder>"),
+        "ReminderStorageRepository.awaiting" to (Shape.READ by "(NoticeDelivery): List<Reminder>"),
         "ReminderStorageRepository.withdrawn" to (Shape.READ by "(): List<Reminder>"),
+        "ReminderStorageRepository.stale" to (Shape.READ by "(Instant): List<Reminder>"),
         "ReminderStorageRepository.ofKinds" to (Shape.READ by "(Collection<? extends NotificationKind>): List<Reminder>"),
-        "ReminderStorageRepository.defer" to (Shape.NAMED_FIELDS by "(NotificationKey, Instant): Unit"),
-        "ReminderStorageRepository.markShown" to (Shape.NAMED_FIELDS by "(NotificationKey, Instant): Unit"),
-        "ReminderStorageRepository.withdraw" to (Shape.NAMED_FIELDS by "(Collection<NotificationKey>): Unit"),
-        "ReminderStorageRepository.forget" to (Shape.NAMED_FIELDS by "(Collection<NotificationKey>): Unit"),
-        "ReminderStorageRepository.forgetShownBefore" to (Shape.NAMED_FIELDS by "(Instant): Unit")
+        // Обязательство считает своё состояние само и приходит сюда целиком: спорить с ним нечем.
+        "ReminderStorageRepository.saveAll" to (Shape.ACTION by "(Collection<Reminder>): Unit"),
+        "ReminderStorageRepository.deleteAll" to (Shape.NAMED_FIELDS by "(Collection<NotificationKey>): Unit")
     )
 
     /**

@@ -108,7 +108,7 @@ class DailyRoundTest {
 
         assertEquals(DailyRound.Report(missed = 0, promised = 0, withdrawn = 0), report)
         assertEquals(emptyList<Any>(), quiet.notifier.shown)
-        assertEquals(ReminderOutbox.Report(shown = 0, dismissed = 0, nextAt = null), delivered)
+        assertEquals(ReminderOutbox.Report(shown = 0, dismissed = 0, blocked = 0, nextAt = null), delivered)
         assertNull(quiet.reminders.wakeAt)
     }
 

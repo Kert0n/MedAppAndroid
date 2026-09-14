@@ -36,5 +36,9 @@ class ReminderStorageEntity(
     @ColumnInfo(name = "target_date") val targetDate: LocalDate?,
     @ColumnInfo(name = "due_at") val dueAt: Instant,
     val state: String,
-    @ColumnInfo(name = "shown_at") val shownAt: Instant?
+    @ColumnInfo(name = "shown_at") val shownAt: Instant?,
+    /** Раньше этого срока обязательство не трогают: задержка повтора после сбоя (PLAN E3, D8). */
+    @ColumnInfo(name = "not_before") val notBefore: Instant?,
+    /** Только вход задержки: смысла сам по себе не несёт. */
+    val attempts: Int
 )

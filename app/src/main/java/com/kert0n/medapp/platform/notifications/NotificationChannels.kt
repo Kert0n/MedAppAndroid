@@ -19,10 +19,17 @@ class NotificationChannels @Inject constructor(@ApplicationContext private val c
 
     fun ensure() {
         val manager = context.getSystemService(NotificationManager::class.java)
+        val ours = NotificationChannel.entries.map { it.id }
         for (channel in NotificationChannel.entries) {
             manager.createNotificationChannel(
                 SystemChannel(channel.id, context.getString(channel.title), channel.importance.system)
             )
+        }
+        // Канал, который приложение перестало объявлять, система держит у себя дальше: у того, кто
+        // ставил прежнюю сборку, в настройках остался бы переключатель, не способный ничего
+        // показать. Убираем за собой.
+        for (stale in manager.notificationChannels.map { it.id } - ours.toSet()) {
+            manager.deleteNotificationChannel(stale)
         }
     }
 

@@ -1,5 +1,6 @@
 package com.kert0n.medapp.fixture
 
+import com.kert0n.medapp.domain.notification.Delivery
 import com.kert0n.medapp.domain.notification.Freshness
 import com.kert0n.medapp.domain.notification.NotificationKey
 import com.kert0n.medapp.domain.notification.NotificationSettings
@@ -9,15 +10,27 @@ import com.kert0n.medapp.domain.notification.Reminder
 import com.kert0n.medapp.domain.notification.ReminderAlarms
 import java.time.Instant
 
-/** Показы, какими их видит порт: что показано, что погашено; разрешение можно отнять. */
+/**
+ * Показы, какими их видит порт: что показано, что погашено. Разрешение можно отнять ([allowed]) —
+ * это причина **структурная**; можно уронить показ ([failing]) — это сбой; можно сделать вид, что
+ * повода больше нет ([vanished]) — коробки или курса не нашлось. Поведение у трёх случаев разное.
+ */
 class FakeNotifier(var allowed: Boolean = true) : Notifier {
     val shown = mutableListOf<Reminder>()
     val dismissed = mutableListOf<NotificationKey>()
 
-    override suspend fun show(reminder: Reminder): Boolean {
-        if (!allowed) return false
+    /** Ключи, показ которых бросает: сбой хранения или системы посреди прохода. */
+    val failing = mutableSetOf<NotificationKey>()
+
+    /** Ключи, у которых повода больше нет: текст собрать не из чего. */
+    val vanished = mutableSetOf<NotificationKey>()
+
+    override suspend fun show(reminder: Reminder): Delivery {
+        if (reminder.key in failing) error("показ сорвался: ${reminder.key}")
+        if (!allowed) return Delivery.NOT_ALLOWED
+        if (reminder.key in vanished) return Delivery.SUBJECT_GONE
         shown += reminder
-        return true
+        return Delivery.SHOWN
     }
 
     override suspend fun dismiss(key: NotificationKey) {

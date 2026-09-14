@@ -181,4 +181,28 @@ class CalendarRemindersTest {
             tomorrow.reminderStore.ofKinds(listOf(NotificationKind.INTAKE_MISSED)).map { Uuid.parse(it.key.subject) }.toSet()
         )
     }
+
+    /**
+     * Поздний приём: человек вчера не ответил, а сегодня отмечает, что принял. Прошлое приводится
+     * в порядок **до** записи (F4), поэтому пункт успевает стать пропуском и обещает сказать о
+     * себе — а запись приёма по `MISSED` разрешена. Если снять только напоминание о приёме, человек
+     * получит «вы пропустили приём» сразу после того, как отметил, что принял.
+     */
+    @Test
+    fun aLateConfirmationWithdrawsTheMissNoticeToo() = runTest {
+        val id = treated()
+        val yesterday = planned(id).first { it.slot.localDate == start }
+        val tomorrow = Scenarios(database, Instant.parse("2027-03-11T05:00:00Z"), notifier = scenarios.notifier)
+
+        tomorrow.intakeConfirmation.confirm(yesterday.id, PACK, dose("2"), Instant.parse("2027-03-11T05:00:00Z"))
+        tomorrow.reminderOutbox.pass()
+
+        assertEquals(IntakeStatus.TAKEN, requireNotNull(database.intakeRepository().find(yesterday.id)).status)
+        assertEquals(
+            "после «принял» человеку не говорят «вы пропустили»",
+            emptyList<NotificationKind>(),
+            tomorrow.notifier.shown.map { it.kind }.filter { it == NotificationKind.INTAKE_MISSED }
+        )
+        assertNull(tomorrow.reminderStore.find(NotificationKey.intake(yesterday.id, NotificationKind.INTAKE_MISSED)))
+    }
 }

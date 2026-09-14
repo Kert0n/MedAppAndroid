@@ -21,40 +21,27 @@ class ReminderRoomRepository @Inject constructor(
     override fun changes(): Flow<Unit> =
         database.invalidationTracker.createFlow("reminders", emitInitialState = false).map { }
 
-    override suspend fun raiseAll(reminders: Collection<Reminder>) {
-        for (reminder in reminders) this.reminders.raise(reminder.toStorageEntity())
-    }
-
     override suspend fun find(key: NotificationKey): Reminder? = reminders.find(key.stored)?.toDomain()
 
-    override suspend fun due(now: Instant, delivery: NoticeDelivery): List<Reminder> =
-        reminders.due(now, delivery.name).map { it.toDomain() }
+    override suspend fun findAll(keys: Collection<NotificationKey>): List<Reminder> =
+        if (keys.isEmpty()) emptyList() else reminders.findAll(keys.map { it.stored }).map { it.toDomain() }
 
-    override suspend fun nextDue(delivery: NoticeDelivery): Reminder? = reminders.nextDue(delivery.name)?.toDomain()
+    override suspend fun awaiting(delivery: NoticeDelivery): List<Reminder> =
+        reminders.awaiting(delivery.name).map { it.toDomain() }
 
     override suspend fun withdrawn(): List<Reminder> = reminders.withdrawn().map { it.toDomain() }
+
+    override suspend fun stale(before: Instant): List<Reminder> = reminders.olderThan(before).map { it.toDomain() }
 
     override suspend fun ofKinds(kinds: Collection<NotificationKind>): List<Reminder> =
         reminders.ofKinds(kinds.map { it.name }).map { it.toDomain() }
 
-    override suspend fun defer(key: NotificationKey, until: Instant) {
-        reminders.defer(key.stored, until)
+    override suspend fun saveAll(reminders: Collection<Reminder>) {
+        if (reminders.isNotEmpty()) this.reminders.saveAll(reminders.map { it.toStorageEntity() })
     }
 
-    override suspend fun markShown(key: NotificationKey, at: Instant) {
-        reminders.markShown(key.stored, at)
-    }
-
-    override suspend fun withdraw(keys: Collection<NotificationKey>) {
-        if (keys.isNotEmpty()) reminders.withdraw(keys.map { it.stored })
-    }
-
-    override suspend fun forget(keys: Collection<NotificationKey>) {
-        if (keys.isNotEmpty()) reminders.forget(keys.map { it.stored })
-    }
-
-    override suspend fun forgetShownBefore(before: Instant) {
-        reminders.forgetShownBefore(before)
+    override suspend fun deleteAll(keys: Collection<NotificationKey>) {
+        if (keys.isNotEmpty()) reminders.deleteAll(keys.map { it.stored })
     }
 }
 
@@ -71,7 +58,9 @@ private fun Reminder.toStorageEntity() = ReminderStorageEntity(
     targetDate = (target as? NotificationTarget.DayPlan)?.date,
     dueAt = dueAt,
     state = state.name,
-    shownAt = shownAt
+    shownAt = shownAt,
+    notBefore = notBefore,
+    attempts = attempts
 )
 
 private fun ReminderStorageEntity.toDomain() = Reminder(
@@ -79,7 +68,9 @@ private fun ReminderStorageEntity.toDomain() = Reminder(
     target = targetOf(targetKind, targetId, targetDate),
     dueAt = dueAt,
     state = Reminder.State.valueOf(state),
-    shownAt = shownAt
+    shownAt = shownAt,
+    notBefore = notBefore,
+    attempts = attempts
 )
 
 private val NotificationTarget.stored: String
@@ -102,5 +93,6 @@ private fun targetOf(kind: String, id: Uuid?, date: LocalDate?): NotificationTar
     "INTAKE" -> NotificationTarget.Intake(requireNotNull(id) { "у цели-пункта есть идентификатор" })
     "PACKAGE" -> NotificationTarget.PackageCard(requireNotNull(id) { "у цели-коробки есть идентификатор" })
     "COURSE_SOURCES" -> NotificationTarget.CourseSources(requireNotNull(id) { "у цели-лечения есть идентификатор" })
-    else -> NotificationTarget.DayPlan(requireNotNull(date) { "у цели-дня есть дата" })
+    "DAY_PLAN" -> NotificationTarget.DayPlan(requireNotNull(date) { "у цели-дня есть дата" })
+    else -> error("незнакомая цель уведомления: $kind")
 }

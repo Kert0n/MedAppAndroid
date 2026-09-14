@@ -108,7 +108,7 @@ class ReminderAnsweringTest {
     fun snoozeMovesOnlyTheAlarm() = runTest {
         val id = treated()
         val intake = first(id)
-        scenarios.reminderStore.raiseAll(listOf(reminderFor(intake)))
+        scenarios.reminderPromising.promise(listOf(reminderFor(intake)))
 
         val response = scenarios.reminderAnswering.snooze(intake.id) as ReminderAnswering.Response.Snoozed
 
@@ -125,7 +125,7 @@ class ReminderAnsweringTest {
     fun skipDeclinesAndWithdraws() = runTest {
         val id = treated()
         val intake = first(id)
-        scenarios.reminderStore.raiseAll(listOf(reminderFor(intake)))
+        scenarios.reminderPromising.promise(listOf(reminderFor(intake)))
 
         assertEquals(ReminderAnswering.Response.Done, scenarios.reminderAnswering.skip(intake.id))
 
@@ -140,7 +140,7 @@ class ReminderAnsweringTest {
     fun cancellingTheCourseWithdrawsEveryReminder() = runTest {
         val id = treated()
         val planned = database.intakeRepository().ofCourse(id).filterIsInstance<CourseIntake>()
-        scenarios.reminderStore.raiseAll(planned.map { reminderFor(it) })
+        scenarios.reminderPromising.promise(planned.map { reminderFor(it) })
 
         scenarios.courseCancellation.cancel(id)
         scenarios.reminderOutbox.pass()
@@ -160,7 +160,7 @@ class ReminderAnsweringTest {
     fun aRolledBackCancellationLeavesTheAlarmsInPlace() = runTest {
         val id = treated()
         val planned = database.intakeRepository().ofCourse(id).filterIsInstance<CourseIntake>()
-        scenarios.reminderStore.raiseAll(planned.map { reminderFor(it) })
+        scenarios.reminderPromising.promise(planned.map { reminderFor(it) })
         val real = database.transactions()
         val failingAfterWork = object : com.kert0n.medapp.queue.Transactions {
             override suspend fun <T> run(block: suspend () -> T): T = real.run<T> {
@@ -196,11 +196,11 @@ class ReminderAnsweringTest {
     fun aDeferredReminderSurvivesTheDailyRound() = runTest {
         val id = treated()
         val intake = first(id)
-        scenarios.reminderStore.raiseAll(listOf(reminderFor(intake)))
+        scenarios.reminderPromising.promise(listOf(reminderFor(intake)))
         val snoozed = (scenarios.reminderAnswering.snooze(intake.id) as ReminderAnswering.Response.Snoozed).at
 
         // Календарь обещает тем же ключом и плановым сроком — уже обещанного это не трогает.
-        scenarios.reminderStore.raiseAll(listOf(reminderFor(intake)))
+        scenarios.reminderPromising.promise(listOf(reminderFor(intake)))
         scenarios.dailyRound.run()
         scenarios.reminderOutbox.pass()
 
@@ -222,7 +222,7 @@ class ReminderAnsweringTest {
         database.packageRepository().add(pack(id = OTHER_PACK, quantity = tablets("20"), form = TABLET_FORM))
         val both = listOf(treated(), treated(OTHER_PACK)).map { first(it) }
         assertEquals(1, both.map { it.plannedAt }.toSet().size) // оба пункта стоят на один миг
-        scenarios.reminderStore.raiseAll(both.map { reminderFor(it) })
+        scenarios.reminderPromising.promise(both.map { reminderFor(it) })
 
         val delivered = scenarios.reminderOutbox.pass()
 
@@ -240,7 +240,7 @@ class ReminderAnsweringTest {
     fun aFreshOutboxRearmsFromTheTable() = runTest {
         val id = treated()
         val intake = first(id)
-        scenarios.reminderStore.raiseAll(listOf(reminderFor(intake)))
+        scenarios.reminderPromising.promise(listOf(reminderFor(intake)))
 
         // Процесс поднялся заново: будильников в системе нет, таблица на месте.
         val afterRestart = Scenarios(database, now.minusSeconds(3600))
