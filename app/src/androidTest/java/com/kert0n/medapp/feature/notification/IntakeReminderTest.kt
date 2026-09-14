@@ -175,4 +175,29 @@ class IntakeReminderTest {
         assertEquals(1, outbox.pass().shown)
         assertEquals(Reminder.State.SHOWN, requireNotNull(store.find(digest.key)).state)
     }
+
+    /**
+     * Человек выключил напоминания, передумал и включил обратно. Обязательства на плановые пункты
+     * должны вернуться: обещает их календарь, когда заводит пункт, а снимает сверка по настройке —
+     * и обратного хода у неё не было, так что пункты оставались снятыми навсегда.
+     */
+    @Test
+    fun remindersComeBackWhenTheyAreEnabledAgain() = runTest {
+        val id = treated()
+        val planned = intakes(id).map { it.id }.toSet()
+
+        settings.settings = NotificationSettings(intakeRemindersEnabled = false)
+        planning.reconcile(now, ZoneOffset.UTC)
+        outbox.pass()
+        assertEquals(emptyList<Reminder>(), store.ofKinds(listOf(NotificationKind.INTAKE_DUE)))
+
+        settings.settings = NotificationSettings(intakeRemindersEnabled = true)
+        planning.reconcile(now, ZoneOffset.UTC)
+
+        assertEquals(
+            "напоминания не вернулись после включения",
+            planned,
+            store.ofKinds(listOf(NotificationKind.INTAKE_DUE)).map { Uuid.parse(it.key.subject) }.toSet()
+        )
+    }
 }

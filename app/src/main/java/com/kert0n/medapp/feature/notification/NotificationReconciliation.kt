@@ -62,19 +62,37 @@ class NotificationReconciliation @Inject constructor(
         // Лишнее — то, что было обещано по состоянию, а в нынешнем состоянии повода не имеет.
         val wanted = desired.mapTo(HashSet()) { it.key }
         val stale = reminders.ofKinds(FROM_STATE).map { it.key }.filterNot { it in wanted }
-        // Выключенные напоминания снимают и уже обещанное: человек попросил молчать (B18).
-        val silenced = if (settings.current().intakeRemindersEnabled) {
+        // Напоминания о приёме сверка держит в **обе** стороны: включены — обещаем на каждый
+        // плановый пункт, выключены — снимаем обещанное. Обещает их и календарь, когда заводит
+        // пункт, чтобы не ждать прохода; `promise` идемпотентен, и два обещающих не спорят. Без
+        // обратного хода выключить и включить напоминания значило бы потерять их навсегда (C1).
+        val remindersEnabled = settings.current().intakeRemindersEnabled
+        val intakeDue = if (remindersEnabled) plannedReminders() else emptyList()
+        val silenced = if (remindersEnabled) {
             emptyList()
         } else {
             reminders.ofKinds(listOf(NotificationKind.INTAKE_DUE)).map { it.key }
         }
 
         transactions.run {
-            promising.promise(desired + reductions)
+            promising.promise(desired + reductions + intakeDue)
             withdrawal.withdrawKeys(stale + silenced)
         }
-        return Report(promised = desired.size, withdrawn = stale.size + silenced.size)
+        return Report(promised = desired.size + intakeDue.size, withdrawn = stale.size + silenced.size)
     }
+
+    /**
+     * Обещания на плановые пункты — по календарю. Сверка их не выдумывает: срок обязательства и
+     * есть момент пункта.
+     */
+    private suspend fun plannedReminders(): List<Reminder> =
+        intakes.plannedBefore(EVERY_PLANNED).map {
+            Reminder(
+                NotificationKey.intake(it.id, NotificationKind.INTAKE_DUE),
+                NotificationTarget.Intake(it.id),
+                it.plannedAt
+            )
+        }
 
     /** Сколько обещано по нынешнему состоянию и сколько снято как потерявшее повод. */
     data class Report(val promised: Int, val withdrawn: Int)
@@ -163,6 +181,12 @@ class NotificationReconciliation @Inject constructor(
     }
 
     companion object {
+        /**
+         * Граница «все плановые»: окном пунктов ведает календарь, и сверке незачем заводить своё.
+         * `Instant.MAX` здесь не годится — база держит момент числом миллисекунд.
+         */
+        private val EVERY_PLANNED: Instant = Instant.ofEpochMilli(Long.MAX_VALUE)
+
         /** Что следует из состояния и потому сверяется: повод исчез — обещание снимается. */
         private val FROM_STATE = listOf(
             NotificationKind.EXPIRY_SOURCE_3D,
