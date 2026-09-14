@@ -9,6 +9,8 @@ import com.kert0n.medapp.queue.SnapshotStorage
 import com.kert0n.medapp.storage.course.CourseDao
 import com.kert0n.medapp.storage.database.MedAppDatabase
 import com.kert0n.medapp.storage.medkit.MedKitDao
+import com.kert0n.medapp.storage.course.followBox
+import com.kert0n.medapp.storage.intake.IntakeDao
 import com.kert0n.medapp.storage.medkit.loseAccess
 import com.kert0n.medapp.storage.medkit.toStorageEntity
 import com.kert0n.medapp.storage.pack.PackageDao
@@ -35,6 +37,7 @@ class SnapshotRoomStorage @Inject constructor(
     private val medKits: MedKitDao,
     private val packages: PackageDao,
     private val courses: CourseDao,
+    private val intakes: IntakeDao,
     private val vocabulary: VocabularyDao,
     private val queue: SyncOperationDao,
     @ArrivedMedKitName private val arrivedName: String
@@ -76,6 +79,9 @@ class SnapshotRoomStorage @Inject constructor(
             val removed = packageId in snapshot.heldPackages && packages.find(packageId) == null
             if (removed || medKits.find(resolved.pack.medKit.id) == null) continue
             packages.applySnapshot(resolved, observedAt = at)
+            // Курс следует за коробкой той же транзакцией: чужой расход или бронь зажимают
+            // выделения, и бронь уезжает разницей — каждая своей пачке (PLAN D5, E4).
+            queue.enqueueClaimChanges(courses.followBox(packageId, packages, intakes, queue, words, at), packages, at)
         }
         // «Сервер знал, и ждать нечего» посчитано до запроса, а применяется после него — и за это
         // время человек мог унести коробку домой, пометить её или сделать её полку местной.

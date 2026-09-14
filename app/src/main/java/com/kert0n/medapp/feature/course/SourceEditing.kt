@@ -9,7 +9,7 @@ import com.kert0n.medapp.domain.value.Doses
 import com.kert0n.medapp.queue.QueueService
 import com.kert0n.medapp.queue.QueuedCommand
 import com.kert0n.medapp.queue.Transactions
-import com.kert0n.medapp.queue.pack.PackageSyncCommand
+import com.kert0n.medapp.queue.pack.claimChangesSince
 import com.kert0n.medapp.storage.course.CourseStorageRepository
 import com.kert0n.medapp.storage.intake.IntakeStorageRepository
 import com.kert0n.medapp.storage.pack.PackageStorageRepository
@@ -65,7 +65,9 @@ class SourceEditing @Inject constructor(
                     return@run Outcome.Rejected((failure as? CourseRejected ?: throw failure).reason)
                 }
             } else if (held.allocatedDoses != source.doses) {
-                course.allocate(held.pkg, source.doses, now)
+                course.allocate(held.pkg, source.doses, now).getOrElse { failure ->
+                    return@run Outcome.Rejected((failure as? CourseRejected ?: throw failure).reason)
+                }
             } else {
                 course
             }
@@ -89,18 +91,9 @@ class SourceEditing @Inject constructor(
 
         if (!courses.updateSources(course, expected)) return@run Outcome.Stale
         calendar.replan(course, now)
-        val touched = (before.sources + course.sources).map { it.pkg }.distinctBy { it.id }
-        for (ref in touched) {
-            val claim = course.allocatedOf(ref)
-            if (before.allocatedOf(ref) == claim) continue
-            val pkg = packages.find(ref.id) ?: continue
-            val command = if (claim == null || claim.isZero) {
-                // Не было брони — и снимать нечего: подключили с нулём или отвязали пачку без выделения.
-                if (before.allocatedOf(ref)?.isZero != false) continue
-                PackageSyncCommand.ReleaseClaim(pkg.id)
-            } else {
-                PackageSyncCommand.SetClaim(pkg.id, claim)
-            }
+        // Брони — разницей, той же функцией, что у зажима и укладки снимка (PLAN E2).
+        for (command in course.claimChangesSince(before)) {
+            val pkg = packages.find(command.packageId) ?: continue
             queue.change(pkg.medKit, listOf(QueuedCommand(Uuid.random(), command)), now) { true }
         }
         Outcome.Saved(course.projection())

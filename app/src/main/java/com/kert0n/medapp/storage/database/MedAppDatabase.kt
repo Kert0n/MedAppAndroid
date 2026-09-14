@@ -10,6 +10,7 @@ import com.kert0n.medapp.storage.course.ActivePackageAssignmentStorageEntity
 import com.kert0n.medapp.storage.course.CourseDao
 import com.kert0n.medapp.storage.course.CourseRecordStorageEntity
 import com.kert0n.medapp.storage.course.CourseSourceStorageEntity
+import com.kert0n.medapp.storage.course.CoverageReductionStorageEntity
 import com.kert0n.medapp.storage.course.CourseStorageEntity
 import com.kert0n.medapp.storage.course.CourseTimeStorageEntity
 import com.kert0n.medapp.storage.intake.IntakeDao
@@ -51,6 +52,7 @@ import com.kert0n.medapp.storage.value.VocabularyDao
         CourseRecordStorageEntity::class,
         CourseTimeStorageEntity::class,
         CourseSourceStorageEntity::class,
+        CoverageReductionStorageEntity::class,
         ActivePackageAssignmentStorageEntity::class,
         IntakeStorageEntity::class,
         SyncOperationStorageEntity::class,
@@ -138,6 +140,26 @@ abstract class MedAppDatabase : RoomDatabase() {
                 // Неподтверждённое решение об аптечке лежит на ней самой (PLAN E5, E6).
                 connection.execSQL(
                     "ALTER TABLE `med_kits` ADD COLUMN `status` TEXT NOT NULL DEFAULT 'ACTIVE'"
+                )
+                // Сокращение обеспечения — событие; держится за то, что остаётся навсегда (PLAN D5).
+                connection.execSQL(
+                    """
+                    CREATE TABLE IF NOT EXISTS `coverage_reductions` (
+                        `id` TEXT NOT NULL, `course_id` TEXT NOT NULL, `package_id` TEXT NOT NULL,
+                        `covered_before` INTEGER NOT NULL, `covered_after` INTEGER NOT NULL, `at` INTEGER NOT NULL,
+                        PRIMARY KEY(`id`),
+                        FOREIGN KEY(`course_id`) REFERENCES `course_records`(`id`)
+                            ON UPDATE NO ACTION ON DELETE RESTRICT ,
+                        FOREIGN KEY(`package_id`) REFERENCES `package_records`(`id`)
+                            ON UPDATE NO ACTION ON DELETE RESTRICT
+                    )
+                    """.trimIndent()
+                )
+                connection.execSQL(
+                    "CREATE INDEX IF NOT EXISTS `index_coverage_reductions_course_id_at` ON `coverage_reductions` (`course_id`, `at`)"
+                )
+                connection.execSQL(
+                    "CREATE INDEX IF NOT EXISTS `index_coverage_reductions_package_id` ON `coverage_reductions` (`package_id`)"
                 )
                 // Причина отказа — значением у отказанной операции; прежде она лежала текстом
                 // журнала, и у уже отказанных переносится оттуда (PLAN E2).
@@ -300,6 +322,7 @@ abstract class MedAppDatabase : RoomDatabase() {
                         CREATE TABLE IF NOT EXISTS `course_sources_new` (
                             `course_id` TEXT NOT NULL, `package_id` TEXT NOT NULL,
                             `position` INTEGER NOT NULL, `allocated_doses` INTEGER NOT NULL,
+                            `fault` TEXT,
                             PRIMARY KEY(`course_id`, `package_id`),
                             FOREIGN KEY(`course_id`) REFERENCES `courses`(`id`)
                                 ON UPDATE NO ACTION ON DELETE RESTRICT ,

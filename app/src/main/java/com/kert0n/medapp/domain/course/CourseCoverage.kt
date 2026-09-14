@@ -53,14 +53,16 @@ class CourseCoverage(
      * [leftover] — остаток меньше дозы, не переливающийся в следующую пачку. [maxDoses] —
      * верхняя граница ползунка этой пачки: не больше того, что она даёт, и того, что потребность
      * оставляет сверх выделенного остальным (PLAN D5); считается теми же входами, что и
-     * обеспечение, и лежит в той же строке.
+     * обеспечение, и лежит в той же строке. [fault] — источник отключён с причиной: он ничего не
+     * даёт, но виден, чтобы человек понял, что случилось и с какой коробкой.
      */
     data class Source(
         val pkg: PackageRef,
         val allocatedDoses: Doses,
         val coveredDoses: Doses,
         val leftover: Quantity,
-        val maxDoses: Doses
+        val maxDoses: Doses,
+        val fault: CourseSource.Fault? = null
     ) {
         init {
             require(coveredDoses <= allocatedDoses) {

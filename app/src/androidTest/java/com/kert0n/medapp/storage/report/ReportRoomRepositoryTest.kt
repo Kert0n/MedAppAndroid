@@ -1,5 +1,6 @@
 package com.kert0n.medapp.storage.report
 
+import com.kert0n.medapp.fixture.confirmed
 import androidx.room.withTransaction
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import com.kert0n.medapp.domain.course.CourseDraft
@@ -99,7 +100,7 @@ class ReportRoomRepositoryTest {
     @Test
     fun courseAndOneOffIntakesAreRowsOfTheirEpisodeAndBox() = runTest {
         val id = treated()
-        scenarios.intakeConfirmation.confirm(items(id).first().id, PACK, dose("2"), now).getOrThrow()
+        scenarios.intakeConfirmation.confirm(items(id).first().id, PACK, dose("2"), now).confirmed()
         val oneOff = scenarios.unplannedIntakeRecording.record(OTHER_PACK, dose("1"), now)
         assertTrue("$oneOff", oneOff is UnplannedIntakeRecording.Outcome.Recorded)
 
@@ -119,7 +120,7 @@ class ReportRoomRepositoryTest {
     fun onlyTakenIntakesAreSpending() = runTest {
         val id = treated()
         val (first, second) = items(id)
-        scenarios.intakeConfirmation.confirm(first.id, PACK, dose("2"), now).getOrThrow()
+        scenarios.intakeConfirmation.confirm(first.id, PACK, dose("2"), now).confirmed()
         scenarios.intakeDeclining.decline(second.id, now)
         val plan = requireNotNull(database.courseRepository().findPlan(id))
         scenarios.courseOffPlanCounting.set(id, plan.revision, Doses(1))
@@ -180,7 +181,7 @@ class ReportRoomRepositoryTest {
         val id = treated()
         assertTrue(spent().isEmpty)
 
-        scenarios.intakeConfirmation.confirm(items(id).first().id, PACK, dose("2"), now).getOrThrow()
+        scenarios.intakeConfirmation.confirm(items(id).first().id, PACK, dose("2"), now).confirmed()
         database.courseRepository().rename(id, "Парацетамол от простуды", null)
 
         assertEquals("Парацетамол от простуды", spent().episodes.single().record.title)
@@ -199,7 +200,7 @@ class ReportRoomRepositoryTest {
         assertEquals(FutureSpending.Episode(requireNotNull(database.courseRepository().findRecord(id)).projection(), Doses(3), tablets("6")),
             future(12).episodes.single())
 
-        scenarios.intakeConfirmation.confirm(items(id).first().id, PACK, dose("2"), now).getOrThrow()
+        scenarios.intakeConfirmation.confirm(items(id).first().id, PACK, dose("2"), now).confirmed()
 
         assertEquals(Doses(2), future(12).episodes.single().doses)
         // Лечение пять доз: одна принята, до конца месяца осталось четыре, а не двадцать один день.
@@ -258,7 +259,7 @@ class ReportRoomRepositoryTest {
         val item = before.items.filterIsInstance<DayPlan.Item.Scheduled>().single()
         assertEquals(IntakeStatus.PLANNED, item.intake.status)
 
-        scenarios.intakeConfirmation.confirm(item.intake.id, PACK, dose("2"), now).getOrThrow()
+        scenarios.intakeConfirmation.confirm(item.intake.id, PACK, dose("2"), now).confirmed()
 
         assertEquals(IntakeStatus.TAKEN, dayPlan(LocalDate.of(2027, 3, 10)).items.filterIsInstance<DayPlan.Item.Scheduled>().single().intake.status)
         assertEquals(1, dayPlan(LocalDate.of(2027, 3, 14)).items.size)

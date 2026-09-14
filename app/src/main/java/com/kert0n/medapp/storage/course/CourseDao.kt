@@ -6,7 +6,11 @@ import androidx.room.Query
 import androidx.room.Transaction
 import androidx.room.Upsert
 import com.kert0n.medapp.domain.course.Course
+import com.kert0n.medapp.domain.course.CourseDraft
 import com.kert0n.medapp.domain.course.CourseProgress
+import com.kert0n.medapp.domain.course.CoverageReduction
+import com.kert0n.medapp.domain.pack.Availability
+import com.kert0n.medapp.domain.value.Quantity
 import com.kert0n.medapp.domain.course.Revision
 import com.kert0n.medapp.domain.intake.CourseIntake
 import com.kert0n.medapp.domain.pack.PackageRef
@@ -14,6 +18,9 @@ import com.kert0n.medapp.domain.report.CourseInProgress
 import com.kert0n.medapp.domain.value.Vocabulary
 import com.kert0n.medapp.storage.database.chunkedForQuery
 import com.kert0n.medapp.storage.intake.IntakeDao
+import com.kert0n.medapp.storage.pack.PackageDao
+import com.kert0n.medapp.storage.pack.projectionsOf
+import com.kert0n.medapp.storage.server.SyncOperationDao
 import java.time.Instant
 import kotlin.uuid.Uuid
 import kotlinx.coroutines.flow.Flow
@@ -164,6 +171,13 @@ interface CourseDao {
     @Insert
     suspend fun assignPackage(assignment: ActivePackageAssignmentStorageEntity)
 
+    @Insert
+    suspend fun insertReduction(reduction: CoverageReductionStorageEntity)
+
+    /** События сокращения обеспечения курса по времени — карточке курса и уведомлениям (PLAN D5). */
+    @Query("SELECT * FROM coverage_reductions WHERE course_id = :courseId ORDER BY at")
+    suspend fun reductionsOf(courseId: Uuid): List<CoverageReductionStorageEntity>
+
     @Query("SELECT course_id FROM active_package_assignments WHERE package_id = :packageId")
     suspend fun courseHolding(packageId: Uuid): Uuid?
 
@@ -196,6 +210,100 @@ private suspend fun withProgress(courses: List<Course>, intakes: IntakeDao, voca
         .map { it.toDomain(vocabulary) as CourseIntake }
         .groupBy { it.courseId }
     return courses.map { CourseInProgress(it, CourseProgress.of(byCourse[it.id].orEmpty())) }
+}
+
+/**
+ * Расклад «сколько доступно мне» по пачкам лечений — от того же числа, которое видит человек: с
+ * незакрытыми командами поверх и без чужих броней (PLAN D4). Пачки, которой уже нет, в раскладе
+ * ничего: курс вот-вот потеряет её своим переходом. Проекции всех пачек всех лечений — одной
+ * порцией, а не по курсу. Зовётся внутри транзакции читающего.
+ */
+suspend fun PackageDao.availabilityOf(
+    courses: List<Course>,
+    queue: SyncOperationDao,
+    intakes: IntakeDao,
+    vocabulary: Vocabulary
+): Map<Uuid, Availability> {
+    val ids = courses.flatMap { course -> course.sources.map { it.pkg.id } }.distinct()
+    val living = ids.chunkedForQuery().flatMap { among(it) }.map { it.toDomain(vocabulary) }
+    val projected = projectionsOf(living, queue, intakes, vocabulary).associateBy { it.id }
+    return courses.associate { course ->
+        course.id to Availability(
+            course.sources.associate { source ->
+                source.pkg.id to (projected[source.pkg.id]?.availability?.availableToMe ?: Quantity.zero(source.pkg.unit))
+            }
+        )
+    }
+}
+
+/**
+ * Курс следует за коробкой — **одна дверь** для всех, кто коробку изменил: человек пересчётом или
+ * разовым приёмом, сосед расходом или бронью, пришедшими снимком или ответом на команду (PLAN D5,
+ * E4). Каждое идущее лечение, держащее пачку [packageId], зажимает выделения под то, что доступно
+ * ему сейчас, — `Course.clamped` от того же числа, которое видит человек, — и пишется условно по
+ * своей редакции. Расписание, доза и даты не трогаются. Зажимать нечего — курс не пишется, и
+ * редакция не растёт: снимок, согласный с нами, ничего не меняет.
+ *
+ * Возвращает пары «до и после» — брони разницей ставит вызывающий, который владеет транзакцией.
+ * Зовётся внутри уже открытой транзакции того, кто коробку изменил.
+ */
+suspend fun CourseDao.followBox(
+    packageId: Uuid,
+    packages: PackageDao,
+    intakes: IntakeDao,
+    queue: SyncOperationDao,
+    vocabulary: Vocabulary,
+    at: Instant
+): List<CourseFollowed> {
+    val ref = packages.find(packageId)?.toDomain(vocabulary)?.ref ?: return emptyList()
+    val followed = mutableListOf<CourseFollowed>()
+    for (courseId in coursesHolding(packageId)) {
+        val row = findPlan(courseId) ?: continue
+        if (row.isDraft) {
+            followTheBoxAsADraft(row.toDraft(vocabulary), ref, at)
+            continue
+        }
+        val plan = planInProgress(courseId, intakes, vocabulary) ?: continue
+        val course = plan.course
+        // Совместимость — первой: отключённый источник в расклад не входит, и считать по нему нечего.
+        val compatible = when (val fault = course.prescription.faultOf(ref)) {
+            null -> if (courseHolding(packageId) == null || courseHolding(packageId) == courseId) course.restoreSource(ref, at) else course
+            else -> course.faultSource(ref, fault, at)
+        }
+        val availability = packages.availabilityOf(listOf(compatible), queue, intakes, vocabulary).getValue(course.id)
+        val required = compatible.remainingDoses(plan.progress)
+        val clamped = compatible.clamped(required, availability, at)
+        if (clamped === course) continue
+        check(updateAllocations(clamped.toStorageEntity(), clamped.medicine.toSourceStorageEntities(clamped.id), course.revision)) {
+            "план прочитан этой же транзакцией"
+        }
+        // Обеспеченных доз стало меньше — событие (PLAN D5). До — выделенное прежним курсом:
+        // после каждого зажима выделение и есть обеспечение; после — обеспечение нового.
+        val coveredBefore = minOf(course.allocatedDosesTotal, required)
+        val coveredAfter = clamped.coverage(plan.progress, availability).coveredDoses
+        if (coveredAfter < coveredBefore) {
+            insertReduction(CoverageReduction(Uuid.random(), courseId, packageId, coveredBefore, coveredAfter, at).toStorageEntity())
+        }
+        // Назначение коробки следует за пригодностью источника: отключённый её не держит.
+        if (clamped.medicine.faultOf(ref) != null) releasePackage(packageId)
+        else if (course.medicine.faultOf(ref) != null) assignPackage(ActivePackageAssignmentStorageEntity(packageId, courseId))
+        followed += CourseFollowed(course, clamped)
+    }
+    return followed
+}
+
+/** Черновик за коробкой следует только совместимостью: выделений и броней у него нет (PLAN D5). */
+private suspend fun CourseDao.followTheBoxAsADraft(draft: CourseDraft, ref: PackageRef, at: Instant) {
+    val followed = when (val fault = draft.faultOf(ref)) {
+        null -> draft.restoreSource(ref, at)
+        else -> draft.faultSource(ref, fault, at)
+    }
+    if (followed === draft) return
+    saveCourse(
+        course = followed.toStorageEntity(),
+        times = followed.schedule?.toTimeStorageEntities(followed.id).orEmpty(),
+        sources = followed.medicine.toSourceStorageEntities(followed.id)
+    )
 }
 
 /**

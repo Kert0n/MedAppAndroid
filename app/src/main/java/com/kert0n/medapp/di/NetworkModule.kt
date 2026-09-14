@@ -94,10 +94,13 @@ object NetworkModule {
     fun queueTransport(api: MedAppApi): QueueTransport =
         QueueHttpTransport(api)
 
-    /** Часы очереди — системные; тесты подставляют свои. */
+    /**
+     * Часы системные, в зоне устройства: по ней сценарии узнают день момента, названного
+     * человеком, — например, просрочена ли коробка на день приёма (PLAN C1). Тесты подставляют свои.
+     */
     @Provides
     @Singleton
-    fun clock(): Clock = Clock.systemUTC()
+    fun clock(): Clock = Clock.systemDefaultZone()
 
     /**
      * Доменные порты, которые выполняет сеть: знакомство устройства с сервером и пополнение

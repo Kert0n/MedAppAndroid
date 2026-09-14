@@ -172,7 +172,7 @@ class Course(
      * факт, и пункт им не закрывается (PLAN D5). Правило о составе препарата живёт на курсе,
      * а не у того, кто записывает приём.
      */
-    fun isSource(pkg: PackageRef): Boolean = medicine.holds(pkg)
+    fun isSource(pkg: PackageRef): Boolean = medicine.usable(pkg)
 
     /**
      * Пачки действующего курса менять можно: это не изменение дозы или календаря (PLAN D5).
@@ -182,6 +182,22 @@ class Course(
     fun attach(pkg: Package, doses: Doses, at: Instant): Result<Course> =
         medicine.attach(pkg, doses, dose, form)
             .map { changed(medicine = it, revision = revision.next(), updatedAt = at) }
+
+    /**
+     * Сосед сменил у коробки единицу или форму: источник отключается с причиной, бронь и
+     * выделение — ноль, доза и форма лечения прежние (PLAN D5). Уже отключённый по той же
+     * причине — тот же курс, без роста редакции.
+     */
+    fun faultSource(pkg: PackageRef, fault: CourseSource.Fault, at: Instant): Course {
+        if (medicine.faultOf(pkg) == fault) return this
+        return changed(medicine = medicine.fault(pkg, fault), revision = revision.next(), updatedAt = at)
+    }
+
+    /** Совместимость вернулась: причина снимается, выделение — ноль; исправный источник не трогается. */
+    fun restoreSource(pkg: PackageRef, at: Instant): Course {
+        if (medicine.faultOf(pkg) == null) return this
+        return changed(medicine = medicine.restore(pkg), revision = revision.next(), updatedAt = at)
+    }
 
     /** Отвязка последней пачки лечения не отменяет: курс просто становится необеспеченным. */
     fun detach(pkg: PackageRef, at: Instant): Course = changed(
@@ -196,11 +212,9 @@ class Course(
         return changed(medicine = moved, revision = revision.next(), updatedAt = at)
     }
 
-    fun allocate(pkg: PackageRef, doses: Doses, at: Instant): Course = changed(
-        medicine = medicine.allocate(pkg, doses),
-        revision = revision.next(),
-        updatedAt = at
-    )
+    /** Выделение пачке; отключённому источнику — отказ его причиной (PLAN D5). */
+    fun allocate(pkg: PackageRef, doses: Doses, at: Instant): Result<Course> =
+        medicine.allocate(pkg, doses).map { changed(medicine = it, revision = revision.next(), updatedAt = at) }
 
     /**
      * Обеспечение курса: на сколько из оставшихся доз хватит пачек препарата и с какого приёма не

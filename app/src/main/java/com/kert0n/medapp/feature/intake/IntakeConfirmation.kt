@@ -36,6 +36,9 @@ import kotlin.uuid.Uuid
  * командой — её заберёт outbox после коммита, а человек её не ждёт: подтверждение записано, и от
  * сети оно не зависит (PLAN E4). Домен считает от факта — подтверждённого остатка и чужих
  * броней; незакрытые команды очереди — доставка, и о ней он не думает (PLAN D4).
+ *
+ * Вопрос перед записью — третий исход рядом с записью и отказом: просроченную коробку сценарий
+ * не списывает молча, а спрашивает, и пишет только с подтверждением (PLAN D6, ТЗ 4.1.1.5.5).
  */
 class IntakeConfirmation @Inject constructor(
     private val intakes: IntakeStorageRepository,
@@ -50,19 +53,25 @@ class IntakeConfirmation @Inject constructor(
 
     /**
      * Принято [amount] из пачки [packageId] в момент [at], который называет человек: сейчас или
-     * вчера — проверка одна и та же. Отказ — [IntakeRejected] внутри `Result`, и тогда не записано
-     * ничего. Повтор по уже принятому пункту ничего не меняет и отвечает тем, что записано.
+     * вчера — проверка одна и та же. Отказ — [Outcome.Rejected], и тогда не записано ничего;
+     * вопрос — [Outcome.Warned], тоже без записи, пока человек не ответит [acknowledged]. Повтор
+     * по уже принятому пункту ничего не меняет и отвечает тем, что записано.
      */
-    suspend fun confirm(intakeId: Uuid, packageId: Uuid, amount: Dose, at: Instant): Result<Confirmed> =
-        transactions.run { write(intakeId, packageId, amount, at) }
+    suspend fun confirm(
+        intakeId: Uuid,
+        packageId: Uuid,
+        amount: Dose,
+        at: Instant,
+        acknowledged: Boolean = false
+    ): Outcome = transactions.run { write(intakeId, packageId, amount, at, acknowledged) }
 
-    private suspend fun write(intakeId: Uuid, packageId: Uuid, amount: Dose, at: Instant): Result<Confirmed> {
+    private suspend fun write(intakeId: Uuid, packageId: Uuid, amount: Dose, at: Instant, acknowledged: Boolean): Outcome {
         val now = clock.instant()
         val intake = requireNotNull(intakes.find(intakeId) as? CourseIntake) { "подтверждается пункт курса" }
         val record = checkNotNull(courses.findRecord(intake.courseId)) { "у пункта курса есть запись эпизода" }
         if (intake.status == IntakeStatus.TAKEN) {
             val sync = checkNotNull(intakes.syncStateOf(intake.id)) { "принятый пункт записан" }
-            return Result.success(Confirmed(intake.projection(), sync.accounting, episodeClosed = !record.isOpen))
+            return Outcome.Confirmed(intake.projection(), sync.accounting, episodeClosed = !record.isOpen)
         }
         if (!record.isOpen) return rejected(IntakeRejected.Reason.EPISODE_CLOSED)
         val course = courses.openPlan(intake.courseId)
@@ -70,7 +79,7 @@ class IntakeConfirmation @Inject constructor(
         if (amount.unit != intake.unit) return rejected(IntakeRejected.Reason.UNIT_MISMATCH)
         // Акт по пачке — первым: он сверяет единицу коробки, а сравнивать числа разных единиц
         // нечем. Единица источника, проверенная при подключении, могла прийти другой снимком.
-        val taken = pkg.take(amount, at).getOrElse { return Result.failure(it) }
+        val taken = pkg.take(amount, at).getOrElse { return rejected((it as IntakeRejected).reason) }
         // Кому отвечает эта коробка: серверу — только когда он её знает, иначе расход местный и
         // команды не ставит, а расскажет о нём её же создание (PLAN E6).
         val spendsLocally = !packages.answersToServer(packageId)
@@ -82,6 +91,11 @@ class IntakeConfirmation @Inject constructor(
         // Пункт курса принимают из пачки курса; из любой другой это внеплановый факт, и пункт им
         // не закрывается (PLAN D5).
         if (!course.isSource(pkg.ref)) return rejected(IntakeRejected.Reason.PACKAGE_NOT_A_SOURCE)
+        // Вопросы — после отказов и до записи: на день приёма, названный человеком (PLAN D6).
+        val warnings = listOfNotNull(
+            pkg.facts.expiresOn?.takeIf { pkg.isExpiredOn(at.atZone(clock.zone).toLocalDate()) }?.let { IntakeWarning.Expired(it) }
+        )
+        if (warnings.isNotEmpty() && !acknowledged) return Outcome.Warned(warnings)
         // Прошлое до ответа, но после всех отказов — отказ не пишет ничего: неответ, чей день
         // кончился, — пропуск. Иначе конец лечения этим приёмом отменил бы такие пункты, а
         // отменённый пропуском уже не станет (PLAN D6).
@@ -112,7 +126,8 @@ class IntakeConfirmation @Inject constructor(
                 val seen = checkNotNull(packages.projection(pkg.id)) { "пачка прочитана этой же транзакцией" }.availability
                 val availableAfter = seen.availableToMe.minusOrZero(amount.quantity)
                 val doses = course.dosesAfterIntake(pkg.ref, amount, availableAfter)
-                if (doses == allocated) null else CourseReallocation(course.allocate(pkg.ref, doses, now), course.revision)
+                // Пачка — источник, из которого принимают (проверено выше), и выделение ей законно.
+                if (doses == allocated) null else CourseReallocation(course.allocate(pkg.ref, doses, now).getOrThrow(), course.revision)
             }
         }
         val claimAfter = when {
@@ -141,19 +156,27 @@ class IntakeConfirmation @Inject constructor(
         } else {
             calendar.prune(course, course.remainingOccurrences(progress).toSet(), now)
         }
-        return Result.success(Confirmed(confirmed.projection(), sync.accounting, episodeClosed = finished))
+        return Outcome.Confirmed(confirmed.projection(), sync.accounting, episodeClosed = finished)
     }
 
-    private fun rejected(reason: IntakeRejected.Reason): Result<Confirmed> = Result.failure(IntakeRejected(reason))
+    private fun rejected(reason: IntakeRejected.Reason): Outcome = Outcome.Rejected(reason)
 
     /**
-     * Что стало после подтверждения: принятый пункт **проекцией** — сущность действительна лишь
-     * в транзакции, которая её прочитала, и наружу не уходит (PLAN H1), — где его расход, в
-     * локальном остатке или в очереди, и закончилось ли им лечение.
+     * Чем кончилось — три исхода, которые экран делает по-разному (PLAN D6). Записано — принятый
+     * пункт **проекцией** (сущность действительна лишь в транзакции, которая её прочитала, и
+     * наружу не уходит — PLAN H1), где его расход, в локальном остатке или в очереди, и
+     * закончилось ли им лечение. Вопрос — ничего не записано, человек отвечает и повторяет вызов
+     * с подтверждением. Отказ — причина по месту, подтверждением не снимается.
      */
-    data class Confirmed(
-        val intake: IntakeProjection.Scheduled,
-        val accounting: IntakeAccounting,
-        val episodeClosed: Boolean
-    )
+    sealed interface Outcome {
+        data class Confirmed(
+            val intake: IntakeProjection.Scheduled,
+            val accounting: IntakeAccounting,
+            val episodeClosed: Boolean
+        ) : Outcome
+
+        data class Warned(val warnings: List<IntakeWarning>) : Outcome
+
+        data class Rejected(val reason: IntakeRejected.Reason) : Outcome
+    }
 }

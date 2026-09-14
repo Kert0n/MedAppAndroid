@@ -3,6 +3,7 @@ package com.kert0n.medapp.storage.course
 import com.kert0n.medapp.domain.course.Course
 import com.kert0n.medapp.domain.course.CourseCompletion
 import com.kert0n.medapp.domain.course.CourseCoverage
+import com.kert0n.medapp.domain.course.CoverageReduction
 import com.kert0n.medapp.domain.course.CourseDraft
 import com.kert0n.medapp.domain.course.CourseDraftProjection
 import com.kert0n.medapp.domain.course.CourseProjection
@@ -37,6 +38,9 @@ interface CourseStorageRepository {
 
     /** То же по всем идущим лечениям сразу — списку курсов, где нехватка видна значком (H3 №13). */
     fun observeCoverages(): Flow<Map<Uuid, CourseCoverage>>
+
+    /** Сокращения обеспечения эпизода по времени — карточке курса и уведомлениям (PLAN D5, D8). */
+    fun observeReductions(courseId: Uuid): Flow<List<CoverageReduction>>
 
     suspend fun findDraft(id: Uuid): CourseDraft?
 
@@ -80,6 +84,14 @@ interface CourseStorageRepository {
 
     /** Какому активному курсу отдана пачка; `null` — она свободна (PLAN F1, F2). */
     suspend fun courseHolding(packageId: Uuid): Uuid?
+
+    /**
+     * Курс следует за коробкой: каждое идущее лечение, держащее пачку, зажимает выделения под то,
+     * что доступно ему сейчас, условно по своей редакции (PLAN D5). Та же дверь, какой пользуется
+     * укладка снимка. Возвращает пары «до и после» — брони разницей ставит сценарий; пусто —
+     * зажимать было нечего. Зовётся внутри транзакции сценария, который коробку изменил.
+     */
+    suspend fun clampHolding(packageId: Uuid, at: Instant): List<CourseFollowed>
 
     /**
      * Изменённое лечение — доза, форма, расписание, число доз, выделения под них — ложится в план,

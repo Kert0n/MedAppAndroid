@@ -1,5 +1,8 @@
 package com.kert0n.medapp.feature.intake
 
+import com.kert0n.medapp.domain.pack.ExpiryDate
+import com.kert0n.medapp.fixture.factsOf
+import java.time.ZoneOffset
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import com.kert0n.medapp.domain.course.CourseDraft
 import com.kert0n.medapp.domain.intake.IntakeRejected
@@ -116,7 +119,7 @@ class UnplannedIntakeRecordingTest {
         local()
         holdByACourse()
 
-        recording.record(PACK, dose("20"), LATER, touchingReservedConfirmed = true)
+        recording.record(PACK, dose("20"), LATER, acknowledged = true)
 
         assertNull(database.packageRepository().find(PACK))
         assertEquals(emptyList<Uuid>(), database.courses().sourcePackagesOf(COURSE))
@@ -126,7 +129,7 @@ class UnplannedIntakeRecordingTest {
     fun moreThanTheLocalBoxHoldsIsRefusedWithoutWriting() = runTest {
         local()
 
-        val outcome = recording.record(PACK, dose("25"), LATER, touchingReservedConfirmed = true)
+        val outcome = recording.record(PACK, dose("25"), LATER, acknowledged = true)
 
         assertEquals(UnplannedIntakeRecording.Outcome.Rejected(IntakeRejected.Reason.INSUFFICIENT), outcome)
         assertEquals(tablets("20"), database.packageRepository().find(PACK)?.quantity)
@@ -140,7 +143,7 @@ class UnplannedIntakeRecordingTest {
 
         val outcome = recording.record(PACK, dose("12"), LATER)
 
-        assertEquals(UnplannedIntakeRecording.Outcome.TouchesReserved(tablets("10")), outcome)
+        assertEquals(UnplannedIntakeRecording.Outcome.Warned(listOf(IntakeWarning.TouchesReserved(tablets("10")))), outcome)
         assertEquals(tablets("20"), database.packageRepository().find(PACK)?.quantity)
         assertEquals(Doses(5), allocated())
     }
@@ -151,7 +154,7 @@ class UnplannedIntakeRecordingTest {
         local()
         holdByACourse()
 
-        val outcome = recording.record(PACK, dose("12"), LATER, touchingReservedConfirmed = true)
+        val outcome = recording.record(PACK, dose("12"), LATER, acknowledged = true)
 
         assertTrue(outcome is UnplannedIntakeRecording.Outcome.Recorded)
         assertEquals(tablets("8"), database.packageRepository().find(PACK)?.quantity)
@@ -164,7 +167,7 @@ class UnplannedIntakeRecordingTest {
         shared(claims = Claims(total = BigDecimal("16"), mine = BigDecimal("10")))
         holdByACourse()
 
-        assertEquals(UnplannedIntakeRecording.Outcome.TouchesReserved(tablets("4")), recording.record(PACK, dose("5"), LATER))
+        assertEquals(UnplannedIntakeRecording.Outcome.Warned(listOf(IntakeWarning.TouchesReserved(tablets("4")))), recording.record(PACK, dose("5"), LATER))
         assertTrue(commands().isEmpty())
     }
 
@@ -174,7 +177,7 @@ class UnplannedIntakeRecordingTest {
         shared()
         holdByACourse()
 
-        val outcome = recording.record(PACK, dose("12"), LATER, touchingReservedConfirmed = true) as UnplannedIntakeRecording.Outcome.Recorded
+        val outcome = recording.record(PACK, dose("12"), LATER, acknowledged = true) as UnplannedIntakeRecording.Outcome.Recorded
 
         assertEquals(IntakeAccounting.PENDING, outcome.accounting)
         assertEquals(tablets("20"), database.packageRepository().find(PACK)?.quantity)
@@ -218,7 +221,7 @@ class UnplannedIntakeRecordingTest {
         adjusting.adjust(PACK, com.kert0n.medapp.feature.packages.PackageAdjusting.Action.Recount(seen = tablets("20"), actual = tablets("5")))
         assertEquals(Doses(5), allocated())
 
-        recording.record(PACK, dose("1"), LATER, touchingReservedConfirmed = true)
+        recording.record(PACK, dose("1"), LATER, acknowledged = true)
 
         assertEquals(tablets("20"), requireNotNull(database.packageRepository().find(PACK)).quantity)
         assertEquals(tablets("4"), requireNotNull(database.packageRepository().projection(PACK)).availability.effective)
@@ -249,5 +252,33 @@ class UnplannedIntakeRecordingTest {
         assertEquals(IntakeAccounting.LOCAL_APPLIED, (outcome as UnplannedIntakeRecording.Outcome.Recorded).accounting)
         assertEquals(tablets("19"), requireNotNull(database.packageRepository().find(PACK)).quantity)
         assertTrue(commands().none { it is PackageSyncCommand.Consume })
+    }
+
+    /**
+     * Просрочено и заденет занятое — оба вопроса сразу, и одно подтверждение пишет приём
+     * (PLAN D6). Годен до сегодня — не вопрос.
+     */
+    @Test
+    fun expiryAndReservedAreAskedTogetherAndAnsweredOnce() = runTest {
+        local()
+        holdByACourse()
+        val today = LATER.atZone(ZoneOffset.UTC).toLocalDate()
+        database.packageRepository().describe(PACK, factsOf(pack(quantity = tablets("20"), form = TABLET_FORM)).copy(expiresOn = ExpiryDate(today.minusDays(1))))
+
+        val asked = recording.record(PACK, dose("12"), LATER)
+
+        assertEquals(
+            UnplannedIntakeRecording.Outcome.Warned(listOf(IntakeWarning.Expired(ExpiryDate(today.minusDays(1))), IntakeWarning.TouchesReserved(tablets("10")))),
+            asked
+        )
+        assertEquals(tablets("20"), requireNotNull(database.packageRepository().find(PACK)).quantity)
+
+        assertTrue(recording.record(PACK, dose("12"), LATER, acknowledged = true) is UnplannedIntakeRecording.Outcome.Recorded)
+        assertEquals(tablets("8"), requireNotNull(database.packageRepository().find(PACK)).quantity)
+
+        // Годен до сегодня — не просрочен: остаётся только вопрос о занятом (курс зажат под остаток).
+        database.packageRepository().describe(PACK, factsOf(pack(quantity = tablets("8"), form = TABLET_FORM)).copy(expiresOn = ExpiryDate(today)))
+        val onlyReserved = recording.record(PACK, dose("1"), LATER) as UnplannedIntakeRecording.Outcome.Warned
+        assertEquals(listOf(IntakeWarning.TouchesReserved(tablets("0"))), onlyReserved.warnings)
     }
 }

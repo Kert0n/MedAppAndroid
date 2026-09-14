@@ -1,5 +1,6 @@
 package com.kert0n.medapp.feature.intake
 
+import com.kert0n.medapp.fixture.confirmed
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import com.kert0n.medapp.domain.intake.CourseIntake
 import com.kert0n.medapp.domain.intake.IntakeStatus
@@ -115,7 +116,7 @@ class IntakeDecliningTest {
     fun aTakenItemIsNotDeclinedAndAnUnknownOneIsGone() = runTest {
         val id = treated()
         val today = items(id).first()
-        scenarios.intakeConfirmation.confirm(today.id, PACK, dose("2"), now).getOrThrow()
+        scenarios.intakeConfirmation.confirm(today.id, PACK, dose("2"), now).confirmed()
 
         assertEquals(IntakeDeclining.Outcome.ALREADY_ANSWERED, scenarios.intakeDeclining.decline(today.id, now))
         assertEquals(IntakeStatus.TAKEN, items(id).first { it.id == today.id }.status)

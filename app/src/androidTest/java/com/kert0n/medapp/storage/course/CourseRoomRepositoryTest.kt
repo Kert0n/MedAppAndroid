@@ -1,5 +1,6 @@
 package com.kert0n.medapp.storage.course
 
+import com.kert0n.medapp.fixture.confirmed
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import com.kert0n.medapp.domain.course.CourseCoverage
 import com.kert0n.medapp.domain.intake.CourseIntake
@@ -128,7 +129,7 @@ class CourseRoomRepositoryTest {
         val before = coverageOf(id)
 
         val first = database.intakeRepository().ofCourse(id).filterIsInstance<CourseIntake>().minBy { it.plannedAt }
-        scenarios.intakeConfirmation.confirm(first.id, PACK, dose("2"), now).getOrThrow()
+        scenarios.intakeConfirmation.confirm(first.id, PACK, dose("2"), now).confirmed()
         val afterIntake = coverageOf(id)
         assertEquals(9.doses, afterIntake.requiredDoses)
         assertNotEquals(before, afterIntake)

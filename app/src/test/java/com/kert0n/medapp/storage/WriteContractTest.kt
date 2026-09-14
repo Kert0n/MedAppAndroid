@@ -88,6 +88,7 @@ class WriteContractTest {
         "CourseStorageRepository.observePlan" to (Shape.READ by "(Uuid): Flow<CourseProjection>"),
         "CourseStorageRepository.observeCoverage" to (Shape.READ by "(Uuid): Flow<CourseCoverage>"),
         "CourseStorageRepository.observeCoverages" to (Shape.READ by "(): Flow<Map<Uuid, CourseCoverage>>"),
+        "CourseStorageRepository.observeReductions" to (Shape.READ by "(Uuid): Flow<List<CoverageReduction>>"),
         "CourseStorageRepository.observeRecords" to (Shape.READ by "(): Flow<List<CourseRecordProjection>>"),
         "CourseStorageRepository.observeRecord" to (Shape.READ by "(Uuid): Flow<CourseRecordProjection>"),
         "CourseStorageRepository.findDraft" to (Shape.READ by "(Uuid): CourseDraft"),
@@ -95,6 +96,7 @@ class WriteContractTest {
         "CourseStorageRepository.planIds" to (Shape.READ by "(): List<Uuid>"),
         "CourseStorageRepository.findRecord" to (Shape.READ by "(Uuid): CourseRecord"),
         "CourseStorageRepository.courseHolding" to (Shape.READ by "(Uuid): Uuid"),
+        "CourseStorageRepository.clampHolding" to (Shape.NAMED_FIELDS by "(Uuid, Instant): List<CourseFollowed>"),
         "CourseStorageRepository.rename" to (Shape.NAMED_FIELDS by "(Uuid, String, String): Boolean"),
         // `long` — редакция: `value class Revision` на JVM разворачивается в своё число.
         "CourseStorageRepository.amend" to (Shape.GUARDED by "(Course, long): Boolean"),

@@ -71,7 +71,7 @@ class CourseDrafting @Inject constructor(
                 is Edit.Allocate -> {
                     val source = edited.sources.firstOrNull { it.pkg.id == edit.packageId }
                         ?: return@run Outcome.PackageUnusable
-                    edited.allocate(source.pkg, edit.doses, now)
+                    edited.allocate(source.pkg, edit.doses, now).getOrElse { return@run rejected(it) }
                 }
             }
         }

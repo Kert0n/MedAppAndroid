@@ -1,5 +1,6 @@
 package com.kert0n.medapp.storage.intake
 
+import com.kert0n.medapp.fixture.confirmed
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import com.kert0n.medapp.domain.intake.CourseIntake
 import com.kert0n.medapp.domain.intake.IntakeProjection
@@ -67,7 +68,7 @@ class PackageHistoryReadingTest {
         ) as CourseDrafting.Outcome.Saved).draft
         scenarios.courseActivation.activate(draft.id, draft.revision)
         val first = database.intakeRepository().ofCourse(draft.id).filterIsInstance<CourseIntake>().minBy { it.plannedAt }
-        scenarios.intakeConfirmation.confirm(first.id, PACK, dose("2"), now).getOrThrow()
+        scenarios.intakeConfirmation.confirm(first.id, PACK, dose("2"), now).confirmed()
         scenarios.unplannedIntakeRecording.record(PACK, dose("1"), now.minusSeconds(3_600))
         scenarios.unplannedIntakeRecording.record(OTHER_PACK, dose("1"), now.minusSeconds(60))
 

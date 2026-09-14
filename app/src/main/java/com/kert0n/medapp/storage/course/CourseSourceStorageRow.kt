@@ -20,6 +20,7 @@ class CourseSourceStorageRow(
     fun toDomain(vocabulary: Vocabulary): CourseSource = CourseSource(
         pkg = requireNotNull(pack) { "источник курса ссылается на пачку, которой нет: ${source.packageId}" }
             .toRef(vocabulary),
-        allocatedDoses = Doses(source.allocatedDoses)
+        allocatedDoses = Doses(source.allocatedDoses),
+        fault = source.fault
     )
 }

@@ -104,7 +104,7 @@ fun MedAppDatabase.queueStorage() = com.kert0n.medapp.storage.server.QueueRoomSt
 
 /** Порт полного снимка — укладка целиком одной транзакцией; полка с сервера зовётся как в ресурсах. */
 fun MedAppDatabase.snapshotStorage() = com.kert0n.medapp.storage.server.SnapshotRoomStorage(
-    this, medKits(), packages(), courses(), vocabulary(), syncOperations(),
+    this, medKits(), packages(), courses(), intakes(), vocabulary(), syncOperations(),
     arrivedName = "Общая аптечка"
 )
 
@@ -137,7 +137,9 @@ class Scenarios(database: MedAppDatabase, now: java.time.Instant) {
     private val transactions = database.transactions()
 
     val packageAdding = com.kert0n.medapp.feature.packages.PackageAdding(packages, medKits, queue, transactions, clock)
-    val packageDescribing = com.kert0n.medapp.feature.packages.PackageDescribing(packages, queue, transactions, clock)
+    val courseCalendar = com.kert0n.medapp.feature.course.CourseCalendar(database.intakeRepository(), packages)
+    val courseClamping = com.kert0n.medapp.feature.course.CourseClamping(courses, packages, courseCalendar, queue)
+    val packageDescribing = com.kert0n.medapp.feature.packages.PackageDescribing(packages, courseClamping, queue, transactions, clock)
     val packageRemoval = com.kert0n.medapp.feature.packages.PackageRemoval(
         packages, queue, transactions, clock
     )
@@ -152,10 +154,6 @@ class Scenarios(database: MedAppDatabase, now: java.time.Instant) {
         medKits, packages, packageRelocation, queue, transactions, clock
     )
     val courseDrafting = com.kert0n.medapp.feature.course.CourseDrafting(courses, packages, transactions, clock)
-    val courseCalendar = com.kert0n.medapp.feature.course.CourseCalendar(database.intakeRepository(), packages)
-    val courseClamping = com.kert0n.medapp.feature.course.CourseClamping(
-        courses, database.intakeRepository(), packages, courseCalendar, queue
-    )
     val packageAdjusting = com.kert0n.medapp.feature.packages.PackageAdjusting(packages, courseClamping, queue, transactions, clock)
     val unplannedIntakeRecording = com.kert0n.medapp.feature.intake.UnplannedIntakeRecording(
         database.intakeRepository(), courses, packages, courseClamping, queue, transactions, clock
@@ -184,3 +182,14 @@ class Scenarios(database: MedAppDatabase, now: java.time.Instant) {
         database.intakeRepository(), courses, packages, transactions, queue, courseClosing, courseCalendar, clock
     )
 }
+
+/**
+ * Записанный приём по пункту курса. Тест, который его ждёт, говорит об этом прямо, а не
+ * разворачивает исход молча: вопрос и отказ здесь — провал с названным исходом.
+ */
+fun com.kert0n.medapp.feature.intake.IntakeConfirmation.Outcome.confirmed(): com.kert0n.medapp.feature.intake.IntakeConfirmation.Outcome.Confirmed =
+    this as? com.kert0n.medapp.feature.intake.IntakeConfirmation.Outcome.Confirmed ?: error("ожидался записанный приём, а не $this")
+
+/** Отказ сценария приёма по пункту курса — его причина. */
+fun com.kert0n.medapp.feature.intake.IntakeConfirmation.Outcome.rejected(): com.kert0n.medapp.domain.intake.IntakeRejected.Reason =
+    (this as? com.kert0n.medapp.feature.intake.IntakeConfirmation.Outcome.Rejected)?.reason ?: error("ожидался отказ, а не $this")
