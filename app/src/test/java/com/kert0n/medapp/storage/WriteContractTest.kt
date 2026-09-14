@@ -151,7 +151,9 @@ class WriteContractTest {
         "ReminderStorageRepository.ofKinds" to (Shape.READ by "(Collection<? extends NotificationKind>): List<Reminder>"),
         // Обязательство считает своё состояние само и приходит сюда целиком: спорить с ним нечем.
         "ReminderStorageRepository.saveAll" to (Shape.IN_TRANSACTION by "(Collection<Reminder>): Unit"),
-        "ReminderStorageRepository.deleteAll" to (Shape.NAMED_FIELDS by "(Collection<NotificationKey>): Unit")
+        // Удаляется то, что перечитано той же транзакцией: отозванное, воскрешённое между гашением и
+        // удалением, живёт дальше.
+        "ReminderStorageRepository.deleteAll" to (Shape.IN_TRANSACTION by "(Collection<NotificationKey>): Unit")
     )
 
     /**
@@ -174,6 +176,10 @@ class WriteContractTest {
             // Отложить по кнопке из шторки.
             "feature/notification/ReminderAnswering.kt",
             // Записать исход показа — перечитав: пока шла система, обязательство могли изменить.
+            "feature/notification/ReminderOutbox.kt"
+        ),
+        "ReminderStorageRepository.deleteAll" to setOf(
+            // Забыть отозванное и давнее — перечитав: воскрешённое между гашением и удалением живёт.
             "feature/notification/ReminderOutbox.kt"
         )
     )

@@ -112,11 +112,12 @@ class ReminderOutbox @Inject constructor(
     }
 
     private suspend fun attempt(): Report {
-        val dismissed = dismissWithdrawn()
+        var dismissed = dismissWithdrawn()
         val now = clock.instant()
-        val awaiting = reminders.awaiting(NoticeDelivery.SYSTEM)
-        val due = awaiting.filter { it.isDue(now) }
-        if (due.any { it.kind == NotificationKind.INTAKE_DUE }) freshness.refreshBriefly(REFRESH_WAIT)
+        // Ожидание свежести — окно до двух секунд, и прочитанное до него устаревает: человек
+        // успевает отложить, лечение — отмениться. Показывается то, что наступило **после** него.
+        if (due(now).any { it.kind == NotificationKind.INTAKE_DUE }) freshness.refreshBriefly(REFRESH_WAIT)
+        val due = due(now)
 
         var shown = 0
         var blocked = 0
@@ -128,7 +129,14 @@ class ReminderOutbox @Inject constructor(
                 blocked++
                 continue
             }
-            if (settle(reminder.key, outcome)) shown += if (outcome == Delivery.SHOWN) 1 else 0
+            when (settle(reminder.key, outcome)) {
+                Settled.RECORDED -> if (outcome == Delivery.SHOWN) shown++
+                // Пока система показывала, обязательство изменилось: карточка висит без основания.
+                Settled.OUTDATED -> if (outcome == Delivery.SHOWN) {
+                    attempt { notifier.dismiss(reminder.key) }
+                    dismissed++
+                }
+            }
         }
         forgetThePast(now)
 
@@ -141,43 +149,60 @@ class ReminderOutbox @Inject constructor(
         return report
     }
 
+    /** Наступившее и несказанное этим способом доставки — свежим чтением. */
+    private suspend fun due(now: Instant): List<Reminder> =
+        reminders.awaiting(NoticeDelivery.SYSTEM).filter { it.isDue(now) }
+
     /**
-     * Записать исход показа — **перечитав** обязательство своей транзакцией. Между чтением до сети
-     * и этой записью прошло до двух секунд: лечение могли отменить, человек мог отложить. Писать
-     * прочитанное тогда значило бы воскресить снятое и потерять отсрочку (F5, C1).
+     * Записать исход показа — **перечитав** обязательство своей транзакцией. Пока шла система,
+     * лечение могли отменить, человек мог отложить. Писать прочитанное значило бы воскресить снятое
+     * и потерять отсрочку (F5, C1).
      *
-     * Изменилось — не трогаем: решение приняли без нас, и оно свежее. Карточку, показанную зря,
-     * погасит следующий проход.
+     * Изменилось — решение приняли без нас, и оно свежее: исход не записывается, а вызывающий
+     * гасит показ, оставшийся без основания. «Следующий проход поправит» здесь не работает: он
+     * снимает отозванное, а отложенное остаётся обещанным на новый срок — с карточкой в шторке.
      */
-    private suspend fun settle(key: com.kert0n.medapp.domain.notification.NotificationKey, outcome: Delivery): Boolean =
+    private suspend fun settle(key: com.kert0n.medapp.domain.notification.NotificationKey, outcome: Delivery): Settled =
         transactions.run {
-            val fresh = reminders.find(key) ?: return@run false
+            val fresh = reminders.find(key) ?: return@run Settled.OUTDATED
             val at = clock.instant()
-            if (!fresh.isDue(at)) return@run false
+            if (!fresh.isDue(at)) return@run Settled.OUTDATED
             when (outcome) {
                 Delivery.SHOWN -> fresh.deliveredAt(at)
                 Delivery.SUBJECT_GONE -> fresh.withdraw()
                 Delivery.FAILED -> fresh.failedAt(at)
-                Delivery.NOT_ALLOWED -> return@run false
+                Delivery.NOT_ALLOWED -> return@run Settled.OUTDATED
             }
             reminders.saveAll(listOf(fresh))
-            true
+            Settled.RECORDED
         }
+
+    /** Исход записан — либо обязательство изменилось, пока система показывала, и показ устарел. */
+    private enum class Settled { RECORDED, OUTDATED }
 
     /** Точность просит тот, чей срок настал: напоминанию о приёме она нужна, остальному нет. */
     private fun exactnessOf(awaiting: List<Reminder>, next: java.time.Instant): Boolean =
         awaiting.any { it.exact && it.wakeAt(next) == null && it.dueAt <= next }
 
-    /** Повода больше нет: гасим показанное и забываем. Система не откатывается вместе с базой (F5). */
+    /**
+     * Повода больше нет: гасим показанное и забываем. Система не откатывается вместе с базой (F5),
+     * поэтому гашение идёт по прочитанному, а удаление — **перечитав** в своей транзакции: пока
+     * система гасила, повод мог вернуться, и `promise` воскресил обязательство под тем же ключом.
+     * Удалить его значило бы потерять живое; гашение воскрешённого безвредно — сказано о нём не было.
+     */
     private suspend fun dismissWithdrawn(): Int {
         val withdrawn = reminders.withdrawn()
         for (reminder in withdrawn) notifier.dismiss(reminder.key)
-        reminders.deleteAll(withdrawn.map { it.key })
+        transactions.run {
+            reminders.deleteAll(
+                reminders.findAll(withdrawn.map { it.key }).filter { it.state == Reminder.State.WITHDRAWN }.map { it.key }
+            )
+        }
         return withdrawn.size
     }
 
-    /** Давнее забывается: решает сама сущность, запрос только сужает отбор. */
-    private suspend fun forgetThePast(now: java.time.Instant) {
+    /** Давнее забывается: решает сама сущность, запрос только сужает отбор — и решает, и удаляет одна транзакция. */
+    private suspend fun forgetThePast(now: java.time.Instant) = transactions.run {
         val stale = reminders.stale(now.minus(Reminder.RETENTION))
         reminders.deleteAll(stale.filter { it.forgettable(now) }.map { it.key })
     }

@@ -272,5 +272,9 @@ class ReminderOutboxTest {
         val after = requireNotNull(scenarios.reminderStore.find(reminder.key))
         assertEquals("отсрочка потеряна: записано прочитанное до сети", later, after.dueAt)
         assertEquals(Reminder.State.DUE, after.state)
+        // И в шторке отложенного нет: наступившее перечитано после ожидания, а не показано по
+        // объекту, прочитанному до него.
+        assertTrue("отложенное показано", scenarios.notifier.shown.none { it.key == reminder.key })
+        assertEquals("будильник — на новый срок", later, scenarios.reminders.wakeAt)
     }
 }
