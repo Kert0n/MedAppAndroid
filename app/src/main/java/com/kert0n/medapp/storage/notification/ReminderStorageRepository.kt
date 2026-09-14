@@ -3,6 +3,7 @@ package com.kert0n.medapp.storage.notification
 import com.kert0n.medapp.domain.notification.NoticeDelivery
 import com.kert0n.medapp.domain.notification.NotificationKey
 import com.kert0n.medapp.domain.notification.NotificationKind
+import com.kert0n.medapp.domain.notification.PendingNotice
 import com.kert0n.medapp.domain.notification.Reminder
 import kotlinx.coroutines.flow.Flow
 
@@ -37,6 +38,12 @@ interface ReminderStorageRepository {
      * к чему будить, решает [Reminder]; запрос таких вопросов не задаёт.
      */
     suspend fun awaiting(delivery: NoticeDelivery): List<Reminder>
+
+    /**
+     * То же невыполненное — потоком проекций для экрана (PLAN H3 №29): лист приёмов без пушей и
+     * баннеры дня. Наступило ли, экран решает по `dueAt` и своим часам.
+     */
+    fun observeAwaiting(delivery: NoticeDelivery): Flow<List<PendingNotice>>
 
     /** Отозванное: его надо погасить в системе и забыть. */
     suspend fun withdrawn(): List<Reminder>

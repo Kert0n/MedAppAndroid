@@ -56,6 +56,29 @@ class ReminderOutboxTest {
         Reminder(NotificationKey.reduction(course), NotificationTarget.CourseSources(course), at)
 
     /**
+     * Баннер дня показывает экран, а отмечает показ владелец доставки — один и для системы, и
+     * для экрана. Отмеченный второй раз не наступает; системное обязательство под этой отметкой
+     * не меняется; назавтра сверка снимает баннер сама — просрочка вместо «сегодня истекает».
+     */
+    @Test
+    fun aBannerShownByTheScreenIsRecordedOnceByTheOwner() = runTest {
+        val day = LocalDate.of(2027, 3, 10)
+        val expiry = com.kert0n.medapp.domain.pack.ExpiryDate(day)
+        val banner = Reminder(NotificationKey.expiry(PACK, expiry, NotificationKind.EXPIRY_TODAY), NotificationTarget.PackageCard(PACK), now.minusSeconds(60))
+        val system = digest()
+        scenarios.reminderStore.saveAll(listOf(banner, system))
+
+        scenarios.reminderOutbox.bannerShown(listOf(banner.key, system.key))
+
+        assertEquals(Reminder.State.SHOWN, requireNotNull(scenarios.reminderStore.find(banner.key)).state)
+        assertEquals("системное обязательство экрану не принадлежит", Reminder.State.DUE, requireNotNull(scenarios.reminderStore.find(system.key)).state)
+        assertTrue(scenarios.reminderStore.awaiting(com.kert0n.medapp.domain.notification.NoticeDelivery.IN_APP_BANNER).isEmpty())
+        // Повторная отметка ничего не ломает: показанное остаётся показанным.
+        scenarios.reminderOutbox.bannerShown(listOf(banner.key))
+        assertEquals(Reminder.State.SHOWN, requireNotNull(scenarios.reminderStore.find(banner.key)).state)
+    }
+
+    /**
      * **Структурная причина: будиться незачем.** Разрешения нет — показ не состоится, сколько ни
      * буди. Обязательство остаётся невыполненным и ждёт экрана, а будильник на прошедший срок не
      * ставится: иначе система разбудит процесс немедленно, проход снова не покажет, и так без конца.

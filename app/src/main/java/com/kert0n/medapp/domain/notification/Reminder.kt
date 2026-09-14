@@ -79,6 +79,9 @@ class Reminder(
     /** Наступило, а сказать нечем: этого ждёт лист приёмов при запуске (PLAN H3 №29). */
     fun awaitsAttention(now: Instant): Boolean = isDue(now)
 
+    /** Экрану — проекция: что обещано, кому и на когда; переходов у неё нет. */
+    fun projection(): PendingNotice = PendingNotice(key, target, dueAt)
+
     /**
      * Человек отложил: срок другой, повод тот же. `plannedAt` пункта и граница `MISSED` не
      * двигаются (PLAN D8) — сдвигается только обещание сказать, и задержка повтора с ним не спорит.

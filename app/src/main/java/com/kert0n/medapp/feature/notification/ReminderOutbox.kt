@@ -7,6 +7,7 @@ import com.kert0n.medapp.domain.notification.NotificationKind
 import com.kert0n.medapp.domain.notification.Freshness
 import com.kert0n.medapp.domain.notification.Delivery
 import com.kert0n.medapp.domain.notification.Reminder
+import com.kert0n.medapp.domain.notification.NotificationKey
 import com.kert0n.medapp.domain.notification.Notifier
 import com.kert0n.medapp.domain.notification.ReminderAlarms
 import com.kert0n.medapp.storage.notification.ReminderStorageRepository
@@ -157,6 +158,22 @@ class ReminderOutbox @Inject constructor(
         return report
     }
 
+    /**
+     * Экран показал баннеры дня (PLAN D8): владелец доставки один и для системы, и для экрана —
+     * отметка показа делается здесь, перечитав обязательство своей транзакцией. Отмечается только
+     * баннер, и только наступивший: системное обязательство экрану не принадлежит.
+     */
+    suspend fun bannerShown(keys: Collection<NotificationKey>) {
+        if (keys.isEmpty()) return
+        transactions.run {
+            val at = clock.instant()
+            val shown = reminders.findAll(keys)
+                .filter { it.delivery == NoticeDelivery.IN_APP_BANNER && it.isDue(at) }
+                .onEach { it.deliveredAt(at) }
+            reminders.saveAll(shown)
+        }
+    }
+
     /** Наступившее и несказанное этим способом доставки — свежим чтением. */
     private suspend fun due(now: Instant): List<Reminder> =
         reminders.awaiting(NoticeDelivery.SYSTEM).filter { it.isDue(now) }
@@ -170,7 +187,7 @@ class ReminderOutbox @Inject constructor(
      * гасит показ, оставшийся без основания. «Следующий проход поправит» здесь не работает: он
      * снимает отозванное, а отложенное остаётся обещанным на новый срок — с карточкой в шторке.
      */
-    private suspend fun settle(key: com.kert0n.medapp.domain.notification.NotificationKey, outcome: Delivery): Settled =
+    private suspend fun settle(key: NotificationKey, outcome: Delivery): Settled =
         transactions.run {
             val fresh = reminders.find(key) ?: return@run Settled.OUTDATED
             val at = clock.instant()

@@ -4,9 +4,11 @@ import com.kert0n.medapp.domain.notification.NoticeDelivery
 import com.kert0n.medapp.domain.notification.NotificationKey
 import com.kert0n.medapp.domain.notification.NotificationKind
 import com.kert0n.medapp.domain.notification.NotificationTarget
+import com.kert0n.medapp.domain.notification.PendingNotice
 import com.kert0n.medapp.domain.notification.Reminder
 import com.kert0n.medapp.domain.value.Attempts
 import com.kert0n.medapp.storage.database.MedAppDatabase
+import com.kert0n.medapp.storage.database.observing
 import java.time.Instant
 import java.time.LocalDate
 import javax.inject.Inject
@@ -32,6 +34,9 @@ class ReminderRoomRepository @Inject constructor(
 
     override suspend fun awaiting(delivery: NoticeDelivery): List<Reminder> =
         reminders.awaiting(delivery.name).map { it.toDomain() }
+
+    override fun observeAwaiting(delivery: NoticeDelivery): Flow<List<PendingNotice>> =
+        database.observing("reminders") { awaiting(delivery).map { it.projection() } }
 
     override suspend fun withdrawn(): List<Reminder> = reminders.withdrawn().map { it.toDomain() }
 

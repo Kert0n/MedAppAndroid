@@ -149,6 +149,7 @@ class WriteContractTest {
         "ReminderStorageRepository.find" to (Shape.READ by "(NotificationKey): Reminder"),
         "ReminderStorageRepository.findAll" to (Shape.READ by "(Collection<NotificationKey>): List<Reminder>"),
         "ReminderStorageRepository.awaiting" to (Shape.READ by "(NoticeDelivery): List<Reminder>"),
+        "ReminderStorageRepository.observeAwaiting" to (Shape.READ by "(NoticeDelivery): Flow<List<PendingNotice>>"),
         "ReminderStorageRepository.withdrawn" to (Shape.READ by "(): List<Reminder>"),
         "ReminderStorageRepository.stale" to (Shape.READ by "(Instant): List<Reminder>"),
         "ReminderStorageRepository.ofKinds" to (Shape.READ by "(Collection<? extends NotificationKind>): List<Reminder>"),
