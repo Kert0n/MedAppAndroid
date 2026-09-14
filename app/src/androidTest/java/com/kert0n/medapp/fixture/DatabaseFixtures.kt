@@ -146,7 +146,7 @@ fun MedAppDatabase.queueService() = com.kert0n.medapp.queue.QueueService(transac
  */
 class Scenarios(
     database: MedAppDatabase,
-    now: java.time.Instant,
+    val now: java.time.Instant,
     val notifier: FakeNotifier = FakeNotifier(),
     val reminders: FakeReminders = FakeReminders(),
     val notificationSettings: FakeSettings = FakeSettings(),

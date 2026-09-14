@@ -17,6 +17,8 @@ import com.kert0n.medapp.domain.value.Quantity
 import com.kert0n.medapp.domain.value.QuantityUnit
 import com.kert0n.medapp.feature.course.CourseClosing
 import com.kert0n.medapp.feature.intake.IntakeConfirmation
+import com.kert0n.medapp.feature.intake.UnplannedIntakeRecording
+import java.time.Instant
 import com.kert0n.medapp.fixture.MOSCOW
 import com.kert0n.medapp.fixture.schedule
 import com.kert0n.medapp.fixture.ProbeAccounts
@@ -523,6 +525,33 @@ class SharedMedKitProbe {
         assertEquals(PackageStatus.ACTIVE, carried.status)
         assertAmount("16", carried.quantity.amount)
         assertEquals(listOf(shared.box), anna.database.courses().sourcePackagesOf(anna.course))
+    }
+
+    /**
+     * **Гонка версии (PLAN J2.11).** Оба выпили из одной коробки, не видя друг друга: Анна —
+     * офлайн, Борис — и доставил первым. Связь у Анны: расход готовится по **свежему** чтению —
+     * `GET` приносит остаток и версию после Бориса, `sync` уходит с ней, и сервер списывает поверх,
+     * а не отвергает по устаревшей версии (C1 «Синхронизация», E3). Оба приёма — факты, оба учтены,
+     * ни одного отказа.
+     */
+    @Test
+    fun bothConsumeWithoutSeeingEachOtherAndBothIntakesLand(): Unit = runBlocking {
+        val shared = sharedShelfWithBorisTreated()
+        // У Анны коробка — как она её видела: 20 минус то, что успела узнать. Её приём — офлайн.
+        val annas = anna.scenarios().unplannedIntakeRecording.record(shared.box, twoPills(), Instant.now(), acknowledged = true)
+        val recorded = (annas as? UnplannedIntakeRecording.Outcome.Recorded) ?: throw AssertionError("приём Анны не записан: $annas")
+        // Борис доставил свой второй приём раньше: на сервере 16 и новая версия.
+        boris.confirm(shared.intakes[1], shared.box)
+        boris.drain()
+        assertAmount("16", serverAmount(shared.box))
+
+        anna.drain()
+
+        assertAmount("14", serverAmount(shared.box))
+        assertEquals(listOf(SyncOperationStatus.APPLIED), anna.statuses().distinct())
+        assertEquals(IntakeAccounting.REMOTE_APPLIED, anna.accountingOf(recorded.intake.id))
+        assertEquals(IntakeAccounting.REMOTE_APPLIED, boris.accountingOf(shared.intakes[1]))
+        assertAmount("14", requireNotNull(anna.packages.find(shared.box)).quantity.amount)
     }
 
     /**
