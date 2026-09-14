@@ -126,6 +126,7 @@ interface SyncOperationDao {
     suspend fun unclosedOfMedKit(medKitId: Uuid): Int
 
     /** Незакрытые команды полки строками — чтобы закрыть каждую её же переходом (PLAN G2). */
+    @Transaction
     @Query(
         "SELECT * FROM sync_operations WHERE med_kit_id = :medKitId " +
             "AND status NOT IN ('APPLIED', 'REFUSED', 'ACCESS_LOST') ORDER BY sequence"
