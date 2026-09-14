@@ -139,19 +139,14 @@ class SystemNotifier @Inject constructor(
     }
 
     /**
-     * Открыть приложение по цели: только идентификаторы и дата в extras (G3). Платформа не знает
-     * экранов и их Activity (H1) — открывается то, что пакет объявил точкой входа.
+     * Открыть приложение по цели: только идентификаторы и дата в extras (G3), и кладёт их тот же
+     * [NotificationTargetExtras], который их потом читает. Платформа не знает экранов и их
+     * Activity (H1) — открывается то, что пакет объявил точкой входа.
      */
     private fun openIntent(notification: Reminder): PendingIntent {
         val intent = requireNotNull(context.packageManager.getLaunchIntentForPackage(context.packageName)) { "у приложения есть точка входа" }
             .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_SINGLE_TOP)
-        when (val target = notification.target) {
-            is NotificationTarget.Intake -> intent.putExtra(EXTRA_INTAKE_ID, target.intakeId.toString())
-            is NotificationTarget.PackageCard -> intent.putExtra(EXTRA_PACKAGE_ID, target.packageId.toString())
-            is NotificationTarget.CourseSources -> intent.putExtra(EXTRA_COURSE_ID, target.courseId.toString())
-            is NotificationTarget.DayPlan -> intent.putExtra(EXTRA_DATE, target.date.toString())
-            NotificationTarget.SyncStatus -> intent.putExtra(EXTRA_SYNC_STATUS, true)
-        }
+        NotificationTargetExtras.put(intent, notification.target)
         return PendingIntent.getActivity(context, notification.key.hashCode(), intent, PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE)
     }
 
@@ -170,12 +165,6 @@ class SystemNotifier @Inject constructor(
         }
 
     companion object {
-        const val EXTRA_INTAKE_ID = "intake_id"
-        const val EXTRA_PACKAGE_ID = "package_id"
-        const val EXTRA_COURSE_ID = "course_id"
-        const val EXTRA_DATE = "date"
-        const val EXTRA_SYNC_STATUS = "sync_status"
-
         private val DATE: DateTimeFormatter = DateTimeFormatter.ofLocalizedDate(FormatStyle.MEDIUM)
     }
 }

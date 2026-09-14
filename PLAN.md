@@ -2041,8 +2041,9 @@ interface DevicePermissions { fun current(): PermissionStates }
 `DailyWorker` и вход в приложение остаются страховкой на случай потерянного системой будильника —
 и единственным поводом прийти, когда показывать нельзя структурно.
 
-**Платформа** `platform/notifications`: четыре канала, `SystemNotifier` (`tag = subject`,
-`id = kind`, текст из `R.string.*`, `PendingIntent` только с идентификаторами),
+**Платформа** `platform/notifications`: пять каналов, `SystemNotifier` (`tag = subject`,
+`id = kind`, текст из `R.string.*`, `PendingIntent` только с идентификаторами — кладёт и читает их
+`NotificationTargetExtras`, один на писателя и читателя),
 `AlarmManagerReminders` (`setExactAndAllowWhileIdle` при разрешении, иначе `setAndAllowWhileIdle`),
 `ReminderWakeReceiver`, `NotificationActionReceiver` (`SKIP` → `IntakeDeclining`, `SNOOZE` →
 `Reminder.defer`; `startActivity` из приёмника не делается — это запрещённый trampoline),
@@ -4780,7 +4781,7 @@ T-22, T-28.
 | 1 | `Разрешение на уведомления спрашивается, когда нужно` | `POST_NOTIFICATIONS` при включении напоминаний, отказ не ломает курс |
 | 2 | `Точные будильники объясняются, а не требуются` | переход в системные настройки `SCHEDULE_EXACT_ALARM`, состояние видно |
 | 3 | `Баннер «сегодня истекает» показывается один раз` | несколько пачек дня — один баннер со списком |
-| 4 | `Уведомление ведёт туда, куда обещает` | `NotificationTarget` → маршрут |
+| 4 | `Уведомление ведёт туда, куда обещает` | `NotificationTarget` → маршрут; цель из намерения берётся `NotificationTargetExtras.read` — тем же, что её кладёт `SystemNotifier`; своего разбора extras оболочка не пишет (разбор #29) |
 | 5 | `Сказать нечем — спрашиваем при запуске` | экран 29: лист невыполненных обязательств, «Принял»/«Пропустил» теми же сценариями; заголовок ведёт в системные настройки |
 | 6 | `«Принял» возвращается в шторку` | путь к форме предупреждения в обход запрета trampoline — решить и проверить (C1) |
 
