@@ -1,5 +1,6 @@
 package com.kert0n.medapp.domain.notification
 
+import com.kert0n.medapp.domain.value.Attempts
 import java.time.Duration
 import java.time.Instant
 
@@ -23,7 +24,7 @@ class Reminder(
     state: State = State.DUE,
     shownAt: Instant? = null,
     notBefore: Instant? = null,
-    attempts: Int = 0
+    attempts: Attempts = Attempts.none
 ) {
 
     /** Момент, к которому обещано сказать. Логический: система точной доставки не обещает. */
@@ -46,7 +47,7 @@ class Reminder(
         private set
 
     /** Только вход задержки: смысла сам по себе не несёт. */
-    var attempts: Int = attempts
+    var attempts: Attempts = attempts
         private set
 
     init {
@@ -86,7 +87,7 @@ class Reminder(
         check(state != State.WITHDRAWN) { "отозванное напоминание не откладывают" }
         dueAt = until
         notBefore = null
-        attempts = 0
+        attempts = Attempts.none
         state = State.DUE
     }
 
@@ -96,7 +97,7 @@ class Reminder(
         state = State.SHOWN
         shownAt = at
         notBefore = null
-        attempts = 0
+        attempts = Attempts.none
     }
 
     /**
@@ -105,7 +106,7 @@ class Reminder(
      */
     fun failedAt(now: Instant) {
         check(state == State.DUE) { "повторяют то, что наступило" }
-        attempts += 1
+        attempts = attempts.next()
         notBefore = now.plus(backoff(attempts))
     }
 
@@ -122,7 +123,7 @@ class Reminder(
         check(revivable()) { "воскрешают только отозванное и несказанное" }
         this.dueAt = dueAt
         notBefore = null
-        attempts = 0
+        attempts = Attempts.none
         state = State.DUE
     }
 
@@ -158,8 +159,8 @@ class Reminder(
         private val MAX_BACKOFF: Duration = Duration.ofHours(1)
         private const val MAX_BACKOFF_STEPS = 6
 
-        private fun backoff(attempts: Int): Duration =
-            INITIAL_BACKOFF.multipliedBy(1L shl minOf(attempts - 1, MAX_BACKOFF_STEPS).coerceAtLeast(0))
+        private fun backoff(attempts: Attempts): Duration =
+            INITIAL_BACKOFF.multipliedBy(1L shl minOf(attempts.count - 1, MAX_BACKOFF_STEPS).coerceAtLeast(0))
                 .coerceAtMost(MAX_BACKOFF)
     }
 }

@@ -5,6 +5,7 @@ import com.kert0n.medapp.domain.notification.NotificationKey
 import com.kert0n.medapp.domain.notification.NotificationKind
 import com.kert0n.medapp.domain.notification.NotificationTarget
 import com.kert0n.medapp.domain.notification.Reminder
+import com.kert0n.medapp.domain.value.Attempts
 import com.kert0n.medapp.storage.database.MedAppDatabase
 import java.time.Instant
 import java.time.LocalDate
@@ -60,7 +61,7 @@ private fun Reminder.toStorageEntity() = ReminderStorageEntity(
     state = state.name,
     shownAt = shownAt,
     notBefore = notBefore,
-    attempts = attempts
+    attempts = attempts.count
 )
 
 private fun ReminderStorageEntity.toDomain() = Reminder(
@@ -70,7 +71,7 @@ private fun ReminderStorageEntity.toDomain() = Reminder(
     state = Reminder.State.valueOf(state),
     shownAt = shownAt,
     notBefore = notBefore,
-    attempts = attempts
+    attempts = Attempts(attempts)
 )
 
 private val NotificationTarget.stored: String

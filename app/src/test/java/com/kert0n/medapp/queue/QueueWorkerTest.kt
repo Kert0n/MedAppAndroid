@@ -1,5 +1,6 @@
 package com.kert0n.medapp.queue
 
+import com.kert0n.medapp.domain.value.Attempts
 import com.kert0n.medapp.domain.value.Vocabulary
 import org.junit.Assert.assertFalse
 import java.math.BigDecimal
@@ -169,7 +170,7 @@ class QueueWorkerTest {
         override suspend fun defer(id: Uuid, reason: String, at: Instant, notBefore: Instant) {
             deferred += id to reason
             val operation = operations.getValue(id)
-            operations[id] = operation.with(attempts = operation.attempts + 1, lastTriedAt = at, notBefore = notBefore)
+            operations[id] = operation.with(attempts = operation.attempts.next(), lastTriedAt = at, notBefore = notBefore)
         }
 
 
@@ -190,7 +191,7 @@ class QueueWorkerTest {
                 )
                 is Settlement.Transition.Retry -> operation.with(
                     status = SyncOperationStatus.PENDING,
-                    attempts = operation.attempts + (if (transition.attempted) 1 else 0),
+                    attempts = if (transition.attempted) operation.attempts.next() else operation.attempts,
                     lastTriedAt = at, dropAnswer = true,
                     notBefore = transition.notBefore, dropNotBefore = transition.notBefore == null,
                     outcomeUnknown = operation.outcomeUnknown || transition.outcomeUnknown
@@ -229,7 +230,7 @@ class QueueWorkerTest {
         private fun SyncOperation.with(
             status: SyncOperationStatus = this.status,
             prepared: PreparedRequest? = this.prepared,
-            attempts: Int = this.attempts,
+            attempts: Attempts = this.attempts,
             lastTriedAt: Instant? = this.lastTriedAt,
             answer: RawResponse? = this.answer,
             notBefore: Instant? = this.notBefore,
@@ -318,7 +319,7 @@ class QueueWorkerTest {
         outcomeUnknown: Boolean = false
     ) = SyncOperation(
         id = id, command = command, sequence = sequence, createdAt = EARLIER, payloadVersion = 1,
-        prepared = prepared, status = status, attempts = attempts, lastTriedAt = lastTriedAt,
+        prepared = prepared, status = status, attempts = Attempts(attempts), lastTriedAt = lastTriedAt,
         outcomeUnknown = outcomeUnknown
     )
 
@@ -761,7 +762,7 @@ class QueueWorkerTest {
         worker(storage, transport).drain()
 
         assertEquals(1, transport.sent.size)
-        assertTrue(storage.operations.values.all { it.attempts == 0 })
+        assertTrue(storage.operations.values.all { it.attempts.isNone })
         assertEquals(listOf(now.plusSeconds(2)), storage.operations.values.mapNotNull { it.notBefore })
     }
 

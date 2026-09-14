@@ -321,8 +321,8 @@ class QueueWorker @Inject constructor(
     }
 
     /** Две секунды после первой неудачи, удвоение с каждой следующей, не дольше пяти минут. */
-    private fun backoff(attempts: Int): Duration =
-        (INITIAL_BACKOFF * (1 shl minOf(attempts - 1, MAX_BACKOFF_STEPS).coerceAtLeast(0))).coerceAtMost(MAX_BACKOFF)
+    private fun backoff(attempts: com.kert0n.medapp.domain.value.Attempts): Duration =
+        (INITIAL_BACKOFF * (1 shl minOf(attempts.count - 1, MAX_BACKOFF_STEPS).coerceAtLeast(0))).coerceAtMost(MAX_BACKOFF)
 
     /** Чем кончился шаг по одной операции. */
     private sealed interface Step {
@@ -367,7 +367,7 @@ class QueueWorker @Inject constructor(
         }
 
         private fun later(operation: SyncOperation, wait: Duration? = null): Instant =
-            clock.instant().plus((wait ?: backoff(operation.attempts + 1)).toJavaDuration()).also(::retryNotBefore)
+            clock.instant().plus((wait ?: backoff(operation.attempts.next())).toJavaDuration()).also(::retryNotBefore)
 
         /** Записывает шаг; `true` — проход надо остановить. */
         suspend fun record(operation: SyncOperation, step: Step): Boolean {

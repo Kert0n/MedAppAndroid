@@ -1,5 +1,6 @@
 package com.kert0n.medapp.queue
 
+import com.kert0n.medapp.domain.value.Attempts
 import com.kert0n.medapp.network.server.RawResponse
 import java.time.Instant
 import java.util.Objects
@@ -34,7 +35,7 @@ class SyncOperation(
     val groupId: Uuid? = null,
     dependsOn: Set<Uuid> = emptySet(),
     val status: SyncOperationStatus = SyncOperationStatus.PENDING,
-    val attempts: Int = 0,
+    val attempts: Attempts = Attempts.none,
     val lastError: String? = null,
     val lastTriedAt: Instant? = null,
     val answer: RawResponse? = null,
@@ -47,7 +48,6 @@ class SyncOperation(
 
     init {
         require(sequence >= 0) { "номер в очереди не бывает отрицательным: $sequence" }
-        require(attempts >= 0) { "число попыток не бывает отрицательным: $attempts" }
         require(payloadVersion >= 1) { "версия payload начинается с единицы" }
         require(id !in dependsOn) { "операция не зависит от себя самой" }
         require((answer != null) == (status == SyncOperationStatus.ANSWERED)) {

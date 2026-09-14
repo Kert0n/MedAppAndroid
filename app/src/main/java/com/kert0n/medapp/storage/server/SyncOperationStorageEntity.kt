@@ -68,7 +68,7 @@ fun SyncOperation.toStorageEntity(
     payloadVersion = payloadVersion,
     sequence = sequence,
     status = status,
-    attempts = attempts,
+    attempts = attempts.count,
     createdAt = createdAt,
     packageId = SyncCommandStorageConverter.packageIdOf(command),
     medKitId = medKitId,
