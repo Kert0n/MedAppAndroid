@@ -128,8 +128,15 @@ fun MedAppDatabase.queueService() = com.kert0n.medapp.queue.QueueService(transac
  * Сценарии над одной базой с остановленными часами [now]: удаление и перенос коробки, уборка
  * полки. Собираются вместе, потому что аптечка зовёт шаги коробки, и граф один.
  */
-class Scenarios(database: MedAppDatabase, now: java.time.Instant) {
+class Scenarios(
+    database: MedAppDatabase,
+    now: java.time.Instant,
+    val notifier: FakeNotifier = FakeNotifier(),
+    val reminders: FakeReminders = FakeReminders(),
+    val notificationSettings: FakeSettings = FakeSettings()
+) {
     private val clock = java.time.Clock.fixed(now, java.time.ZoneOffset.UTC)
+    val reminderWithdrawal = com.kert0n.medapp.feature.notification.ReminderWithdrawal(notifier, reminders)
     private val packages = database.packageRepository()
     private val medKits = database.medKitRepository()
     private val courses = database.courseRepository()
@@ -173,13 +180,16 @@ class Scenarios(database: MedAppDatabase, now: java.time.Instant) {
         courses, database.intakeRepository(), packages, courseCalendar, queue, transactions, clock
     )
     val intakeDeclining = com.kert0n.medapp.feature.intake.IntakeDeclining(
-        database.intakeRepository(), courses, courseCalendar, transactions, clock
+        database.intakeRepository(), courses, courseCalendar, reminderWithdrawal, transactions, clock
     )
     val courseOffPlanCounting = com.kert0n.medapp.feature.course.CourseOffPlanCounting(
         courses, database.intakeRepository(), courseCalendar, courseClamping, courseClosing, transactions, clock
     )
     val intakeConfirmation = com.kert0n.medapp.feature.intake.IntakeConfirmation(
-        database.intakeRepository(), courses, packages, transactions, queue, courseClosing, courseCalendar, clock
+        database.intakeRepository(), courses, packages, transactions, queue, courseClosing, courseCalendar, reminderWithdrawal, clock
+    )
+    val reminderAnswering = com.kert0n.medapp.feature.notification.ReminderAnswering(
+        database.intakeRepository(), intakeConfirmation, intakeDeclining, reminders, notificationSettings, clock
     )
 }
 

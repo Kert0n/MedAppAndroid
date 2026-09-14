@@ -24,6 +24,7 @@ import com.kert0n.medapp.storage.course.CourseStorageRepository
 import com.kert0n.medapp.storage.intake.IntakeOutcome
 import com.kert0n.medapp.storage.intake.IntakeStorageRepository
 import com.kert0n.medapp.storage.pack.PackageStorageRepository
+import com.kert0n.medapp.feature.notification.ReminderWithdrawal
 import java.time.Clock
 import java.time.Instant
 import javax.inject.Inject
@@ -48,6 +49,7 @@ class IntakeConfirmation @Inject constructor(
     private val queue: QueueService,
     private val closing: CourseClosing,
     private val calendar: CourseCalendar,
+    private val reminders: ReminderWithdrawal,
     private val clock: Clock
 ) {
 
@@ -64,6 +66,8 @@ class IntakeConfirmation @Inject constructor(
         at: Instant,
         acknowledged: Boolean = false
     ): Outcome = transactions.run { write(intakeId, packageId, amount, at, acknowledged) }
+        // Ответ дан — напоминать больше нечего: показанное гасится, будильник снимается (PLAN D8).
+        .also { if (it is Outcome.Confirmed) reminders.withdraw(intakeId) }
 
     private suspend fun write(intakeId: Uuid, packageId: Uuid, amount: Dose, at: Instant, acknowledged: Boolean): Outcome {
         val now = clock.instant()

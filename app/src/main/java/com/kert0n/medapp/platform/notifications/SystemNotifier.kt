@@ -138,8 +138,13 @@ class SystemNotifier @Inject constructor(
         return PendingIntent.getActivity(context, notification.key.hashCode(), intent, PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE)
     }
 
-    /** Действия с уведомления получают своего приёмника вместе с путём «Принял» из шторки (B17, коммит 5). */
-    private fun actionIntent(intakeId: Uuid, action: NotificationAction, key: NotificationKey): PendingIntent? = null
+    /** Действие едет своему приёмнику; в extras — только идентификатор пункта (G3). */
+    private fun actionIntent(intakeId: Uuid, action: NotificationAction, key: NotificationKey): PendingIntent? {
+        val intent = Intent(context, NotificationActionReceiver::class.java)
+            .setAction(action.name)
+            .putExtra(NotificationActionReceiver.EXTRA_INTAKE_ID, intakeId.toString())
+        return PendingIntent.getBroadcast(context, key.hashCode() * 31 + action.ordinal, intent, PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE)
+    }
 
     private val NotificationAction.label: Int
         get() = when (this) {

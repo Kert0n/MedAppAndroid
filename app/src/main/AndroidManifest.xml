@@ -39,6 +39,10 @@
         <receiver
             android:name=".platform.notifications.IntakeAlarmReceiver"
             android:exported="false" />
+        <!-- «Принял», «Пропустить», «Отложить» с уведомления — тем же путём, что экран (PLAN D8). -->
+        <receiver
+            android:name=".platform.notifications.NotificationActionReceiver"
+            android:exported="false" />
 
         <!-- WorkManager собирает фоновые задачи графом (MedApp), а не своим инициализатором. -->
         <provider

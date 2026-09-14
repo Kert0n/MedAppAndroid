@@ -20,6 +20,8 @@ import com.kert0n.medapp.feature.intake.IntakeConfirmation
 import com.kert0n.medapp.fixture.MOSCOW
 import com.kert0n.medapp.fixture.schedule
 import com.kert0n.medapp.fixture.ProbeAccounts
+import com.kert0n.medapp.fixture.FakeNotifier
+import com.kert0n.medapp.fixture.FakeReminders
 import com.kert0n.medapp.fixture.Scenarios
 import com.kert0n.medapp.fixture.courseRepository
 import com.kert0n.medapp.fixture.inMemoryDatabase
@@ -584,7 +586,8 @@ class SharedMedKitProbe {
         private val publishing = MedKitPublishing(medKits, packages, relocation, queue, transactions, clock)
         private val confirmation = IntakeConfirmation(
             database.intakeRepository(), courses, packages, transactions, queue, CourseClosing(courses, packages, queue),
-            CourseCalendar(database.intakeRepository(), packages), clock
+            CourseCalendar(database.intakeRepository(), packages),
+            com.kert0n.medapp.feature.notification.ReminderWithdrawal(FakeNotifier(), FakeReminders()), clock
         )
 
         fun scenarios() = Scenarios(database, clock.instant())
