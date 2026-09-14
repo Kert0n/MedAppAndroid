@@ -139,8 +139,9 @@ class CalendarRemindersTest {
     }
 
     /**
-     * `missOverdue` зовут восемь мест, и сказать о пропуске должно каждое: отказ от одного пункта
-     * отмечает вчерашний неответ — и обещает сказать о нём, хотя проход дня не при чём.
+     * `missOverdue` зовут восемь мест, и сказать о пропуске должно каждое — обещание заводит сам
+     * `missOverdue`, а не тот, кто его позвал. Здесь проверены два вызывающих, не имеющих к
+     * проходу дня отношения: отказ от пункта и правка лечения.
      */
     @Test
     fun everyPlaceThatMissesAnIntakeOwesTheNotice() = runTest {
@@ -161,5 +162,23 @@ class CalendarRemindersTest {
         // А об отказе человека не сообщают: он решил сам (D6, D8).
         assertNull(tomorrow.reminderStore.find(NotificationKey.intake(today.id, NotificationKind.INTAKE_MISSED)))
         assertEquals(Reminder.State.WITHDRAWN, requireNotNull(tomorrow.reminderStore.find(NotificationKey.intake(today.id, NotificationKind.INTAKE_DUE))).state)
+    }
+
+    /** Второй вызывающий: правка лечения тоже приводит прошлое в порядок — и тоже обещает сказать. */
+    @Test
+    fun amendingTheCourseAlsoOwesTheNoticeForWhatItMissed() = runTest {
+        val id = treated()
+        val tomorrow = Scenarios(database, Instant.parse("2027-03-11T05:00:00Z"), notifier = scenarios.notifier)
+        val revision = requireNotNull(database.courseRepository().findPlan(id)).revision
+
+        tomorrow.courseAmendment.amend(id, revision, listOf(CourseAmendment.Change.SetDose(dose("1"))))
+
+        val yesterday = database.intakeRepository().ofCourse(id).filterIsInstance<CourseIntake>()
+            .single { it.slot.localDate == start }
+        assertEquals(IntakeStatus.MISSED, yesterday.status)
+        assertEquals(
+            setOf(yesterday.id),
+            tomorrow.reminderStore.ofKinds(listOf(NotificationKind.INTAKE_MISSED)).map { Uuid.parse(it.key.subject) }.toSet()
+        )
     }
 }

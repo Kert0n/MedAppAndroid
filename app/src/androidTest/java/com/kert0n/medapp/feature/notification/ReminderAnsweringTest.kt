@@ -10,6 +10,7 @@ import com.kert0n.medapp.domain.notification.Reminder
 import com.kert0n.medapp.domain.pack.ExpiryDate
 import com.kert0n.medapp.domain.value.Doses
 import com.kert0n.medapp.feature.course.CourseDrafting
+import com.kert0n.medapp.fixture.OTHER_PACK
 import com.kert0n.medapp.fixture.PACK
 import com.kert0n.medapp.fixture.Scenarios
 import com.kert0n.medapp.fixture.TABLET_FORM
@@ -61,7 +62,7 @@ class ReminderAnsweringTest {
     @After
     fun tearDown() = database.close()
 
-    private suspend fun treated(): Uuid {
+    private suspend fun treated(fromPackage: Uuid = PACK): Uuid {
         val created = scenarios.courseDrafting.create("Ибупрофен")
         val draft = (scenarios.courseDrafting.edit(
             created.id, created.revision,
@@ -70,7 +71,7 @@ class ReminderAnsweringTest {
                 CourseDrafting.Edit.SetForm(TABLET_FORM),
                 CourseDrafting.Edit.SetSchedule(schedule(start = LocalDate.of(2027, 3, 10))),
                 CourseDrafting.Edit.SetTotalDoses(Doses(5)),
-                CourseDrafting.Edit.Attach(PACK, Doses(5))
+                CourseDrafting.Edit.Attach(fromPackage, Doses(5))
             )
         ) as CourseDrafting.Outcome.Saved).draft
         scenarios.courseActivation.activate(draft.id, draft.revision)
@@ -180,5 +181,72 @@ class ReminderAnsweringTest {
         assertTrue(scenarios.reminderStore.ofKinds(listOf(NotificationKind.INTAKE_DUE)).all { it.state == Reminder.State.DUE })
         scenarios.reminderOutbox.pass()
         assertEquals(emptyList<NotificationKey>(), scenarios.notifier.dismissed)
+    }
+
+    /**
+     * Прежде «Отложить» жило только в `AlarmManager`, и ближайший проход дня переставлял будильник
+     * обратно на `plannedAt` — момент в прошлом, — отчего напоминание возвращалось через минуты
+     * вместо пятнадцати. Теперь срок лежит в обязательстве.
+     *
+     * **Красная проверка** — заведение обязательства с плановым сроком поверх отложенного: сделай
+     * `raiseAll` перезаписью вместо «завести недостающее», и отсрочка исчезнет. Проход дня здесь
+     * же, потому что зовёт он ровно это.
+     */
+    @Test
+    fun aDeferredReminderSurvivesTheDailyRound() = runTest {
+        val id = treated()
+        val intake = first(id)
+        scenarios.reminderStore.raiseAll(listOf(reminderFor(intake)))
+        val snoozed = (scenarios.reminderAnswering.snooze(intake.id) as ReminderAnswering.Response.Snoozed).at
+
+        // Календарь обещает тем же ключом и плановым сроком — уже обещанного это не трогает.
+        scenarios.reminderStore.raiseAll(listOf(reminderFor(intake)))
+        scenarios.dailyRound.run()
+        scenarios.reminderOutbox.pass()
+
+        assertEquals(snoozed, requireNotNull(scenarios.reminderStore.find(reminderKey(intake))).dueAt)
+        assertEquals(Reminder.State.DUE, requireNotNull(scenarios.reminderStore.find(reminderKey(intake))).state)
+        // Будильник — на отложенный момент, а не на плановый: система исполняет сохранённый срок.
+        assertEquals(snoozed, scenarios.reminders.wakeAt)
+        assertEquals(emptyList<Any>(), scenarios.notifier.shown.filter { it.kind == NotificationKind.INTAKE_DUE })
+    }
+
+    /**
+     * Два препарата в один миг — две карточки и **один** будильник: число записей в системе от
+     * числа обязательств не зависит (решение владельца 2026-09-14). Прежде на этот миг стояло два
+     * будильника, и различал их только `hashCode` ключа.
+     */
+    @Test
+    fun twoIntakesAtTheSameMomentGiveTwoCardsAndOneAlarm() = runTest {
+        // Активное назначение пачки уникально, поэтому у второго лечения своя коробка.
+        database.packageRepository().add(pack(id = OTHER_PACK, quantity = tablets("20"), form = TABLET_FORM))
+        val both = listOf(treated(), treated(OTHER_PACK)).map { first(it) }
+        assertEquals(1, both.map { it.plannedAt }.toSet().size) // оба пункта стоят на один миг
+        scenarios.reminderStore.raiseAll(both.map { reminderFor(it) })
+
+        val delivered = scenarios.reminderOutbox.pass()
+
+        assertEquals(2, delivered.shown)
+        assertEquals(both.map { reminderKey(it) }.toSet(), scenarios.notifier.shown.map { it.key }.toSet())
+        assertEquals(1, scenarios.reminders.settings.size)
+    }
+
+    /**
+     * Система забыла — приложение помнит: новый владелец доставки над той же базой поднимает
+     * будильник из обязательств, ничего не зная о прежнем. Так расписание переживает перезагрузку
+     * и перезапуск процесса (PLAN D8).
+     */
+    @Test
+    fun aFreshOutboxRearmsFromTheTable() = runTest {
+        val id = treated()
+        val intake = first(id)
+        scenarios.reminderStore.raiseAll(listOf(reminderFor(intake)))
+
+        // Процесс поднялся заново: будильников в системе нет, таблица на месте.
+        val afterRestart = Scenarios(database, now.minusSeconds(3600))
+        assertNull(afterRestart.reminders.wakeAt)
+        afterRestart.reminderOutbox.pass()
+
+        assertEquals(intake.plannedAt, afterRestart.reminders.wakeAt)
     }
 }
