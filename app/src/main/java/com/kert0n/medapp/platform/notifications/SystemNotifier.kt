@@ -5,6 +5,7 @@ import android.app.PendingIntent
 import android.content.Context
 import android.content.Intent
 import android.content.pm.PackageManager
+import android.os.Build
 import androidx.core.app.NotificationCompat
 import androidx.core.app.NotificationManagerCompat
 import androidx.core.content.ContextCompat
@@ -45,7 +46,10 @@ class SystemNotifier @Inject constructor(
 
     override suspend fun show(notification: PlannedNotification): Boolean {
         // Проверка стоит здесь, а не в отдельном методе: lint видит её только рядом с `notify`.
-        if (ContextCompat.checkSelfPermission(context, Manifest.permission.POST_NOTIFICATIONS) != PackageManager.PERMISSION_GRANTED) return false
+        // `POST_NOTIFICATIONS` — разрешение только с Android 13; ниже его нет, и спрашивать надо систему.
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU &&
+            ContextCompat.checkSelfPermission(context, Manifest.permission.POST_NOTIFICATIONS) != PackageManager.PERMISSION_GRANTED
+        ) return false
         if (!NotificationManagerCompat.from(context).areNotificationsEnabled()) return false
         val text = textOf(notification) ?: return false
         val builder = NotificationCompat.Builder(context, notification.channel.id)

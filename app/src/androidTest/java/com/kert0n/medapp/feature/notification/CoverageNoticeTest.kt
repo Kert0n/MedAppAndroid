@@ -21,6 +21,7 @@ import com.kert0n.medapp.fixture.tablets
 import com.kert0n.medapp.storage.database.MedAppDatabase
 import com.kert0n.medapp.storage.server.NotificationLogRoomRepository
 import java.time.Clock
+import java.time.Duration
 import java.time.Instant
 import java.time.LocalDate
 import java.time.ZoneOffset
@@ -80,20 +81,20 @@ class CoverageNoticeTest {
     @Test
     fun aReductionIsAnnouncedOnceAndTheGapIsAnnouncedByItsDate() = runTest {
         val id = treated()
-        assertEquals(emptyList<NotificationKind>(), kinds(planning.coverageDue(today, now)))
+        assertEquals(emptyList<NotificationKind>(), kinds(planning.coverageDue(now)))
 
         scenarios.packageAdjusting.adjust(PACK, PackageAdjusting.Action.Recount(seen = tablets("20"), actual = tablets("8")))
 
-        assertEquals(listOf(NotificationKind.COVERAGE_SHORT), kinds(planning.coverageDue(today, now)))
+        assertEquals(listOf(NotificationKind.COVERAGE_SHORT), kinds(planning.coverageDue(now)))
         // Первый необеспеченный — пятый пункт, 14 марта: за три дня — 11-го, в день — 14-го.
-        assertEquals(listOf(NotificationKind.COVERAGE_SHORT, NotificationKind.COVERAGE_3D), kinds(planning.coverageDue(today.plusDays(1), now)))
-        assertEquals(listOf(NotificationKind.COVERAGE_SHORT), kinds(planning.coverageDue(today.plusDays(2), now)))
-        assertEquals(listOf(NotificationKind.COVERAGE_SHORT, NotificationKind.COVERAGE_END), kinds(planning.coverageDue(today.plusDays(4), now)))
+        assertEquals(listOf(NotificationKind.COVERAGE_SHORT, NotificationKind.COVERAGE_3D), kinds(planning.coverageDue(now.plus(Duration.ofDays(1)))))
+        assertEquals(listOf(NotificationKind.COVERAGE_SHORT), kinds(planning.coverageDue(now.plus(Duration.ofDays(2)))))
+        assertEquals(listOf(NotificationKind.COVERAGE_SHORT, NotificationKind.COVERAGE_END), kinds(planning.coverageDue(now.plus(Duration.ofDays(4)))))
 
         // Событие показывается один раз: повтор планирования журнал отсеивает.
         val delivery = NotificationDelivery(scenarios.notifier, scenarios.reminders, NotificationLogRoomRepository(database.notificationLog()), Clock.fixed(now, ZoneOffset.UTC))
-        assertEquals(1, delivery.deliver(planning.coverageDue(today, now)))
-        assertEquals(0, delivery.deliver(planning.coverageDue(today, now)))
+        assertEquals(1, delivery.deliver(planning.coverageDue(now)))
+        assertEquals(0, delivery.deliver(planning.coverageDue(now)))
         assertEquals(id, (scenarios.notifier.shown.single().target as com.kert0n.medapp.domain.notification.NotificationTarget.CourseSources).courseId)
     }
 
@@ -104,7 +105,7 @@ class CoverageNoticeTest {
         scenarios.packageAdjusting.adjust(PACK, PackageAdjusting.Action.Recount(seen = tablets("20"), actual = tablets("8")))
         settings.settings = com.kert0n.medapp.domain.notification.NotificationSettings(coverageThresholdDays = 2)
 
-        assertEquals(listOf(NotificationKind.COVERAGE_SHORT, NotificationKind.COVERAGE_3D), kinds(planning.coverageDue(today.plusDays(2), now)))
-        assertEquals(listOf(NotificationKind.COVERAGE_SHORT), kinds(planning.coverageDue(today.plusDays(1), now)))
+        assertEquals(listOf(NotificationKind.COVERAGE_SHORT, NotificationKind.COVERAGE_3D), kinds(planning.coverageDue(now.plus(Duration.ofDays(2)))))
+        assertEquals(listOf(NotificationKind.COVERAGE_SHORT), kinds(planning.coverageDue(now.plus(Duration.ofDays(1)))))
     }
 }

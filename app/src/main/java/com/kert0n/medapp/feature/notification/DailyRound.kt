@@ -25,7 +25,7 @@ class DailyRound @Inject constructor(
         val reminders = planning.remindersDue(now)
         delivery.arm(reminders)
         val events = planning.expiryDue(today, now).filter { it.delivery == NoticeDelivery.SYSTEM } +
-            planning.coverageDue(today, now) +
+            planning.coverageDue(now) +
             planning.missed(kept.missedIntakes, now)
         var shown = delivery.deliver(events)
         planning.digest(today, clock.zone, events.size, now)?.let { shown += delivery.deliver(listOf(it)) }

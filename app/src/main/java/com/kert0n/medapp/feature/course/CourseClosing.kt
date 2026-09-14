@@ -3,7 +3,6 @@ package com.kert0n.medapp.feature.course
 import com.kert0n.medapp.domain.course.Course
 import com.kert0n.medapp.domain.course.CourseCompletion
 import com.kert0n.medapp.domain.pack.PackageRef
-import com.kert0n.medapp.feature.notification.ReminderWithdrawal
 import com.kert0n.medapp.queue.QueueService
 import com.kert0n.medapp.queue.QueuedCommand
 import com.kert0n.medapp.queue.pack.PackageSyncCommand
@@ -22,8 +21,7 @@ import kotlin.uuid.Uuid
 class CourseClosing @Inject constructor(
     private val courses: CourseStorageRepository,
     private val packages: PackageStorageRepository,
-    private val queue: QueueService,
-    private val reminders: ReminderWithdrawal
+    private val queue: QueueService
 ) {
 
     /**
@@ -31,15 +29,16 @@ class CourseClosing @Inject constructor(
      * ставят. Кому отвечает пачка, знает она сама, а не ссылка из курса: живая пачка читается
      * той же транзакцией; коробки уже нет — снимать бронь не с чего.
      */
-    suspend fun close(course: Course, closing: CourseCompletion.Closing, at: Instant, except: PackageRef? = null) {
+    suspend fun close(course: Course, closing: CourseCompletion.Closing, at: Instant, except: PackageRef? = null): List<Uuid> {
         courses.close(closing)
-        // Отменённые пункты больше не напоминают о себе: будильники сняты, показанное погашено (PLAN D8).
-        for (intake in closing.cancelled) reminders.withdraw(intake.id)
         for (source in course.sources) {
             if (source.pkg == except) continue
             val pkg = packages.find(source.pkg.id) ?: continue
             val released = QueuedCommand(Uuid.random(), PackageSyncCommand.ReleaseClaim(pkg.id))
             queue.change(pkg.medKit, listOf(released), at) { true }
         }
+        // Отменённые пункты больше не напоминают о себе — но снимать будильники и гасить показанное
+        // сценарий будет после фиксации: система не откатывается вместе с базой (PLAN D8, F5).
+        return closing.cancelled.map { it.id }
     }
 }

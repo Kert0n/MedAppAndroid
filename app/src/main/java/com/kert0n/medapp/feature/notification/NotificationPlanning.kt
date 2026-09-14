@@ -36,15 +36,17 @@ class NotificationPlanning @Inject constructor(
 ) {
 
     /**
-     * Обеспечение идущих лечений на день [today] (PLAN D8): сокращение — событием, сразу и один раз
+     * Обеспечение идущих лечений на момент [at] (PLAN D8): сокращение — событием, сразу и один раз
      * на событие; за `coverageThresholdDays` календарных дней до первого необеспеченного пункта и в
-     * его день — по дате в зоне курса. Обеспеченному курсу предупреждать нечего.
+     * его день. День берётся **в зоне курса** — той же, в которой стоит и пункт: день устройства
+     * у полуночи может быть уже другим. Обеспеченному курсу предупреждать нечего.
      */
-    suspend fun coverageDue(today: LocalDate, at: Instant): List<PlannedNotification> {
+    suspend fun coverageDue(at: Instant): List<PlannedNotification> {
         val threshold = settings.current().coverageThresholdDays
         val due = mutableListOf<PlannedNotification>()
         for ((courseId, coverage) in courses.observeCoverages().first()) {
             val zone = courses.findPlan(courseId)?.schedule?.zone ?: continue
+            val today = at.atZone(zone).toLocalDate()
             for (reduction in courses.observeReductions(courseId).first()) {
                 due += PlannedNotification(NotificationKey.reduction(reduction.id), reduction.at, NotificationTarget.CourseSources(courseId), NoticeDelivery.SYSTEM)
             }

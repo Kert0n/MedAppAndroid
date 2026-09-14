@@ -3,6 +3,7 @@ package com.kert0n.medapp.platform.notifications
 import android.content.BroadcastReceiver
 import android.content.Context
 import android.content.Intent
+import android.util.Log
 import com.kert0n.medapp.feature.notification.NotificationDelivery
 import com.kert0n.medapp.feature.notification.NotificationPlanning
 import com.kert0n.medapp.queue.Synchronization
@@ -41,6 +42,10 @@ class IntakeAlarmReceiver : BroadcastReceiver() {
             try {
                 synchronization.refreshBriefly(REFRESH_WAIT)
                 planning.reminderFor(intakeId)?.let { delivery.deliver(listOf(it)) }
+            } catch (failure: Exception) {
+                // Сбой хранения или системы — не повод ронять процесс: журнал, и следующий проход повторит.
+                if (failure is kotlinx.coroutines.CancellationException) throw failure
+                Log.w(TAG, "напоминание о приёме не удалось", failure)
             } finally {
                 pending.finish()
             }
@@ -48,6 +53,7 @@ class IntakeAlarmReceiver : BroadcastReceiver() {
     }
 
     companion object {
+        private const val TAG = "MedAppNotifications"
         /** Дольше напоминание не ждёт: пара секунд — и показ с тем, что есть (PLAN D8). */
         val REFRESH_WAIT: Duration = Duration.ofSeconds(2)
 

@@ -65,11 +65,16 @@ class IntakeConfirmation @Inject constructor(
         amount: Dose,
         at: Instant,
         acknowledged: Boolean = false
-    ): Outcome = transactions.run { write(intakeId, packageId, amount, at, acknowledged) }
-        // Ответ дан — напоминать больше нечего: показанное гасится, будильник снимается (PLAN D8).
-        .also { if (it is Outcome.Confirmed) reminders.withdraw(intakeId) }
+    ): Outcome {
+        val cancelled = mutableListOf<Uuid>()
+        val outcome = transactions.run { write(intakeId, packageId, amount, at, acknowledged, cancelled) }
+        // После фиксации — система не откатывается вместе с базой (F5): ответ дан, напоминать больше
+        // нечего; лечение закончилось этим приёмом — и о его отменённых пунктах тоже (PLAN D8).
+        if (outcome is Outcome.Confirmed) reminders.withdrawAll(listOf(intakeId) + cancelled)
+        return outcome
+    }
 
-    private suspend fun write(intakeId: Uuid, packageId: Uuid, amount: Dose, at: Instant, acknowledged: Boolean): Outcome {
+    private suspend fun write(intakeId: Uuid, packageId: Uuid, amount: Dose, at: Instant, acknowledged: Boolean, cancelled: MutableList<Uuid>): Outcome {
         val now = clock.instant()
         val intake = requireNotNull(intakes.find(intakeId) as? CourseIntake) { "подтверждается пункт курса" }
         val record = checkNotNull(courses.findRecord(intake.courseId)) { "у пункта курса есть запись эпизода" }
@@ -156,7 +161,7 @@ class IntakeConfirmation @Inject constructor(
 
         if (finished) {
             // Снятие брони с этой пачки уже уехало зависимым от расхода — второй раз не ставится.
-            closing.close(course, completion.close(record, intakes.ofCourse(course.id).filterIsInstance<CourseIntake>(), now), now, except = pkg.ref)
+            cancelled += closing.close(course, completion.close(record, intakes.ofCourse(course.id).filterIsInstance<CourseIntake>(), now), now, except = pkg.ref)
         } else {
             calendar.prune(course, course.remainingOccurrences(progress).toSet(), now)
         }

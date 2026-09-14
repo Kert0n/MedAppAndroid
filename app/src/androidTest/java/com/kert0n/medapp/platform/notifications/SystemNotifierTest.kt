@@ -70,8 +70,10 @@ class SystemNotifierTest {
         database.close()
     }
 
+    /** До Android 13 разрешения нет — считается выданным; выше — как ответит система. */
     private fun granted(): Boolean =
-        ContextCompat.checkSelfPermission(context, Manifest.permission.POST_NOTIFICATIONS) == PackageManager.PERMISSION_GRANTED
+        android.os.Build.VERSION.SDK_INT < android.os.Build.VERSION_CODES.TIRAMISU ||
+            ContextCompat.checkSelfPermission(context, Manifest.permission.POST_NOTIFICATIONS) == PackageManager.PERMISSION_GRANTED
 
     @Test
     fun everyChannelExistsWithItsImportance() {

@@ -169,12 +169,12 @@ class Scenarios(
     val courseActivation = com.kert0n.medapp.feature.course.CourseActivation(
         courses, packages, courseCalendar, queue, transactions, clock
     )
-    val courseClosing = com.kert0n.medapp.feature.course.CourseClosing(courses, packages, queue, reminderWithdrawal)
+    val courseClosing = com.kert0n.medapp.feature.course.CourseClosing(courses, packages, queue)
     val courseCancellation = com.kert0n.medapp.feature.course.CourseCancellation(
-        courses, database.intakeRepository(), courseCalendar, courseClosing, transactions, clock
+        courses, database.intakeRepository(), courseCalendar, courseClosing, reminderWithdrawal, transactions, clock
     )
     val courseAmendment = com.kert0n.medapp.feature.course.CourseAmendment(
-        courses, database.intakeRepository(), packages, courseCalendar, courseClosing, queue, transactions, clock
+        courses, database.intakeRepository(), packages, courseCalendar, courseClosing, queue, reminderWithdrawal, transactions, clock
     )
     val sourceEditing = com.kert0n.medapp.feature.course.SourceEditing(
         courses, database.intakeRepository(), packages, courseCalendar, queue, transactions, clock
@@ -183,7 +183,7 @@ class Scenarios(
         database.intakeRepository(), courses, courseCalendar, reminderWithdrawal, transactions, clock
     )
     val courseOffPlanCounting = com.kert0n.medapp.feature.course.CourseOffPlanCounting(
-        courses, database.intakeRepository(), courseCalendar, courseClamping, courseClosing, transactions, clock
+        courses, database.intakeRepository(), courseCalendar, courseClamping, courseClosing, reminderWithdrawal, transactions, clock
     )
     val intakeConfirmation = com.kert0n.medapp.feature.intake.IntakeConfirmation(
         database.intakeRepository(), courses, packages, transactions, queue, courseClosing, courseCalendar, reminderWithdrawal, clock

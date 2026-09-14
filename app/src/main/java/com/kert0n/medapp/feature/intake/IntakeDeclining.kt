@@ -34,7 +34,7 @@ class IntakeDeclining @Inject constructor(
 ) {
 
     suspend fun decline(intakeId: Uuid, at: Instant): Outcome = write(intakeId, at)
-        // Ответ дан — напоминать больше нечего (PLAN D8).
+        // После фиксации: ответ дан — напоминать больше нечего (PLAN D8, F5).
         .also { if (it == Outcome.DECLINED) reminders.withdraw(intakeId) }
 
     private suspend fun write(intakeId: Uuid, at: Instant): Outcome = transactions.run {

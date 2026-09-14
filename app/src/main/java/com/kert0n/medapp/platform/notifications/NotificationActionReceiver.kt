@@ -3,6 +3,7 @@ package com.kert0n.medapp.platform.notifications
 import android.content.BroadcastReceiver
 import android.content.Context
 import android.content.Intent
+import android.util.Log
 import com.kert0n.medapp.domain.notification.NotificationAction
 import com.kert0n.medapp.domain.notification.NotificationKey
 import com.kert0n.medapp.domain.notification.NotificationKind
@@ -44,6 +45,10 @@ class NotificationActionReceiver : BroadcastReceiver() {
                 }
                 notifier.dismiss(NotificationKey.intake(intakeId, NotificationKind.INTAKE_DUE))
                 if (response is ReminderAnswering.Response.OpenApp) openApp(context, intakeId)
+            } catch (failure: Exception) {
+                // Сбой хранения или системы — не повод ронять процесс: журнал, и следующий проход повторит.
+                if (failure is kotlinx.coroutines.CancellationException) throw failure
+                Log.w(TAG, "действие с уведомления не удалось", failure)
             } finally {
                 pending.finish()
             }
@@ -58,6 +63,7 @@ class NotificationActionReceiver : BroadcastReceiver() {
     }
 
     companion object {
+        private const val TAG = "MedAppNotifications"
         const val EXTRA_INTAKE_ID = "intake_id"
     }
 }

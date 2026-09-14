@@ -18,8 +18,11 @@ import com.kert0n.medapp.fixture.intakeRepository
 import com.kert0n.medapp.fixture.pack
 import com.kert0n.medapp.fixture.packageRepository
 import com.kert0n.medapp.fixture.schedule
+import com.kert0n.medapp.fixture.courseRepository
 import com.kert0n.medapp.fixture.tablets
+import com.kert0n.medapp.fixture.transactions
 import com.kert0n.medapp.storage.database.MedAppDatabase
+import java.time.Clock
 import java.time.Instant
 import java.time.LocalDate
 import java.time.ZoneOffset
@@ -156,5 +159,35 @@ class ReminderAnsweringTest {
 
         assertEquals(emptyMap<NotificationKey, Instant>(), scenarios.reminders.scheduled)
         assertEquals(planned.map { reminderKey(it) }.toSet(), scenarios.notifier.dismissed.toSet())
+    }
+
+    /**
+     * Будильники снимаются **после** фиксации: транзакция, откатившаяся после закрытия курса,
+     * оставляет пункты плановыми — и их будильники на месте (красная проверка: снимать внутри
+     * транзакции — будильники пропали бы у неотменённых пунктов).
+     */
+    @Test
+    fun aRolledBackCancellationLeavesTheAlarmsInPlace() = runTest {
+        val id = treated()
+        val planned = database.intakeRepository().ofCourse(id).filterIsInstance<CourseIntake>()
+        for (intake in planned) scenarios.reminders.schedule(reminderKey(intake), intake.plannedAt)
+        val real = database.transactions()
+        val failingAfterWork = object : com.kert0n.medapp.queue.Transactions {
+            override suspend fun <T> run(block: suspend () -> T): T = real.run<T> {
+                block()
+                throw IllegalStateException("сбой фиксации")
+            }
+        }
+        val cancellation = com.kert0n.medapp.feature.course.CourseCancellation(
+            database.courseRepository(), database.intakeRepository(), scenarios.courseCalendar, scenarios.courseClosing,
+            scenarios.reminderWithdrawal, failingAfterWork, Clock.fixed(now, ZoneOffset.UTC)
+        )
+
+        val failure = runCatching { cancellation.cancel(id) }.exceptionOrNull()
+
+        assertEquals("сбой фиксации", failure?.message)
+        assertTrue(requireNotNull(database.courseRepository().findRecord(id)).isOpen)
+        assertEquals(planned.map { reminderKey(it) }.toSet(), scenarios.reminders.scheduled.keys)
+        assertEquals(emptyList<NotificationKey>(), scenarios.notifier.dismissed)
     }
 }

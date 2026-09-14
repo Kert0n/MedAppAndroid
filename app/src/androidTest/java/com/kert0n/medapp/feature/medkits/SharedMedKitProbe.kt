@@ -586,7 +586,7 @@ class SharedMedKitProbe {
         private val publishing = MedKitPublishing(medKits, packages, relocation, queue, transactions, clock)
         private val withdrawal = com.kert0n.medapp.feature.notification.ReminderWithdrawal(FakeNotifier(), FakeReminders())
         private val confirmation = IntakeConfirmation(
-            database.intakeRepository(), courses, packages, transactions, queue, CourseClosing(courses, packages, queue, withdrawal),
+            database.intakeRepository(), courses, packages, transactions, queue, CourseClosing(courses, packages, queue),
             CourseCalendar(database.intakeRepository(), packages), withdrawal, clock
         )
 
