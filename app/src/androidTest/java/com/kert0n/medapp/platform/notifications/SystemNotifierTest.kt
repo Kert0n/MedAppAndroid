@@ -157,6 +157,41 @@ class SystemNotifierTest {
     }
 
     /**
+     * **Разные уведомления не делят один `PendingIntent`.** Тождество намерения для системы —
+     * код запроса и `filterEquals` намерения, а extras в него не входят. Пока код запроса был
+     * `hashCode()` ключа, две коробки с совпавшим хешем получали одно системное намерение, и
+     * `FLAG_UPDATE_CURRENT` подменял цель прежней карточки: нажал на первую — открылась вторая.
+     * Полное имя цели входит в тождество (`setIdentifier`), и хеш больше ничего не решает.
+     */
+    @Test
+    fun collidingKeysDoNotShareAPendingIntent() = runTest {
+        if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.TIRAMISU) {
+            InstrumentationRegistry.getInstrumentation().uiAutomation
+                .grantRuntimePermission(context.packageName, Manifest.permission.POST_NOTIFICATIONS)
+        }
+        // Два идентификатора, у которых `"<id>@2027-03-31".hashCode()` совпадает: найдены перебором.
+        val first = kotlin.uuid.Uuid.parse("2f786c9c-a130-4658-beee-092331cf0eb8")
+        val second = kotlin.uuid.Uuid.parse("21279b22-bef8-40db-9041-73678e446eaa")
+        database.packageRepository().add(pack(id = first, name = "Первая", quantity = tablets("20"), expiresOn = expiry))
+        database.packageRepository().add(pack(id = second, name = "Вторая", quantity = tablets("20"), expiresOn = expiry))
+        val a = Reminder(NotificationKey.expiry(first, expiry, NotificationKind.EXPIRY_SOURCE_3D), NotificationTarget.PackageCard(first), planned.dueAt)
+        val b = Reminder(NotificationKey.expiry(second, expiry, NotificationKind.EXPIRY_SOURCE_3D), NotificationTarget.PackageCard(second), planned.dueAt)
+        assertEquals("пара перестала сталкиваться — проверка сторожила бы пустоту", a.key.hashCode(), b.key.hashCode())
+
+        assertEquals(com.kert0n.medapp.domain.notification.Delivery.SHOWN, notifier.show(a))
+        assertEquals(com.kert0n.medapp.domain.notification.Delivery.SHOWN, notifier.show(b))
+
+        val shownA = requireNotNull(awaitShown(a.key.subject)) { "первая не показана" }
+        val shownB = requireNotNull(awaitShown(b.key.subject)) { "вторая не показана" }
+        org.junit.Assert.assertNotEquals(
+            "две карточки делят одно системное намерение",
+            shownA.notification.contentIntent, shownB.notification.contentIntent
+        )
+        notifier.dismiss(a.key)
+        notifier.dismiss(b.key)
+    }
+
+    /**
      * Приёмник действий не запускает активность ни при каком исходе: из уведомления это
      * запрещённый платформой переход (C1). Проверка читает манифест и класс приёмника — так
      * нарушение видно до того, как человек нажмёт кнопку и ничего не произойдёт.

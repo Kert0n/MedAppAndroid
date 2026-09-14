@@ -38,22 +38,33 @@ class FakeNotifier(var allowed: Boolean = true) : Notifier {
     }
 }
 
-/** Один будильник: последняя постановка побеждает, `stopWaking` его снимает. */
+/**
+ * Будильники, какими их видит порт. [wakeAt] и [exact] — последняя постановка; [exactAt] и
+ * [inexactAt] — что стоит у каждой точности: точная просьба и приблизительная — разные просьбы
+ * к системе, и одна другую не заменяет (PLAN D8).
+ */
 class FakeReminders(override val canBeExact: Boolean = true) : ReminderAlarms {
     var wakeAt: Instant? = null
         private set
     var exact: Boolean = false
+        private set
+    var exactAt: Instant? = null
+        private set
+    var inexactAt: Instant? = null
         private set
     val settings = mutableListOf<Instant>()
 
     override suspend fun wakeAt(at: Instant, exact: Boolean) {
         wakeAt = at
         this.exact = exact
+        if (exact) exactAt = at else inexactAt = at
         settings += at
     }
 
     override suspend fun stopWaking() {
         wakeAt = null
+        exactAt = null
+        inexactAt = null
     }
 }
 

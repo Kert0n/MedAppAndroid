@@ -137,7 +137,7 @@ class Scenarios(
     val freshness: FakeFreshness = FakeFreshness()
 ) {
     private val clock = java.time.Clock.fixed(now, java.time.ZoneOffset.UTC)
-    private val transactions = database.transactions()
+    val transactions = database.transactions()
     val reminderStore = com.kert0n.medapp.storage.notification.ReminderRoomRepository(database, database.reminders())
     val reminderWithdrawal = com.kert0n.medapp.feature.notification.ReminderWithdrawal(reminderStore, transactions)
     val reminderPromising = com.kert0n.medapp.feature.notification.ReminderPromising(reminderStore, notificationSettings, transactions)
