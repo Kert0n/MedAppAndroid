@@ -4,6 +4,7 @@ import android.app.Application
 import androidx.hilt.work.HiltWorkerFactory
 import androidx.work.Configuration
 import com.kert0n.medapp.platform.connectivity.SyncTriggers
+import com.kert0n.medapp.platform.notifications.NotificationChannels
 import com.kert0n.medapp.queue.QueueOutbox
 import com.kert0n.medapp.queue.SyncSchedule
 import dagger.hilt.android.HiltAndroidApp
@@ -30,6 +31,9 @@ class MedApp : Application(), Configuration.Provider {
     lateinit var schedule: SyncSchedule
 
     @Inject
+    lateinit var channels: NotificationChannels
+
+    @Inject
     lateinit var workerFactory: HiltWorkerFactory
 
     override val workManagerConfiguration: Configuration
@@ -37,6 +41,8 @@ class MedApp : Application(), Configuration.Provider {
 
     override fun onCreate() {
         super.onCreate()
+        // Каналы — до первого уведомления: человек выключает их по отдельности (PLAN D8).
+        channels.ensure()
         outbox.start()
         triggers.start()
         schedule.keepRegular()

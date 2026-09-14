@@ -27,4 +27,36 @@
 
     <!-- Экраны, которых ещё нет -->
     <string name="screen_not_ready">Этот экран ещё не готов.</string>
+    <!-- Уведомления: каналы -->
+    <string name="channel_intakes">Приёмы</string>
+    <string name="channel_expiry">Сроки годности</string>
+    <string name="channel_coverage">Нехватка лекарств</string>
+    <string name="channel_digest">Сводка дня</string>
+    <string name="channel_sync">Синхронизация</string>
+
+    <!-- Уведомления: тексты -->
+    <string name="notice_intake_due_title">Пора принять: %1$s</string>
+    <string name="notice_intake_due_body">%1$s из коробки «%2$s»</string>
+    <string name="notice_intake_due_unsupplied">%1$s — коробки для этого приёма нет</string>
+    <string name="notice_intake_missed_title">Пропущен приём: %1$s</string>
+    <string name="notice_intake_missed_body">Вчерашний приём %1$s остался без ответа</string>
+    <string name="notice_expiry_3d_title">Через три дня истекает срок: %1$s</string>
+    <string name="notice_expiry_1d_title">Завтра истекает срок: %1$s</string>
+    <string name="notice_expiry_today_title">Сегодня истекает срок: %1$s</string>
+    <string name="notice_expiry_body">Годен до %1$s</string>
+    <string name="notice_coverage_short_title">Лекарства стало меньше: %1$s</string>
+    <string name="notice_coverage_3d_title">Через три дня закончится лекарство: %1$s</string>
+    <string name="notice_coverage_end_title">Лекарство заканчивается: %1$s</string>
+    <string name="notice_coverage_body_until">Доз хватит до %1$s</string>
+    <string name="notice_coverage_body_none">Ни одного обеспеченного приёма</string>
+    <string name="notice_digest_title">Сводка дня</string>
+    <string name="notice_digest_body">Что принять и что проверить %1$s</string>
+    <string name="notice_sync_title">Синхронизация ждёт решения</string>
+    <string name="notice_sync_body">Сервер отказал в одной из операций</string>
+
+    <!-- Уведомления: действия -->
+    <string name="action_take">Принял</string>
+    <string name="action_skip">Пропустить</string>
+    <string name="action_snooze">Отложить</string>
+    <string name="action_open">Открыть</string>
 </resources>
