@@ -544,6 +544,9 @@ UUID и проверяем принадлежность; недоступнос�
 | **Чужая правка и обеспечение** | тест B15 «поток не переизлучает после правки чужой пачки» | проверяется **значение**: пересчёт чужой коробки обеспечение курса не меняет — `CourseCoverage` равен прежнему. Хранение равные значения не гасит | решение владельца 2026-09-14: тест должен останавливать расчёт от чужих входов, а не считать сигналы; равенство определяет домен |
 | **День приёма для просрочки** | — | дата момента `at` в зоне устройства (`Clock.systemDefaultZone()` в DI, `clock.zone`); курс своей зоной здесь не участвует | «годен до» — календарная дата коробки, а «сегодня» у человека — его день; UTC-часы отдавали бы вчера после 21:00 МСК (B16) |
 | **Зажим — в транзакции укладки** | пять дефектов очереди лечились порознь; зажим звали только сценарии человека | курс следует за коробкой одной дверью `CourseDao.followBox` внутри транзакции, где коробка изменилась, — и у сценариев, и у снимка; брони — разницей одной функцией | E4 и F5: следствие чужого изменения — часть укладки, как и отключение недоступных источников; иначе между снимком и зажимом курс обещал бы дозы, которых нет (B16) |
+| **Журнал показов — после показа** | «падение между записью журнала и показом учитывается повтором» | журнал пишется **после** показа: падение между ними — повтор той же парой `tag/id`, который система склеивает; обратный порядок терял бы уведомление | B17: потерянное напоминание о приёме хуже показанного дважды одной строкой |
+| **Горизонт будильников** | — | будильники приёмов ставятся на 36 часов вперёд и перестраиваются `DailyWorker`, входом в приложение и boot | `AlarmManager` ограничен и не хранит 60-дневное окно календаря; сутки с запасом покрывают пропущенный проход (B17) |
+| **«Принял» из шторки** | — | тот же `IntakeConfirmation.confirm(intakeId, plannedPackage, plannedAmount, now)`, что у экрана; `Confirmed` гасит уведомление, `Warned`/`Rejected` открывают приложение с одним `intakeId` — предупреждение действием из шторки не обходится (D8) | B17: один путь приёма, второго правила для шторки нет |
 
 ## C2. Чего в первой законченной версии нет
 
@@ -1879,10 +1882,38 @@ data class NotificationSettings(
 `notification_log(key, delivery, shown_at)` хранит фактические показы. Разные этапы (`3D`, `1D`,
 день события), дата годности и дата нехватки входят в ключи. После исправления срока старые
 уведомления отменяются и строятся новые; перестановка источников без изменения события не спамит.
-На запуске восстановление сверяет желаемые уведомления с системой; падение между записью журнала
-и системным показом учитывается повтором с той же парой tag/id. Для баннера ключ сохраняется при
-фактическом показе. Несколько событий дня группируются в один баннер со списком пачек, отметка
+На запуске восстановление сверяет желаемые уведомления с системой. **Журнал пишется после
+показа** (B17): падение между показом и записью даёт на следующем проходе повтор той же парой
+`tag/id`, который система склеивает в одно уведомление, — а обратный порядок терял бы показ. Для
+баннера ключ сохраняется при фактическом показе. Несколько событий дня группируются в один баннер со списком пачек, отметка
 показа при этом относится к каждой пачке.
+
+### Кто что делает (B17)
+
+Домен `domain/notification` называет **что** и **когда** сказать и владеет правилами дат:
+`ExpiryDate.stageOn(today)` — этап годности (`SOURCE_3D`, `SOURCE_1D`, `TODAY`) по календарным
+датам, а не через `72h`; `CourseCoverage.noticeOn(today, zone)` — `COVERAGE_3D`/`COVERAGE_END` по
+дате первого необеспеченного пункта в зоне курса; `PlannedNotification` — величина «что показать».
+Действия названы портами домена и исполняются платформой: `Notifier` (показать, погасить),
+`ReminderAlarms` (поставить будильник на момент, точно или нет; снять), `NotificationSettingsSource`
+(пороги и время сводки — в B17 умолчания D8, в B18 DataStore).
+
+Сборка «что должно быть сказано сейчас» — сценарий `feature/notification/NotificationPlanning`:
+читает планы с прогрессом, приёмы, пачки, обеспечение, события сокращения и журнал, отдаёт
+уведомления к показу и будильники к постановке. Показ и запись в журнал —
+`feature/notification/NotificationDelivery`: показанное тем же способом второй раз не показывается.
+Будильники ставятся на **36 часов вперёд** и перестраиваются каждым `DailyWorker`, входом в
+приложение и загрузкой устройства: `AlarmManager` — не место для окна в 60 дней.
+
+Платформа `platform/notifications`: пять каналов, `SystemNotifier` (`tag = subject`,
+`id = kind`, текст из `R.string.*`, `PendingIntent` только с идентификаторами),
+`AlarmManagerReminders` (`setExactAndAllowWhileIdle` при разрешении, иначе `setAndAllowWhileIdle`),
+`IntakeAlarmReceiver` (короткая синхронизация — и показ), `NotificationActionReceiver` («Принял»
+— `IntakeConfirmation` тем же вызовом, что экран; вопрос или отказ открывают экран по `intakeId`),
+`DailyWorker` раз в сутки на `digestAt` (порт `DailySchedule`), `BootAndTimeReceiver`.
+`INTAKE_MISSED` показывает `DailyWorker` после `CourseUpkeep` — о неответе; отказ человека
+уведомления не даёт. Курс закончен или отменён — `CourseClosing` гасит показанное и снимает
+будильники его пунктов.
 
 ### Каналы и доставка
 
@@ -3037,8 +3068,9 @@ com.kert0n.medapp                         есть · [B17] — появится
 │              CredentialsModule
 ├─ domain/     бизнес, по понятиям: value/, pack/, medkit/, course/, intake/, account/, template/,
 │              report/ (отчёты личного кабинета);
-│              [B17] notification/ — модель, её правила и **порты действий**: `DeviceAccount`,
-│              `VocabularyLibrary`, `MedKitInvitations`, `PackageTemplates`; [B18] порт настроек.
+│              notification/ — модель уведомления, правила дат и порты `Notifier`,
+│              `ReminderAlarms`, `NotificationSettingsSource`; **порты действий** домена:
+│              `DeviceAccount`, `VocabularyLibrary`, `MedKitInvitations`, `PackageTemplates`.
 │              Время — через `Clock`; о хранении и доставке не знает ничего
 ├─ network/    сеть, по понятиям: value/, pack/, medkit/, account/, template/ — DTO, мапперы,
 │   │          резолвер словаря, обвязка предусловий; [B19] crpt/; про очередь не знает
@@ -3058,15 +3090,17 @@ com.kert0n.medapp                         есть · [B17] — появится
 │   │          QueueRoomStorage — порт работника), журнал уведомлений
 │   └─ database/ MedAppDatabase, converters, RoomTransactions
 ├─ platform/   background/ (SyncWorker, WorkManagerSyncSchedule), connectivity/ (SyncTriggers),
-│              credentials/ (Keystore); [B17] notifications/ (каналы, будильники, приёмники,
-│              DailyWorker); [B18] settings/ (DataStore, разрешения)
+│              credentials/ (Keystore); notifications/ (каналы, SystemNotifier,
+│              AlarmManagerReminders, IntakeAlarmReceiver, NotificationActionReceiver, DailyWorker,
+│              BootAndTimeReceiver, DefaultNotificationSettings); [B18] settings/ (DataStore, разрешения)
 ├─ feature/    сценарии — целое действие человека одной транзакцией: bootstrap/ (AppStart),
 │              medkits/ (MedKitKeeping, MedKitRemoval, MedKitPublishing, MedKitJoining,
 │              MedKitInvitation), packages/ (PackageAdding, PackageDescribing, PackageAdjusting,
 │              PackageRemoval, PackageRelocation), course/ (CourseClosing, CourseDrafting,
 │              CourseCalendar, CourseUpkeep, CourseActivation, CourseCancellation, CourseAmendment,
 │              SourceEditing, CourseClamping, CourseOffPlanCounting), intake/ (IntakeConfirmation,
-│              UnplannedIntakeRecording, IntakeDeclining), template/ (TemplateSearching);
+│              UnplannedIntakeRecording, IntakeDeclining), template/ (TemplateSearching),
+│              notification/ (NotificationPlanning, NotificationDelivery, порт DailySchedule);
 │              [B18] account/; [B19] scan/
 ├─ presentation/ представление, по понятиям: value/, pack/, medkit/, bootstrap/ — DTO состояния,
 │              мапперы из проекций, разбор ввода, ViewModel; ParsedInput, ScreenState в корне.
