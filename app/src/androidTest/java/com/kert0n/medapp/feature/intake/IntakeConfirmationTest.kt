@@ -150,7 +150,7 @@ class IntakeConfirmationTest {
     fun anIntakeThatEmptiesTheLocalPackageEndsItAndDetachesTheSource() = runTest {
         activate()
         // Пачка на две таблетки: одна доза — и она кончилась.
-        packages.adjust(PackageAdjustment.Recount(PACK, tablets("2")), at = FIRST_PLANNED_AT)
+        assertTrue(packages.adjust(PackageAdjustment.Recount(PACK, tablets("2")), at = FIRST_PLANNED_AT))
 
         val confirmed = confirmation.confirm(INTAKE, PACK, dose("2"), FIRST_PLANNED_AT).confirmed()
 
@@ -175,7 +175,7 @@ class IntakeConfirmationTest {
     @Test
     fun anAnswerAboutThePastDoesNotMoveTheCourseBackwards() = runTest {
         activate()
-        packages.adjust(PackageAdjustment.Recount(PACK, tablets("2")), at = now)
+        assertTrue(packages.adjust(PackageAdjustment.Recount(PACK, tablets("2")), at = now))
 
         confirmation.confirm(INTAKE, PACK, dose("2"), FIRST_PLANNED_AT).confirmed()
 
@@ -374,7 +374,7 @@ class IntakeConfirmationTest {
     @Test
     fun anExpiredBoxAsksBeforeTheIntakeIsWritten() = runTest {
         val today = FIRST_PLANNED_AT.atZone(ZoneOffset.UTC).toLocalDate()
-        packages.describe(PACK, factsOf(pack(quantity = tablets("20"))).copy(expiresOn = ExpiryDate(today.minusDays(1))))
+        assertTrue(packages.describe(PACK, factsOf(pack(quantity = tablets("20"))).copy(expiresOn = ExpiryDate(today.minusDays(1)))))
         activate()
 
         val asked = confirmation.confirm(INTAKE, PACK, dose("2"), FIRST_PLANNED_AT)
@@ -394,7 +394,7 @@ class IntakeConfirmationTest {
     @Test
     fun aBoxGoodUntilTodayIsNotExpired() = runTest {
         val today = FIRST_PLANNED_AT.atZone(ZoneOffset.UTC).toLocalDate()
-        packages.describe(PACK, factsOf(pack(quantity = tablets("20"))).copy(expiresOn = ExpiryDate(today)))
+        assertTrue(packages.describe(PACK, factsOf(pack(quantity = tablets("20"))).copy(expiresOn = ExpiryDate(today))))
         activate()
 
         confirmation.confirm(INTAKE, PACK, dose("2"), FIRST_PLANNED_AT).confirmed()

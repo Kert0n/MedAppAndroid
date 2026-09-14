@@ -192,7 +192,7 @@ class SnapshotRoomStorageTest {
     @Test
     fun aSnapshotDoesNotTakeAwayAShelfWhoseDecisionIsStillWaiting() = runTest {
         storage.lay(serverSnapshot(mapOf(HOME_KIT to 2L), listOf(snapshot(PACK))), at)
-        database.medKitRepository().mark(HOME_KIT, MedKitStatus.REMOVING)
+        assertTrue(database.medKitRepository().mark(HOME_KIT, MedKitStatus.REMOVING))
 
         storage.lay(serverSnapshot(emptyMap(), emptyList(), goneMedKits = setOf(HOME_KIT)), at)
 

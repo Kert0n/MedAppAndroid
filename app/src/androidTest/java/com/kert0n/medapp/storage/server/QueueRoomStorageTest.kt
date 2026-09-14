@@ -250,8 +250,8 @@ class QueueRoomStorageTest {
         val claim = PackageSyncCommand.ReleaseClaim(PACK)
         val older = storage.enqueue(QueuedCommand(Uuid.random(), claim), HOME_KIT, at)
         val removal = storage.enqueue(QueuedCommand(Uuid.random(), MedKitSyncCommand.Delete(HOME_KIT)), HOME_KIT, at.plusSeconds(1))
-        database.packageRepository().mark(PACK, PackageStatus.REMOVING, by = removal.id)
-        database.medKitRepository().mark(HOME_KIT, MedKitStatus.REMOVING)
+        assertTrue(database.packageRepository().mark(PACK, PackageStatus.REMOVING, by = removal.id))
+        assertTrue(database.medKitRepository().mark(HOME_KIT, MedKitStatus.REMOVING))
 
         storage.settle(older.id, Delivery.Applied(PackageState.None), at.plusSeconds(2))
 
@@ -265,8 +265,8 @@ class QueueRoomStorageTest {
     @Test
     fun theRefusalOfTheShelfsCommandReleasesTheBoxesItMarked() = runTest {
         val removal = storage.enqueue(QueuedCommand(Uuid.random(), MedKitSyncCommand.Delete(HOME_KIT)), HOME_KIT, at)
-        database.packageRepository().mark(PACK, PackageStatus.REMOVING, by = removal.id)
-        database.medKitRepository().mark(HOME_KIT, MedKitStatus.REMOVING)
+        assertTrue(database.packageRepository().mark(PACK, PackageStatus.REMOVING, by = removal.id))
+        assertTrue(database.medKitRepository().mark(HOME_KIT, MedKitStatus.REMOVING))
 
         storage.settle(removal.id, Delivery.Refused(RefusalReason.CONFLICT, PackageState.None), at.plusSeconds(1))
 
@@ -283,7 +283,7 @@ class QueueRoomStorageTest {
     @Test
     fun aSnapshotDoesNotReleaseTheMark() = runTest {
         val decision = Uuid.random()
-        database.packageRepository().mark(PACK, PackageStatus.REMOVING, by = decision)
+        assertTrue(database.packageRepository().mark(PACK, PackageStatus.REMOVING, by = decision))
 
         database.packageRepository().applySnapshot(snapshot, at)
 

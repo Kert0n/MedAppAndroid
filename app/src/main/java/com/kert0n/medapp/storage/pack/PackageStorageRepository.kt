@@ -1,5 +1,6 @@
 package com.kert0n.medapp.storage.pack
 
+import androidx.annotation.CheckResult
 import com.kert0n.medapp.domain.pack.Claims
 import com.kert0n.medapp.domain.course.Course
 import com.kert0n.medapp.domain.pack.Availability
@@ -54,6 +55,7 @@ interface PackageStorageRepository {
      *
      * `false` — пачки больше нет.
      */
+    @CheckResult
     suspend fun describe(packageId: Uuid, facts: PackageFacts): Boolean
 
     /**
@@ -67,6 +69,7 @@ interface PackageStorageRepository {
      *
      * Запись о коробке и приёмы, которые за неё держатся, остаются (D6). `false` — пачки и так нет.
      */
+    @CheckResult
     suspend fun end(ending: PackageEnding, at: Instant): Boolean
 
     /**
@@ -94,6 +97,7 @@ interface PackageStorageRepository {
      * сценарий, а закрытие **этой** команды в очереди, поэтому `ACTIVE` сюда не передают.
      * `false` — пачки больше нет.
      */
+    @CheckResult
     suspend fun mark(packageId: Uuid, status: PackageStatus, by: Uuid): Boolean
 
     /**
@@ -131,6 +135,7 @@ interface PackageStorageRepository {
      * Кончившаяся коробка (пересчёт в ноль, утилизация всего) строки не оставляет; запись о ней
      * остаётся (PLAN D3). `false` — пачки больше нет: писать переход некуда.
      */
+    @CheckResult
     suspend fun adjust(
         adjustment: PackageAdjustment,
         reallocation: CourseReallocation? = null,

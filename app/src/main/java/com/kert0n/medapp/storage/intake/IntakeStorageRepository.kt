@@ -1,5 +1,6 @@
 package com.kert0n.medapp.storage.intake
 
+import androidx.annotation.CheckResult
 import com.kert0n.medapp.domain.course.ScheduledOccurrence
 import com.kert0n.medapp.domain.intake.CourseIntake
 import com.kert0n.medapp.domain.intake.Intake
@@ -63,5 +64,6 @@ interface IntakeStorageRepository {
      * `false` означает, что приём уже записан: условный переход не нашёл ожидаемого статуса либо
      * внеплановый приём с тем же тождеством уже заведён, и повтор ничего не списал.
      */
+    @CheckResult
     suspend fun record(outcome: IntakeOutcome): Boolean
 }

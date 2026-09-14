@@ -1,5 +1,6 @@
 package com.kert0n.medapp.storage.course
 
+import androidx.annotation.CheckResult
 import androidx.room.Dao
 import androidx.room.Insert
 import androidx.room.Query
@@ -89,6 +90,7 @@ interface CourseDao {
      * расписание меняет изменение лечения, и пересчёт обеспечения их не касается.
      */
     @Transaction
+    @CheckResult
     suspend fun updateAllocations(
         course: CourseStorageEntity,
         sources: List<CourseSourceStorageEntity>,

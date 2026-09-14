@@ -1,5 +1,6 @@
 package com.kert0n.medapp.storage.server
 
+import androidx.annotation.CheckResult
 import com.kert0n.medapp.queue.RefusalReason
 import com.kert0n.medapp.queue.SyncCommand
 import com.kert0n.medapp.queue.SyncOperation
@@ -60,5 +61,6 @@ interface SyncOperationStorageRepository {
      * за ней (`SUPERSEDED`), разбираются тем же решением. `false` — строки нет или она уже
      * разобрана. Годится ли она к разбору, решает сценарий по [StoredSyncOperation.needsDecision].
      */
+    @CheckResult
     suspend fun dismiss(id: Uuid, at: Instant): Boolean
 }

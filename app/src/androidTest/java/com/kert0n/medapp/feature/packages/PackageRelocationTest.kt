@@ -78,7 +78,7 @@ class PackageRelocationTest {
 
     /** Полка, о которой принято решение: публикация уже назвала серверу своё содержимое. */
     private suspend fun publishing(kit: Uuid) {
-        database.medKitRepository().mark(kit, MedKitStatus.PUBLISHING)
+        assertTrue(database.medKitRepository().mark(kit, MedKitStatus.PUBLISHING))
     }
 
     private suspend fun commands(): List<SyncCommand> = database.syncOperations().all()

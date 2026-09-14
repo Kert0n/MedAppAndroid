@@ -275,6 +275,25 @@ class WriteContractTest {
         }
     }
 
+    /**
+     * Условная запись не молчит (PLAN C1): метод, отвечающий `Boolean` «записалось ли», помечен
+     * `@CheckResult`, и проигнорированный ответ роняет lint, а не ждёт ревью. Аннотация живёт в
+     * байткоде без времени выполнения, поэтому читается исходник порта.
+     */
+    @Test
+    fun everyConditionalWriteDemandsItsResultBeRead() {
+        val conditional = contract.filter { (_, clause) ->
+            clause.shape in setOf(Shape.GUARDED, Shape.NAMED_FIELDS, Shape.ACTION) && clause.signature.endsWith(": Boolean")
+        }.keys
+        assertTrue("условных записей не нашлось — проверка сторожила бы пустоту", conditional.isNotEmpty())
+        val unmarked = conditional.filterNot { method ->
+            val (port, name) = method.split('.')
+            val file = sources.walkTopDown().first { it.name == "$port.kt" }
+            file.readText().contains(Regex("@CheckResult\\s+suspend fun $name\\("))
+        }
+        assertEquals("условная запись без @CheckResult", emptyList<String>(), unmarked)
+    }
+
     @Test
     fun onlyTheNamedDebtTakesAReadEntityWithoutARevision() {
         val unguarded = contract.filterValues { it.shape == Shape.UNGUARDED }.keys

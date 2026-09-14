@@ -117,11 +117,13 @@ class IntakeRoomRepository @Inject constructor(
             }
         }
         outcome.reallocation?.let { (course, expected) ->
-            courses.updateAllocations(
-                course.toCourseStorageEntity(),
-                course.medicine.toSourceStorageEntities(course.id),
-                expected
-            )
+            check(
+                courses.updateAllocations(
+                    course.toCourseStorageEntity(),
+                    course.medicine.toSourceStorageEntities(course.id),
+                    expected
+                )
+            ) { "план прочитан этой же транзакцией" }
         }
         true
     }

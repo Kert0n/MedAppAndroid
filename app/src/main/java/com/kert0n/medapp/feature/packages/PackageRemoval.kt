@@ -47,7 +47,7 @@ class PackageRemoval @Inject constructor(
 
     /** Шаг внутри чужой транзакции — коробка уходит по решению человека, следа не остаётся (D7). */
     internal suspend fun discard(pkg: Package, at: Instant) {
-        packages.end(pkg.ended(), at)
+        check(packages.end(pkg.ended(), at)) { "пачка прочитана этой же транзакцией" }
     }
 
     /**
