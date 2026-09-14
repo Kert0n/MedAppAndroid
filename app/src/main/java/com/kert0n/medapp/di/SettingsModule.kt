@@ -7,7 +7,9 @@ import androidx.datastore.preferences.core.Preferences
 import androidx.datastore.preferences.preferencesDataStoreFile
 import com.kert0n.medapp.domain.notification.NotificationSettingsSource
 import com.kert0n.medapp.feature.settings.SettingsStore
+import com.kert0n.medapp.platform.settings.AndroidDevicePermissions
 import com.kert0n.medapp.platform.settings.DataStoreSettings
+import com.kert0n.medapp.platform.settings.DevicePermissions
 import com.kert0n.medapp.platform.settings.StoredNotificationSettings
 import dagger.Module
 import dagger.Provides
@@ -49,4 +51,8 @@ object SettingsModule {
     @Provides
     @Singleton
     fun notificationSettings(implementation: StoredNotificationSettings): NotificationSettingsSource = implementation
+
+    @Provides
+    @Singleton
+    fun permissions(implementation: AndroidDevicePermissions): DevicePermissions = implementation
 }

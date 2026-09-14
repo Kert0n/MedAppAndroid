@@ -25,7 +25,10 @@ class NotificationOwnershipTest {
             "domain/notification/ReminderAlarms.kt",
             "platform/notifications/AlarmManagerReminders.kt",
             "di/NotificationModule.kt",
-            "feature/notification/ReminderOutbox.kt"
+            "feature/notification/ReminderOutbox.kt",
+            // Состояние разрешений читает `canBeExact` — ответ владельца будильников, а не второй
+            // ответ на тот же вопрос; будить и снимать оно не умеет.
+            "platform/settings/AndroidDevicePermissions.kt"
         ),
         "Notifier" to setOf(
             "domain/notification/Notifier.kt",
