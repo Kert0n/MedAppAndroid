@@ -375,6 +375,19 @@ adb devices   # проверить, что устройство на месте,
   -Pandroid.testInstrumentationRunnerArguments.class=com.kert0n.medapp.network.account.RegistrationProbe
 ```
 
+**«Честный знак» — чужой недокументированный API, и обращаемся мы с ним бережно**: о его циклах
+обновления неизвестно ничего, лишний трафик или «умная» правка кода могут нас отрезать. Код с
+коробки уходит байт в байт под `{FNC1}`, ответ читается терпимо. Живой запрос делает только
+`CrptProbe` — по явному `-PprobeCrpt`, **один запрос за запуск**, раз на PR, который трогает
+`network/crpt`; код лежит в `local.properties` как `MEDAPP_CRPT_PROBE_CODE` (разделители GS —
+экранированным U+001D). Из сети вне России реестр отвечает `451` — это названный исход, а не
+повод перебирать варианты; форму ответа подтверждает только прогон из российской сети.
+
+```bash
+ANDROID_SERIAL=emulator-5554 ./gradlew :app:connectedDebugAndroidTest -PprobeCrpt \
+  -Pandroid.testInstrumentationRunnerArguments.class=com.kert0n.medapp.network.crpt.CrptProbe
+```
+
 Локальный сервер — только для отладки, когда прод показал проблему. Из `../MedAppServer`, с
 JDK 25 и работающим Docker:
 

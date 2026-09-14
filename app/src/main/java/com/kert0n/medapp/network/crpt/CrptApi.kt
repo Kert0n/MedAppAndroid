@@ -17,8 +17,10 @@ import kotlin.coroutines.cancellation.CancellationException
 /**
  * Один вопрос «Честному знаку»: что за код (PLAN H5). Клиент отдельный и без пропуска MedApp
  * (G3). Исходы — те, что различает сценарий: тело ответа, «не найдено», недоступность. `404` и
- * `400` — тоже «не найдено»: так отвечает и наблюдаемый API, и референс; прочие статусы и
- * нечитаемое тело — «сервер промолчал», обрыв — «связи нет».
+ * `400` — тоже «не найдено»: так отвечает и наблюдаемый API, и референс; `451` и `403` — нас не
+ * приняли (доступ закрыт по месту или правилу, и повтор тем же не поможет — проба 2026-09-14
+ * получила ровно `451` из сети разработчика); прочие статусы и нечитаемое тело — «сервер
+ * промолчал», обрыв — «связи нет».
  */
 class CrptApi @Inject constructor(@CrptHttp private val client: HttpClient) {
 
@@ -34,6 +36,7 @@ class CrptApi @Inject constructor(@CrptHttp private val client: HttpClient) {
                 if (body.codeFounded) CrptCheck.Body(body) else CrptCheck.NotFound
             }
             HttpStatusCode.NotFound, HttpStatusCode.BadRequest -> CrptCheck.NotFound
+            UNAVAILABLE_FOR_LEGAL_REASONS, HttpStatusCode.Forbidden -> CrptCheck.Unavailable(Unavailability.SERVER_REFUSED_US)
             else -> CrptCheck.Unavailable(Unavailability.SERVER_SILENT)
         }
     } catch (cancelled: CancellationException) {
@@ -44,6 +47,9 @@ class CrptApi @Inject constructor(@CrptHttp private val client: HttpClient) {
 
     companion object {
         const val CHECK = "/v2/mobile/check"
+
+        /** 451 Unavailable For Legal Reasons — в Ktor не именован. */
+        val UNAVAILABLE_FOR_LEGAL_REASONS = HttpStatusCode(451, "Unavailable For Legal Reasons")
     }
 }
 

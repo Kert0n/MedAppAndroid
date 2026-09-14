@@ -1,4 +1,5 @@
 import org.jetbrains.kotlin.gradle.dsl.JvmTarget
+import java.util.Base64
 import java.util.Properties
 
 plugins {
@@ -88,6 +89,13 @@ android {
         }
         if (project.hasProperty("probeRegistration")) {
             testInstrumentationRunnerArguments["probeRegistration"] = "true"
+        }
+        // Проба «Честного знака» — только по явному -PprobeCrpt: чужой API, один запрос за запуск.
+        // Код с коробки лежит в local.properties (разделители GS — экранированным U+001D), в APK и
+        // в git не попадает; в аргументы едет Base64 — управляющий байт через `am instrument` не проходит.
+        if (project.hasProperty("probeCrpt")) {
+            testInstrumentationRunnerArguments["probeCrptCode"] =
+                Base64.getEncoder().encodeToString(secretOrNull("MEDAPP_CRPT_PROBE_CODE").orEmpty().toByteArray())
         }
         if (project.hasProperty("probe")) {
             for (user in listOf("A", "B")) {

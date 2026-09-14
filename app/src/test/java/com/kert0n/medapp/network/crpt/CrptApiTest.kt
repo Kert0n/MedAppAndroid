@@ -86,6 +86,13 @@ class CrptApiTest {
         assertEquals(CrptCheck.Unavailable(Unavailability.NO_CONNECTION), api { throw ConnectException("связи нет") }.check(code))
     }
 
+    /** `451` — доступ закрыт по месту, `403` — по правилу: повтор тем же не поможет, человеку нужно решение. */
+    @Test
+    fun aLegalOrPolicyRefusalIsARefusalNotSilence() = runTest {
+        assertEquals(CrptCheck.Unavailable(Unavailability.SERVER_REFUSED_US), api { respond("", CrptApi.UNAVAILABLE_FOR_LEGAL_REASONS) }.check(code))
+        assertEquals(CrptCheck.Unavailable(Unavailability.SERVER_REFUSED_US), api { respond("", HttpStatusCode.Forbidden) }.check(code))
+    }
+
     @Test
     fun anythingElseIsAServerThatKeptSilent() = runTest {
         assertEquals(CrptCheck.Unavailable(Unavailability.SERVER_SILENT), api { respond("", HttpStatusCode.BadGateway) }.check(code))
