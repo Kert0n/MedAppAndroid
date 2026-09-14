@@ -8,7 +8,7 @@ package com.kert0n.medapp.network.crpt
 object CrptFixtures {
 
     /** Разделитель полей DataMatrix — GS: так его отдаёт сканер, и так он уходит в CRPT. */
-    const val GS = ""
+    const val GS = "\u001d"
 
     /** Настоящий текст сканера начинается с `01`, поля `91`/`92` отделены GS. */
     const val SCANNED = "0104601234567890215ABCDE12345" + GS + "91EE11" + GS + "92dGVzdA=="
@@ -26,7 +26,7 @@ object CrptFixtures {
           "category": "drugs",
           "categoryV2": "drugs",
           "context": "scan",
-          "code": "0104601234567890210000000000091EE1192AAAA",
+          "code": "01046012345678902100000000000\u001d91EE11\u001d92AAAA",
           "gtin": "04601234567890",
           "serial": "0000000000000",
           "productName": "Цетрин",
@@ -82,6 +82,29 @@ object CrptFixtures {
               },
               {"order": 100, "itemType": "doc_links", "docLinksData": [{}]},
               {"order": 110, "itemType": "complaint_from_card"}
+            ]
+          }
+        }
+    """.trimIndent()
+
+    /**
+     * Второй живой ответ той же пробы: составная дозировка, блок картинок и `receiptDate`
+     * отсутствуют — форма та же, блоков меньше.
+     */
+    val lozenge = """
+        {
+          "codeFounded": true,
+          "status": "item_sold_receipt_interm",
+          "category": "drugs",
+          "code": "01046012345678902100000000001",
+          "productName": "Доритрицин",
+          "expireDate": 1853884800000,
+          "screen": {
+            "items": [
+              {"itemType": "main_card", "title": "Доритрицин", "chips": [{"chipType": "country", "value": "ГЕРМАНИЯ"}, {"chipType": "simple_text", "value": "МЕДИЦЕ ФАРМА ГМБХ & КО. КГ"}]},
+              {"itemType": "pharmacy_search", "pharmacyData": {"title": "Доритрицин", "activeSubstance": "бензокаин+бензалкония хлорид+тиротрицин", "form": "таблетки для рассасывания", "dosage": "1.5 мг+1 мг+0.5 мг", "quantity": "10 шт"}},
+              {"itemType": "attributes_card", "attrList": [{"label": "Описание", "value": "ТАБЛЕТКИ ДЛЯ РАССАСЫВАНИЯ, 1.5 мг+1 мг+0.5 мг"}, {"label": "Внутри упаковки", "value": "БЛИСТЕР - 1 шт по 10"}]},
+              {"itemType": "attributes", "attrList": [{"label": "Производитель", "value": "МЕДИЦЕ ФАРМА ГМБХ & КО. КГ"}, {"label": "Импортёр", "value": "ООО «МЕДИЦЕ РУС»"}]}
             ]
           }
         }

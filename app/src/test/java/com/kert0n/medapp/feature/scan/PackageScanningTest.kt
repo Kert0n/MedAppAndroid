@@ -26,7 +26,7 @@ class PackageScanningTest {
     }
 
     private val suggestion = PackageSuggestion(name = "Ибупрофен", form = FormSuggestion.None, isMedicine = true)
-    private val text = "0104601234567890215ABCDE1234591EE1192dGVzdA=="
+    private val text = "0104601234567890215ABCDE12345\u001d91EE11\u001d92dGVzdA=="
 
     @Test
     fun aDataMatrixIsAskedOnceAndAnsweredWithASuggestion() = runTest {

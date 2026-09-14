@@ -45,6 +45,23 @@ class CrptSuggestionTest {
         assertTrue(suggestion.isMedicine)
     }
 
+    /**
+     * Составная дозировка «1.5 мг+1 мг+0.5 мг» остаётся строкой — у предложения нет поля, куда её
+     * превратить; блоков в ответе меньше — предложение не беднее, чем ответ.
+     */
+    @Test
+    fun aCompoundDosageStaysTextAndFewerBlocksAreNotAnError() {
+        val lozenges = DosageForm(Uuid.parse("00000000-0000-4000-8000-000000000105"), "таблетки для рассасывания")
+        val suggestion = dto(CrptFixtures.lozenge).toSuggestion(Vocabulary(emptyList(), listOf(tablets, coated, lozenges)))
+
+        assertEquals("Доритрицин", suggestion.name)
+        assertEquals(FormSuggestion.One(lozenges), suggestion.form)
+        assertEquals("1.5 мг+1 мг+0.5 мг", suggestion.dosageText)
+        assertEquals("ГЕРМАНИЯ", suggestion.country)
+        assertEquals("МЕДИЦЕ ФАРМА ГМБХ & КО. КГ", suggestion.manufacturer)
+        assertEquals(LocalDate.of(2028, 9, 30), suggestion.expiresOn?.lastDay)
+    }
+
     /** Категория вне лекарств — предупреждение; форма при этом подставляется, если словарь её знает. */
     @Test
     fun aCosmeticIsNotAMedicine() {

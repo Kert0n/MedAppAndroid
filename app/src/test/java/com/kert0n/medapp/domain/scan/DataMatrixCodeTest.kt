@@ -11,7 +11,7 @@ import org.junit.Test
  */
 class DataMatrixCodeTest {
 
-    private val gs = ""
+    private val gs = "\u001d"
 
     @Test
     fun theWireIsTheTextVerbatimUnderALiteralPrefix() {
