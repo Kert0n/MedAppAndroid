@@ -572,6 +572,26 @@ class QueueRoomStorageTest {
         watcher.cancel()
     }
 
+    /**
+     * **Зависимая закрывается тем же переходом, что и своя.** Утрата доступа причины не имеет — ни
+     * у родителя, ни у зависимой: каскад не сочиняет закрытие сам, а несёт `Transition.Close`, и
+     * `last_error` у зависимой такой же, каким его пишет собственное закрытие.
+     */
+    @Test
+    fun accessLostCascadesWithoutARefusalReason() = runTest {
+        val release = Uuid.parse("00000000-0000-4000-8000-000000000092")
+        database.syncOperations().enqueue(operation, PackageSyncCommand.Consume(PACK, dose("3"), INTAKE, claimAfter = tablets("0")), at)
+        database.syncOperations().enqueue(release, PackageSyncCommand.ReleaseClaim(PACK), at, dependsOn = setOf(operation))
+        storage.take(operation, null, at)
+
+        storage.settle(operation, Delivery.AccessLost, at.plusSeconds(1))
+
+        val dependent = (requireNotNull(database.syncOperations().find(release)).toDomain(VOCABULARY) as StoredSyncOperation.Readable).operation
+        assertEquals(SyncOperationStatus.ACCESS_LOST, dependent.status)
+        assertNull("утрата доступа без причины", dependent.refusalReason)
+        assertNull("зависимая закрыта не тем переходом, что своя: last_error", dependent.lastError)
+    }
+
     /** Закрытие одно: закрытую операцию второй исход не переписывает и следствий не оставляет. */
     @Test
     fun aClosedOperationIsNotClosedAgain() = runTest {

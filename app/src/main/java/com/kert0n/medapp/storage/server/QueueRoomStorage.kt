@@ -19,7 +19,6 @@ import com.kert0n.medapp.queue.QueuedCommand
 import com.kert0n.medapp.queue.Settlement
 import com.kert0n.medapp.queue.StoredSyncOperation
 import com.kert0n.medapp.queue.SyncOperation
-import com.kert0n.medapp.queue.RefusalReason
 import com.kert0n.medapp.queue.SyncOperationStatus
 import com.kert0n.medapp.queue.Take
 import com.kert0n.medapp.queue.medkit.MedKitSyncCommand
@@ -168,12 +167,7 @@ class QueueRoomStorage @Inject constructor(
      */
     override suspend fun settle(id: Uuid, settlement: Settlement, at: Instant) = database.withTransaction {
         val changed = when (val transition = settlement.transition) {
-            // Закрытая операция не повторяется, а счёт попыток — вход задержки и только он:
-            // закрытию нечего им двигать (PLAN E2, E3).
-            is Settlement.Transition.Close -> queue.settle(
-                id, transition.status, transition.refusalReason?.name, at, attempted = 0,
-                refusalReason = transition.refusalReason
-            )
+            is Settlement.Transition.Close -> close(id, transition, at)
             is Settlement.Transition.Reprepare ->
                 queue.reprepare(id, transition.lastError, at, transition.notBefore)
             is Settlement.Transition.Retry -> queue.settle(
@@ -187,6 +181,15 @@ class QueueRoomStorage @Inject constructor(
         for (effect in settlement.effects) apply(id, effect, at)
     }
 
+    /**
+     * Закрытие — одна дверь для своей операции и для зависимых: что пишется в строку при закрытии,
+     * знает только это место. Закрытая операция не повторяется, а счёт попыток — вход задержки и
+     * только он: закрытию нечего им двигать (PLAN E2, E3). Причина — значением и ровно у отказа;
+     * журналу она же строкой.
+     */
+    private suspend fun close(id: Uuid, close: Settlement.Transition.Close, at: Instant): Int =
+        queue.settle(id, close.status, close.refusalReason?.name, at, attempted = 0, refusalReason = close.refusalReason)
+
     private suspend fun apply(id: Uuid, effect: Settlement.Effect, at: Instant) {
         when (effect) {
             is Settlement.Effect.LayDown -> layDown(effect.snapshot, at, carried = sentFrom(id))
@@ -198,7 +201,7 @@ class QueueRoomStorage @Inject constructor(
             is Settlement.Effect.MedKitLeft -> left(effect.medKitId, at)
             is Settlement.Effect.MedKitPublished -> publishedOnServer(effect.medKitId, at)
             is Settlement.Effect.Account -> intakes.setAccounting(id, effect.accounting)
-            is Settlement.Effect.Cascade -> cascade(id, effect)
+            is Settlement.Effect.Cascade -> cascade(id, effect, at)
             is Settlement.Effect.Settled -> settled(id)
             is Settlement.Effect.Withdrawn -> withdrawn(id, effect.packageId, at)
             is Settlement.Effect.Returned -> returned(effect.packageId, effect.medKitId)
@@ -242,8 +245,8 @@ class QueueRoomStorage @Inject constructor(
      */
     private suspend fun sentFrom(id: Uuid): Quantity? {
         val operation = operationOf(id) ?: return null
-        return when (operation.command) {
-            is PackageSyncCommand.Withdraw -> (operation.command as PackageSyncCommand.Withdraw).carried
+        return when (val command = operation.command) {
+            is PackageSyncCommand.Withdraw -> command.carried
             is PackageSyncCommand.Create -> operation.prepared?.quantityBefore
             else -> null
         }
@@ -391,12 +394,10 @@ class QueueRoomStorage @Inject constructor(
      * Зависимость значит «нужен эффект»: не будет его у родителя — не будет и у зависимых, и у их
      * зависимых. Закрывается всё незакрытое ниже по графу — одним чтением, каждая операция раз.
      */
-    private suspend fun cascade(id: Uuid, effect: Settlement.Effect.Cascade) {
+    private suspend fun cascade(id: Uuid, effect: Settlement.Effect.Cascade, at: Instant) {
         for (dependent in queue.dependentsOf(id)) {
             if (dependent.status.isClosed) continue
-            // Зависимая закрывается тем же статусом; причина — значением, и только у отказа.
-            val superseded = RefusalReason.SUPERSEDED.takeIf { effect.status == SyncOperationStatus.REFUSED }
-            queue.settle(dependent.id, effect.status, RefusalReason.SUPERSEDED.name, at = null, attempted = 0, refusalReason = superseded)
+            close(dependent.id, effect.close, at)
             intakes.setAccounting(dependent.id, effect.accounting)
             settled(dependent.id)
         }

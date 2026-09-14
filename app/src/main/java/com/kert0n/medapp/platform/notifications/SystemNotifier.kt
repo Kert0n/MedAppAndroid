@@ -51,7 +51,7 @@ class SystemNotifier @Inject constructor(
     private val packages: PackageStorageRepository
 ) : Notifier {
 
-    override suspend fun show(notification: Reminder): Delivery {
+    override suspend fun show(reminder: Reminder): Delivery {
         // Проверка стоит здесь, а не в отдельном методе: lint видит её только рядом с `notify`.
         // `POST_NOTIFICATIONS` — разрешение только с Android 13; ниже его нет, и спрашивать надо систему.
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU &&
@@ -62,27 +62,27 @@ class SystemNotifier @Inject constructor(
         // выключает их по отдельности (PLAN D8). Выключенный канал молчит, а `notify` об этом не
         // скажет — спрашиваем канал **этого вида**.
         val channel = context.getSystemService(android.app.NotificationManager::class.java)
-            .getNotificationChannel(notification.channel.id)
+            .getNotificationChannel(reminder.channel.id)
         if (channel == null || channel.importance == android.app.NotificationManager.IMPORTANCE_NONE) {
             return Delivery.NOT_ALLOWED
         }
         // Текст собирается из чтений по идентификаторам цели: не нашлось — повода больше нет.
-        val text = textOf(notification) ?: return Delivery.SUBJECT_GONE
-        val builder = NotificationCompat.Builder(context, notification.channel.id)
+        val text = textOf(reminder) ?: return Delivery.SUBJECT_GONE
+        val builder = NotificationCompat.Builder(context, reminder.channel.id)
             .setSmallIcon(R.drawable.ic_notification_medication)
             .setContentTitle(text.title)
             .setContentText(text.body)
             .setStyle(NotificationCompat.BigTextStyle().bigText(text.body))
             .setAutoCancel(true)
-            .setContentIntent(openIntent(notification))
-        for (action in notification.actions) {
-            val intake = (notification.target as? NotificationTarget.Intake)?.intakeId ?: continue
+            .setContentIntent(openIntent(reminder))
+        for (action in reminder.actions) {
+            val intake = (reminder.target as? NotificationTarget.Intake)?.intakeId ?: continue
             // «Принял» открывает приложение — с целью и действием в extras, не через приёмник:
             // запуск активности из приёмника платформа запрещает (trampoline, C1).
-            val intent = if (action.handledInBackground) actionIntent(intake, action, notification.key) else openIntent(notification, action)
+            val intent = if (action.handledInBackground) actionIntent(intake, action, reminder.key) else openIntent(reminder, action)
             builder.addAction(0, context.getString(action.label), intent)
         }
-        NotificationManagerCompat.from(context).notify(notification.key.subject, notification.kind.ordinal, builder.build())
+        NotificationManagerCompat.from(context).notify(reminder.key.subject, reminder.kind.ordinal, builder.build())
         return Delivery.SHOWN
     }
 
