@@ -3,6 +3,8 @@ package com.kert0n.medapp.platform.notifications
 import android.content.Intent
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import com.kert0n.medapp.feature.notification.ReminderOutbox
+import com.kert0n.medapp.fixture.await
+import kotlinx.coroutines.runBlocking
 import dagger.hilt.android.testing.HiltAndroidRule
 import dagger.hilt.android.testing.HiltAndroidTest
 import javax.inject.Inject
@@ -45,17 +47,14 @@ class BootAndTimeReceiverTest {
     fun theReceiverWakesTheOwnerOfTheAlarms() {
         val context = InstrumentationRegistry.getInstrumentation().targetContext
         outbox.start()
-        // Начальный проход и готовность наблюдателя — до отсчёта: иначе их и засчитали бы за ответ.
-        val started = System.currentTimeMillis() + 5_000
-        while (!(outbox.ready.value && outbox.state.value.passes >= 1) && System.currentTimeMillis() < started) Thread.sleep(50)
-        Thread.sleep(300)
+        // Начальный проход и готовность наблюдателя — до отсчёта, и дождаться их обязательно:
+        // иначе запоздавший начальный проход засчитали бы за ответ приёмнику.
+        runBlocking { await("наблюдатель встал и начальный проход прошёл") { outbox.ready.value && outbox.state.value.passes >= 1 } }
         val before = outbox.state.value.passes
 
         BootAndTimeReceiver().onReceive(context, Intent(android.app.AlarmManager.ACTION_SCHEDULE_EXACT_ALARM_PERMISSION_STATE_CHANGED))
 
-        val deadline = System.currentTimeMillis() + 5_000
-        while (outbox.state.value.passes <= before && System.currentTimeMillis() < deadline) Thread.sleep(50)
-        assertTrue("владелец постановок не разбужен", outbox.state.value.passes > before)
+        runBlocking { await("владелец постановок разбужен") { outbox.state.value.passes > before } }
     }
 
     @Test

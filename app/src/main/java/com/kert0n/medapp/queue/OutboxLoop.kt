@@ -30,7 +30,10 @@ import kotlinx.coroutines.launch
  * [ready] — наблюдатель сигналов встал: запись, сделанная раньше, сигнала не даст, и тому, кто
  * ждёт именно сигнала (проверки), есть чего дождаться, а не сколько-то миллисекунд. Готовность
  * приносит сам поток: его **первое** значение — «наблюдатель на месте», а не изменение (у Room
- * это `emitInitialState`, и приходит оно после того, как триггеры таблиц поставлены).
+ * это `emitInitialState`, и приходит оно после того, как триггеры таблиц поставлены). Начальный
+ * проход ставится **из того же первого значения**, а не при старте: иначе коммит между чтением
+ * начального прохода и постановкой наблюдателя не давал бы сигнала никому (C1 «Цикл владельца —
+ * сначала наблюдатель»).
  */
 class OutboxLoop(
     private val signals: Flow<Unit>,
@@ -65,6 +68,7 @@ class OutboxLoop(
                 if (first) {
                     first = false
                     _ready.value = true
+                    if (initialPass) wake.trySend(Unit)
                 } else {
                     wake.trySend(Unit)
                 }
@@ -79,7 +83,6 @@ class OutboxLoop(
     }
 
     private suspend fun run() {
-        if (initialPass) wake.trySend(Unit)
         var timer: Job? = null
         for (signal in wake) {
             timer?.cancel()

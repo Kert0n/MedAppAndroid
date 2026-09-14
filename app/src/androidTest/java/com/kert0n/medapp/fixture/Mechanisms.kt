@@ -9,7 +9,6 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.cancel
 import kotlinx.coroutines.delay
-import kotlinx.coroutines.withTimeoutOrNull
 
 /**
  * Механизмы, которые в приложении живут с процессом, — **запущенные**, как в `MedApp.onCreate`:
@@ -23,7 +22,12 @@ import kotlinx.coroutines.withTimeoutOrNull
  */
 class Mechanisms(scenarios: Scenarios, at: java.time.Instant) : AutoCloseable {
 
-    private val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
+    /**
+     * Время жизни механизмов — у проверки: владелец, которого тест строит сам (со своими часами
+     * или своей сверкой), живёт здесь же и гаснет в [close] вместе с остальными, а не переживает
+     * закрытую базу и не будит соседние проверки.
+     */
+    val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
 
     val outbox: ReminderOutbox = ReminderOutbox(
         scenarios.reminderStore, scenarios.notifier, scenarios.reminders, scenarios.freshness,
@@ -42,14 +46,9 @@ class Mechanisms(scenarios: Scenarios, at: java.time.Instant) : AutoCloseable {
         }
     }
 
-    /** Дождаться условия или упасть с именем того, чего ждали. */
-    suspend fun await(what: String, timeoutMillis: Long = 5_000, condition: suspend () -> Boolean) {
-        val met = withTimeoutOrNull(timeoutMillis) {
-            while (!condition()) delay(20)
-            true
-        }
-        if (met != true) throw AssertionError("не дождались: $what")
-    }
+    /** Дождаться условия или упасть с именем того, чего ждали — то же [await], что у всех проверок. */
+    suspend fun await(what: String, timeoutMillis: Long = 5_000, condition: suspend () -> Boolean) =
+        com.kert0n.medapp.fixture.await(what, timeoutMillis, condition)
 
     /** Механизмы затихли: число проходов владельца доставки не менялось [quietMillis]. */
     suspend fun settle(quietMillis: Long = 500) {

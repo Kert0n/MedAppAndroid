@@ -249,7 +249,7 @@ class NotificationProtocolTest {
         val clock = com.kert0n.medapp.fixture.TickingClock(now)
         val outbox = ReminderOutbox(
             scenarios.reminderStore, scenarios.notifier, scenarios.reminders, scenarios.freshness, scenarios.transactions,
-            clock, CoroutineScope(SupervisorJob() + Dispatchers.IO)
+            clock, mechanisms.scope
         )
         val ripe = intake(now)                       // уже наступил — ради него и ждут свежесть
         val ripening = intake(now.plusSeconds(2))    // наступит, пока ждут
@@ -279,7 +279,7 @@ class NotificationProtocolTest {
             database.intakeRepository(), database.packageRepository(), database.courseRepository(), scenarios.reminderStore,
             database.queueRepository(), scenarios.reminderPromising, scenarios.reminderWithdrawal, failing, scenarios.transactions
         )
-        val upkeep = NotificationUpkeep(scenarios.reminderStore, reconciliation, java.time.Clock.fixed(now, ZoneOffset.UTC), CoroutineScope(SupervisorJob() + Dispatchers.IO))
+        val upkeep = NotificationUpkeep(scenarios.reminderStore, reconciliation, java.time.Clock.fixed(now, ZoneOffset.UTC), mechanisms.scope)
         upkeep.start()
         mechanisms.await("наблюдатель оснований встал") { upkeep.ready.value }
 

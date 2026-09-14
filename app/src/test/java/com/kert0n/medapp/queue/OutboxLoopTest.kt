@@ -5,6 +5,7 @@ import java.time.Duration
 import java.time.Instant
 import java.time.ZoneOffset
 import kotlinx.coroutines.CompletableDeferred
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.onStart
 import kotlinx.coroutines.test.advanceTimeBy
@@ -48,6 +49,27 @@ class OutboxLoopTest {
 
         assertTrue("готовность — из первого значения потока", loop.ready.value)
         assertEquals("первое значение — не изменение: прохода по нему нет", 0, passes)
+    }
+
+    /**
+     * **Начальный проход — не раньше, чем встал наблюдатель.** Иначе коммит между чтением
+     * начального прохода и постановкой наблюдателя не давал сигнала никому: работа лежала до
+     * чужого повода. У Room наблюдатель встаёт не мгновенно — здесь это `delay` перед первым
+     * значением.
+     */
+    @Test
+    fun theInitialPassDoesNotRunBeforeTheObserverStands() = runTest {
+        lateinit var loop: OutboxLoop
+        var readyAtPass: Boolean? = null
+        loop = OutboxLoop(signals.onStart { delay(100); emit(Unit) }, Duration.ofMinutes(1), Clock.fixed(now, ZoneOffset.UTC), backgroundScope) {
+            readyAtPass = loop.ready.value
+            null
+        }
+        loop.start()
+        advanceTimeBy(1_000)
+        runCurrent()
+
+        assertEquals("начальный проход шёл до того, как встал наблюдатель", true, readyAtPass)
     }
 
     @Test
