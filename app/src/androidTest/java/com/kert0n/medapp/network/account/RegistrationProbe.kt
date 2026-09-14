@@ -50,6 +50,7 @@ class RegistrationProbe {
         try {
             val credentials = KeystoreCredentialSource(
                 PreferenceDataStoreFactory.create(scope = scope) { file },
+                file,
                 KeystoreKey(alias),
                 Dispatchers.IO
             )

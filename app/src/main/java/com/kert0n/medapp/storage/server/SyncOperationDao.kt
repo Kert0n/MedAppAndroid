@@ -125,6 +125,14 @@ interface SyncOperationDao {
     )
     suspend fun unclosedOfMedKit(medKitId: Uuid): Int
 
+    /** Незакрытые команды полки строками — чтобы закрыть каждую её же переходом (PLAN G2). */
+    @Transaction
+    @Query(
+        "SELECT * FROM sync_operations WHERE med_kit_id = :medKitId " +
+            "AND status NOT IN ('APPLIED', 'REFUSED', 'ACCESS_LOST') ORDER BY sequence"
+    )
+    suspend fun unclosedRowsOfMedKit(medKitId: Uuid): List<SyncOperationStorageRow>
+
     /**
      * Что ещё касается человека: незакрытые — ждут, отправляются, ответ записан — и отказанные,
      * которым нужно его решение. Применённые и утратившие доступ экрану не нужны (PLAN H3 №28).

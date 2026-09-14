@@ -28,10 +28,9 @@ class SyncOperationStorageRow(
             payload = operation.payload,
             payloadVersion = operation.payloadVersion,
             vocabulary = vocabulary
-        ) ?: return unreadable(
-            StoredSyncOperation.Reason.Format(
-                "команда «${operation.kind}» версии ${operation.payloadVersion} этой сборке неизвестна"
-            )
+        ) ?: return StoredSyncOperation.Unreadable(
+            operation.id,
+            "команда «${operation.kind}» версии ${operation.payloadVersion} этой сборке неизвестна"
         )
         StoredSyncOperation.Readable(
             SyncOperation(
@@ -54,12 +53,9 @@ class SyncOperationStorageRow(
             )
         )
     } catch (missed: VocabularyMiss) {
-        unreadable(StoredSyncOperation.Reason.VocabularyStale(missed))
+        StoredSyncOperation.Stale(operation.id, missed)
     } catch (cause: IllegalArgumentException) {
         // Сюда же приходит SerializationException: повреждённый JSON — её наследник.
-        unreadable(StoredSyncOperation.Reason.Format(cause.message ?: "строка очереди не собирается"))
+        StoredSyncOperation.Unreadable(operation.id, cause.message ?: "строка очереди не собирается")
     }
-
-    private fun unreadable(reason: StoredSyncOperation.Reason) =
-        StoredSyncOperation.Unreadable(operation.id, reason)
 }

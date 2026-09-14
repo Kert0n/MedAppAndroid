@@ -90,7 +90,7 @@ class QueueWorkerTest {
     private class Storage(operations: List<SyncOperation>) : QueueStorage {
         val operations = operations.associateBy { it.id }.toMutableMap()
         val settled = mutableListOf<Pair<Uuid, Delivery>>()
-        val unreadable = mutableListOf<StoredSyncOperation.Unreadable>()
+        val unreadable = mutableListOf<StoredSyncOperation>()
         var frozen = 0
         var known = PackageSyncState(PACK, ResourceVersion(3))
         var knownPack: Package = pack(quantity = tablets("20"))
@@ -794,13 +794,13 @@ class QueueWorkerTest {
     @Test
     fun unreadableRowIsSkippedAndNamed() = runTest {
         val storage = Storage(emptyList())
-        val broken = StoredSyncOperation.Unreadable(OTHER_PACK, StoredSyncOperation.Reason.Format("payload не разбирается"))
+        val broken = StoredSyncOperation.Unreadable(OTHER_PACK, "payload не разбирается")
         storage.unreadable += broken
         val transport = transport { ApiResult.Success(RawResponse(200, snapshotJson)) }
 
         val report = worker(storage, transport).drain()
 
-        assertEquals(listOf(broken), report.skipped)
+        assertEquals(listOf(QueueWorker.Report.Skipped(OTHER_PACK, "payload не разбирается")), report.skipped)
         assertTrue(transport.sent.isEmpty())
     }
 
@@ -808,7 +808,7 @@ class QueueWorkerTest {
     fun staleVocabularyIsReadOnceAndThePassRestarts() = runTest {
         val storage = Storage(emptyList())
         val miss = VocabularyMiss(VocabularyMiss.Kind.UNIT, MILLILITRES.id)
-        storage.unreadable += StoredSyncOperation.Unreadable(OTHER_PACK, StoredSyncOperation.Reason.VocabularyStale(miss))
+        storage.unreadable += StoredSyncOperation.Stale(OTHER_PACK, miss)
         val transport = transport { ApiResult.Success(RawResponse(200, snapshotJson)) }
 
         val report = worker(storage, transport, online = true).drain()

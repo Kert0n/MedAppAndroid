@@ -9,19 +9,23 @@ import androidx.work.OneTimeWorkRequestBuilder
 import androidx.work.PeriodicWorkRequestBuilder
 import androidx.work.WorkManager
 import androidx.work.workDataOf
+import com.kert0n.medapp.queue.SyncInterval
 import com.kert0n.medapp.queue.SyncSchedule
 import java.time.Clock
 import java.time.Duration
 import java.time.Instant
 import javax.inject.Inject
 import javax.inject.Provider
+import kotlinx.coroutines.flow.first
 
 /**
  * Заходы без человека — планировщиком системы (PLAN E4). Он не обещает точного времени и сам
  * дожидается связи: заход без неё бессмыслен, а с ней система поднимет процесс, даже если его убили.
  *
- * Оба захода уникальны по имени и при повторной постановке сохраняются: регулярный не сдвигается
- * каждым запуском, а за остатком приходят один раз — пока он есть, заход сам просит повтора.
+ * Оба захода уникальны по имени. Регулярный ставится с интервалом из настроек: тот же интервал
+ * ничего не трогает — задача не сдвигается каждым запуском, — а другой обновляет **ту же** задачу,
+ * и следующий заход считается от последнего с новым шагом. За остатком приходят один раз — пока
+ * он есть, заход сам просит повтора.
  */
 class WorkManagerSyncSchedule @Inject constructor(
     private val workManager: Provider<WorkManager>,
@@ -34,11 +38,13 @@ class WorkManagerSyncSchedule @Inject constructor(
      */
     private val work: WorkManager get() = workManager.get()
 
-    override fun keepRegular() {
-        val request = PeriodicWorkRequestBuilder<SyncWorker>(REGULAR_INTERVAL)
+    override suspend fun keepRegular(interval: SyncInterval) {
+        val standing = work.getWorkInfosForUniqueWorkFlow(REGULAR).first().firstOrNull { !it.state.isFinished }
+        if (standing?.periodicityInfo?.repeatIntervalMillis == interval.duration.toMillis()) return
+        val request = PeriodicWorkRequestBuilder<SyncWorker>(interval.duration)
             .setConstraints(online)
             .build()
-        work.enqueueUniquePeriodicWork(REGULAR, ExistingPeriodicWorkPolicy.KEEP, request)
+        work.enqueueUniquePeriodicWork(REGULAR, ExistingPeriodicWorkPolicy.UPDATE, request)
     }
 
     override fun comeBackFor(dueAt: Instant) {
@@ -54,12 +60,6 @@ class WorkManagerSyncSchedule @Inject constructor(
     private val online = Constraints.Builder().setRequiredNetworkType(NetworkType.CONNECTED).build()
 
     companion object {
-        /**
-         * Как часто узнавать чужие изменения, пока приложение закрыто. Журнал повторов сервера живёт
-         * не дольше суток (B6), и заходить реже нельзя; настройками станет от 15 минут до 8 часов (H3).
-         */
-        val REGULAR_INTERVAL: Duration = Duration.ofHours(1)
-
         /** Первая пауза повтора за остатком; дальше система удваивает её сама. */
         val COME_BACK_BACKOFF: Duration = Duration.ofSeconds(30)
 

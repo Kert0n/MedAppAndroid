@@ -28,6 +28,8 @@ object ProbeAccounts {
             error("пробы учёток не заводят: они заведены один раз и лежат в local.properties")
 
         override suspend fun confirm(): CredentialsSaved = CredentialsSaved.SAVED
+        override suspend fun forget(): CredentialsSaved =
+            error("пробы учёток не стирают: они заведены один раз и лежат в local.properties")
     }
 
     private val arguments get() = InstrumentationRegistry.getArguments()

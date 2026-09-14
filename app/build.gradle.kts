@@ -54,6 +54,14 @@ val verifyReleaseSecrets = tasks.register("verifyReleaseSecrets") {
 tasks.matching { it.name == "assembleRelease" || it.name == "bundleRelease" }
     .configureEach { dependsOn(verifyReleaseSecrets) }
 
+/**
+ * Предупреждение обработчика аннотаций — провал сборки. Room предупреждал о строке с `@Relation`
+ * без `@Transaction`, а прогон читал только ошибки — сигнал был и был отфильтрован (разбор #29).
+ */
+ksp {
+    allWarningsAsErrors = true
+}
+
 android {
     namespace = "com.kert0n.medapp"
     compileSdk {

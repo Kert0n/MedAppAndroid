@@ -135,21 +135,18 @@ class SystemNotifier @Inject constructor(
             )
         }
         is NotificationTarget.DayPlan -> Text(context.getString(R.string.notice_digest_title), context.getString(R.string.notice_digest_body, target.date.format(DATE)))
+        NotificationTarget.SyncStatus -> Text(context.getString(R.string.notice_sync_attention_title), context.getString(R.string.notice_sync_attention_body))
     }
 
     /**
-     * Открыть приложение по цели: только идентификаторы и дата в extras (G3). Платформа не знает
-     * экранов и их Activity (H1) — открывается то, что пакет объявил точкой входа.
+     * Открыть приложение по цели: только идентификаторы и дата в extras (G3), и кладёт их тот же
+     * [NotificationTargetExtras], который их потом читает. Платформа не знает экранов и их
+     * Activity (H1) — открывается то, что пакет объявил точкой входа.
      */
     private fun openIntent(notification: Reminder): PendingIntent {
         val intent = requireNotNull(context.packageManager.getLaunchIntentForPackage(context.packageName)) { "у приложения есть точка входа" }
             .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_SINGLE_TOP)
-        when (val target = notification.target) {
-            is NotificationTarget.Intake -> intent.putExtra(EXTRA_INTAKE_ID, target.intakeId.toString())
-            is NotificationTarget.PackageCard -> intent.putExtra(EXTRA_PACKAGE_ID, target.packageId.toString())
-            is NotificationTarget.CourseSources -> intent.putExtra(EXTRA_COURSE_ID, target.courseId.toString())
-            is NotificationTarget.DayPlan -> intent.putExtra(EXTRA_DATE, target.date.toString())
-        }
+        NotificationTargetExtras.put(intent, notification.target)
         return PendingIntent.getActivity(context, notification.key.hashCode(), intent, PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE)
     }
 
@@ -168,11 +165,6 @@ class SystemNotifier @Inject constructor(
         }
 
     companion object {
-        const val EXTRA_INTAKE_ID = "intake_id"
-        const val EXTRA_PACKAGE_ID = "package_id"
-        const val EXTRA_COURSE_ID = "course_id"
-        const val EXTRA_DATE = "date"
-
         private val DATE: DateTimeFormatter = DateTimeFormatter.ofLocalizedDate(FormatStyle.MEDIUM)
     }
 }

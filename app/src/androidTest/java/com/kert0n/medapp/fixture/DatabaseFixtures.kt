@@ -82,7 +82,7 @@ fun MedAppDatabase.intakeRepository() = com.kert0n.medapp.storage.intake.IntakeR
 )
 
 fun MedAppDatabase.medKitRepository() = com.kert0n.medapp.storage.medkit.MedKitRoomRepository(
-    this, medKits()
+    this, medKits(), packages(), courses(), syncOperations(), queueStorage(), vocabulary()
 )
 
 fun MedAppDatabase.queueRepository() = com.kert0n.medapp.storage.server.SyncOperationRoomRepository(
@@ -140,7 +140,7 @@ class Scenarios(
     private val transactions = database.transactions()
     val reminderStore = com.kert0n.medapp.storage.notification.ReminderRoomRepository(database, database.reminders())
     val reminderWithdrawal = com.kert0n.medapp.feature.notification.ReminderWithdrawal(reminderStore, transactions)
-    val reminderPromising = com.kert0n.medapp.feature.notification.ReminderPromising(reminderStore, transactions)
+    val reminderPromising = com.kert0n.medapp.feature.notification.ReminderPromising(reminderStore, notificationSettings, transactions)
     private val packages = database.packageRepository()
     private val medKits = database.medKitRepository()
     private val courses = database.courseRepository()
@@ -192,7 +192,7 @@ class Scenarios(
         database.intakeRepository(), courses, packages, transactions, queue, courseClosing, courseCalendar, reminderWithdrawal, clock
     )
     val notificationReconciliation = com.kert0n.medapp.feature.notification.NotificationReconciliation(
-        database.intakeRepository(), packages, courses, reminderStore, reminderPromising, reminderWithdrawal,
+        database.intakeRepository(), packages, courses, reminderStore, database.queueRepository(), reminderPromising, reminderWithdrawal,
         notificationSettings, transactions
     )
     val dailyRound = com.kert0n.medapp.feature.notification.DailyRound(courseUpkeep, notificationReconciliation, clock)

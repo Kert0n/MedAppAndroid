@@ -12,6 +12,9 @@ import com.kert0n.medapp.storage.intake.IntakeStorageRepository
 import com.kert0n.medapp.storage.pack.PackageQuery
 import com.kert0n.medapp.storage.notification.ReminderStorageRepository
 import com.kert0n.medapp.storage.pack.PackageStorageRepository
+import com.kert0n.medapp.queue.StoredSyncOperation
+import com.kert0n.medapp.queue.SyncOperationStatus
+import com.kert0n.medapp.storage.server.SyncOperationStorageRepository
 import com.kert0n.medapp.queue.Transactions
 import java.time.LocalDate
 import java.time.ZoneId
@@ -28,7 +31,9 @@ import kotlin.uuid.Uuid
  * Сверяется то, что следует из **состояния**: сроки годности, предупреждения о нехватке и сводка.
  * Их нельзя копить — исправленный срок отменяет прежнее предупреждение, восстановленное
  * обеспечение снимает своё. Обязательства от **события** — приём, пропуск, сокращение — сверка не
- * отзывает: повод уже в прошлом, и пересчитать его из нынешнего состояния нечем.
+ * отзывает: повод уже в прошлом, и пересчитать его из нынешнего состояния нечем. Исключение одно —
+ * человек попросил молчать: выключенная настройка снимает обещанное своего вида и не даёт обещать
+ * новое, включённая возвращает несказанное (D8).
  *
  * Показывать и будить сверка не умеет: это дело [ReminderOutbox], и он проснётся сам.
  */
@@ -37,6 +42,7 @@ class NotificationReconciliation @Inject constructor(
     private val packages: PackageStorageRepository,
     private val courses: CourseStorageRepository,
     private val reminders: ReminderStorageRepository,
+    private val operations: SyncOperationStorageRepository,
     private val promising: ReminderPromising,
     private val withdrawal: ReminderWithdrawal,
     private val settings: NotificationSettingsSource,
@@ -56,27 +62,32 @@ class NotificationReconciliation @Inject constructor(
      */
     suspend fun reconcile(now: Instant, zone: ZoneId): Report {
         val today = now.atZone(zone).toLocalDate()
+        val current = settings.current()
         val events = expiryDue(today, now) + coverageDue(now)
-        val desired = events + listOfNotNull(digest(today, zone, events.size))
-        val reductions = reductionsDue(now)
+        val digest = digest(today, zone, events.size)
+        val desired = events + listOfNotNull(digest, syncAttention(now))
+        val reductions = if (current.remoteChangeEnabled) reductionsDue(now) else emptyList()
         // Лишнее — то, что было обещано по состоянию, а в нынешнем состоянии повода не имеет.
+        // Сводка, обещанная на другое время и ещё не сказанная, — тоже лишнее: человек перенёс её,
+        // и снятое здесь обещание ниже воскреснет с новым сроком.
         val wanted = desired.mapTo(HashSet()) { it.key }
-        val stale = reminders.ofKinds(FROM_STATE).map { it.key }.filterNot { it in wanted }
-        // Напоминания о приёме сверка держит в **обе** стороны: включены — обещаем на каждый
-        // плановый пункт, выключены — снимаем обещанное. Обещает их и календарь, когда заводит
-        // пункт, чтобы не ждать прохода; `promise` идемпотентен, и два обещающих не спорят. Без
-        // обратного хода выключить и включить напоминания значило бы потерять их навсегда (C1).
-        val remindersEnabled = settings.current().intakeRemindersEnabled
-        val intakeDue = if (remindersEnabled) plannedReminders() else emptyList()
-        val silenced = if (remindersEnabled) {
-            emptyList()
-        } else {
-            reminders.ofKinds(listOf(NotificationKind.INTAKE_DUE)).map { it.key }
+        val stale = reminders.ofKinds(FROM_STATE)
+            .filter { it.key !in wanted || (digest != null && it.key == digest.key && it.state == Reminder.State.DUE && it.dueAt != digest.dueAt) }
+            .map { it.key }
+        // Напоминания о приёме и сообщения о чужом сокращении сверка держит в **обе** стороны:
+        // включены — обещаем, выключены — снимаем обещанное. Обещает приёмы и календарь, когда
+        // заводит пункт, чтобы не ждать прохода; `promise` идемпотентен, и два обещающих не спорят.
+        // Без обратного хода выключить и включить напоминания значило бы потерять их навсегда (C1).
+        val intakeDue = if (current.intakeRemindersEnabled) plannedReminders() else emptyList()
+        val silenced = buildList {
+            if (!current.intakeRemindersEnabled) addAll(reminders.ofKinds(listOf(NotificationKind.INTAKE_DUE)).map { it.key })
+            if (!current.remoteChangeEnabled) addAll(reminders.ofKinds(listOf(NotificationKind.COVERAGE_SHORT)).map { it.key })
         }
 
         transactions.run {
-            promising.promise(desired + reductions + intakeDue)
+            // Сначала снять, потом обещать: воскрешение снятого даёт ему новый срок.
             withdrawal.withdrawKeys(stale + silenced)
+            promising.promise(desired + reductions + intakeDue)
         }
         return Report(promised = desired.size + intakeDue.size, withdrawn = stale.size + silenced.size)
     }
@@ -157,6 +168,25 @@ class NotificationReconciliation @Inject constructor(
         }
     }
 
+    /**
+     * Очередь ждёт решения человека (PLAN D8, H3 №28): отвергнутое сервером или нечитаемое само не
+     * разрешится. Строка, которой не хватило словаря, — не повод: её дочитает работник. Обязательство
+     * одно на всю очередь, предмет — последняя такая операция: новый отказ говорится снова, прежняя
+     * карточка уходит, а сказанное второй раз не беспокоит. Решать стало нечего — снимается.
+     * Отвергнутое остаётся в очереди, пока человек его не разберёт, и через срок хранения сказанное
+     * забывается — тогда о нерешённом напоминают ещё раз.
+     */
+    suspend fun syncAttention(at: Instant): Reminder? {
+        val newest = operations.observeOutstanding().first().lastOrNull { it.needsDecision() } ?: return null
+        return Reminder(NotificationKey.sync(newest.id), NotificationTarget.SyncStatus, at)
+    }
+
+    private fun StoredSyncOperation.needsDecision(): Boolean = when (this) {
+        is StoredSyncOperation.Readable -> operation.status == SyncOperationStatus.REFUSED
+        is StoredSyncOperation.Stale -> false
+        is StoredSyncOperation.Unreadable -> true
+    }
+
     /** Пункты, ставшие пропуском неответом (их называет проход календаря), — уведомлением каждому (PLAN D8). */
     fun missed(intakeIds: List<Uuid>, at: Instant): List<Reminder> = intakeIds.map { id ->
         Reminder(NotificationKey.intake(id, NotificationKind.INTAKE_MISSED), NotificationTarget.Intake(id), at)
@@ -194,7 +224,8 @@ class NotificationReconciliation @Inject constructor(
             NotificationKind.EXPIRY_TODAY,
             NotificationKind.COVERAGE_3D,
             NotificationKind.COVERAGE_END,
-            NotificationKind.DAILY_DIGEST
+            NotificationKind.DAILY_DIGEST,
+            NotificationKind.SYNC_ATTENTION
         )
     }
 }

@@ -22,6 +22,7 @@ import com.kert0n.medapp.fixture.inMemoryDatabase
 import com.kert0n.medapp.fixture.intakeRepository
 import com.kert0n.medapp.fixture.pack
 import com.kert0n.medapp.fixture.packageRepository
+import com.kert0n.medapp.fixture.queueRepository
 import com.kert0n.medapp.fixture.schedule
 import com.kert0n.medapp.fixture.tablets
 import com.kert0n.medapp.fixture.transactions
@@ -64,7 +65,7 @@ class IntakeReminderTest {
     fun setUp() = runTest {
         database = inMemoryDatabase()
         scenarios = Scenarios(database, now)
-        planning = NotificationReconciliation(database.intakeRepository(), database.packageRepository(), database.courseRepository(), scenarios.reminderStore, scenarios.reminderPromising, scenarios.reminderWithdrawal, settings, database.transactions())
+        planning = NotificationReconciliation(database.intakeRepository(), database.packageRepository(), database.courseRepository(), scenarios.reminderStore, database.queueRepository(), scenarios.reminderPromising, scenarios.reminderWithdrawal, settings, database.transactions())
         store = ReminderRoomRepository(database, database.reminders())
         outbox = outboxAt(now)
         database.packageRepository().add(pack(id = PACK, quantity = tablets("20"), form = TABLET_FORM))
@@ -114,6 +115,20 @@ class IntakeReminderTest {
         // Будильник один — на ближайший оставшийся; показывать пока нечего, их час не настал.
         assertEquals(all[1].plannedAt, reminders.wakeAt)
         assertEquals(emptyList<Any>(), notifier.shown)
+    }
+
+    /**
+     * Выключенные напоминания не заводятся вовсе — и календарём тоже: пункт нового курса не должен
+     * напоминать до ближайшей сверки. Красная проверка: снять проверку настройки в
+     * `ReminderPromising` — обязательства появились бы, и до сверки шторка их показала бы.
+     */
+    @Test
+    fun disabledRemindersAreNotPromisedByTheCalendarEither() = runTest {
+        scenarios.notificationSettings.settings = NotificationSettings(intakeRemindersEnabled = false)
+
+        treated()
+
+        assertEquals(emptyList<Reminder>(), store.ofKinds(listOf(NotificationKind.INTAKE_DUE)))
     }
 
     /** Выключенные напоминания снимают и уже обещанное: человек попросил молчать (контракт B18). */

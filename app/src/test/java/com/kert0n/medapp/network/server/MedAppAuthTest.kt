@@ -63,6 +63,11 @@ class MedAppAuthTest {
             (account as? StoredAccount.Pending)?.let { account = StoredAccount.Present(it.credentials) }
             return CredentialsSaved.SAVED
         }
+
+        override suspend fun forget(): CredentialsSaved {
+            account = StoredAccount.Absent
+            return CredentialsSaved.SAVED
+        }
     }
 
     private val tokenCalls = AtomicInteger()

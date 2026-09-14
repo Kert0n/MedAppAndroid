@@ -10,7 +10,7 @@ import javax.inject.Inject
 import javax.inject.Singleton
 
 /**
- * Четыре канала D8, и каждый человек выключает отдельно в системных настройках. Идентификаторы
+ * Пять каналов D8, и каждый человек выключает отдельно в системных настройках. Идентификаторы
  * стабильны: канал с новым идентификатором — новый канал, и настройки прежнего пропадут.
  * Заводить каналы повторно безопасно — система хранит выбор человека, а не наши умолчания.
  */
@@ -40,6 +40,7 @@ class NotificationChannels @Inject constructor(@ApplicationContext private val c
                 NotificationChannel.EXPIRY -> "expiry"
                 NotificationChannel.COVERAGE -> "coverage"
                 NotificationChannel.DIGEST -> "digest"
+                NotificationChannel.SYNC -> "sync"
             }
 
         private val NotificationChannel.title: Int
@@ -48,6 +49,7 @@ class NotificationChannels @Inject constructor(@ApplicationContext private val c
                 NotificationChannel.EXPIRY -> R.string.channel_expiry
                 NotificationChannel.COVERAGE -> R.string.channel_coverage
                 NotificationChannel.DIGEST -> R.string.channel_digest
+                NotificationChannel.SYNC -> R.string.channel_sync
             }
 
         private val NotificationChannel.Importance.system: Int

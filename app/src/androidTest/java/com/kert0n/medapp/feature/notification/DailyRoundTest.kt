@@ -4,6 +4,8 @@ import androidx.test.ext.junit.runners.AndroidJUnit4
 import com.kert0n.medapp.domain.intake.CourseIntake
 import com.kert0n.medapp.domain.intake.IntakeStatus
 import com.kert0n.medapp.domain.notification.NotificationKind
+import com.kert0n.medapp.domain.notification.NotificationSettings
+import com.kert0n.medapp.domain.notification.Reminder
 import com.kert0n.medapp.domain.pack.ExpiryDate
 import com.kert0n.medapp.domain.value.Doses
 import com.kert0n.medapp.feature.course.CourseDrafting
@@ -20,6 +22,7 @@ import com.kert0n.medapp.fixture.tablets
 import com.kert0n.medapp.storage.database.MedAppDatabase
 import java.time.Instant
 import java.time.LocalDate
+import java.time.LocalTime
 import kotlin.uuid.Uuid
 import kotlinx.coroutines.test.runTest
 import org.junit.After
@@ -110,6 +113,26 @@ class DailyRoundTest {
         assertEquals(emptyList<Any>(), quiet.notifier.shown)
         assertEquals(ReminderOutbox.Report(shown = 0, dismissed = 0, blocked = 0, nextAt = null), delivered)
         assertNull(quiet.reminders.wakeAt)
+    }
+
+    /**
+     * Человек перенёс сводку на вечер, пока утренняя ещё не сказана: обещание одно, и срок у него
+     * новый — тем же проходом (PLAN D8). Красная проверка: обещать раньше, чем снимать, — снятое
+     * воскресло бы только следующим проходом, и в этот день сводка вышла бы в прежний час.
+     */
+    @Test
+    fun aMovedDigestGetsItsNewHourAtOnce() = runTest {
+        treated(Scenarios(database, Instant.parse("2027-03-10T05:00:00Z")))
+        val morning = Scenarios(database, Instant.parse("2027-03-11T02:00:00Z"))
+        morning.dailyRound.run()
+        assertEquals(Instant.parse("2027-03-11T09:00:00Z"), morning.reminderStore.ofKinds(listOf(NotificationKind.DAILY_DIGEST)).single().dueAt)
+
+        morning.notificationSettings.settings = NotificationSettings(digestAt = LocalTime.of(18, 0))
+        morning.dailyRound.run()
+
+        val digest = morning.reminderStore.ofKinds(listOf(NotificationKind.DAILY_DIGEST)).single()
+        assertEquals(Instant.parse("2027-03-11T18:00:00Z"), digest.dueAt)
+        assertEquals(Reminder.State.DUE, digest.state)
     }
 
     /**

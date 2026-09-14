@@ -15,7 +15,11 @@ class ServerDeviceAccount @Inject constructor(
     private val registration: AccountRegistration
 ) : DeviceAccount {
 
-    override suspend fun ensure(): AccountReadiness = when (val outcome = registration.ensure()) {
+    override suspend fun ensure(): AccountReadiness = registration.ensure().asReadiness()
+
+    override suspend fun replaceUnreadable(): AccountReadiness = registration.replaceUnreadable().asReadiness()
+
+    private fun AccountRegistration.Outcome.asReadiness(): AccountReadiness = when (val outcome = this) {
         AccountRegistration.Outcome.Ready -> AccountReadiness.Ready
         AccountRegistration.Outcome.Unreadable -> AccountReadiness.KeyLost
         // Не записались — значит на сервере ничего нет: исход настройки, а не сбой (PLAN G2).

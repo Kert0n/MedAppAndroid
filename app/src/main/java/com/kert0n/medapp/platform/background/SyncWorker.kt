@@ -5,6 +5,7 @@ import androidx.hilt.work.HiltWorker
 import androidx.work.CoroutineWorker
 import androidx.work.WorkerParameters
 import com.kert0n.medapp.feature.course.CourseUpkeep
+import com.kert0n.medapp.feature.settings.SettingsStore
 import com.kert0n.medapp.queue.Synchronization
 import dagger.assisted.Assisted
 import dagger.assisted.AssistedInject
@@ -28,6 +29,7 @@ class SyncWorker @AssistedInject constructor(
     @Assisted parameters: WorkerParameters,
     private val synchronization: Synchronization,
     private val upkeep: CourseUpkeep,
+    private val settings: SettingsStore,
     private val clock: Clock
 ) : CoroutineWorker(context, parameters) {
 
@@ -41,9 +43,10 @@ class SyncWorker @AssistedInject constructor(
         return if (comeBack && round.backlogDueAt != null) Result.retry() else Result.success()
     }
 
-    private fun refreshedRecently(): Boolean {
+    /** «Недавно» — половина выбранного интервала: регулярность нужна, когда никто не смотрит (PLAN E4). */
+    private suspend fun refreshedRecently(): Boolean {
         val refreshedAt = synchronization.state.value.refreshedAt ?: return false
-        return Duration.between(refreshedAt, clock.instant()) < WorkManagerSyncSchedule.REGULAR_INTERVAL.dividedBy(2)
+        return Duration.between(refreshedAt, clock.instant()) < settings.current().syncInterval.duration.dividedBy(2)
     }
 
     companion object {

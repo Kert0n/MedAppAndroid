@@ -14,12 +14,17 @@ import dagger.Provides
 import dagger.hilt.InstallIn
 import dagger.hilt.android.qualifiers.ApplicationContext
 import dagger.hilt.components.SingletonComponent
+import java.io.File
 import javax.inject.Qualifier
 import javax.inject.Singleton
 
 @Qualifier
 @Retention(AnnotationRetention.BINARY)
 annotation class CredentialsStore
+
+@Qualifier
+@Retention(AnnotationRetention.BINARY)
+annotation class CredentialsFile
 
 /**
  * Сеть получает учётку через свой порт, а хранит её платформа. Файл DataStore лежит в каталоге
@@ -37,9 +42,13 @@ abstract class CredentialsModule {
 
         @Provides
         @Singleton
+        @CredentialsFile
+        fun file(@ApplicationContext context: Context): File = context.preferencesDataStoreFile("credentials")
+
+        @Provides
+        @Singleton
         @CredentialsStore
-        fun store(@ApplicationContext context: Context): DataStore<Preferences> =
-            PreferenceDataStoreFactory.create { context.preferencesDataStoreFile("credentials") }
+        fun store(@CredentialsFile file: File): DataStore<Preferences> = PreferenceDataStoreFactory.create { file }
 
         @Provides
         @Singleton

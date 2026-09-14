@@ -22,6 +22,7 @@ import org.junit.After
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNotEquals
+import org.junit.Assert.assertNull
 import org.junit.Before
 import org.junit.Test
 
@@ -50,7 +51,7 @@ class KeystoreCredentialSourceTest {
         file = File(context.cacheDir, "$alias.preferences_pb")
         blocked = File(context.cacheDir, "$alias.blocked")
         store = PreferenceDataStoreFactory.create(scope = scope) { file }
-        source = KeystoreCredentialSource(store, KeystoreKey(alias), Dispatchers.IO)
+        source = KeystoreCredentialSource(store, file, KeystoreKey(alias), Dispatchers.IO)
     }
 
     @After
@@ -149,6 +150,35 @@ class KeystoreCredentialSourceTest {
     }
 
     /**
+     * Стирает сохранённое только решение человека: после него учётки нет, и новая ложится на
+     * чистое. Повреждённый файл стирается целиком — править его нечем.
+     */
+    @Test
+    fun forgettingADamagedStoreMakesRoomForANewAccount() = runTest {
+        file.parentFile?.mkdirs()
+        file.writeBytes(byteArrayOf(0x4D, 0x65, 0x64, 0x41, 0x70, 0x70, 0x21, 0x00, 0x7F))
+        assertEquals(StoredAccount.Unreadable, source.read())
+
+        assertEquals(CredentialsSaved.SAVED, source.forget())
+
+        assertEquals(StoredAccount.Absent, source.read())
+        assertEquals(CredentialsSaved.SAVED, source.save(credentials))
+        assertEquals(StoredAccount.Pending(credentials), source.read())
+    }
+
+    /** Стирание читаемой учётки — тоже стирание: сценарий решает, звать ли его, а не хранилище. */
+    @Test
+    fun forgettingErasesAStoredAccount() = runTest {
+        source.save(credentials)
+        source.confirm()
+
+        assertEquals(CredentialsSaved.SAVED, source.forget())
+
+        assertEquals(StoredAccount.Absent, source.read())
+        assertNull(raw("login"))
+    }
+
+    /**
      * Учётка, которую не удалось записать, — исход, а не исключение: на сервере её при этом нет,
      * и решение, повторять ли настройку, принимает человек.
      */
@@ -158,6 +188,7 @@ class KeystoreCredentialSourceTest {
         blocked.writeBytes(ByteArray(0))
         val unwritable = KeystoreCredentialSource(
             PreferenceDataStoreFactory.create(scope = scope) { File(blocked, "credentials.preferences_pb") },
+            File(blocked, "credentials.preferences_pb"),
             KeystoreKey(alias),
             Dispatchers.IO
         )

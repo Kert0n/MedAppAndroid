@@ -39,5 +39,12 @@ data class NotificationKey(val kind: NotificationKind, val subject: String) {
         fun reduction(reductionId: Uuid): NotificationKey = NotificationKey(NotificationKind.COVERAGE_SHORT, reductionId.toString())
 
         fun digest(date: LocalDate): NotificationKey = NotificationKey(NotificationKind.DAILY_DIGEST, date.toString())
+
+        /**
+         * Очередь ждёт решения: обязательство одно на всю очередь, а предмет — **последняя** из
+         * операций, требующих решения. Новый отказ — новый предмет: о нём говорят снова, а прежняя
+         * карточка уходит; отвергнутое, о котором уже сказали, второй раз не беспокоит.
+         */
+        fun sync(newestOperationId: Uuid): NotificationKey = NotificationKey(NotificationKind.SYNC_ATTENTION, newestOperationId.toString())
     }
 }

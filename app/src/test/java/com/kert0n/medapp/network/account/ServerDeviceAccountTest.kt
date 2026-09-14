@@ -12,6 +12,7 @@ import io.ktor.http.headersOf
 import kotlin.uuid.Uuid
 import kotlinx.coroutines.test.runTest
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertTrue
 import org.junit.Test
 
 /**
@@ -31,6 +32,14 @@ class ServerDeviceAccountTest {
 
         override suspend fun confirm(): CredentialsSaved {
             (account as? StoredAccount.Pending)?.let { account = StoredAccount.Present(it.credentials) }
+            return CredentialsSaved.SAVED
+        }
+
+        var forgotten = 0
+        override suspend fun forget(): CredentialsSaved {
+            if (!writable) return CredentialsSaved.LOST
+            forgotten++
+            account = StoredAccount.Absent
             return CredentialsSaved.SAVED
         }
     }
@@ -64,6 +73,15 @@ class ServerDeviceAccountTest {
     }
 
     /** Нечитаемое сохранённое — утрата ключа, а не отказ: поверх него не регистрируют (PLAN G2). */
+    /** Решение переводится тем же словарём, что и знакомство: новая учётка — «готово». */
+    @Test
+    fun replacingTheUnreadableSpeaksTheSameWords() = runTest {
+        val stored = Memory(StoredAccount.Unreadable)
+
+        assertEquals(AccountReadiness.Ready, account(stored, registered).replaceUnreadable())
+        assertTrue(stored.account is StoredAccount.Present)
+    }
+
     @Test
     fun anUnreadableKeyIsLostNotRefused() = runTest {
         val readiness = account(Memory(StoredAccount.Unreadable), registered).ensure()
