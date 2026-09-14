@@ -71,15 +71,25 @@ class AlarmManagerRemindersTest {
         assertEquals(allowed, reminders.canBeExact)
     }
 
-    /** В намерении нет ничего: ни идентификаторов, ни текстов — что сказать, читают из базы (G3). */
+    /**
+     * Будильник адресован **только** приёмнику пробуждения и своему действию: намерение с тем же
+     * адресом его находит, а с чужим действием — нет. Что в намерении нет идентификаторов, отсюда
+     * не видно: `PendingIntent` своего намерения не отдаёт, и проверять это пришлось бы намерением,
+     * построенным в самой проверке, — то есть ничем. Держит это `ReminderWakeReceiverTest`, который
+     * идёт настоящим широковещанием.
+     */
     @Test
-    fun theIntentCarriesNothing() = runTest {
+    fun theAlarmIsAddressedToTheWakeReceiverAlone() = runTest {
         reminders.wakeAt(Instant.now().plusSeconds(3600), exact = true)
 
-        val intent = Intent(context, ReminderWakeReceiver::class.java).setAction(ReminderWakeReceiver.ACTION)
-        assertNotNull(
-            PendingIntent.getBroadcast(context, 0, intent, PendingIntent.FLAG_NO_CREATE or PendingIntent.FLAG_IMMUTABLE)
+        fun lookup(action: String) = PendingIntent.getBroadcast(
+            context,
+            0,
+            Intent(context, ReminderWakeReceiver::class.java).setAction(action),
+            PendingIntent.FLAG_NO_CREATE or PendingIntent.FLAG_IMMUTABLE
         )
-        assertEquals(null, intent.extras)
+
+        assertNotNull(lookup(ReminderWakeReceiver.ACTION))
+        assertEquals(null, lookup("com.kert0n.medapp.SOMETHING_ELSE"))
     }
 }

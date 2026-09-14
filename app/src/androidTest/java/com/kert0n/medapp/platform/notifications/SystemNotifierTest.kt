@@ -149,12 +149,14 @@ class SystemNotifierTest {
         val source = NotificationActionReceiver::class.java.declaredMethods.map { it.name }
         assertTrue("startActivity в приёмнике", source.none { it.contains("openApp", ignoreCase = true) })
 
-        val declared = context.packageManager.queryBroadcastReceivers(
-            android.content.Intent(com.kert0n.medapp.domain.notification.NotificationAction.SKIP.name)
-                .setPackage(context.packageName),
+        // Спрашивать `queryBroadcastReceivers` по действию бесполезно: intent-фильтра у приёмника
+        // нет, список приходит пустой, и «ни один не экспортирован» проходит всегда. Спрашиваем
+        // сам компонент — он адресуется по имени, как его и зовёт уведомление.
+        val declared = context.packageManager.getReceiverInfo(
+            android.content.ComponentName(context, NotificationActionReceiver::class.java),
             0
         )
-        assertTrue("приёмник действий объявлен внутренним", declared.none { it.activityInfo.exported })
+        assertFalse("приёмник действий объявлен наружу", declared.exported)
     }
 
     /**
