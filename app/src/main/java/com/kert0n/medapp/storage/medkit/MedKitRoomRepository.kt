@@ -44,7 +44,8 @@ class MedKitRoomRepository @Inject constructor(
                 when (val stored = row.toDomain(words)) {
                     is StoredSyncOperation.Readable ->
                         queueStorage.settle(stored.id, Delivery.AccessLost.settlement(stored.operation.command), at)
-                    is StoredSyncOperation.Unreadable ->
+                    // Полки больше нет — дочитывать словарь ради строки, которой некуда ехать, незачем.
+                    is StoredSyncOperation.Stale, is StoredSyncOperation.Unreadable ->
                         queue.settle(stored.id, SyncOperationStatus.ACCESS_LOST, "учётка заменена", at)
                 }
             }

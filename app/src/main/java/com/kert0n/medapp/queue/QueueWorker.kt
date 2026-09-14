@@ -80,9 +80,14 @@ class QueueWorker @Inject constructor(
             val entry = storage.ready(clock.instant()).firstOrNull { it.id !in drain.skippedIds } ?: break
             val operation = when (entry) {
                 is StoredSyncOperation.Readable -> entry.operation
+                // Словаря не хватило: дочитывается один раз за проход, и строка читается снова.
+                is StoredSyncOperation.Stale -> {
+                    if (words.refreshOnce()) continue
+                    drain.skip(entry.id, entry.miss.message.orEmpty())
+                    continue
+                }
                 is StoredSyncOperation.Unreadable -> {
-                    if (entry.reason is StoredSyncOperation.Reason.VocabularyStale && words.refreshOnce()) continue
-                    drain.skip(entry)
+                    drain.skip(entry.id, entry.reason)
                     continue
                 }
             }
@@ -345,7 +350,7 @@ class QueueWorker @Inject constructor(
     /** Состояние одного прохода: что закрыто, что пропущено, какие пачки уже прочитаны. */
     private inner class Drain {
         private var settled = 0
-        private val skipped = ArrayList<StoredSyncOperation.Unreadable>()
+        private val skipped = ArrayList<Report.Skipped>()
         private val failed = ArrayList<Report.Failure>()
         private var retryAt: Instant? = null
         private val reprepared = HashMap<Uuid, Int>()
@@ -357,9 +362,9 @@ class QueueWorker @Inject constructor(
         /** Операции, чей ответ в этом проходе уже записан: сбой после него — ожидание, а не повтор. */
         val answeredIds = HashSet<Uuid>()
 
-        fun skip(entry: StoredSyncOperation.Unreadable) {
-            skipped += entry
-            skippedIds += entry.id
+        fun skip(id: Uuid, reason: String) {
+            skipped += Report.Skipped(id, reason)
+            skippedIds += id
         }
 
         private fun retryNotBefore(at: Instant) {
@@ -429,10 +434,13 @@ class QueueWorker @Inject constructor(
      */
     data class Report(
         val settled: Int,
-        val skipped: List<StoredSyncOperation.Unreadable>,
+        val skipped: List<Skipped>,
         val retryAt: Instant?,
         val failed: List<Failure> = emptyList()
     ) {
+        /** Строка, которую проход не собрал: названа с причиной, в базе не тронута. */
+        data class Skipped(val id: Uuid, val reason: String)
+
         /** Операция, чей шаг бросил: названа с причиной, помечена в базе, ждёт повтора. */
         data class Failure(val id: Uuid, val reason: String)
     }

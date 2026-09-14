@@ -52,7 +52,7 @@
     <string name="notice_digest_title">Сводка дня</string>
     <string name="notice_digest_body">Что принять и что проверить %1$s</string>
     <string name="notice_sync_attention_title">Нужно ваше решение</string>
-    <string name="notice_sync_attention_body">Сервер не принял часть изменений — откройте состояние синхронизации</string>
+    <string name="notice_sync_attention_body">Часть изменений ждёт вашего решения — откройте состояние синхронизации</string>
 
     <!-- Уведомления: действия -->
     <string name="action_skip">Пропустить</string>

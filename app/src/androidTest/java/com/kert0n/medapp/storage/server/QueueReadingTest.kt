@@ -108,7 +108,7 @@ class QueueReadingTest {
         val shown = outstanding().single() as StoredSyncOperation.Unreadable
 
         assertEquals(delete, shown.id)
-        assertTrue(shown.reason is StoredSyncOperation.Reason.Format)
+        assertTrue(shown.reason, shown.reason.contains("версии"))
     }
 
     /** Местная полка серверу не отвечает: пересчёт на ней команд не ставит, и очередь пуста. */

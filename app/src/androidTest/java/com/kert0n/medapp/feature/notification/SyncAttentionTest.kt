@@ -5,6 +5,8 @@ import com.kert0n.medapp.domain.notification.NotificationKey
 import com.kert0n.medapp.domain.notification.NotificationKind
 import com.kert0n.medapp.domain.notification.NotificationTarget
 import com.kert0n.medapp.domain.notification.Reminder
+import com.kert0n.medapp.domain.value.Quantity
+import com.kert0n.medapp.domain.value.QuantityUnit
 import com.kert0n.medapp.fixture.INTAKE
 import com.kert0n.medapp.fixture.PACK
 import com.kert0n.medapp.fixture.Scenarios
@@ -13,20 +15,25 @@ import com.kert0n.medapp.fixture.dose
 import com.kert0n.medapp.fixture.inMemoryDatabase
 import com.kert0n.medapp.fixture.pack
 import com.kert0n.medapp.fixture.packageRepository
+import com.kert0n.medapp.fixture.queueRepository
 import com.kert0n.medapp.fixture.tablets
 import com.kert0n.medapp.queue.RefusalReason
+import com.kert0n.medapp.queue.StoredSyncOperation
 import com.kert0n.medapp.queue.SyncOperationStatus
 import com.kert0n.medapp.queue.pack.PackageSyncCommand
 import com.kert0n.medapp.storage.database.MedAppDatabase
 import com.kert0n.medapp.storage.server.SyncOperationStorageEntity
 import com.kert0n.medapp.storage.server.toStorageEntity
+import java.math.BigDecimal
 import java.time.Instant
 import java.time.ZoneOffset
 import kotlin.uuid.Uuid
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.test.runTest
 import org.junit.After
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNull
+import org.junit.Assert.assertTrue
 import org.junit.Before
 import org.junit.Test
 import org.junit.runner.RunWith
@@ -106,6 +113,23 @@ class SyncAttentionTest {
 
         assertEquals(Reminder.State.WITHDRAWN, attention().single().state)
         scenarios.reminderOutbox.pass()
+        assertNull(attention().firstOrNull())
+    }
+
+    /**
+     * Строке не хватило словаря — её дочитает работник, человек не нужен (PLAN F4). Красная
+     * проверка: считать поводом любую несобранную строку — карточка «нужно решение» пришла бы по
+     * единице, которой не хватало один заход.
+     */
+    @Test
+    fun aRowShortOfVocabularyIsNotAReasonToBother() = runTest {
+        val foreign = QuantityUnit(Uuid.random(), "чужая единица")
+        database.syncOperations().enqueue(first, PackageSyncCommand.Consume(PACK, dose(Quantity(BigDecimal.ONE, foreign)), INTAKE), now)
+        val stored = database.queueRepository().observeOutstanding().first().single()
+        assertTrue("строка должна быть неполной по словарю, а не нечитаемой", stored is StoredSyncOperation.Stale)
+
+        reconcile()
+
         assertNull(attention().firstOrNull())
     }
 
