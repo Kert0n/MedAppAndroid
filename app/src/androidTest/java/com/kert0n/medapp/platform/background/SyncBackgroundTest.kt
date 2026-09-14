@@ -160,7 +160,7 @@ class SyncBackgroundTest {
         schedule.keepRegular(SyncInterval.DEFAULT)
         val before = work.getWorkInfosForUniqueWork(WorkManagerSyncSchedule.REGULAR).get().single()
 
-        schedule.keepRegular(SyncInterval(Duration.ofHours(4)))
+        schedule.keepRegular(SyncInterval(240))
 
         val infos = work.getWorkInfosForUniqueWork(WorkManagerSyncSchedule.REGULAR).get().filter { !it.state.isFinished }
         assertEquals(1, infos.size)
@@ -172,10 +172,10 @@ class SyncBackgroundTest {
     @Test
     fun theSameIntervalRecreatesNothing() = runBlocking {
         val schedule = WorkManagerSyncSchedule({ work }, clock)
-        schedule.keepRegular(SyncInterval(Duration.ofHours(4)))
+        schedule.keepRegular(SyncInterval(240))
         val before = work.getWorkInfosForUniqueWork(WorkManagerSyncSchedule.REGULAR).get().single()
 
-        schedule.keepRegular(SyncInterval(Duration.ofHours(4)))
+        schedule.keepRegular(SyncInterval(240))
 
         val after = work.getWorkInfosForUniqueWork(WorkManagerSyncSchedule.REGULAR).get().single()
         assertEquals(before.id, after.id)
@@ -188,7 +188,7 @@ class SyncBackgroundTest {
         val synchronization = synchronization(WorkManagerSyncSchedule({ work }, clock))
         synchronization.synchronize()
         val readsAfterEntry = snapshotReads.get()
-        settings.saved = AppSettings(syncInterval = SyncInterval(Duration.ofHours(4)))
+        settings.saved = AppSettings(syncInterval = SyncInterval(240))
 
         worker(synchronization, comeBack = false, at = now.plus(Duration.ofHours(1))).doWork()
         assertEquals("час спустя при интервале в четыре — человек только что заходил", readsAfterEntry, snapshotReads.get())

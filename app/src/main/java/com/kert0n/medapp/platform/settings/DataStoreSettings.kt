@@ -17,7 +17,6 @@ import com.kert0n.medapp.feature.settings.SettingsStore
 import com.kert0n.medapp.queue.SyncInterval
 import java.io.File
 import java.io.IOException
-import java.time.Duration
 import java.time.LocalTime
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.flow.Flow
@@ -79,7 +78,7 @@ class DataStoreSettings(
         this[DIGEST_ENABLED] = n.digestEnabled
         this[DIGEST_AT_SECOND] = n.digestAt.toSecondOfDay()
         this[REMOTE_CHANGE] = n.remoteChangeEnabled
-        this[SYNC_INTERVAL_MINUTES] = settings.syncInterval.duration.toMinutes()
+        this[SYNC_INTERVAL_MINUTES] = settings.syncInterval.minutes
     }
 
     private fun Preferences.toSettings(): AppSettings {
@@ -96,7 +95,7 @@ class DataStoreSettings(
             )
         }.getOrDefault(defaults)
         val interval = runCatching {
-            this[SYNC_INTERVAL_MINUTES]?.let { SyncInterval(Duration.ofMinutes(it)) }
+            this[SYNC_INTERVAL_MINUTES]?.let { SyncInterval(it) }
         }.getOrNull() ?: SyncInterval.DEFAULT
         return AppSettings(notifications, interval)
     }

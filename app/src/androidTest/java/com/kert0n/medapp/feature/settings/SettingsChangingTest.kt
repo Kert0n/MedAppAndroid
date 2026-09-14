@@ -112,7 +112,7 @@ class SettingsChangingTest {
         treated()
         val owed = scenarios.reminderStore.ofKinds(listOf(NotificationKind.INTAKE_DUE)).size
         scenarios.notificationSettings.settings = NotificationSettings(intakeRemindersEnabled = false)
-        val interval = SyncInterval(Duration.ofHours(2))
+        val interval = SyncInterval(120)
 
         changing.change(AppSettings(syncInterval = interval))
 

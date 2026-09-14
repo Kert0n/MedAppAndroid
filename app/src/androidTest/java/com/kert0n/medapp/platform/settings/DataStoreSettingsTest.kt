@@ -9,7 +9,6 @@ import com.kert0n.medapp.feature.settings.AppSettings
 import com.kert0n.medapp.feature.settings.SettingsSaved
 import com.kert0n.medapp.queue.SyncInterval
 import java.io.File
-import java.time.Duration
 import java.time.LocalTime
 import kotlin.uuid.Uuid
 import kotlinx.coroutines.CoroutineScope
@@ -41,7 +40,7 @@ class DataStoreSettingsTest {
             digestAt = LocalTime.of(18, 30),
             remoteChangeEnabled = false
         ),
-        syncInterval = SyncInterval(Duration.ofHours(4))
+        syncInterval = SyncInterval(270) // не круглое в часах: хранилище не должно округлять
     )
 
     private lateinit var scope: CoroutineScope
