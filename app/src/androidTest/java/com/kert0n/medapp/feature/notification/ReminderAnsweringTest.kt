@@ -144,4 +144,17 @@ class ReminderAnsweringTest {
         assertEquals(IntakeStatus.MISSED, requireNotNull(database.intakeRepository().find(intake.id)).status)
         assertTrue(scenarios.notifier.dismissed.contains(reminderKey(intake)))
     }
+
+    /** Отмена курса снимает будильники всех его пунктов и гасит показанное (PLAN D8). */
+    @Test
+    fun cancellingTheCourseWithdrawsEveryReminder() = runTest {
+        val id = treated()
+        val planned = database.intakeRepository().ofCourse(id).filterIsInstance<CourseIntake>()
+        for (intake in planned) scenarios.reminders.schedule(reminderKey(intake), intake.plannedAt)
+
+        scenarios.courseCancellation.cancel(id)
+
+        assertEquals(emptyMap<NotificationKey, Instant>(), scenarios.reminders.scheduled)
+        assertEquals(planned.map { reminderKey(it) }.toSet(), scenarios.notifier.dismissed.toSet())
+    }
 }

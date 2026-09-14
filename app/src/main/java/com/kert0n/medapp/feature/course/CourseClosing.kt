@@ -3,6 +3,7 @@ package com.kert0n.medapp.feature.course
 import com.kert0n.medapp.domain.course.Course
 import com.kert0n.medapp.domain.course.CourseCompletion
 import com.kert0n.medapp.domain.pack.PackageRef
+import com.kert0n.medapp.feature.notification.ReminderWithdrawal
 import com.kert0n.medapp.queue.QueueService
 import com.kert0n.medapp.queue.QueuedCommand
 import com.kert0n.medapp.queue.pack.PackageSyncCommand
@@ -21,7 +22,8 @@ import kotlin.uuid.Uuid
 class CourseClosing @Inject constructor(
     private val courses: CourseStorageRepository,
     private val packages: PackageStorageRepository,
-    private val queue: QueueService
+    private val queue: QueueService,
+    private val reminders: ReminderWithdrawal
 ) {
 
     /**
@@ -31,6 +33,8 @@ class CourseClosing @Inject constructor(
      */
     suspend fun close(course: Course, closing: CourseCompletion.Closing, at: Instant, except: PackageRef? = null) {
         courses.close(closing)
+        // Отменённые пункты больше не напоминают о себе: будильники сняты, показанное погашено (PLAN D8).
+        for (intake in closing.cancelled) reminders.withdraw(intake.id)
         for (source in course.sources) {
             if (source.pkg == except) continue
             val pkg = packages.find(source.pkg.id) ?: continue

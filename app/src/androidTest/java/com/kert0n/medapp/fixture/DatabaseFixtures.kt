@@ -169,7 +169,7 @@ class Scenarios(
     val courseActivation = com.kert0n.medapp.feature.course.CourseActivation(
         courses, packages, courseCalendar, queue, transactions, clock
     )
-    val courseClosing = com.kert0n.medapp.feature.course.CourseClosing(courses, packages, queue)
+    val courseClosing = com.kert0n.medapp.feature.course.CourseClosing(courses, packages, queue, reminderWithdrawal)
     val courseCancellation = com.kert0n.medapp.feature.course.CourseCancellation(
         courses, database.intakeRepository(), courseCalendar, courseClosing, transactions, clock
     )

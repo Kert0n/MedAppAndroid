@@ -91,7 +91,7 @@ class IntakeConfirmationTest {
         val transactions = database.transactions()
         val clock = Clock.fixed(now, ZoneOffset.UTC)
         val service = QueueService(transactions, database.queueStorage())
-        confirmation = IntakeConfirmation(intakes, courses, packages, transactions, service, CourseClosing(courses, packages, service), CourseCalendar(intakes, packages), withdrawal, clock)
+        confirmation = IntakeConfirmation(intakes, courses, packages, transactions, service, CourseClosing(courses, packages, service, withdrawal), CourseCalendar(intakes, packages), withdrawal, clock)
         packages.add(pack(quantity = tablets("20")))
     }
 
@@ -247,7 +247,7 @@ class IntakeConfirmationTest {
         // Отвечают назавтра после пропуска: день второго пункта ещё идёт, и пропуском он не стал.
         val service = QueueService(database.transactions(), database.queueStorage())
         val nextMorning = IntakeConfirmation(
-            intakes, courses, packages, database.transactions(), service, CourseClosing(courses, packages, service),
+            intakes, courses, packages, database.transactions(), service, CourseClosing(courses, packages, service, withdrawal),
             CourseCalendar(intakes, packages), withdrawal, Clock.fixed(slots[1].at, ZoneOffset.UTC)
         )
 
