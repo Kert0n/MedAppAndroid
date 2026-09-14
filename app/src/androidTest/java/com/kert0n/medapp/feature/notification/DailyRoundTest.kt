@@ -24,6 +24,8 @@ import kotlin.uuid.Uuid
 import kotlinx.coroutines.test.runTest
 import org.junit.After
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertNull
+import org.junit.Assert.assertTrue
 import org.junit.Before
 import org.junit.Test
 import org.junit.runner.RunWith
@@ -71,33 +73,41 @@ class DailyRoundTest {
         val nextMorning = Scenarios(database, Instant.parse("2027-03-11T05:00:00Z"))
 
         val report = nextMorning.dailyRound.run()
+        val delivered = nextMorning.reminderOutbox.pass()
 
         val byDay = database.intakeRepository().ofCourse(id).filterIsInstance<CourseIntake>().associate { it.slot.localDate to it }
         assertEquals(IntakeStatus.MISSED, byDay.getValue(start).status)
         assertEquals(1, report.missed)
-        // Будильники — на сегодняшний пункт и завтрашний (36 часов), не на вчерашний.
-        assertEquals(setOf(byDay.getValue(start.plusDays(1)).id, byDay.getValue(start.plusDays(2)).id), nextMorning.reminders.scheduled.keys.map { Uuid.parse(it.subject) }.toSet())
-        // Показано: пропуск, срок источника за день, сводка.
+        // Обязательства на приёмы — сегодняшний и завтрашний (36 часов), не вчерашний.
+        assertEquals(
+            setOf(byDay.getValue(start.plusDays(1)).id, byDay.getValue(start.plusDays(2)).id),
+            nextMorning.reminderStore.ofKinds(listOf(NotificationKind.INTAKE_DUE)).map { Uuid.parse(it.key.subject) }.toSet()
+        )
+        // Сказано: пропуск, срок источника за день, сводка. Приёмы ещё впереди — их черёд не настал.
         assertEquals(setOf(NotificationKind.INTAKE_MISSED, NotificationKind.EXPIRY_SOURCE_1D, NotificationKind.DAILY_DIGEST), nextMorning.notifier.shown.map { it.kind }.toSet())
-        assertEquals(NotificationKind.DAILY_DIGEST, nextMorning.notifier.shown.last().kind)
-        assertEquals(3, report.shown)
+        assertEquals(3, delivered.shown)
+        // Будильник один, и он на ближайший невыполненный срок — сегодняшний приём в 09:00 МСК.
+        assertEquals(byDay.getValue(start.plusDays(1)).plannedAt, nextMorning.reminders.wakeAt)
+        assertTrue(nextMorning.reminders.exact)
 
-        // Повтор того же утра: пропусков больше нет, показанное не повторяется, будильники те же.
+        // Повтор того же утра: пропусков больше нет, сказанное не повторяется.
         val again = nextMorning.dailyRound.run()
         assertEquals(0, again.missed)
-        assertEquals(0, again.shown)
+        assertEquals(0, nextMorning.reminderOutbox.pass().shown)
         assertEquals(3, nextMorning.notifier.shown.size)
     }
 
-    /** Без лечения и с годными коробками проход молчит и в журнал не пишет — счастливый путь. */
+    /** Без лечения и с годными коробками проход молчит, ничего не обещает и не будит — счастливый путь. */
     @Test
     fun aQuietDayShowsNothing() = runTest {
         val quiet = Scenarios(database, Instant.parse("2027-03-01T05:00:00Z"))
 
         val report = quiet.dailyRound.run()
+        val delivered = quiet.reminderOutbox.pass()
 
-        assertEquals(DailyRound.Report(missed = 0, reminders = 0, shown = 0), report)
+        assertEquals(DailyRound.Report(missed = 0, reminders = 0, raised = 0), report)
         assertEquals(emptyList<Any>(), quiet.notifier.shown)
-        assertEquals(0, database.reminders().ofKinds(listOf(NotificationKind.DAILY_DIGEST.name)).size)
+        assertEquals(ReminderOutbox.Report(shown = 0, dismissed = 0, nextAt = null), delivered)
+        assertNull(quiet.reminders.wakeAt)
     }
 }

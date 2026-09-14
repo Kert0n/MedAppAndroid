@@ -1,6 +1,7 @@
 package com.kert0n.medapp.queue
 
 import com.kert0n.medapp.di.ApplicationScope
+import com.kert0n.medapp.domain.notification.Freshness
 import java.time.Clock
 import java.time.Duration
 import java.time.Instant
@@ -41,7 +42,7 @@ class Synchronization @Inject constructor(
     private val schedule: SyncSchedule,
     private val clock: Clock,
     @ApplicationScope private val scope: CoroutineScope
-) {
+) : Freshness {
 
     private val guard = Mutex()
     private var running: CompletableDeferred<Round>? = null
@@ -84,7 +85,12 @@ class Synchronization @Inject constructor(
      * и показывается с тем, что есть, а заход **не отменяется** — доживает в своём scope, и его итог
      * достанется следующему, кто спросит. `null` — не успели.
      */
-    suspend fun refreshBriefly(within: Duration): Round? {
+    override suspend fun refreshBriefly(within: Duration) {
+        awaitBriefly(within)
+    }
+
+    /** То же, но с итогом — проверкам важно, дождались ли захода. */
+    suspend fun awaitBriefly(within: Duration): Round? {
         val round = scope.async { runCatching { synchronize() }.getOrNull() }
         return withTimeoutOrNull(within.toMillis()) { round.await() }
     }

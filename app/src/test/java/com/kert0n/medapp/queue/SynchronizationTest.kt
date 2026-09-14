@@ -129,7 +129,7 @@ class SynchronizationTest {
         val scope = kotlinx.coroutines.CoroutineScope(kotlinx.coroutines.SupervisorJob() + kotlinx.coroutines.Dispatchers.Default)
         val synchronization = synchronization(calls, gate = gate, scope = scope)
 
-        val brief = synchronization.refreshBriefly(java.time.Duration.ofMillis(300))
+        val brief = synchronization.awaitBriefly(java.time.Duration.ofMillis(300))
 
         assertNull(brief)
         // Сервер ответил позже — заход дошёл до конца, и следующий повод получает его итог.
@@ -144,7 +144,7 @@ class SynchronizationTest {
     @Test
     fun aBriefRefreshReturnsTheRoundWhenItIsInTime() = kotlinx.coroutines.runBlocking {
         val scope = kotlinx.coroutines.CoroutineScope(kotlinx.coroutines.SupervisorJob() + kotlinx.coroutines.Dispatchers.Default)
-        val brief = synchronization(java.util.Collections.synchronizedList(ArrayList()), scope = scope).refreshBriefly(java.time.Duration.ofSeconds(5))
+        val brief = synchronization(java.util.Collections.synchronizedList(ArrayList()), scope = scope).awaitBriefly(java.time.Duration.ofSeconds(5))
         assertEquals(now, brief?.finishedAt)
         scope.cancel()
     }

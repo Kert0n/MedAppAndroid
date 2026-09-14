@@ -1,5 +1,6 @@
 package com.kert0n.medapp.fixture
 
+import com.kert0n.medapp.domain.notification.Freshness
 import com.kert0n.medapp.domain.notification.NotificationKey
 import com.kert0n.medapp.domain.notification.NotificationSettings
 import com.kert0n.medapp.domain.notification.NotificationSettingsSource
@@ -24,19 +25,35 @@ class FakeNotifier(var allowed: Boolean = true) : Notifier {
     }
 }
 
-/** Будильники по ключу: последняя постановка побеждает, снятие убирает. */
+/** Один будильник: последняя постановка побеждает, `stopWaking` его снимает. */
 class FakeReminders(override val canBeExact: Boolean = true) : ReminderAlarms {
-    val scheduled = LinkedHashMap<NotificationKey, Instant>()
+    var wakeAt: Instant? = null
+        private set
+    var exact: Boolean = false
+        private set
+    val settings = mutableListOf<Instant>()
 
-    override suspend fun schedule(key: NotificationKey, at: Instant) {
-        scheduled[key] = at
+    override suspend fun wakeAt(at: Instant, exact: Boolean) {
+        wakeAt = at
+        this.exact = exact
+        settings += at
     }
 
-    override suspend fun cancel(key: NotificationKey) {
-        scheduled.remove(key)
+    override suspend fun stopWaking() {
+        wakeAt = null
     }
 }
 
 class FakeSettings(var settings: NotificationSettings = NotificationSettings.DEFAULT) : NotificationSettingsSource {
     override suspend fun current(): NotificationSettings = settings
+}
+
+/** Свежесть, которой не нужна сеть: проверкам важно, что её спросили, а не что она принесла. */
+class FakeFreshness : Freshness {
+    var asked = 0
+        private set
+
+    override suspend fun refreshBriefly(within: java.time.Duration) {
+        asked++
+    }
 }

@@ -133,10 +133,12 @@ class Scenarios(
     now: java.time.Instant,
     val notifier: FakeNotifier = FakeNotifier(),
     val reminders: FakeReminders = FakeReminders(),
-    val notificationSettings: FakeSettings = FakeSettings()
+    val notificationSettings: FakeSettings = FakeSettings(),
+    val freshness: FakeFreshness = FakeFreshness()
 ) {
     private val clock = java.time.Clock.fixed(now, java.time.ZoneOffset.UTC)
-    val reminderWithdrawal = com.kert0n.medapp.feature.notification.ReminderWithdrawal(notifier, reminders)
+    val reminderStore = com.kert0n.medapp.storage.notification.ReminderRoomRepository(database, database.reminders())
+    val reminderWithdrawal = com.kert0n.medapp.feature.notification.ReminderWithdrawal(reminderStore)
     private val packages = database.packageRepository()
     private val medKits = database.medKitRepository()
     private val courses = database.courseRepository()
@@ -188,14 +190,20 @@ class Scenarios(
     val intakeConfirmation = com.kert0n.medapp.feature.intake.IntakeConfirmation(
         database.intakeRepository(), courses, packages, transactions, queue, courseClosing, courseCalendar, reminderWithdrawal, clock
     )
-    val reminderStore = com.kert0n.medapp.storage.notification.ReminderRoomRepository(database, database.reminders())
     val notificationPlanning = com.kert0n.medapp.feature.notification.NotificationPlanning(
         database.intakeRepository(), packages, courses, notificationSettings
     )
-    val notificationDelivery = com.kert0n.medapp.feature.notification.NotificationDelivery(notifier, reminders, reminderStore, clock)
-    val dailyRound = com.kert0n.medapp.feature.notification.DailyRound(courseUpkeep, notificationPlanning, notificationDelivery, clock)
+    val dailyRound = com.kert0n.medapp.feature.notification.DailyRound(courseUpkeep, notificationPlanning, reminderStore, clock)
     val reminderAnswering = com.kert0n.medapp.feature.notification.ReminderAnswering(
-        database.intakeRepository(), intakeConfirmation, intakeDeclining, reminders, reminderStore, notificationSettings, clock
+        database.intakeRepository(), intakeConfirmation, intakeDeclining, reminderStore, notificationSettings, clock
+    )
+    /**
+     * Владелец показа и будильника. В проверках его проход зовут явно: так видно, что показ —
+     * отдельный шаг, а не побочное действие прохода дня.
+     */
+    val reminderOutbox = com.kert0n.medapp.feature.notification.ReminderOutbox(
+        reminderStore, notifier, reminders, freshness, clock,
+        kotlinx.coroutines.CoroutineScope(kotlinx.coroutines.SupervisorJob() + kotlinx.coroutines.Dispatchers.Unconfined)
     )
 }
 

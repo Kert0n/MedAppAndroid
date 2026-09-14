@@ -2,7 +2,7 @@
   "formatVersion": 1,
   "database": {
     "version": 3,
-    "identityHash": "90d8128eebb39454997589e1113f742d",
+    "identityHash": "bf47e3f2147b0fe180173e38c21fc579",
     "entities": [
       {
         "tableName": "quantity_units",
@@ -1517,7 +1517,7 @@
       },
       {
         "tableName": "reminders",
-        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`key` TEXT NOT NULL, `kind` TEXT NOT NULL, `subject` TEXT NOT NULL, `target_kind` TEXT NOT NULL, `target_id` TEXT, `target_date` TEXT, `due_at` INTEGER NOT NULL, `state` TEXT NOT NULL, `shown_at` INTEGER, PRIMARY KEY(`key`))",
+        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`key` TEXT NOT NULL, `kind` TEXT NOT NULL, `delivery` TEXT NOT NULL, `subject` TEXT NOT NULL, `target_kind` TEXT NOT NULL, `target_id` TEXT, `target_date` TEXT, `due_at` INTEGER NOT NULL, `state` TEXT NOT NULL, `shown_at` INTEGER, PRIMARY KEY(`key`))",
         "fields": [
           {
             "fieldPath": "key",
@@ -1528,6 +1528,12 @@
           {
             "fieldPath": "kind",
             "columnName": "kind",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "delivery",
+            "columnName": "delivery",
             "affinity": "TEXT",
             "notNull": true
           },
@@ -1604,13 +1610,22 @@
             ],
             "orders": [],
             "createSql": "CREATE INDEX IF NOT EXISTS `index_reminders_shown_at` ON `${TABLE_NAME}` (`shown_at`)"
+          },
+          {
+            "name": "index_reminders_delivery",
+            "unique": false,
+            "columnNames": [
+              "delivery"
+            ],
+            "orders": [],
+            "createSql": "CREATE INDEX IF NOT EXISTS `index_reminders_delivery` ON `${TABLE_NAME}` (`delivery`)"
           }
         ]
       }
     ],
     "setupQueries": [
       "CREATE TABLE IF NOT EXISTS room_master_table (id INTEGER PRIMARY KEY,identity_hash TEXT)",
-      "INSERT OR REPLACE INTO room_master_table (id,identity_hash) VALUES(42, '90d8128eebb39454997589e1113f742d')"
+      "INSERT OR REPLACE INTO room_master_table (id,identity_hash) VALUES(42, 'bf47e3f2147b0fe180173e38c21fc579')"
     ]
   }
 }

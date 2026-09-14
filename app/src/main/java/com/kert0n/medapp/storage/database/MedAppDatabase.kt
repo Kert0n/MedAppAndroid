@@ -150,7 +150,7 @@ abstract class MedAppDatabase : RoomDatabase() {
                 connection.execSQL(
                     """
                     CREATE TABLE IF NOT EXISTS `reminders` (
-                        `key` TEXT NOT NULL, `kind` TEXT NOT NULL, `subject` TEXT NOT NULL,
+                        `key` TEXT NOT NULL, `kind` TEXT NOT NULL, `delivery` TEXT NOT NULL, `subject` TEXT NOT NULL,
                         `target_kind` TEXT NOT NULL, `target_id` TEXT, `target_date` TEXT,
                         `due_at` INTEGER NOT NULL, `state` TEXT NOT NULL, `shown_at` INTEGER,
                         PRIMARY KEY(`key`)
@@ -160,6 +160,7 @@ abstract class MedAppDatabase : RoomDatabase() {
                 connection.execSQL("CREATE INDEX IF NOT EXISTS `index_reminders_due_at` ON `reminders` (`due_at`)")
                 connection.execSQL("CREATE INDEX IF NOT EXISTS `index_reminders_state` ON `reminders` (`state`)")
                 connection.execSQL("CREATE INDEX IF NOT EXISTS `index_reminders_shown_at` ON `reminders` (`shown_at`)")
+                connection.execSQL("CREATE INDEX IF NOT EXISTS `index_reminders_delivery` ON `reminders` (`delivery`)")
                 // Сокращение обеспечения — событие; держится за то, что остаётся навсегда (PLAN D5).
                 connection.execSQL(
                     """

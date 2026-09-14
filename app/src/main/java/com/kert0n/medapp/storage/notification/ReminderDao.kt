@@ -20,12 +20,12 @@ interface ReminderDao {
     suspend fun find(key: String): ReminderStorageEntity?
 
     /** Наступившее и ещё не сказанное — в порядке срока. */
-    @Query("SELECT * FROM reminders WHERE state = 'DUE' AND due_at <= :now ORDER BY due_at")
-    suspend fun due(now: Instant): List<ReminderStorageEntity>
+    @Query("SELECT * FROM reminders WHERE state = 'DUE' AND delivery = :delivery AND due_at <= :now ORDER BY due_at")
+    suspend fun due(now: Instant, delivery: String): List<ReminderStorageEntity>
 
-    /** Ближайший срок, на который стоит будить процесс; пусто — будить незачем. */
-    @Query("SELECT due_at FROM reminders WHERE state = 'DUE' ORDER BY due_at LIMIT 1")
-    suspend fun nextDueAt(): Instant?
+    /** Самое раннее невыполненное: к нему и будят процесс. Пусто — будить незачем. */
+    @Query("SELECT * FROM reminders WHERE state = 'DUE' AND delivery = :delivery ORDER BY due_at LIMIT 1")
+    suspend fun nextDue(delivery: String): ReminderStorageEntity?
 
     /** Отозванное, но ещё висящее в шторке: погасить и забыть — работа владельца доставки. */
     @Query("SELECT * FROM reminders WHERE state = 'WITHDRAWN'")

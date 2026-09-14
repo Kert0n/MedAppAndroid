@@ -19,11 +19,17 @@ import kotlin.uuid.Uuid
  */
 @Entity(
     tableName = "reminders",
-    indices = [Index("due_at"), Index("state"), Index("shown_at")]
+    indices = [Index("due_at"), Index("state"), Index("shown_at"), Index("delivery")]
 )
 class ReminderStorageEntity(
     @PrimaryKey val key: String,
     val kind: String,
+    /**
+     * Системой или баннером внутри приложения. Выведено из вида при записи, но лежит колонкой:
+     * владелец доставки спрашивает «что наступило **системного**», и спрашивать это надо запросом,
+     * а не перебором в памяти.
+     */
+    val delivery: String,
     val subject: String,
     @ColumnInfo(name = "target_kind") val targetKind: String,
     @ColumnInfo(name = "target_id") val targetId: Uuid?,

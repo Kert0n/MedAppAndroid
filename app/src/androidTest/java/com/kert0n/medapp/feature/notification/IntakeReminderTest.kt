@@ -56,16 +56,24 @@ class IntakeReminderTest {
     private val reminders = FakeReminders()
     private val settings = FakeSettings()
     private lateinit var planning: NotificationPlanning
-    private lateinit var delivery: NotificationDelivery
+    private lateinit var store: com.kert0n.medapp.storage.notification.ReminderStorageRepository
+    private lateinit var outbox: ReminderOutbox
 
     @Before
     fun setUp() = runTest {
         database = inMemoryDatabase()
         scenarios = Scenarios(database, now)
         planning = NotificationPlanning(database.intakeRepository(), database.packageRepository(), database.courseRepository(), settings)
-        delivery = NotificationDelivery(notifier, reminders, ReminderRoomRepository(database, database.reminders()), Clock.fixed(now, ZoneOffset.UTC))
+        store = ReminderRoomRepository(database, database.reminders())
+        outbox = outboxAt(now)
         database.packageRepository().add(pack(id = PACK, quantity = tablets("20"), form = TABLET_FORM))
     }
+
+    /** Владелец доставки с остановленными на [at] часами: обязательство наступает в свой момент. */
+    private fun outboxAt(at: Instant) = ReminderOutbox(
+        store, notifier, reminders, com.kert0n.medapp.fixture.FakeFreshness(), Clock.fixed(at, ZoneOffset.UTC),
+        kotlinx.coroutines.CoroutineScope(kotlinx.coroutines.SupervisorJob() + kotlinx.coroutines.Dispatchers.Unconfined)
+    )
 
     @After
     fun tearDown() = database.close()
@@ -96,13 +104,16 @@ class IntakeReminderTest {
         scenarios.intakeConfirmation.confirm(all[0].id, PACK, dose("2"), now).confirmed()
 
         val due = planning.remindersDue(now)
-        delivery.arm(due)
+        store.raiseAll(due)
+        outbox.pass()
 
         // 36 часов от 08:00 МСК — до 20:00 завтра: 21:00 сегодня и 09:00 завтра входят, 21:00 завтра —
         // нет; принятый в 09:00 сегодня не напоминает.
         assertEquals(listOf(all[1].id, all[2].id), due.map { (it.target as com.kert0n.medapp.domain.notification.NotificationTarget.Intake).intakeId })
         assertTrue(due.all { it.exact && it.actions == listOf(NotificationAction.TAKE, NotificationAction.SKIP, NotificationAction.SNOOZE) })
-        assertEquals(due.associate { it.key to it.dueAt }, reminders.scheduled)
+        // Будильник один — на ближайший из них; показывать пока нечего, их час не настал.
+        assertEquals(all[1].plannedAt, reminders.wakeAt)
+        assertEquals(emptyList<Any>(), notifier.shown)
         assertNull(planning.reminderFor(all[0].id))
         assertEquals(all[1].id, (planning.reminderFor(all[1].id)?.target as com.kert0n.medapp.domain.notification.NotificationTarget.Intake).intakeId)
     }
@@ -125,18 +136,16 @@ class IntakeReminderTest {
         val due = requireNotNull(planning.reminderFor(first.id))
         val digestDay = LocalDate.of(2027, 3, 10)
         val digest = Reminder(NotificationKey.digest(digestDay), com.kert0n.medapp.domain.notification.NotificationTarget.DayPlan(digestDay), now)
-        // Наступает обязательство в свой момент: доставка смотрит на срок, а не на список к показу.
-        val atIntake = NotificationDelivery(
-            notifier, reminders, ReminderRoomRepository(database, database.reminders()),
-            Clock.fixed(first.plannedAt, ZoneOffset.UTC)
-        )
+        // Наступает обязательство в свой момент: владелец смотрит на срок, а не на список к показу.
+        val atIntake = outboxAt(first.plannedAt)
+        store.raiseAll(listOf(due, digest))
 
-        assertEquals(2, atIntake.deliver(listOf(due, digest)))
-        assertEquals(0, atIntake.deliver(listOf(due, digest)))
+        assertEquals(2, atIntake.pass().shown)
+        assertEquals(0, atIntake.pass().shown)
 
         // Человек отложил — обязательство наступает снова, и о нём говорят второй раз.
         scenarios.reminderAnswering.snooze(first.id)
-        assertEquals(1, atIntake.deliver(listOf(due, digest)))
+        assertEquals(1, atIntake.pass().shown)
         assertEquals(3, notifier.shown.size)
         assertEquals(1, notifier.shown.count { it.kind == NotificationKind.DAILY_DIGEST })
     }
@@ -150,14 +159,14 @@ class IntakeReminderTest {
         treated()
         val digestDay = LocalDate.of(2027, 3, 10)
         val digest = Reminder(NotificationKey.digest(digestDay), com.kert0n.medapp.domain.notification.NotificationTarget.DayPlan(digestDay), now)
-        val store = ReminderRoomRepository(database, database.reminders())
+        store.raiseAll(listOf(digest))
 
         notifier.allowed = false
-        assertEquals(0, delivery.deliver(listOf(digest)))
+        assertEquals(0, outbox.pass().shown)
         assertEquals(Reminder.State.DUE, requireNotNull(store.find(digest.key)).state)
 
         notifier.allowed = true
-        assertEquals(1, delivery.deliver(listOf(digest)))
+        assertEquals(1, outbox.pass().shown)
         assertEquals(Reminder.State.SHOWN, requireNotNull(store.find(digest.key)).state)
     }
 }

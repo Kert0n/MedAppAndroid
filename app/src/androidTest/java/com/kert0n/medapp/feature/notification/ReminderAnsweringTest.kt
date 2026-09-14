@@ -5,6 +5,7 @@ import com.kert0n.medapp.domain.intake.CourseIntake
 import com.kert0n.medapp.domain.intake.IntakeStatus
 import com.kert0n.medapp.domain.notification.NotificationKey
 import com.kert0n.medapp.domain.notification.NotificationKind
+import com.kert0n.medapp.domain.notification.Reminder
 import com.kert0n.medapp.domain.pack.ExpiryDate
 import com.kert0n.medapp.domain.value.Doses
 import com.kert0n.medapp.feature.course.CourseDrafting
@@ -80,12 +81,15 @@ class ReminderAnsweringTest {
 
     private fun reminderKey(intake: CourseIntake) = NotificationKey.intake(intake.id, NotificationKind.INTAKE_DUE)
 
-    /** Двойное «Принял» — один приём и одна команда; напоминание погашено, будильник снят. */
+    private fun reminderFor(intake: CourseIntake) =
+        Reminder(reminderKey(intake), com.kert0n.medapp.domain.notification.NotificationTarget.Intake(intake.id), intake.plannedAt)
+
+    /** Двойное «Принял» — один приём и одна команда; обязательство отозвано и карточка погашена. */
     @Test
     fun takeWritesOnceAndWithdrawsTheReminder() = runTest {
         val id = treated()
         val intake = first(id)
-        scenarios.reminders.schedule(reminderKey(intake), intake.plannedAt)
+        scenarios.reminderStore.raiseAll(listOf(reminderFor(intake)))
 
         assertEquals(ReminderAnswering.Response.Done, scenarios.reminderAnswering.take(intake.id))
         assertEquals(ReminderAnswering.Response.Done, scenarios.reminderAnswering.take(intake.id))
@@ -93,8 +97,11 @@ class ReminderAnsweringTest {
         assertEquals(IntakeStatus.TAKEN, requireNotNull(database.intakeRepository().find(intake.id)).status)
         assertEquals(tablets("18"), requireNotNull(database.packageRepository().find(PACK)).quantity)
         assertEquals(0, database.syncOperations().all().size) // местная полка — команд нет
+        // Отозвано транзакцией приёма; гасит карточку владелец доставки — после коммита.
+        assertEquals(Reminder.State.WITHDRAWN, requireNotNull(scenarios.reminderStore.find(reminderKey(intake))).state)
+        scenarios.reminderOutbox.pass()
         assertTrue(scenarios.notifier.dismissed.contains(reminderKey(intake)))
-        assertNull(scenarios.reminders.scheduled[reminderKey(intake)])
+        assertNull(scenarios.reminderStore.find(reminderKey(intake)))
     }
 
     /** Просроченная коробка: из шторки приём не записывается — открывается приложение (предупреждение не обходится). */
@@ -126,51 +133,59 @@ class ReminderAnsweringTest {
     fun snoozeMovesOnlyTheAlarm() = runTest {
         val id = treated()
         val intake = first(id)
+        scenarios.reminderStore.raiseAll(listOf(reminderFor(intake)))
 
         val response = scenarios.reminderAnswering.snooze(intake.id) as ReminderAnswering.Response.Snoozed
 
         assertEquals(now.plusSeconds(15 * 60), response.at)
-        assertEquals(response.at, scenarios.reminders.scheduled[reminderKey(intake)])
+        // Сдвиг лежит в обязательстве, а не в системе: он переживёт и проход дня, и перезагрузку.
+        assertEquals(response.at, requireNotNull(scenarios.reminderStore.find(reminderKey(intake))).dueAt)
         val same = first(id)
         assertEquals(intake.plannedAt, same.plannedAt)
         assertEquals(IntakeStatus.PLANNED, same.status)
     }
 
-    /** «Пропустить» — отказ человека: пункт пропущен, напоминание погашено. */
+    /** «Пропустить» — отказ человека: пункт пропущен, обязательство отозвано, карточка погашена. */
     @Test
     fun skipDeclinesAndWithdraws() = runTest {
         val id = treated()
         val intake = first(id)
+        scenarios.reminderStore.raiseAll(listOf(reminderFor(intake)))
 
         assertEquals(ReminderAnswering.Response.Done, scenarios.reminderAnswering.skip(intake.id))
 
         assertEquals(IntakeStatus.MISSED, requireNotNull(database.intakeRepository().find(intake.id)).status)
+        assertEquals(Reminder.State.WITHDRAWN, requireNotNull(scenarios.reminderStore.find(reminderKey(intake))).state)
+        scenarios.reminderOutbox.pass()
         assertTrue(scenarios.notifier.dismissed.contains(reminderKey(intake)))
     }
 
-    /** Отмена курса снимает будильники всех его пунктов и гасит показанное (PLAN D8). */
+    /** Отмена курса снимает обязательства всех его пунктов и гасит показанное (PLAN D8). */
     @Test
     fun cancellingTheCourseWithdrawsEveryReminder() = runTest {
         val id = treated()
         val planned = database.intakeRepository().ofCourse(id).filterIsInstance<CourseIntake>()
-        for (intake in planned) scenarios.reminders.schedule(reminderKey(intake), intake.plannedAt)
+        scenarios.reminderStore.raiseAll(planned.map { reminderFor(it) })
 
         scenarios.courseCancellation.cancel(id)
+        scenarios.reminderOutbox.pass()
 
-        assertEquals(emptyMap<NotificationKey, Instant>(), scenarios.reminders.scheduled)
+        assertEquals(emptyList<Reminder>(), scenarios.reminderStore.ofKinds(listOf(NotificationKind.INTAKE_DUE)))
         assertEquals(planned.map { reminderKey(it) }.toSet(), scenarios.notifier.dismissed.toSet())
+        assertNull(scenarios.reminders.wakeAt)
     }
 
     /**
-     * Будильники снимаются **после** фиксации: транзакция, откатившаяся после закрытия курса,
-     * оставляет пункты плановыми — и их будильники на месте (красная проверка: снимать внутри
-     * транзакции — будильники пропали бы у неотменённых пунктов).
+     * Показанное гасится **после** фиксации: транзакция, откатившаяся после закрытия курса,
+     * оставляет пункты плановыми — и их обязательства целы (красная проверка: гасить внутри
+     * транзакции — карточки пропали бы у неотменённых пунктов). Теперь это держит сама форма:
+     * отзыв — строка в той же базе, и откат уносит его вместе с остальным.
      */
     @Test
     fun aRolledBackCancellationLeavesTheAlarmsInPlace() = runTest {
         val id = treated()
         val planned = database.intakeRepository().ofCourse(id).filterIsInstance<CourseIntake>()
-        for (intake in planned) scenarios.reminders.schedule(reminderKey(intake), intake.plannedAt)
+        scenarios.reminderStore.raiseAll(planned.map { reminderFor(it) })
         val real = database.transactions()
         val failingAfterWork = object : com.kert0n.medapp.queue.Transactions {
             override suspend fun <T> run(block: suspend () -> T): T = real.run<T> {
@@ -187,7 +202,9 @@ class ReminderAnsweringTest {
 
         assertEquals("сбой фиксации", failure?.message)
         assertTrue(requireNotNull(database.courseRepository().findRecord(id)).isOpen)
-        assertEquals(planned.map { reminderKey(it) }.toSet(), scenarios.reminders.scheduled.keys)
+        assertEquals(planned.map { reminderKey(it) }.toSet(), scenarios.reminderStore.ofKinds(listOf(NotificationKind.INTAKE_DUE)).map { it.key }.toSet())
+        assertTrue(scenarios.reminderStore.ofKinds(listOf(NotificationKind.INTAKE_DUE)).all { it.state == Reminder.State.DUE })
+        scenarios.reminderOutbox.pass()
         assertEquals(emptyList<NotificationKey>(), scenarios.notifier.dismissed)
     }
 }

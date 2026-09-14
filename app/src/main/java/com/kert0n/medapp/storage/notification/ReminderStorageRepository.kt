@@ -1,5 +1,6 @@
 package com.kert0n.medapp.storage.notification
 
+import com.kert0n.medapp.domain.notification.NoticeDelivery
 import com.kert0n.medapp.domain.notification.NotificationKey
 import com.kert0n.medapp.domain.notification.NotificationKind
 import com.kert0n.medapp.domain.notification.Reminder
@@ -23,11 +24,11 @@ interface ReminderStorageRepository {
 
     suspend fun find(key: NotificationKey): Reminder?
 
-    /** Наступившее и ещё не сказанное. */
-    suspend fun due(now: Instant): List<Reminder>
+    /** Наступившее и ещё не сказанное — этим способом доставки. */
+    suspend fun due(now: Instant, delivery: NoticeDelivery): List<Reminder>
 
-    /** Ближайший срок, к которому нужно проснуться; `null` — будить незачем. */
-    suspend fun nextDueAt(): Instant?
+    /** Самое раннее невыполненное: к нему и будят процесс. `null` — будить незачем. */
+    suspend fun nextDue(delivery: NoticeDelivery): Reminder?
 
     /** Отозванное, но ещё висящее в шторке. */
     suspend fun withdrawn(): List<Reminder>

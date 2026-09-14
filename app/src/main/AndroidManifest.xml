@@ -35,9 +35,9 @@
             </intent-filter>
         </activity>
 
-        <!-- Будильник приёма: сработал — напоминание показано, если пункт ещё ждёт ответа (PLAN D8). -->
+        <!-- Будильник: сработал — владелец доставки читает обязательства и говорит наступившее (PLAN D8). -->
         <receiver
-            android:name=".platform.notifications.IntakeAlarmReceiver"
+            android:name=".platform.notifications.ReminderWakeReceiver"
             android:exported="false" />
         <!-- «Принял», «Пропустить», «Отложить» с уведомления — тем же путём, что экран (PLAN D8). -->
         <receiver

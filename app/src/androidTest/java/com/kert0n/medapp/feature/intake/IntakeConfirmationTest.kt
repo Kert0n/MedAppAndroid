@@ -79,7 +79,7 @@ class IntakeConfirmationTest {
     private lateinit var confirmation: IntakeConfirmation
 
     private val now: Instant = Instant.parse("2027-03-10T12:00:00Z")
-    private val withdrawal = com.kert0n.medapp.feature.notification.ReminderWithdrawal(com.kert0n.medapp.fixture.FakeNotifier(), com.kert0n.medapp.fixture.FakeReminders())
+    private val withdrawal by lazy { com.kert0n.medapp.feature.notification.ReminderWithdrawal(com.kert0n.medapp.storage.notification.ReminderRoomRepository(database, database.reminders())) }
     private val third: Uuid = Uuid.parse("00000000-0000-4000-8000-000000000063")
 
     @Before

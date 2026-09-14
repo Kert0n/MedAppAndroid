@@ -1,5 +1,6 @@
 package com.kert0n.medapp.storage.notification
 
+import com.kert0n.medapp.domain.notification.NoticeDelivery
 import com.kert0n.medapp.domain.notification.NotificationKey
 import com.kert0n.medapp.domain.notification.NotificationKind
 import com.kert0n.medapp.domain.notification.NotificationTarget
@@ -26,9 +27,10 @@ class ReminderRoomRepository @Inject constructor(
 
     override suspend fun find(key: NotificationKey): Reminder? = reminders.find(key.stored)?.toDomain()
 
-    override suspend fun due(now: Instant): List<Reminder> = reminders.due(now).map { it.toDomain() }
+    override suspend fun due(now: Instant, delivery: NoticeDelivery): List<Reminder> =
+        reminders.due(now, delivery.name).map { it.toDomain() }
 
-    override suspend fun nextDueAt(): Instant? = reminders.nextDueAt()
+    override suspend fun nextDue(delivery: NoticeDelivery): Reminder? = reminders.nextDue(delivery.name)?.toDomain()
 
     override suspend fun withdrawn(): List<Reminder> = reminders.withdrawn().map { it.toDomain() }
 
@@ -62,6 +64,7 @@ private val NotificationKey.stored: String get() = "${kind.name}:$subject"
 private fun Reminder.toStorageEntity() = ReminderStorageEntity(
     key = key.stored,
     kind = key.kind.name,
+    delivery = delivery.name,
     subject = key.subject,
     targetKind = target.stored,
     targetId = target.id,

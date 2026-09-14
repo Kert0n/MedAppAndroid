@@ -91,10 +91,12 @@ class CoverageNoticeTest {
         assertEquals(listOf(NotificationKind.COVERAGE_SHORT), kinds(planning.coverageDue(now.plus(Duration.ofDays(2)))))
         assertEquals(listOf(NotificationKind.COVERAGE_SHORT, NotificationKind.COVERAGE_END), kinds(planning.coverageDue(now.plus(Duration.ofDays(4)))))
 
-        // Событие показывается один раз: повтор планирования журнал отсеивает.
-        val delivery = NotificationDelivery(scenarios.notifier, scenarios.reminders, ReminderRoomRepository(database, database.reminders()), Clock.fixed(now, ZoneOffset.UTC))
-        assertEquals(1, delivery.deliver(planning.coverageDue(now)))
-        assertEquals(0, delivery.deliver(planning.coverageDue(now)))
+        // Событие говорится один раз: повторная сверка заводит обязательство, которого ещё нет,
+        // а сказанное не трогает.
+        scenarios.reminderStore.raiseAll(planning.coverageDue(now))
+        assertEquals(1, scenarios.reminderOutbox.pass().shown)
+        scenarios.reminderStore.raiseAll(planning.coverageDue(now))
+        assertEquals(0, scenarios.reminderOutbox.pass().shown)
         assertEquals(id, (scenarios.notifier.shown.single().target as com.kert0n.medapp.domain.notification.NotificationTarget.CourseSources).courseId)
     }
 

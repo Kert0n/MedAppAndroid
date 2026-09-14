@@ -3,14 +3,20 @@ package com.kert0n.medapp.domain.notification
 import java.time.Instant
 
 /**
- * Будильник к моменту события — действие, которое исполняет система (PLAN D8). Точно — если она
+ * Разбудить процесс к моменту — и только это (PLAN D8). Будильник **один**: расписание целиком
+ * лежит в обязательствах, а система остаётся исполнителем ближайшего срока. Точно — если она
  * разрешила; иначе примерно, и [canBeExact] говорит об этом честно.
+ *
+ * О ключах, видах и приёмах порт не знает и показывать ничего не умеет: что сказать проснувшись —
+ * забота владельца доставки.
  */
 interface ReminderAlarms {
 
     val canBeExact: Boolean
 
-    suspend fun schedule(key: NotificationKey, at: Instant)
+    /** Разбудить к [at]. Повторный вызов переставляет тот же будильник, второго не заводится. */
+    suspend fun wakeAt(at: Instant, exact: Boolean)
 
-    suspend fun cancel(key: NotificationKey)
+    /** Будить незачем: невыполненных обязательств не осталось. */
+    suspend fun stopWaking()
 }
