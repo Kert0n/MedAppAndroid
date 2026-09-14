@@ -43,6 +43,17 @@
         <receiver
             android:name=".platform.notifications.NotificationActionReceiver"
             android:exported="false" />
+        <!-- После загрузки, перевода часов и смены зоны будильники строятся заново из базы (PLAN D8). -->
+        <receiver
+            android:name=".platform.notifications.BootAndTimeReceiver"
+            android:exported="true">
+            <intent-filter>
+                <action android:name="android.intent.action.BOOT_COMPLETED" />
+                <action android:name="android.intent.action.TIMEZONE_CHANGED" />
+                <action android:name="android.intent.action.TIME_SET" />
+                <action android:name="android.app.action.SCHEDULE_EXACT_ALARM_PERMISSION_STATE_CHANGED" />
+            </intent-filter>
+        </receiver>
 
         <!-- WorkManager собирает фоновые задачи графом (MedApp), а не своим инициализатором. -->
         <provider
