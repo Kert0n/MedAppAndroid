@@ -32,7 +32,8 @@ import kotlin.uuid.Uuid
             onDelete = ForeignKey.RESTRICT
         )
     ],
-    indices = [Index(value = ["course_id", "at"]), Index("package_id")]
+    // Сверка читает недавние сокращения по моменту, а не перебором истории (PLAN D8).
+    indices = [Index(value = ["course_id", "at"]), Index("package_id"), Index("at")]
 )
 class CoverageReductionStorageEntity(
     @PrimaryKey val id: Uuid,

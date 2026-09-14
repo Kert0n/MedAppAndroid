@@ -30,7 +30,9 @@ import kotlin.uuid.Uuid
         Index(value = ["sequence"], unique = true),
         Index(value = ["package_id", "sequence"]),
         Index("status"),
-        Index("group_id")
+        Index("group_id"),
+        // Свои команды полка считает по ключу, а не перебором всей истории очереди.
+        Index("med_kit_id")
     ]
 )
 class SyncOperationStorageEntity(

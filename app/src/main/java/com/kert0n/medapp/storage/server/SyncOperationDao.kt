@@ -136,10 +136,11 @@ interface SyncOperationDao {
      * Что ещё касается человека: незакрытые — ждут, отправляются, ответ записан — и отказанные,
      * которым нужно его решение. Применённые, утратившие доступ и разобранные человеком экрану не
      * нужны (PLAN H3 №28). Чтение, а не поток: нечитаемые строки различает разбор, и поток строит
-     * репозиторий.
+     * репозиторий. Состояния названы списком, а не отрицанием: по списку SQLite идёт индексом, а
+     * `NOT IN` перебирал бы всю историю очереди.
      */
     @Transaction
-    @Query("SELECT * FROM sync_operations WHERE status NOT IN ('APPLIED', 'ACCESS_LOST') AND dismissed_at IS NULL ORDER BY sequence")
+    @Query("SELECT * FROM sync_operations WHERE status IN ('PENDING', 'SENDING', 'ANSWERED', 'REFUSED') AND dismissed_at IS NULL ORDER BY sequence")
     suspend fun outstanding(): List<SyncOperationStorageRow>
 
     /** Отказ разобран человеком: отметка, а не удаление — приём держится за учёт своего расхода. */

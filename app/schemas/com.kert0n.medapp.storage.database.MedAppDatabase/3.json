@@ -2,7 +2,7 @@
   "formatVersion": 1,
   "database": {
     "version": 3,
-    "identityHash": "eadac6cdba0d70be5ecbd4ee208440be",
+    "identityHash": "f4842f2821408b351e3aede9be401441",
     "entities": [
       {
         "tableName": "quantity_units",
@@ -993,6 +993,15 @@
             ],
             "orders": [],
             "createSql": "CREATE INDEX IF NOT EXISTS `index_coverage_reductions_package_id` ON `${TABLE_NAME}` (`package_id`)"
+          },
+          {
+            "name": "index_coverage_reductions_at",
+            "unique": false,
+            "columnNames": [
+              "at"
+            ],
+            "orders": [],
+            "createSql": "CREATE INDEX IF NOT EXISTS `index_coverage_reductions_at` ON `${TABLE_NAME}` (`at`)"
           }
         ],
         "foreignKeys": [
@@ -1216,6 +1225,16 @@
             ],
             "orders": [],
             "createSql": "CREATE INDEX IF NOT EXISTS `index_intakes_answered_at` ON `${TABLE_NAME}` (`answered_at`)"
+          },
+          {
+            "name": "index_intakes_status_scheduled_at",
+            "unique": false,
+            "columnNames": [
+              "status",
+              "scheduled_at"
+            ],
+            "orders": [],
+            "createSql": "CREATE INDEX IF NOT EXISTS `index_intakes_status_scheduled_at` ON `${TABLE_NAME}` (`status`, `scheduled_at`)"
           }
         ],
         "foreignKeys": [
@@ -1457,6 +1476,15 @@
             ],
             "orders": [],
             "createSql": "CREATE INDEX IF NOT EXISTS `index_sync_operations_group_id` ON `${TABLE_NAME}` (`group_id`)"
+          },
+          {
+            "name": "index_sync_operations_med_kit_id",
+            "unique": false,
+            "columnNames": [
+              "med_kit_id"
+            ],
+            "orders": [],
+            "createSql": "CREATE INDEX IF NOT EXISTS `index_sync_operations_med_kit_id` ON `${TABLE_NAME}` (`med_kit_id`)"
           }
         ]
       },
@@ -1642,7 +1670,7 @@
     ],
     "setupQueries": [
       "CREATE TABLE IF NOT EXISTS room_master_table (id INTEGER PRIMARY KEY,identity_hash TEXT)",
-      "INSERT OR REPLACE INTO room_master_table (id,identity_hash) VALUES(42, 'eadac6cdba0d70be5ecbd4ee208440be')"
+      "INSERT OR REPLACE INTO room_master_table (id,identity_hash) VALUES(42, 'f4842f2821408b351e3aede9be401441')"
     ]
   }
 }

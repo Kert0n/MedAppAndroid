@@ -182,6 +182,8 @@ abstract class MedAppDatabase : RoomDatabase() {
                 connection.execSQL(
                     "CREATE INDEX IF NOT EXISTS `index_coverage_reductions_package_id` ON `coverage_reductions` (`package_id`)"
                 )
+                connection.execSQL("CREATE INDEX IF NOT EXISTS `index_coverage_reductions_at` ON `coverage_reductions` (`at`)")
+                connection.execSQL("CREATE INDEX IF NOT EXISTS `index_sync_operations_med_kit_id` ON `sync_operations` (`med_kit_id`)")
                 // Причина отказа — значением у отказанной операции; прежде она лежала текстом
                 // журнала, и у уже отказанных переносится оттуда (PLAN E2).
                 connection.execSQL("ALTER TABLE `sync_operations` ADD COLUMN `refusal_reason` TEXT")
@@ -297,7 +299,10 @@ abstract class MedAppDatabase : RoomDatabase() {
                         "ON `intakes` (`operation_id`)",
                     // Истраченное за год читается по моменту ответа, а не перебором (PLAN H6).
                     "CREATE INDEX IF NOT EXISTS `index_intakes_answered_at` " +
-                        "ON `intakes` (`answered_at`)"
+                        "ON `intakes` (`answered_at`)",
+                    // Просроченные пункты сверка находит по состоянию и сроку (PLAN D8).
+                    "CREATE INDEX IF NOT EXISTS `index_intakes_status_scheduled_at` " +
+                        "ON `intakes` (`status`, `scheduled_at`)"
                 )
                 connection.rebuild(
                     table = "package_details",

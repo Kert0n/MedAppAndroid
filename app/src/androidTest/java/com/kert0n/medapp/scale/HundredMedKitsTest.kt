@@ -194,6 +194,35 @@ class HundredMedKitsTest {
         }
     }
 
+    /**
+     * Сверка и проход теперь идут на каждое изменение оснований, а `intakes`, `coverage_reductions`
+     * и `sync_operations` растут всю жизнь установки — год приёмов это 7 300 строк, история
+     * очереди не убывает. Ни один их запрос не читается перебором: план SQLite (`EXPLAIN QUERY
+     * PLAN`) по каждому снятому запросу не содержит `SCAN` по этим таблицам. Перебор `packages`
+     * законен — список всех коробок и есть вопрос; `reminders` давнее забывает сама
+     * (`Reminder.RETENTION`) и не растёт.
+     */
+    @Test
+    fun theReconciliationReadsGrowingTablesByIndex(): Unit = runBlocking {
+        seeded()
+        val scenarios = Scenarios(database, now)
+        synchronized(queries) { queries.clear() }
+        scenarios.notificationReconciliation.reconcile(now, ZoneOffset.UTC)
+        scenarios.reminderOutbox.pass()
+        val selects = synchronized(queries) { queries.filter { it.trimStart().startsWith("SELECT", ignoreCase = true) }.distinct() }
+        assertTrue("сверка и проход ничего не прочитали — проверка сторожила бы пустоту", selects.isNotEmpty())
+
+        val growing = Regex("SCAN (?:TABLE )?(intakes|coverage_reductions|sync_operations)\\b")
+        val scans = selects.mapNotNull { sql ->
+            val plan = database.openHelper.readableDatabase.query("EXPLAIN QUERY PLAN $sql").use { cursor ->
+                val detail = cursor.getColumnIndexOrThrow("detail")
+                generateSequence { if (cursor.moveToNext()) cursor.getString(detail) else null }.toList()
+            }
+            plan.firstOrNull { growing.containsMatchIn(it) }?.let { "$it  <=  ${sql.lineSequence().joinToString(" ") { line -> line.trim() }.take(160)}" }
+        }
+        assertEquals("растущую таблицу читают перебором", emptyList<String>(), scans)
+    }
+
     /** Та же засевалка над другой базой — для сравнения счёта запросов. */
     private suspend fun seedInto(target: MedAppDatabase, shelves: Int, perShelf: Int, courses: Int) {
         target.withTransaction {
