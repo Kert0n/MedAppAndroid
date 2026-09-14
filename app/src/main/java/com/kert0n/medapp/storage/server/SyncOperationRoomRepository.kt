@@ -64,13 +64,10 @@ class SyncOperationRoomRepository @Inject constructor(
 
     override suspend fun dismiss(id: Uuid, at: Instant): Boolean = database.withTransaction {
         if (queue.dismiss(id, at) != 1) return@withTransaction false
-        // Зависимые, закрытые следом за этой (`SUPERSEDED`), — тем же решением: отдельно их не разбирают.
-        val pending = ArrayDeque(listOf(id))
-        while (pending.isNotEmpty()) {
-            for (dependent in queue.supersededDependentsOf(pending.removeFirst())) {
-                queue.dismiss(dependent, at)
-                pending += dependent
-            }
+        // Зависимые, закрытые следом за этой (`SUPERSEDED`), — тем же решением: отдельно их не
+        // разбирают. Обход один, каждая операция в нём раз.
+        for (dependent in queue.dependentsOf(id)) {
+            if (dependent.refusalReason == RefusalReason.SUPERSEDED && dependent.dismissedAt == null) queue.dismiss(dependent.id, at)
         }
         true
     }

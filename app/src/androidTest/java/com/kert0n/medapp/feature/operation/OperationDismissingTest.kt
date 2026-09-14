@@ -21,6 +21,7 @@ import com.kert0n.medapp.storage.server.toStorageEntity
 import java.time.Instant
 import kotlin.uuid.Uuid
 import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.test.runTest
 import org.junit.After
 import org.junit.Assert.assertEquals
@@ -119,5 +120,35 @@ class OperationDismissingTest {
         assertEquals(OperationDismissing.Outcome.NOT_AWAITING_DECISION, scenarios.operationDismissing.dismiss(applied))
 
         assertEquals(OperationDismissing.Outcome.GONE, scenarios.operationDismissing.dismiss(Uuid.random()))
+    }
+
+    /**
+     * Ромб зависимостей разбирается по разу: `A ← B, A ← C, D ← B и C` — три отметки, а не четыре.
+     * Обход один, и второй раз к `D` он не приходит (C1 «Обход зависимостей — запрос»).
+     */
+    @Test
+    fun aDiamondOfDependentsIsDismissedOnceEach() = runBlocking {
+        val writes = mutableListOf<String>()
+        val watched = inMemoryDatabase { sql -> if (sql.contains("dismissed_at")) synchronized(writes) { writes += sql } }
+        try {
+            val own = Scenarios(watched, now)
+            watched.packageRepository().add(pack(id = PACK, quantity = tablets("20"), form = TABLET_FORM))
+            val a = Uuid.random(); val b = Uuid.random(); val c = Uuid.random(); val d = Uuid.random()
+            watched.syncOperations().enqueue(a, PackageSyncCommand.Delete(PACK), now)
+            watched.syncOperations().enqueue(b, PackageSyncCommand.ReleaseClaim(PACK), now, dependsOn = setOf(a))
+            watched.syncOperations().enqueue(c, PackageSyncCommand.ReleaseClaim(PACK), now, dependsOn = setOf(a))
+            watched.syncOperations().enqueue(d, PackageSyncCommand.ReleaseClaim(PACK), now, dependsOn = setOf(b, c))
+            watched.syncOperations().settle(a, SyncOperationStatus.REFUSED, "отвергнуто", now, refusalReason = RefusalReason.CONFLICT)
+            for (id in listOf(b, c, d)) watched.syncOperations().settle(id, SyncOperationStatus.REFUSED, "следом", now, refusalReason = RefusalReason.SUPERSEDED)
+            synchronized(writes) { writes.clear() }
+
+            assertEquals(OperationDismissing.Outcome.DISMISSED, own.operationDismissing.dismiss(a))
+
+            val updates = synchronized(writes) { writes.count { it.trimStart().startsWith("UPDATE", ignoreCase = true) } }
+            assertEquals("отметок разбора: $writes", 4, updates)
+            assertTrue(watched.queueRepository().observeOutstanding().first().isEmpty())
+        } finally {
+            watched.close()
+        }
     }
 }

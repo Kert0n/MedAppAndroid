@@ -387,18 +387,18 @@ class QueueRoomStorage @Inject constructor(
         following.get().follow(snapshot.pack.id, at)
     }
 
-    /** Зависимость значит «нужен эффект»: не будет его у родителя — не будет и у зависимых, и у их зависимых. */
+    /**
+     * Зависимость значит «нужен эффект»: не будет его у родителя — не будет и у зависимых, и у их
+     * зависимых. Закрывается всё незакрытое ниже по графу — одним чтением, каждая операция раз.
+     */
     private suspend fun cascade(id: Uuid, effect: Settlement.Effect.Cascade) {
-        val pending = ArrayDeque(listOf(id))
-        while (pending.isNotEmpty()) {
-            for (dependent in queue.unclosedDependentsOf(pending.removeFirst())) {
-                // Зависимая закрывается тем же статусом; причина — значением, и только у отказа.
-                val superseded = RefusalReason.SUPERSEDED.takeIf { effect.status == SyncOperationStatus.REFUSED }
-                queue.settle(dependent, effect.status, RefusalReason.SUPERSEDED.name, at = null, attempted = 0, refusalReason = superseded)
-                intakes.setAccounting(dependent, effect.accounting)
-                settled(dependent)
-                pending += dependent
-            }
+        for (dependent in queue.dependentsOf(id)) {
+            if (dependent.status.isClosed) continue
+            // Зависимая закрывается тем же статусом; причина — значением, и только у отказа.
+            val superseded = RefusalReason.SUPERSEDED.takeIf { effect.status == SyncOperationStatus.REFUSED }
+            queue.settle(dependent.id, effect.status, RefusalReason.SUPERSEDED.name, at = null, attempted = 0, refusalReason = superseded)
+            intakes.setAccounting(dependent.id, effect.accounting)
+            settled(dependent.id)
         }
     }
 }

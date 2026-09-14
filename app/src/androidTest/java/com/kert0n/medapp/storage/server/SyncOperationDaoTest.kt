@@ -358,4 +358,21 @@ class SyncOperationDaoTest {
 
     private suspend fun unreadable(id: Uuid): StoredSyncOperation.Unreadable =
         requireNotNull(queue.find(id)).toDomain(VOCABULARY) as StoredSyncOperation.Unreadable
+
+    /**
+     * Все, кому нужен эффект операции, — одним чтением, каждый по разу, в порядке очереди: ромб
+     * `A ← B, A ← C, D ← B и C` не удваивает `D`. Что с ними делать, решает вызывающий по строке.
+     */
+    @Test
+    fun dependentsAreFoundOnceEachInQueueOrderThroughADiamond() = runTest {
+        val fourth = Uuid.parse("00000000-0000-4000-8000-000000000094")
+        queue.enqueue(first, PackageSyncCommand.Delete(PACK), createdAt)
+        queue.enqueue(second, PackageSyncCommand.ReleaseClaim(PACK), createdAt, dependsOn = setOf(first))
+        queue.enqueue(third, PackageSyncCommand.ReleaseClaim(PACK), createdAt, dependsOn = setOf(first))
+        queue.enqueue(fourth, PackageSyncCommand.ReleaseClaim(PACK), createdAt, dependsOn = setOf(second, third))
+
+        assertEquals(listOf(second, third, fourth), queue.dependentsOf(first).map { it.id })
+        assertEquals(listOf(fourth), queue.dependentsOf(second).map { it.id })
+        assertEquals(emptyList<Uuid>(), queue.dependentsOf(fourth).map { it.id })
+    }
 }

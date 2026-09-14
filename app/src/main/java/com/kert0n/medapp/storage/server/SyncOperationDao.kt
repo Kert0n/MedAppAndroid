@@ -287,22 +287,20 @@ interface SyncOperationDao {
     suspend fun reprepare(id: Uuid, lastError: String, at: Instant, notBefore: Instant?): Int
 
     /**
-     * Незакрытые операции, которым нужен эффект [dependsOn], закрываются тем же статусом: отказ
-     * родителя отказывает зависимым, утрата доступа — теряет их. Возвращает их номера, чтобы
-     * каскад дошёл и до их зависимых.
+     * Все операции, которым — прямо или через другие — нужен эффект [dependsOn], каждая один раз,
+     * в порядке очереди (PLAN E2, C1 «Обход зависимостей — запрос»). Граф без циклов по построению:
+     * зависят только от поставленного раньше. Что с ними делать — закрыть незакрытые следом за
+     * родителем, отметить разобранными закрытые каскадом, — решает вызывающий по строке; обход
+     * один и ромб зависимостей в нём не удваивается.
      */
     @Query(
-        "SELECT operation_id FROM sync_operation_dependencies d JOIN sync_operations o ON o.id = d.operation_id " +
-            "WHERE d.depends_on_id = :dependsOn AND o.status IN ('PENDING', 'SENDING')"
+        "WITH RECURSIVE dependents(id) AS (" +
+            "SELECT operation_id FROM sync_operation_dependencies WHERE depends_on_id = :dependsOn " +
+            "UNION " +
+            "SELECT d.operation_id FROM sync_operation_dependencies d JOIN dependents p ON d.depends_on_id = p.id" +
+            ") SELECT o.* FROM sync_operations o JOIN dependents ON o.id = dependents.id ORDER BY o.sequence"
     )
-    suspend fun unclosedDependentsOf(dependsOn: Uuid): List<Uuid>
-
-    /** Зависимые, закрытые следом за родителем (`SUPERSEDED`): решение о нём — решение и о них. */
-    @Query(
-        "SELECT operation_id FROM sync_operation_dependencies d JOIN sync_operations o ON o.id = d.operation_id " +
-            "WHERE d.depends_on_id = :dependsOn AND o.refusal_reason = 'SUPERSEDED'"
-    )
-    suspend fun supersededDependentsOf(dependsOn: Uuid): List<Uuid>
+    suspend fun dependentsOf(dependsOn: Uuid): List<SyncOperationStorageEntity>
 
     @Query("SELECT depends_on_id FROM sync_operation_dependencies WHERE operation_id = :id")
     suspend fun dependenciesOf(id: Uuid): List<Uuid>
