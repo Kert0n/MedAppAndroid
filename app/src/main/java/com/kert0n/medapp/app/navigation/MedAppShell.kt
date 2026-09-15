@@ -12,6 +12,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.navigation.NavController
 import androidx.navigation.NavDestination
 import androidx.navigation.NavDestination.Companion.hasRoute
@@ -24,6 +25,10 @@ import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
 import com.kert0n.medapp.R
 import com.kert0n.medapp.ui.EmptyState
+import com.kert0n.medapp.ui.medkit.MedKitFormRoute
+import com.kert0n.medapp.ui.medkit.MedKitListRoute
+import kotlin.reflect.typeOf
+import kotlin.uuid.Uuid
 
 /**
  * Оболочка приложения: пять мест внизу и содержимое над ними. Место, где стоит человек, живёт в
@@ -57,20 +62,42 @@ private fun MedAppBottomBar(navController: NavController) {
                 selected = selected,
                 onClick = { navController.goTo(destination) },
                 icon = { Icon(painterResource(destination.icon(selected)), contentDescription = null) },
-                label = { Text(stringResource(destination.label)) }
+                // Подпись в одну строку: на 360 dp пять мест делят экран по 72 dp, и «Настройки»
+                // переносились второй строкой, которую полоса обрезала (Sm29).
+                label = {
+                    Text(
+                        stringResource(destination.label),
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis
+                    )
+                }
             )
         }
     }
 }
 
 /**
- * Содержимое мест. Экранов ещё нет — за каждым стоит общее «пусто», то самое, которое потом
- * покажут настоящие экраны, когда показывать действительно нечего.
+ * Содержимое мест и экраны вглубь. За местом, экрана у которого ещё нет, стоит общее «пусто» —
+ * то самое, которое потом покажет настоящий экран, когда показывать действительно нечего.
+ *
+ * Как идентификатор едет в аргументе, навигация сама не знает: тип называется здесь, один раз на
+ * все маршруты, которые его возят (`UuidNavType`, `UuidOrNoneNavType`).
  */
 @Composable
 private fun MedAppNavHost(navController: NavHostController, modifier: Modifier = Modifier) {
     NavHost(navController, startDestination = Route.MedKits, modifier = modifier) {
-        composable<Route.MedKits> { NotReadyYet() }
+        composable<Route.MedKits> {
+            MedKitListRoute(
+                onOpen = { navController.navigate(Route.MedKitContents(it)) },
+                onAdd = { navController.navigate(Route.MedKitForm()) },
+                onSearch = { navController.navigate(Route.AllPackages) }
+            )
+        }
+        composable<Route.MedKitForm>(typeMap = mapOf(typeOf<Uuid?>() to UuidOrNoneNavType)) {
+            MedKitFormRoute(onDone = { navController.popBackStack() })
+        }
+        composable<Route.MedKitContents>(typeMap = mapOf(typeOf<Uuid>() to UuidNavType)) { NotReadyYet() }
+        composable<Route.AllPackages> { NotReadyYet() }
         composable<Route.Plan> { NotReadyYet() }
         composable<Route.Scanner> { NotReadyYet() }
         composable<Route.Analytics> { NotReadyYet() }

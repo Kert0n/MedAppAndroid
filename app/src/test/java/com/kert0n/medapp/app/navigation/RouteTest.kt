@@ -1,5 +1,6 @@
 package com.kert0n.medapp.app.navigation
 
+import com.kert0n.medapp.presentation.RouteArguments
 import java.io.File
 import kotlinx.serialization.descriptors.SerialDescriptor
 import kotlinx.serialization.serializer
@@ -76,6 +77,25 @@ class RouteTest {
             for (index in 0 until descriptor.elementsCount) {
                 val field = descriptor.getElementName(index).lowercase()
                 assertTrue("${descriptor.serialName}.$field возит ключ", "key" !in field)
+            }
+        }
+    }
+
+    /**
+     * Имена полей маршрута — те же, под которыми `ViewModel` достаёт их из `SavedStateHandle`.
+     * Представление маршрутов не видит (граница H1) и знает только имена, так что разъехаться они
+     * могли бы молча: переименованное поле оставило бы форму без своего места и открыло бы её
+     * пустой.
+     *
+     * Красная проверка: переименовать поле любого маршрута — тест краснеет с его именем.
+     */
+    @Test
+    fun routeFieldsAreNamedAsThePresentationLooksThemUp() {
+        val known = setOf(RouteArguments.MED_KIT_ID, RouteArguments.PACKAGE_ID)
+        for (descriptor in routes) {
+            for (index in 0 until descriptor.elementsCount) {
+                val field = descriptor.getElementName(index)
+                assertTrue("${descriptor.serialName}.$field не назван в RouteArguments", field in known)
             }
         }
     }

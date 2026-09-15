@@ -23,11 +23,51 @@
 
     <!-- Аптечки -->
     <string name="med_kit_arrived_name">Общая аптечка</string>
+    <string name="med_kits_title">Аптечки</string>
+    <string name="med_kits_empty">Аптечек пока нет. Заведите первую — это место, где лежат лекарства: ящик, полка, сумка в машине.</string>
+    <string name="med_kits_add">Завести аптечку</string>
+    <string name="med_kit_empty_inside">Пусто</string>
+    <string name="med_kit_expired_description">Есть просроченные упаковки</string>
+    <string name="med_kit_shared_description">Общая аптечка</string>
+    <string name="search_medicines_everywhere">Найти лекарство во всех аптечках</string>
+
+    <!-- Русские количества: «1 упаковка», «2 упаковки», «12 упаковок» -->
+    <plurals name="packages_count">
+        <item quantity="one">%d упаковка</item>
+        <item quantity="few">%d упаковки</item>
+        <item quantity="many">%d упаковок</item>
+        <item quantity="other">%d упаковки</item>
+    </plurals>
+    <plurals name="packages_expired">
+        <item quantity="one">%d просрочена</item>
+        <item quantity="few">%d просрочены</item>
+        <item quantity="many">%d просрочено</item>
+        <item quantity="other">%d просрочено</item>
+    </plurals>
+    <plurals name="participants_count">
+        <item quantity="one">%d участник</item>
+        <item quantity="few">%d участника</item>
+        <item quantity="many">%d участников</item>
+        <item quantity="other">%d участника</item>
+    </plurals>
+
+    <!-- Аптечка: создание и правка -->
+    <string name="med_kit_new">Новая аптечка</string>
+    <string name="med_kit_edit">Правка аптечки</string>
+    <string name="med_kit_name">Название</string>
+    <string name="med_kit_location">Место хранения (необязательно)</string>
+    <string name="med_kit_name_empty">Название нужно: без него аптечку не отличить от других.</string>
+    <string name="med_kit_name_too_long">Название длиннее %1$d символов.</string>
+    <string name="med_kit_location_too_long">Место хранения длиннее %1$d символов.</string>
+    <string name="med_kit_busy">Аптечка ждёт ответа сервера на другое решение — правку пока не записать.</string>
+    <string name="med_kit_gone">Этой аптечки больше нет.</string>
 
     <!-- Экраны, которых ещё нет -->
     <string name="screen_not_ready">Этот экран ещё не готов.</string>
 
     <!-- Общие действия форм: строка приходит вместе с экраном, которому нужна (AGENTS) -->
+    <string name="action_back">Назад</string>
+    <string name="action_save">Сохранить</string>
     <string name="action_cancel">Отмена</string>
     <string name="action_choose">Выбрать</string>
     <string name="action_pick_date">Выбрать дату</string>
