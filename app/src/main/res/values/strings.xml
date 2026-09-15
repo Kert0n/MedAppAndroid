@@ -132,6 +132,22 @@
     <string name="pack_removal_on_the_way">Удаление в пути: общая аптечка ещё не ответила.</string>
     <string name="pack_busy">Коробка ждёт ответа сервера на другое решение.</string>
 
+    <!-- Упаковка: пересчёт и утилизация -->
+    <string name="amount_title">Количество</string>
+    <string name="amount_tab_recount">Пересчитал</string>
+    <string name="amount_tab_disposal">Выбросил</string>
+    <string name="amount_now">Сейчас записано: %1$s %2$s</string>
+    <string name="amount_recounted">Пересчитал и увидел</string>
+    <string name="amount_disposed">Сколько выбросил</string>
+    <string name="amount_recount_explained">Назовите то, что видите целиком, — вычитание сделает учёт.</string>
+    <string name="amount_disposal_explained">Столько ушло; остальное остаётся в коробке.</string>
+    <string name="amount_record">Записать</string>
+    <string name="amount_nothing_to_dispose">Выбросить ноль — это ничего не сделать.</string>
+    <string name="amount_more_than_there_is">Столько в коробке и не лежало.</string>
+    <string name="amount_zero_title">Коробки больше не будет?</string>
+    <string name="amount_zero_explained">В ней не останется ничего, и она исчезнет. Приёмы из неё останутся в истории.</string>
+    <string name="amount_zero_confirm">Да, коробка кончилась</string>
+
     <!-- Упаковка: отказы формы -->
     <string name="pack_med_kit_missing">Выберите аптечку: упаковка лежит в каком-то одном месте.</string>
     <string name="pack_med_kit_gone">Этой аптечки больше нет — выберите другую.</string>

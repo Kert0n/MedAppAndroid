@@ -27,6 +27,7 @@ import com.kert0n.medapp.R
 import com.kert0n.medapp.ui.EmptyState
 import com.kert0n.medapp.ui.medkit.MedKitFormRoute
 import com.kert0n.medapp.ui.medkit.MedKitListRoute
+import com.kert0n.medapp.ui.pack.PackageAmountRoute
 import com.kert0n.medapp.ui.pack.PackageFormRoute
 import com.kert0n.medapp.ui.pack.PackageRoute
 import kotlin.reflect.typeOf
@@ -122,7 +123,9 @@ private fun MedAppNavHost(navController: NavHostController, modifier: Modifier =
                 onTransfer = { navController.navigate(Route.PackageTransfer(it)) }
             )
         }
-        composable<Route.PackageAmount>(typeMap = mapOf(typeOf<Uuid>() to UuidNavType)) { NotReadyYet() }
+        composable<Route.PackageAmount>(typeMap = mapOf(typeOf<Uuid>() to UuidNavType)) {
+            PackageAmountRoute(onDone = { navController.popBackStack() })
+        }
         composable<Route.PackageTransfer>(typeMap = mapOf(typeOf<Uuid>() to UuidNavType)) { NotReadyYet() }
         composable<Route.AllPackages> { NotReadyYet() }
         composable<Route.Plan> { NotReadyYet() }
