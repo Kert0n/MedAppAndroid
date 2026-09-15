@@ -74,7 +74,7 @@ class DayPlanningTest {
         val clock = Clock.fixed(Instant.parse("2027-03-10T09:00:00Z"), moscow)
         val reads = AskedDays()
 
-        val plan = DayPlanning(Today(clock, Quiet), reads, clock).observe(daysAhead = 2).first()
+        val plan = DayPlanning(Today(clock, Quiet), reads).observe(daysAhead = 2).first()
 
         assertEquals(LocalDate.of(2027, 3, 12), plan.date)
         assertEquals(listOf(LocalDate.of(2027, 3, 12) to moscow), reads.asked)
@@ -97,7 +97,7 @@ class DayPlanningTest {
         }
         val reads = AskedDays()
 
-        val days = DayPlanning(Today(running, Quiet), reads, running).observe(daysAhead = 1).take(2).toList()
+        val days = DayPlanning(Today(running, Quiet), reads).observe(daysAhead = 1).take(2).toList()
 
         // 23:30 десятого в Москве: «завтра» — одиннадцатое, а после полуночи — двенадцатое.
         assertEquals(listOf(LocalDate.of(2027, 3, 11), LocalDate.of(2027, 3, 12)), days.map { it.date })
@@ -118,7 +118,7 @@ class DayPlanningTest {
         val seen = mutableListOf<LocalDate>()
 
         val eyes = backgroundScope.launch {
-            DayPlanning(Today(running, shifts), reads, running).observe().collect { seen += it.date }
+            DayPlanning(Today(running, shifts), reads).observe().collect { seen += it.date }
         }
         runCurrent()
         zone = ZoneId.of("Asia/Vladivostok")
@@ -129,12 +129,46 @@ class DayPlanningTest {
         assertEquals(listOf(LocalDate.of(2027, 3, 10), LocalDate.of(2027, 3, 11)), seen)
     }
 
+    /**
+     * Переезд между зонами с одинаковым числом — **другой день**: начало и конец суток уехали,
+     * и разовые приёмы попадают в него уже по новым границам. Чтение обязано перечитать.
+     *
+     * Красная проверка: следить только за числом — план остаётся в прежней зоне до следующей
+     * полуночи, и «за сегодня» считается по чужим границам.
+     */
+    @Test
+    fun aZoneChangeWithTheSameDateIsANewDayToo() = runTest {
+        val start = Instant.parse("2027-03-10T09:00:00Z") // полдень в Москве, вечер в Ташкенте
+        var zone = moscow
+        val running = object : Clock() {
+            override fun instant(): Instant = start.plusMillis(testScheduler.currentTime)
+            override fun getZone(): ZoneId = zone
+            override fun withZone(zone: ZoneId): Clock = this
+        }
+        val shifts = Shifts()
+        val reads = AskedDays()
+
+        val eyes = backgroundScope.launch {
+            DayPlanning(Today(running, shifts), reads).observe().collect { }
+        }
+        runCurrent()
+        zone = ZoneId.of("Asia/Tashkent")
+        shifts.happened()
+        runCurrent()
+        eyes.cancel()
+
+        assertEquals(
+            listOf(LocalDate.of(2027, 3, 10) to moscow, LocalDate.of(2027, 3, 10) to ZoneId.of("Asia/Tashkent")),
+            reads.asked
+        )
+    }
+
     /** Назад пока не листают, и «так нельзя» не притворяется пустым днём. */
     @Test
     fun theDayBeforeTodayIsRefusedRatherThanShownEmpty() {
         val clock = Clock.fixed(Instant.parse("2027-03-10T09:00:00Z"), moscow)
 
-        val refused = runCatching { DayPlanning(Today(clock, Quiet), AskedDays(), clock).observe(daysAhead = -1) }
+        val refused = runCatching { DayPlanning(Today(clock, Quiet), AskedDays()).observe(daysAhead = -1) }
 
         assertEquals(
             "в прошлое пока не листают: сдвиг -1",

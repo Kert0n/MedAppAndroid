@@ -3,12 +3,15 @@ package com.kert0n.medapp.feature.time
 import java.time.Clock
 import java.time.Duration
 import java.time.LocalDate
+import java.time.ZoneId
 import javax.inject.Inject
 import javax.inject.Singleton
+import kotlinx.coroutines.channels.Channel
+import kotlinx.coroutines.channels.trySendBlocking
 import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.channelFlow
 import kotlinx.coroutines.flow.distinctUntilChanged
-import kotlinx.coroutines.flow.first
-import kotlinx.coroutines.flow.flow
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.withTimeoutOrNull
 
 /**
@@ -31,21 +34,40 @@ class Today @Inject constructor(
     private val shifts: ClockShifts
 ) {
 
-    /** Текущий день сразу и каждый следующий — в его местную полночь. */
-    fun observe(): Flow<LocalDate> = flow {
+    /**
+     * Текущий день сразу и каждый следующий — в его местную полночь или когда границу суток
+     * увели часы.
+     *
+     * **Слушают вести всё время, а не в перерывах между днями.** Подписаться на сигнал заново
+     * в каждом обороте значит оставить щель между двумя подписками, и весть, пришедшая в неё,
+     * пропадает: у [ClockShifts] нет повтора для опоздавших. Постоянный слушатель складывает
+     * её в дверь-«последнюю весть» ([Channel.CONFLATED]), и оборот забирает её, когда дойдёт.
+     */
+    fun observe(): Flow<Day> = channelFlow {
+        val moved = Channel<Unit>(Channel.CONFLATED)
+        launch { shifts.signals.collect { moved.trySendBlocking(Unit) } }
         while (true) {
             val zone = clock.zone
             val now = clock.instant()
             val today = now.atZone(zone).toLocalDate()
-            emit(today)
+            send(Day(today, zone))
             // Пересчитывается от начала следующего дня, а не «через сутки»: перевод часов и
             // смена зоны иначе увели бы границу дня в сторону и больше не вернули.
             val midnight = today.plusDays(1).atStartOfDay(zone).toInstant()
             // Ожидание кончается полуночью — или вестью о том, что полночь теперь другая:
             // переехавший человек иначе досидел бы во вчера до старой границы суток.
             withTimeoutOrNull(Duration.between(now, midnight).toMillis().coerceAtLeast(1)) {
-                shifts.signals.first()
+                moved.receive()
             }
         }
     }.distinctUntilChanged()
 }
+
+/**
+ * День человека — дата **в его зоне**.
+ *
+ * Зона здесь не украшение: границы дня считаются по ней, и переехавший в полдень получает день
+ * с другими началом и концом, даже когда число осталось прежним. Оттого два дня с одним числом,
+ * но разными зонами — разные дни, и тот, кто читает «что было за день», обязан перечитать.
+ */
+data class Day(val date: LocalDate, val zone: ZoneId)
