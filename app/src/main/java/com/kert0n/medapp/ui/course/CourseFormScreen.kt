@@ -79,7 +79,9 @@ fun CourseFormScreen(
     onConfirmDiscard: () -> Unit,
     onDismissDiscard: () -> Unit,
     onBack: () -> Unit,
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier,
+    /** Путь к источникам; `null` — записывать пачки ещё некуда: черновик не записан (H3 №16). */
+    onSources: (() -> Unit)? = null
 ) {
     val editing = state as? CourseFormUiState.Editing
     Scaffold(
@@ -107,7 +109,7 @@ fun CourseFormScreen(
             // Черновика нет — это отказ, а не пустая форма: заполненную человек сохранил бы и
             // не понял, куда делась его правка.
             CourseFormUiState.Gone -> ErrorMessage(text = stringResource(R.string.course_gone), modifier = Modifier.padding(padding))
-            is CourseFormUiState.Editing -> Fields(state, onEdit, onSave, onBack, Modifier.padding(padding))
+            is CourseFormUiState.Editing -> Fields(state, onEdit, onSave, onBack, onSources, Modifier.padding(padding))
         }
     }
     if (editing?.asksToDiscard == true) DiscardDialog(onConfirm = onConfirmDiscard, onDismiss = onDismissDiscard)
@@ -120,6 +122,7 @@ private fun Fields(
     onEdit: (CourseFormPresentationDTO) -> Unit,
     onSave: () -> Unit,
     onBack: () -> Unit,
+    onSources: (() -> Unit)?,
     modifier: Modifier
 ) {
     val form = state.form
@@ -206,6 +209,12 @@ private fun Fields(
             modifier = Modifier.fillMaxWidth()
         )
         state.error?.let { Text(it.message(), color = MaterialTheme.colorScheme.error) }
+        onSources?.let {
+            TextButton(
+                onClick = it,
+                modifier = Modifier.fillMaxWidth().defaultMinSize(minHeight = 48.dp)
+            ) { Text(stringResource(R.string.course_sources)) }
+        }
         Button(
             onClick = onSave,
             modifier = Modifier.fillMaxWidth().defaultMinSize(minHeight = 48.dp)

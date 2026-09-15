@@ -21,6 +21,8 @@ import kotlin.uuid.Uuid
  */
 data class PackageProjection(
     val id: Uuid,
+    /** Чем коробка входит в чужой агрегат: имя, единица и форма — то, о чём его спрашивают. */
+    val ref: PackageRef,
     val medKit: MedKitRef,
     val facts: PackageFacts,
     val quantity: Quantity,

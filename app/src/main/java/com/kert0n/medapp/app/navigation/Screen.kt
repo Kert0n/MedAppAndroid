@@ -77,4 +77,12 @@ sealed interface Screen : NavKey {
     /** Карточка курса (PLAN H3 №14): обеспечение, назначение, источники, пункты. */
     @Serializable
     data class CourseCard(val courseId: Uuid) : Screen
+
+    /** Источники лечения (PLAN H3 №16): стек коробок в порядке расходования. */
+    @Serializable
+    data class CourseSources(val courseId: Uuid) : Screen
+
+    /** Выбор источника (PLAN H3 №17): какую коробку подключить к этому лечению. */
+    @Serializable
+    data class SourcePicking(val courseId: Uuid) : Screen
 }

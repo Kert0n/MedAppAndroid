@@ -340,4 +340,38 @@
     <string name="course_rejected_schedule_in_past">Новое расписание не может начинаться раньше сегодняшнего дня.</string>
     <string name="course_rejected_already_attached">Эта пачка уже подключена.</string>
     <string name="course_rejected_package_unusable">Эту пачку выбрасывают или её полки больше нет — источником ей не быть.</string>
+    <string name="course_missing">Этого лечения больше нет.</string>
+    <string name="course_finished">Это лечение уже закончено.</string>
+    <string name="course_sources">Источники</string>
+    <string name="course_sources_add">Подключить ещё</string>
+    <string name="course_sources_empty">Пачек пока нет — подключите первую.</string>
+    <string name="course_source_detach">Отвязать</string>
+    <string name="course_source_detach_title">Отвязать пачку?</string>
+    <string name="course_source_detach_explained">Лечение останется, но эта коробка перестанет его обеспечивать, а её бронь снимется.</string>
+    <string name="course_source_handle">Переставить: %1$s</string>
+    <string name="course_source_move_up">Выше</string>
+    <string name="course_source_move_down">Ниже</string>
+    <string name="course_source_free">свободно %1$s %2$s</string>
+    <string name="course_source_expires">годен до %1$s</string>
+    <plurals name="course_source_allocated">
+        <item quantity="one">выделен %d приём</item>
+        <item quantity="few">выделено %d приёма</item>
+        <item quantity="many">выделено %d приёмов</item>
+        <item quantity="other">выделено %d приёма</item>
+    </plurals>
+    <plurals name="course_source_beyond_limit">
+        <item quantity="one">Из этой пачки выйдет только %d приём.</item>
+        <item quantity="few">Из этой пачки выйдет только %d приёма.</item>
+        <item quantity="many">Из этой пачки выйдет только %d приёмов.</item>
+        <item quantity="other">Из этой пачки выйдет только %d приёма.</item>
+    </plurals>
+    <string name="course_source_fault_unit">Другая единица — снимите пачку или поправьте её сведения.</string>
+    <string name="course_source_fault_form">Другая форма — снимите пачку или поправьте её сведения.</string>
+    <string name="course_source_taken">Эта пачка занята другим лечением.</string>
+    <string name="course_source_taken_named">«%1$s» занята другим лечением.</string>
+    <string name="course_source_unusable">Эту пачку выбрасывают или её полки больше нет.</string>
+    <string name="course_source_unusable_named">«%1$s» выбрасывают или её полки больше нет.</string>
+    <string name="course_picking">Подключить пачку</string>
+    <string name="course_picking_empty">Подходящих пачек нет: заведите коробку на полке или укажите ей форму.</string>
+    <string name="action_got_it">Понятно</string>
 </resources>

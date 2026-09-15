@@ -11,16 +11,24 @@ import androidx.compose.ui.test.performTextInput
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import com.kert0n.medapp.HiltTestActivity
 import com.kert0n.medapp.fixture.CAPSULE_FORM
+import com.kert0n.medapp.fixture.HOME_KIT
 import com.kert0n.medapp.fixture.MILLILITRES
+import com.kert0n.medapp.fixture.PACK
+import com.kert0n.medapp.fixture.medKit
 import com.kert0n.medapp.fixture.TABLETS
 import com.kert0n.medapp.fixture.TABLET_FORM
+import com.kert0n.medapp.fixture.pack
+import com.kert0n.medapp.fixture.packageRepository
+import com.kert0n.medapp.fixture.tablets
 import com.kert0n.medapp.storage.database.MedAppDatabase
+import com.kert0n.medapp.storage.medkit.toStorageEntity as toMedKitStorageEntity
 import com.kert0n.medapp.storage.value.toStorageEntity
 import com.kert0n.medapp.ui.theme.MedAppTheme
 import dagger.hilt.android.testing.HiltAndroidRule
 import dagger.hilt.android.testing.HiltAndroidTest
 import javax.inject.Inject
 import kotlinx.coroutines.runBlocking
+import org.junit.Assert.assertNull
 import org.junit.Before
 import org.junit.Rule
 import org.junit.Test
@@ -52,6 +60,8 @@ class CoursesJourneyTest {
                 units = listOf(TABLETS, MILLILITRES).map { it.toStorageEntity() },
                 forms = listOf(TABLET_FORM, CAPSULE_FORM).map { it.toStorageEntity() }
             )
+            // Полка заводится до коробок: без неё внешний ключ коробки не на что сослаться.
+            database.medKits().insertIfMissing(medKit(id = HOME_KIT).toMedKitStorageEntity())
         }
         compose.setContent { MedAppTheme { MedAppShell() } }
         compose.onNodeWithText("План").performClick()
@@ -71,6 +81,36 @@ class CoursesJourneyTest {
         compose.waitUntil { compose.onAllNodesWithText("Черновики").fetchSemanticsNodes().isNotEmpty() }
         compose.onNodeWithText("Нурофен").assertIsDisplayed()
         compose.onNodeWithText("по 2 после еды").assertIsDisplayed()
+    }
+
+    /**
+     * Черновик ничего не занимает (PLAN D5): у него нет ни броней, ни назначений пачек. Коробка,
+     * заведённая на полке, остаётся свободной — её держит не черновик, а начатое лечение.
+     */
+    @Test
+    fun aDraftHoldsNoBoxAtAll() {
+        runBlocking {
+            database.packageRepository().add(
+                pack(id = PACK, name = "Нурофен", quantity = tablets("20"), form = TABLET_FORM)
+            )
+        }
+        compose.onNodeWithText("Записать лечение").performClick()
+        compose.onNodeWithText("Название").performTextInput("Нурофен")
+        compose.onNodeWithText("Заметка (необязательно)").performTextInput("купить завтра")
+        compose.onNodeWithText("Сохранить").performScrollTo().performClick()
+        compose.waitUntil { compose.onAllNodesWithText("Черновики").fetchSemanticsNodes().isNotEmpty() }
+
+        compose.onNodeWithText("Нурофен").performClick()
+        compose.onNodeWithText("Источники").performScrollTo().performClick()
+
+        // Стек пуст, и подключать пока нечего: доза и форма ещё не названы, сверять коробку не с чем.
+        compose.onNodeWithText("Пачек пока нет — подключите первую.").assertIsDisplayed()
+        compose.onNodeWithText("Подключить ещё").performClick()
+        compose.onNodeWithText("Подходящих пачек нет: заведите коробку на полке или укажите ей форму.")
+            .assertIsDisplayed()
+
+        val held = runBlocking { database.packageRepository().projection(PACK)?.holdingCourseId }
+        assertNull(held)
     }
 
     /** Черновик открывается редактором из списка и уходит по «удалить» — после вопроса. */

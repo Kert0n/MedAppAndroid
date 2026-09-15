@@ -20,7 +20,11 @@ import com.kert0n.medapp.presentation.course.CourseFormUiState
 import com.kert0n.medapp.presentation.course.CourseFormViewModel
 import com.kert0n.medapp.presentation.course.CourseListViewModel
 import com.kert0n.medapp.presentation.course.CoursePresentationDTO
+import com.kert0n.medapp.presentation.course.CourseSourcesViewModel
+import com.kert0n.medapp.presentation.course.SourcePickingViewModel
 import com.kert0n.medapp.ui.course.CourseFormScreen
+import com.kert0n.medapp.ui.course.CourseSourcesScreen
+import com.kert0n.medapp.ui.course.SourcePickingScreen
 import com.kert0n.medapp.ui.plan.PlanMode
 import com.kert0n.medapp.ui.plan.PlanScreen
 import androidx.compose.runtime.LaunchedEffect
@@ -255,10 +259,38 @@ private fun screens(stacks: TabStacks) = entryProvider<NavKey> {
             onAskToDiscard = model::askToDiscard,
             onConfirmDiscard = model::discard,
             onDismissDiscard = model::dismissDiscard,
+            // Источники записанного черновика: у нового их некуда подключать — он ещё не записан.
+            onSources = key.courseId?.let { { stacks.go(Screen.CourseSources(it)) } },
             onBack = stacks::back
         )
     }
     entry<Screen.CourseCard> { NotReadyYet() }
+    entry<Screen.CourseSources> { key ->
+        val model = hiltViewModel<CourseSourcesViewModel, CourseSourcesViewModel.Factory>(
+            key = key.toString(),
+            creationCallback = { factory -> factory.create(key.courseId) }
+        )
+        CourseSourcesScreen(
+            state = model.state.collectAsStateWithLifecycle().value,
+            onMove = model::move,
+            onDetach = model::askToDetach,
+            onConfirmDetach = model::detach,
+            onDismissDetach = model::dismissDetach,
+            onDismissMessage = model::dismissMessage,
+            onAdd = { stacks.go(Screen.SourcePicking(key.courseId)) },
+            onBack = stacks::back
+        )
+    }
+    entry<Screen.SourcePicking> { key ->
+        val model = hiltViewModel<SourcePickingViewModel, SourcePickingViewModel.Factory>(
+            key = key.toString(),
+            creationCallback = { factory -> factory.create(key.courseId) }
+        )
+        val state = model.state.collectAsStateWithLifecycle().value
+        // Подключённая коробка ждёт человека в стеке: там он и решит, сколько из неё брать.
+        LaunchedEffect(state.isAttached) { if (state.isAttached) stacks.back() }
+        SourcePickingScreen(state = state, onAttach = model::attach, onBack = stacks::back)
+    }
     for (place in Place.entries - Place.MED_KITS - Place.PLAN) {
         entry(place.key) { NotReadyYet() }
     }
