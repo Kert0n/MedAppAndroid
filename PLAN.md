@@ -4757,7 +4757,7 @@ API», «`followBox`» — закрыто, «Отказ разобран», «С
 | 3 | `Строку очереди меняет одна дверь` | **сделан** — `SyncOperationDao.save`, шесть глаголов удалены; `QueueRoomStorage`, `SyncOperationRoomRepository`, `MedKitRoomRepository`, `QueueWorker`; тесты с сырыми глаголами — на фикстуру `update(entity)` или переходы. Красные: страж коммита 4 называет шесть `UPDATE`; `QueueRoomStorageTest.anUnreadableRowIsClosedLikeAReadableOne`; `TransactionBoundariesTest` — `answered`/`defer` в транзакции |
 | 4 | `Дверь одна, и это держит проверка` | **сделан** — `WriteContractTest`: `UPDATE sync_operations` в `app/src/main` — ровно `save` и `dismiss`; сравнение `SyncOperationStatus` с константой — только в `SyncOperationState`, `SyncOperationStatus.isClosed`, `StoredSyncOperation.needsDecision` |
 | 5 | `PLAN: итог B21` | **сделан** — I3, эталон J1, I2 |
-| 6 | `Строка, противоречащая себе, читается, а не роняет очередь` | **сделан** — чтение колонок терпимо (`toState` отбрасывает противоречащее статусу), строгость — у самой операции; `QueueRoomStorageTest.aRowThatContradictsItselfIsUnreadableAndStillClosable`, страж `QueueWriteDoorTest` |
+| 6 | `Строка, противоречащая себе, читается, а не роняет очередь` | **сделан** — чтение колонок терпимо: берётся бесспорное (статус, подтверждённый своей колонкой), лишнее отбрасывается, статус без своей колонки не берётся на веру (`ANSWERED` без ответа — ждущая, `REFUSED` без причины — утрата доступа); условие записи говорит о колонке, а не о прочитанном статусе; строгость — у самой операции. `QueueRoomStorageTest.aRowThatContradictsItselfIsUnreadableAndStillClosable`, `…aStatusWithoutItsColumnIsNotTakenOnTrust`, страж `QueueWriteDoorTest` |
 
 **Тесты.** Тесты до фиксов, красные прогоны — в описании #32: `QueueRoomStorageTest.anUnreadableRowIsClosedLikeAReadableOne` — «last_error expected null, but was:<учётка заменена>»; `QueueWriteDoorTest` — семь `UPDATE sync_operations`, три сравнения статуса мимо типа, `answered`/`defer` вне транзакции. *Домен (`test/`)*:
 `SyncOperationStateTest`. *Границы (`test/`)*: `WriteContractTest` — одна дверь. *База
@@ -5261,7 +5261,7 @@ ANDROID_SERIAL=emulator-5554 ./gradlew :app:connectedDebugAndroidTest -Pprobe
 и отдельными грепами их больше не смотрят.
 Эмулятор — уже запущенный `emulator-5554`, новых не поднимать. Итог инструментальных читать из
 `app/build/outputs/androidTest-results/connected/debug/TEST-*.xml`: `AssumptionViolatedException` у
-`RegistrationProbe` — пропуск, не провал. **Эталон после B21: 825 unit, 546
+`RegistrationProbe` — пропуск, не провал. **Эталон после B21: 825 unit, 547
 инструментальных, 2 пропуска (`RegistrationProbe`, `CrptProbe`), 0 провалов** (после B20 — 813 и 544; после B19 — 788 и 506; после B18 — 764 и 505; после B17 — 752 и 475; после третьей части B17 было 747 и 468; после первой части B17 было 738 и 452 — журнал показов
 ушёл вместе со своими проверками, а обязательства принесли свои; после B16 — 730 и 422) —
 каждый PR записывает свой. **Эталон времени после B20** (`HundredMedKitsTest`, `BigLatest`, 100 полок /

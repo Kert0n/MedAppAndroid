@@ -66,24 +66,37 @@ class SyncOperationStorageEntity(
  * Состояние отправки — из колонок, без словаря: его переходы применимы и к строке, которую нечем
  * прочитать (PLAN C1 «Переходы операции — у типа»).
  *
- * Колонки могут разойтись между собой — записанный ответ у ждущей, причина отказа у применённой:
- * такого состояния не бывает, и строгий тип его не выражает. Строка от этого не перестаёт
- * существовать: её надо показать человеку и дать закрыть, а одна порченая строка не должна
- * останавливать чтение очереди (PLAN F4). Поэтому здесь читается то, что в строке бесспорно, —
- * статус, попытки, сроки, есть ли запрос, — а противоречащее статусу отбрасывается. Собранная
- * операция строит своё состояние сама и строго: противоречие делает её нечитаемой, а не чинит её.
+ * Колонки могут разойтись между собой — и лишним, и недостающим: записанный ответ у ждущей,
+ * причина отказа у применённой, `ANSWERED` без ответа, `REFUSED` без причины. Такого состояния не
+ * бывает, и строгий тип его не выражает. Строка от этого не перестаёт существовать: её надо
+ * показать человеку и дать закрыть, а одна порченая строка не должна останавливать чтение очереди
+ * (PLAN F4). Поэтому здесь читается то, что в строке **бесспорно**: статус, подтверждённый своей
+ * колонкой, попытки, сроки, есть ли запрос; статус, которому его колонка противоречит, бесспорным
+ * не считается — не отвеченная на деле строка остаётся ждущей, а закрытая без вида отказа остаётся
+ * закрытой утратой доступа, — а лишнее отбрасывается. Собранная операция строит своё состояние
+ * сама и строго: противоречие делает её нечитаемой, а не чинит её.
  */
-fun SyncOperationStorageEntity.toState(): SyncOperationState = SyncOperationState(
-    status = status,
-    attempts = Attempts(attempts),
-    lastError = lastError,
-    lastTriedAt = lastTriedAt,
-    answer = answerStatus?.let { RawResponse(it, answerBody.orEmpty()) }.takeIf { status == SyncOperationStatus.ANSWERED },
-    notBefore = notBefore,
-    outcomeUnknown = outcomeUnknown && prepared != null,
-    refusalReason = refusalReason.takeIf { status == SyncOperationStatus.REFUSED },
-    hasRequest = prepared != null
-)
+fun SyncOperationStorageEntity.toState(): SyncOperationState {
+    val answer = answerStatus?.let { RawResponse(it, answerBody.orEmpty()) }
+    val undisputed = when {
+        // Ответа нет — значит, его и не получали: операция ждёт.
+        status == SyncOperationStatus.ANSWERED && answer == null -> SyncOperationStatus.PENDING
+        // Закрытость бесспорна, вид закрытия — нет: отказ без причины не выражается.
+        status == SyncOperationStatus.REFUSED && refusalReason == null -> SyncOperationStatus.ACCESS_LOST
+        else -> status
+    }
+    return SyncOperationState(
+        status = undisputed,
+        attempts = Attempts(attempts),
+        lastError = lastError,
+        lastTriedAt = lastTriedAt,
+        answer = answer.takeIf { undisputed == SyncOperationStatus.ANSWERED },
+        notBefore = notBefore,
+        outcomeUnknown = outcomeUnknown && prepared != null,
+        refusalReason = refusalReason.takeIf { undisputed == SyncOperationStatus.REFUSED },
+        hasRequest = prepared != null
+    )
+}
 
 /**
  * Номер в очереди выдаёт база, поэтому он приходит аргументом: команда его не знает и знать

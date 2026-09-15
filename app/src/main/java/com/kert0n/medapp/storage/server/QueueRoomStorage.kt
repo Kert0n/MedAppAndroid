@@ -174,7 +174,9 @@ class QueueRoomStorage @Inject constructor(
         } ?: return@withTransaction
         // Переподготовка сбрасывает запрос; остальные переходы его не трогают.
         val prepared = row.operation.prepared.takeIf { after.hasRequest }
-        (queue.save(id, after, prepared, was = stored.state.status) == 1).readThisTransaction("операция")
+        // Пишется та строка, которую прочитали, — её статус **как он лежит**: у порченой строки
+        // прочитанное состояние могло взять другой статус, а условие записи говорит о колонке.
+        (queue.save(id, after, prepared, was = row.operation.status) == 1).readThisTransaction("операция")
         for (effect in settlement.effects) apply(id, effect, at)
     }
 

@@ -652,6 +652,36 @@ class QueueRoomStorageTest {
         assertEquals(SyncOperationStatus.ACCESS_LOST, requireNotNull(database.syncOperations().find(broken)).operation.status)
     }
 
+    /**
+     * **Статус без своей колонки бесспорным не считается.** Противоречие бывает и нехваткой:
+     * `ANSWERED` без записанного ответа, `REFUSED` без причины. Такая строка тоже читается —
+     * нечитаемой, — и очередь читается целиком: не отвеченная на деле строка остаётся ждущей и
+     * закрывается, а закрытая без вида отказа остаётся закрытой.
+     */
+    @Test
+    fun aStatusWithoutItsColumnIsNotTakenOnTrust() = runTest {
+        val answeredWithoutAnswer = Uuid.parse("00000000-0000-4000-8000-000000000095")
+        val refusedWithoutReason = Uuid.parse("00000000-0000-4000-8000-000000000096")
+        for ((id, status) in listOf(answeredWithoutAnswer to SyncOperationStatus.ANSWERED, refusedWithoutReason to SyncOperationStatus.REFUSED)) {
+            val stored = database.syncOperations().enqueue(id, PackageSyncCommand.Consume(PACK, dose("1"), INTAKE), at, medKitId = HOME_KIT).toStorageEntity(HOME_KIT)
+            database.syncOperations().update(
+                SyncOperationStorageEntity(
+                    id = stored.id, kind = stored.kind, payload = stored.payload, payloadVersion = stored.payloadVersion,
+                    sequence = stored.sequence, status = status, attempts = stored.attempts,
+                    createdAt = stored.createdAt, packageId = stored.packageId, medKitId = stored.medKitId
+                )
+            )
+        }
+
+        val read = listOf(answeredWithoutAnswer, refusedWithoutReason).map { database.queueRepository().stored(it) }
+
+        assertTrue("строка со статусом без своей колонки не прочиталась: $read", read.all { it is StoredSyncOperation.Unreadable })
+        assertEquals("чтение очереди целиком спотыкается о порченую строку", 2, database.queueRepository().unreadable().size)
+        assertEquals(1, database.medKitRepository().abandonServer(at.plusSeconds(1)))
+        assertEquals(SyncOperationStatus.ACCESS_LOST, requireNotNull(database.syncOperations().find(answeredWithoutAnswer)).operation.status)
+        assertEquals("закрытая остаётся закрытой", SyncOperationStatus.REFUSED, requireNotNull(database.syncOperations().find(refusedWithoutReason)).operation.status)
+    }
+
     /** Закрытие одно: закрытую операцию второй исход не переписывает и следствий не оставляет. */
     @Test
     fun aClosedOperationIsNotClosedAgain() = runTest {
