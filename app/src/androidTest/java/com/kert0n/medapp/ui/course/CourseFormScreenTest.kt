@@ -66,7 +66,7 @@ class CourseFormScreenTest {
         show(editing(error = CourseFormError.Input.TITLE_EMPTY))
 
         compose.onNodeWithText("Название нужно: без него лечение не отличить от других.").assertIsDisplayed()
-        compose.onNodeWithText("Сохранить").performClick()
+        compose.onNodeWithText("Сохранить").performScrollTo().performClick()
 
         assertEquals(1, saved)
     }
