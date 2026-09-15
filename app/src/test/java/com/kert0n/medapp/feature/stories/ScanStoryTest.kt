@@ -36,8 +36,8 @@ import org.junit.Test
  */
 class ScanStoryTest {
 
-    private val coated = DosageForm(Uuid.parse("00000000-0000-4000-8000-000000000102"), "таблетки покрытые пленочной оболочкой")
-    private val words = Vocabulary(listOf(QuantityUnit(Uuid.parse("00000000-0000-4000-8000-000000000001"), "таблетка")), listOf(coated))
+    private val tablets = DosageForm(Uuid.parse("00000000-0000-4000-8000-000000000102"), "таблетки")
+    private val words = Vocabulary(listOf(QuantityUnit(Uuid.parse("00000000-0000-4000-8000-000000000001"), "таблетка")), listOf(tablets))
 
     private class Store(private val words: Vocabulary) : VocabularyStore {
         override suspend fun snapshot(): Vocabulary = words
@@ -63,7 +63,7 @@ class ScanStoryTest {
         val outcome = scanning { CrptFixtures.found to HttpStatusCode.OK }.lookup(dataMatrix()) as PackageScanning.Outcome.Suggested
 
         assertEquals("Цетрин", outcome.suggestion.name)
-        assertEquals(coated, outcome.suggestion.form)
+        assertEquals(tablets, outcome.suggestion.form)
         assertEquals("таблетки покрытые пленочной оболочкой", outcome.suggestion.formText)
         assertEquals(LocalDate.of(2028, 3, 31), outcome.suggestion.expiresOn?.lastDay)
         assertEquals("30 шт", outcome.suggestion.quantityText)

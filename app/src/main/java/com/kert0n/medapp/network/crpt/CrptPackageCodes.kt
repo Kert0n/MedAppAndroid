@@ -10,7 +10,7 @@ import javax.inject.Inject
 /**
  * «Честный знак» как исполнитель порта домена (PLAN H5, H1): ответ переводится в предложение
  * полей, коды и форма ответа за границу сети не уходят. Форма сопоставляется со словарём по
- * снимку: словарь только растёт, и дочитывать его ради подсказки незачем; текст формы из реестра
+ * снимку: дочитывать его ради подсказки незачем; текст формы из реестра
  * остаётся рядом — словари получены разными путями, и совпадение имён не обещано. Отсутствующее
  * не придумывается: чего в ответе нет, того нет и в предложении.
  */
@@ -39,7 +39,7 @@ internal fun CrptCheckNetworkDTO.toSuggestion(words: Vocabulary): PackageSuggest
     return PackageSuggestion(
         name = productName.orNullIfBlank() ?: pharmacy?.title.orNullIfBlank(),
         formText = formText,
-        form = formText?.let(words::formNamed),
+        form = formText?.let { CrptFormMapper.resolve(it, words) },
         manufacturer = attributes[MANUFACTURER_LABEL] ?: attributes.byLabel(MANUFACTURER_ROOTS),
         country = chip(COUNTRY_CHIP) ?: attributes.byLabel(COUNTRY_ROOTS),
         expiresOn = expiresOn(),

@@ -123,6 +123,20 @@ class ContractProbe {
         success(owner.createPackage(kit, packagePost(amount)))
 
     @Test
+    fun commonAndOtherServerFormsSurvivePackageRoundTrip() = runBlocking {
+        val forms = success(owner.formTypes())
+        assertEquals(18, forms.size)
+        val kit = newKit()
+        for (name in listOf("таблетки", "другие")) {
+            val serverForm = forms.single { it.name == name }
+            val post = packagePost().copy(formId = serverForm.id)
+            val created = success(owner.createPackage(kit, post))
+            assertEquals(serverForm.id, created.pack.formId)
+            assertEquals(serverForm.id, success(owner.packageSnapshot(post.id)).pack.formId)
+        }
+    }
+
+    @Test
     fun foreignRegistrationTokenIsRefusedWithoutAnAccount() = runBlocking {
         // Токен сборки проверяется первым: придуманные данные до учётки не доходят.
         val invented = AccountCredentials.random()

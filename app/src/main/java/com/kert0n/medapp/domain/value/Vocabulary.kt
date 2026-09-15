@@ -3,9 +3,10 @@ package com.kert0n.medapp.domain.value
 import kotlin.uuid.Uuid
 
 /**
- * Снимок общего словаря единиц и форм: по идентификатору — объект. Словарь принадлежит серверу и
- * только растёт, поэтому промах значит «снимок устарел», а не «такого нет»: кто держит снимок,
- * тот его и дочитывает, а домен получает уже объекты. Величина: два снимка с одним составом —
+ * Снимок общего словаря единиц и форм: по идентификатору — объект. Словарь принадлежит серверу,
+ * и промах значит либо «снимок устарел», либо «такой записи нет вовсе»: состав словаря сервер
+ * меняет сам (C1 «Формы — базовые виды»). Кто держит снимок, тот его и дочитывает, а домен
+ * получает уже объекты. Величина: два снимка с одним составом —
  * один и тот же словарь, а состав — множество записей по их тождеству, то есть по `id`:
  * переименование на сервере словарь не меняет, оно меняет сведения о той же записи.
  */
@@ -26,33 +27,17 @@ class Vocabulary(units: Collection<QuantityUnit>, forms: Collection<DosageForm>)
      */
     val knowsUnits: Boolean get() = units.isNotEmpty()
 
-    /** `null` — единицы в снимке нет: он старее, чем тот, кто её назвал. */
+    /** `null` — единицы в снимке нет. */
     fun unit(id: Uuid): QuantityUnit? = units[id]
 
     fun form(id: Uuid): DosageForm? = forms[id]
 
     /**
-     * Какую форму словаря называет текст [text] (PLAN H5) — **лучшая догадка**, одна: она сразу
-     * подставляется, а ошибётся — человек поправит сам (решение владельца 2026-09-14). Словарь и
-     * чужой текст получены разными путями, поэтому сравниваются основы слов ([DosageForm.stems]):
-     * совпали целиком — она; иначе самая длинная форма, с которой текст начинается («таблетки
-     * шипучие» → «таблетки»); иначе самая короткая форма, которая начинается с текста («капли» →
-     * «капли глазные»); иначе самая короткая с той же основой первого слова; ничего похожего —
-     * `null`. Косая черта между словами — альтернативы: догадка по первой, которая что-то дала.
+     * Форма по её точному имени. Нужна тем, кто узнал **название** вида из чужого текста и
+     * должен взять объект у сервера, а не завести свой: тождество формы — серверный `id`, и
+     * придумать его клиенту нечем (PLAN D1, H5).
      */
-    fun formNamed(text: String): DosageForm? =
-        DosageForm.alternatives(text).firstNotNullOfOrNull { wanted -> guess(wanted) }
-
-    private fun guess(wanted: List<String>): DosageForm? {
-        val known = forms.values
-        known.firstOrNull { it.stems == wanted }?.let { return it }
-        known.filter { wanted.startsWith(it.stems) }.maxByOrNull { it.stems.size }?.let { return it }
-        known.filter { it.stems.startsWith(wanted) }.minByOrNull { it.stems.size }?.let { return it }
-        return known.filter { it.stems.first() == wanted.first() }.minByOrNull { it.stems.size }
-    }
-
-    private fun List<String>.startsWith(prefix: List<String>): Boolean =
-        prefix.size <= size && subList(0, prefix.size) == prefix
+    fun formWithName(name: String): DosageForm? = forms.values.firstOrNull { it.name == name }
 
     override fun equals(other: Any?): Boolean =
         this === other || (other is Vocabulary && units == other.units && forms == other.forms)

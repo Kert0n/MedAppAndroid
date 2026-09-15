@@ -4,6 +4,7 @@ import android.util.Base64
 import androidx.test.platform.app.InstrumentationRegistry
 import com.kert0n.medapp.BuildConfig
 import com.kert0n.medapp.domain.scan.DataMatrixCode
+import com.kert0n.medapp.domain.value.DosageForm
 import com.kert0n.medapp.domain.value.Vocabulary
 import com.kert0n.medapp.network.server.crptHttpClient
 import com.kert0n.medapp.network.server.crptJson
@@ -18,6 +19,10 @@ import kotlinx.coroutines.runBlocking
 import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonElement
 import kotlinx.serialization.json.JsonObject
+import kotlinx.serialization.json.jsonArray
+import kotlinx.serialization.json.jsonObject
+import kotlinx.serialization.json.jsonPrimitive
+import kotlin.uuid.Uuid
 import org.junit.Assert.assertTrue
 import org.junit.Assume.assumeTrue
 import org.junit.Test
@@ -39,6 +44,14 @@ class CrptProbe {
         val codes = String(Base64.decode(encoded, Base64.DEFAULT), Charsets.UTF_8).split(';').filter { it.isNotBlank() }.map(::DataMatrixCode)
         assumeTrue("список кодов пуст", codes.isNotEmpty())
 
+        val asset = InstrumentationRegistry.getInstrumentation().targetContext.assets
+            .open("vocabulary.json").bufferedReader().use { it.readText() }
+        val forms = crptJson.parseToJsonElement(asset).jsonObject.getValue("formTypes").jsonArray.map { entry ->
+            val item = entry.jsonObject
+            DosageForm(Uuid.parse(item.getValue("id").jsonPrimitive.content), item.getValue("name").jsonPrimitive.content)
+        }
+        val vocabulary = Vocabulary(emptyList(), forms)
+
         val client = crptHttpClient(OkHttp.create(), BuildConfig.CRPT_BASE_URL)
         for ((index, code) in codes.withIndex()) {
             val response = client.post(CrptApi.CHECK) {
@@ -59,7 +72,7 @@ class CrptProbe {
                 val dto = crptJson.decodeFromString(CrptCheckNetworkDTO.serializer(), raw)
                 println("CRPT_PROBE[$index] codeFounded=${dto.codeFounded} category=${dto.category} name=${dto.productName} expireDate=${dto.expireDate}")
                 println("CRPT_PROBE[$index] pharmacy=${dto.pharmacy} labels=${dto.attributes.keys} country=${dto.chip("country")}")
-                println("CRPT_PROBE[$index] suggestion=${dto.toSuggestion(Vocabulary.empty)}")
+                println("CRPT_PROBE[$index] suggestion=${dto.toSuggestion(vocabulary)}")
             }
         }
     }
