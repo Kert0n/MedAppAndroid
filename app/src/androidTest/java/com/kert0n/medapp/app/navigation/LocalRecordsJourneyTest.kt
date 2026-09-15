@@ -97,6 +97,22 @@ class LocalRecordsJourneyTest {
         compose.onNodeWithText("Сколько есть").assertIsDisplayed()
     }
 
+    /** Ноль в пересчёте не принимается: коробка на месте, отказ ведёт к «выбросить» на карточке. */
+    @Test
+    fun recountingToZeroIsRefusedAndTheBoxStays() {
+        aShelfWithABox()
+
+        compose.onNodeWithText("Пересчитать").performClick()
+        compose.waitUntil { compose.onAllNodesWithText("Сейчас записано: 20 таблетка").fetchSemanticsNodes().isNotEmpty() }
+        compose.onNodeWithText("Пересчитал и увидел").performTextInput("0")
+        compose.onNodeWithText("Записать").performClick()
+
+        compose.waitUntil { compose.onAllNodesWithText("Ноль — это выбросить упаковку: сделайте это с её карточки.").fetchSemanticsNodes().isNotEmpty() }
+        compose.onNodeWithText("Коробки больше не будет?").assertDoesNotExist()
+        back()
+        compose.waitUntil { compose.onAllNodesWithText("20 таблетка").fetchSemanticsNodes().isNotEmpty() }
+    }
+
     /**
      * До каждого экрана набора можно дойти руками и вернуться: правка, пересчёт, перенос — с
      * карточки, и назад к ней; с карточки — на полку, с полки — к списку.

@@ -193,9 +193,7 @@
     <string name="recount_seen">Пересчитал и увидел</string>
     <string name="recount_explained">Назовите то, что видите целиком — вычитание сделает учёт.</string>
     <string name="recount_record">Записать</string>
-    <string name="recount_zero_title">Коробки больше не будет?</string>
-    <string name="recount_zero_explained">В ней не останется ничего, и она исчезнет. Приёмы из неё останутся в истории.</string>
-    <string name="recount_zero_confirm">Да, коробка кончилась</string>
+    <string name="recount_zero">Ноль — это выбросить упаковку: сделайте это с её карточки.</string>
     <string name="recount_busy">Упаковка ждёт ответа сервера на другое решение — пересчёт пока не записать.</string>
 
     <!-- Перенос упаковки -->

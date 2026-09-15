@@ -32,7 +32,6 @@ class PackageRecountScreenTest {
     val compose = createComposeRule()
 
     private var submitted = 0
-    private var confirmed = 0
     private var edited: PackageRecountPresentationDTO? = null
 
     private fun show(state: PackageRecountUiState) {
@@ -42,23 +41,16 @@ class PackageRecountScreenTest {
                     state = state,
                     onEdit = { edited = it },
                     onSubmit = { submitted++ },
-                    onCancel = {},
-                    onConfirmEmptying = { confirmed++ },
-                    onDismissEmptying = {}
+                    onCancel = {}
                 )
             }
         }
     }
 
-    private fun recount(
-        amount: String = "",
-        error: PackageRecountError? = null,
-        asksToEmpty: Boolean = false
-    ) = PackageRecountUiState(
+    private fun recount(amount: String = "", error: PackageRecountError? = null) = PackageRecountUiState(
         pack = pack(id = PACK, name = "Нурофен").projected().toPresentationDTO(),
         form = PackageRecountPresentationDTO(amount),
-        error = error,
-        asksToEmpty = asksToEmpty
+        error = error
     )
 
     /** Пока коробка не прочитана — загрузка; нет её — сказано. */
@@ -105,20 +97,12 @@ class PackageRecountScreenTest {
         compose.onNodeWithText("Количество — это число: «20» или «0.5».").assertIsDisplayed()
     }
 
-    /**
-     * Ноль спрашивается словами, и согласие — отдельное нажатие.
-     *
-     * Красная проверка: писать сразу — вопроса нет, и коробка исчезает без спроса.
-     */
+    /** Ноль — это «выбросить», и отказ отправляет на карточку, где это делается. */
     @Test
-    fun goingToZeroIsAskedInWords() {
-        show(recount(amount = "0", asksToEmpty = true))
+    fun zeroIsRefusedInWords() {
+        show(recount(amount = "0", error = PackageRecountError.Zero))
 
-        compose.onNodeWithText("Коробки больше не будет?").assertIsDisplayed()
-        compose.onNodeWithText("В ней не останется ничего, и она исчезнет. Приёмы из неё останутся в истории.").assertIsDisplayed()
-        assertEquals(0, confirmed)
-        compose.onNodeWithText("Да, коробка кончилась").performClick()
-
-        assertEquals(1, confirmed)
+        compose.onNodeWithText("Ноль — это выбросить упаковку: сделайте это с её карточки.").assertIsDisplayed()
+        compose.onNodeWithText("Коробки больше не будет?").assertDoesNotExist()
     }
 }

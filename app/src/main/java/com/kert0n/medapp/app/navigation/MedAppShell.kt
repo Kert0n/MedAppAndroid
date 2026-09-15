@@ -189,9 +189,7 @@ private fun screens(stacks: TabStacks) = entryProvider<NavKey> {
             state = state,
             onEdit = model::edit,
             onSubmit = model::submit,
-            onCancel = stacks::back,
-            onConfirmEmptying = model::confirmEmptying,
-            onDismissEmptying = model::dismissEmptying
+            onCancel = stacks::back
         )
     }
     entry<Screen.PackageTransfer> { key ->

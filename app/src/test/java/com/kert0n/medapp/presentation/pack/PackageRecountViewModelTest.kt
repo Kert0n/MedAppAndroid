@@ -30,7 +30,7 @@ import org.junit.Rule
 import org.junit.Test
 
 /**
- * Пересчёт (PLAN H3 №9): одно число, ноль спрашивается, второе нажатие ничего не начинает. Как
+ * Пересчёт (PLAN H3 №9): одно число, ноль не принимается, второе нажатие ничего не начинает. Как
  * это нарисовано — `PackageRecountScreenTest`; что делает переход на коробке — её проверки.
  */
 class PackageRecountViewModelTest {
@@ -71,13 +71,14 @@ class PackageRecountViewModelTest {
     }
 
     /**
-     * Ноль спрашивается отдельно, и до ответа не записано ничего: коробки после него не будет,
-     * и это решение человека, а не итог арифметики.
+     * Ноль не принимается: ноль — это «выбросить», и делается это с карточки (решение владельца).
+     * Отказ так и говорит, и ничего не записано.
      *
-     * Красная проверка: писать ноль сразу — вопрос не появится, коробка исчезнет без спроса.
+     * Красная проверка: пропустить ноль к сценарию — коробка кончается пересчётом, мимо
+     * подтверждения на карточке.
      */
     @Test
-    fun goingToZeroIsAskedFirstAndNothingIsWrittenUntilAnswered() {
+    fun zeroIsRefusedAndNothingIsWritten() {
         stored.lying(pack(id = PACK, quantity = tablets("20")))
         val model = viewModel()
 
@@ -85,47 +86,10 @@ class PackageRecountViewModelTest {
             state.awaiting { it.pack != null }
             type(model, "0")
             model.submit()
-            state.awaiting { it.asksToEmpty }
+            state.awaiting { it.error != null }
         }
 
-        assertTrue(state.asksToEmpty)
-        assertFalse(state.isDone)
-        assertEquals(tablets("20"), stored.packages.single().quantity)
-    }
-
-    @Test
-    fun aConfirmedZeroEndsTheBox() {
-        stored.lying(pack(id = PACK, quantity = tablets("20")))
-        val model = viewModel()
-
-        val state = watching(model.state) { state ->
-            state.awaiting { it.pack != null }
-            type(model, "0")
-            model.submit()
-            state.awaiting { it.asksToEmpty }
-            model.confirmEmptying()
-            state.awaiting { it.isDone }
-        }
-
-        assertTrue(state.isDone)
-        assertEquals(emptyList<Any>(), stored.packages)
-    }
-
-    /** Передумал — значит не записано: молчание подтверждением не считается. */
-    @Test
-    fun dismissingTheQuestionWritesNothing() {
-        stored.lying(pack(id = PACK, quantity = tablets("20")))
-        val model = viewModel()
-
-        val state = watching(model.state) { state ->
-            state.awaiting { it.pack != null }
-            type(model, "0")
-            model.submit()
-            state.awaiting { it.asksToEmpty }
-            model.dismissEmptying()
-            state.awaiting { !it.asksToEmpty }
-        }
-
+        assertEquals(PackageRecountError.Zero, state.error)
         assertFalse(state.isDone)
         assertEquals(tablets("20"), stored.packages.single().quantity)
     }

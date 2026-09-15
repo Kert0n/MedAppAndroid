@@ -18,6 +18,9 @@ sealed interface PackageRecountError {
     /** Разбор не дал числа: пусто, не число, слишком длинное. */
     data class Amount(val reason: QuantityPresentationError) : PackageRecountError
 
+    /** Ноль — это «выбросить», и делается это с карточки: пересчётом коробку не кончают. */
+    data object Zero : PackageRecountError
+
     /** Коробки больше нет. */
     data object Gone : PackageRecountError
 

@@ -9,7 +9,6 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
-import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
@@ -37,7 +36,7 @@ import com.kert0n.medapp.ui.text
 /**
  * Пересчёт (PLAN H3 №9): одно число и один вопрос. Человек называет то, что видит **целиком**, а
  * вычитание делает учёт — так и написано под полем, а не подразумевается. Причины и заметки
- * здесь нет: истории у коробки нет (D7). Ноль спрашивается словами, а не случается сам.
+ * здесь нет: истории у коробки нет (D7). Ноль не принимается — для него есть «выбросить».
  */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -46,8 +45,6 @@ fun PackageRecountScreen(
     onEdit: (PackageRecountPresentationDTO) -> Unit,
     onSubmit: () -> Unit,
     onCancel: () -> Unit,
-    onConfirmEmptying: () -> Unit,
-    onDismissEmptying: () -> Unit,
     modifier: Modifier = Modifier
 ) {
     Scaffold(
@@ -107,25 +104,13 @@ fun PackageRecountScreen(
             }
         }
     }
-    if (state.asksToEmpty) {
-        AlertDialog(
-            onDismissRequest = onDismissEmptying,
-            title = { Text(stringResource(R.string.recount_zero_title)) },
-            text = { Text(stringResource(R.string.recount_zero_explained)) },
-            confirmButton = {
-                TextButton(onClick = onConfirmEmptying) { Text(stringResource(R.string.recount_zero_confirm)) }
-            },
-            dismissButton = {
-                TextButton(onClick = onDismissEmptying) { Text(stringResource(R.string.action_cancel)) }
-            }
-        )
-    }
 }
 
 /** Текст причины — её свойство: экран не подбирает слова сам. */
 @Composable
 private fun PackageRecountError.message(): String = when (this) {
     is PackageRecountError.Amount -> stringResource(reason.text)
+    PackageRecountError.Zero -> stringResource(R.string.recount_zero)
     PackageRecountError.Gone -> stringResource(R.string.pack_gone)
     PackageRecountError.Busy -> stringResource(R.string.recount_busy)
 }

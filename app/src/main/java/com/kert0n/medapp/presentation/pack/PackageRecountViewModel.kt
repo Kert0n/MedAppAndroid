@@ -28,8 +28,8 @@ import kotlinx.coroutines.launch
  * видел на экране (C1), поэтому `seen` берётся из той же оценки, что показана, а не дочитывается
  * заново в момент нажатия.
  *
- * «Выбросить» сюда не приходит: выбрасывают пачку с карточки, а не таблетки из учёта. Ноль —
- * «коробки больше не будет» — спрашивается отдельно: это решение человека, а не итог арифметики.
+ * «Выбросить» сюда не приходит: выбрасывают пачку с карточки, а не таблетки из учёта. Поэтому и
+ * ноль не принимается: ноль — это «выбросить», и пересчётом коробку не кончают.
  */
 @HiltViewModel(assistedFactory = PackageRecountViewModel.Factory::class)
 class PackageRecountViewModel @AssistedInject constructor(
@@ -67,7 +67,6 @@ class PackageRecountViewModel @AssistedInject constructor(
             form = form,
             isGone = reading is Reading.Read && pack == null,
             error = progress.error,
-            asksToEmpty = progress.asksToEmpty,
             isDone = progress.done
         )
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), PackageRecountUiState())
@@ -79,48 +78,25 @@ class PackageRecountViewModel @AssistedInject constructor(
     }
 
     /**
-     * Записать. Ноль сначала спрашивается. Второе нажатие, пока идёт первое, ничего не начинает:
-     * замок ставится **до** `launch`, потому что между нажатием и записью стоит чтение словаря,
-     * и второе нажатие проходит именно в это окно.
+     * Записать. Второе нажатие, пока идёт первое, ничего не начинает: замок ставится **до**
+     * `launch`, потому что между нажатием и записью стоит чтение словаря, и второе нажатие
+     * проходит именно в это окно.
      */
     fun submit() {
         val now = progress.value
         if (now.working || now.done) return
         progress.value = Progress(working = true)
         viewModelScope.launch {
-            when (val parsed = parse()) {
-                is ParsedInput.Rejected -> progress.value = Progress(error = parsed.error)
-                is ParsedInput.Parsed ->
-                    if (parsed.value.actual.isZero) progress.value = Progress(asksToEmpty = true)
-                    else apply(parsed.value)
+            progress.value = when (val parsed = parse()) {
+                is ParsedInput.Rejected -> Progress(error = parsed.error)
+                is ParsedInput.Parsed -> when (adjusting.adjust(packageId, parsed.value)) {
+                    // Кончиться коробка здесь не может — ноль отвергнут разбором; исход назван
+                    // ради полноты, и ведёт он туда же: записано.
+                    PackageAdjusting.Outcome.ADJUSTED, PackageAdjusting.Outcome.ENDED -> Progress(done = true)
+                    PackageAdjusting.Outcome.GONE -> Progress(error = PackageRecountError.Gone)
+                    PackageAdjusting.Outcome.UNUSABLE -> Progress(error = PackageRecountError.Busy)
+                }
             }
-        }
-    }
-
-    /** Человек согласился, что коробки не станет. Второе согласие — то же самое согласие. */
-    fun confirmEmptying() {
-        val now = progress.value
-        if (!now.asksToEmpty || now.working) return
-        progress.value = Progress(asksToEmpty = true, working = true)
-        viewModelScope.launch {
-            when (val parsed = parse()) {
-                is ParsedInput.Rejected -> progress.value = Progress(error = parsed.error)
-                is ParsedInput.Parsed -> apply(parsed.value)
-            }
-        }
-    }
-
-    /** Передумал — значит не записано. Пока согласие исполняется, отказываться уже не от чего. */
-    fun dismissEmptying() {
-        if (progress.value.working) return
-        progress.value = Progress()
-    }
-
-    private suspend fun apply(recount: PackageAdjusting.Action.Recount) {
-        progress.value = when (adjusting.adjust(packageId, recount)) {
-            PackageAdjusting.Outcome.ADJUSTED, PackageAdjusting.Outcome.ENDED -> Progress(done = true)
-            PackageAdjusting.Outcome.GONE -> Progress(error = PackageRecountError.Gone)
-            PackageAdjusting.Outcome.UNUSABLE -> Progress(error = PackageRecountError.Busy)
         }
     }
 
@@ -131,7 +107,9 @@ class PackageRecountViewModel @AssistedInject constructor(
         val typed = QuantityPresentationDTO(form.value.amount, shown.unit.toPresentationDTO())
         return when (val parsed = typed.toDomain(vocabulary.snapshot())) {
             is ParsedInput.Rejected -> ParsedInput.Rejected(PackageRecountError.Amount(parsed.error))
-            is ParsedInput.Parsed -> ParsedInput.Parsed(PackageAdjusting.Action.Recount(seen = shown, actual = parsed.value))
+            is ParsedInput.Parsed ->
+                if (parsed.value.isZero) ParsedInput.Rejected(PackageRecountError.Zero)
+                else ParsedInput.Parsed(PackageAdjusting.Action.Recount(seen = shown, actual = parsed.value))
         }
     }
 
@@ -142,7 +120,6 @@ class PackageRecountViewModel @AssistedInject constructor(
 
     private data class Progress(
         val working: Boolean = false,
-        val asksToEmpty: Boolean = false,
         val error: PackageRecountError? = null,
         val done: Boolean = false
     )
@@ -154,8 +131,6 @@ data class PackageRecountUiState(
     val form: PackageRecountPresentationDTO = PackageRecountPresentationDTO(),
     val isGone: Boolean = false,
     val error: PackageRecountError? = null,
-    /** Названное число опустошает коробку, и человека об этом спрашивают. */
-    val asksToEmpty: Boolean = false,
     /** Записано: экран уходит. */
     val isDone: Boolean = false
 ) {
