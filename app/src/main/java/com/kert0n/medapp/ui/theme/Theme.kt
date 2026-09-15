@@ -3,6 +3,7 @@ package com.kert0n.medapp.ui.theme
 import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.CompositionLocalProvider
 
 /**
  * Тема приложения: своя зелёная палитра при любом свете и на любом Android.
@@ -13,14 +14,19 @@ import androidx.compose.runtime.Composable
  *
  * [darkTheme] по умолчанию спрашивает систему; аргументом он остаётся ради снимков и проверок,
  * где обе схемы нужно показать рядом.
+ *
+ * Рядом со схемой Material едут [MedAppAccents] — цвета продукта, которым роли в Material нет.
+ * Выбирает между светлым и тёмным янтарём тема, а не каждый экран по-своему.
  */
 @Composable
 fun MedAppTheme(
     darkTheme: Boolean = isSystemInDarkTheme(),
     content: @Composable () -> Unit
 ) {
-    MaterialTheme(
-        colorScheme = if (darkTheme) DarkColors else LightColors,
-        content = content
-    )
+    CompositionLocalProvider(LocalMedAppAccents provides if (darkTheme) DarkAccents else LightAccents) {
+        MaterialTheme(
+            colorScheme = if (darkTheme) DarkColors else LightColors,
+            content = content
+        )
+    }
 }

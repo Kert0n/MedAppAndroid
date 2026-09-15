@@ -26,6 +26,13 @@
 
     <!-- Экраны, которых ещё нет -->
     <string name="screen_not_ready">Этот экран ещё не готов.</string>
+
+    <!-- Общие действия форм: строка приходит вместе с экраном, которому нужна (AGENTS) -->
+    <string name="action_cancel">Отмена</string>
+    <string name="action_choose">Выбрать</string>
+    <string name="action_pick_date">Выбрать дату</string>
+    <string name="action_clear_date">Убрать дату</string>
+
     <!-- Уведомления: каналы -->
     <string name="channel_intakes">Приёмы</string>
     <string name="channel_expiry">Сроки годности</string>
