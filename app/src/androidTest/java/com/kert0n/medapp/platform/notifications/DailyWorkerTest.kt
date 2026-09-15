@@ -16,6 +16,7 @@ import com.kert0n.medapp.domain.intake.IntakeStatus
 import com.kert0n.medapp.domain.value.Doses
 import com.kert0n.medapp.feature.course.CourseDrafting
 import com.kert0n.medapp.fixture.PACK
+import com.kert0n.medapp.fixture.FakeSettingsStore
 import com.kert0n.medapp.fixture.Scenarios
 import com.kert0n.medapp.fixture.TABLET_FORM
 import com.kert0n.medapp.fixture.dose
@@ -30,6 +31,7 @@ import java.time.Clock
 import java.time.Instant
 import java.time.LocalDate
 import java.time.LocalTime
+import java.time.ZoneId
 import java.time.ZoneOffset
 import kotlinx.coroutines.runBlocking
 import org.junit.After
@@ -63,7 +65,7 @@ class DailyWorkerTest {
         TestListenableWorkerBuilder<DailyWorker>(context)
             .setWorkerFactory(object : WorkerFactory() {
                 override fun createWorker(appContext: Context, workerClassName: String, workerParameters: WorkerParameters): ListenableWorker =
-                    DailyWorker(appContext, workerParameters, scenarios.dailyRound)
+                    DailyWorker(appContext, workerParameters, scenarios.dailyRound, WorkManagerDailySchedule({ work }, clock), FakeSettingsStore())
             })
             .build()
 
@@ -129,7 +131,42 @@ class DailyWorkerTest {
 
         val daily = work.getWorkInfosForUniqueWork(WorkManagerDailySchedule.DAILY).get().filter { !it.state.isFinished }
         assertEquals(1, daily.size)
-        assertTrue("задача не помечена новым временем", daily.single().tags.any { it.endsWith("18:00") })
-        assertTrue("задача всё ещё помечена прежним временем", daily.single().tags.none { it.endsWith("09:00") })
+        assertTrue("задача не помечена новым временем", daily.single().tags.any { "18:00@" in it })
+        assertTrue("задача всё ещё помечена прежним временем", daily.single().tags.none { "09:00@" in it })
+    }
+
+    /** Часы, у которых зону можно сменить на ходу, — как у устройства после переезда. */
+    private class MovingClock(private val at: Instant, var current: ZoneId) : Clock() {
+        override fun instant(): Instant = at
+        override fun getZone(): ZoneId = current
+        override fun withZone(zone: ZoneId): Clock = MovingClock(at, zone)
+    }
+
+    /**
+     * **Ежедневная задача стоит на времени в зоне** (C1 «Часы устройства — в его нынешней зоне»).
+     * Сменилась зона — «09:00» уже другой момент, и стоящая задача — не та же: проход дня после
+     * себя переставляет её. Пока метка задачи несла только время, задача считалась той же и
+     * стояла на московские девять во Владивостоке.
+     */
+    @Test
+    fun aZoneChangeReschedulesTheDay() = runBlocking {
+        val moving = MovingClock(now, ZoneId.of("Europe/Moscow"))
+        val schedule = WorkManagerDailySchedule({ work }, moving)
+        schedule.keepDaily(LocalTime.of(9, 0))
+        val moscow = work.getWorkInfosForUniqueWork(WorkManagerDailySchedule.DAILY).get().single()
+
+        moving.current = ZoneId.of("Asia/Vladivostok")
+        val settings = FakeSettingsStore()
+        val worker = TestListenableWorkerBuilder<DailyWorker>(context)
+            .setWorkerFactory(object : WorkerFactory() {
+                override fun createWorker(appContext: Context, workerClassName: String, workerParameters: WorkerParameters): ListenableWorker =
+                    DailyWorker(appContext, workerParameters, Scenarios(database, now).dailyRound, schedule, settings)
+            })
+            .build()
+        assertEquals(ListenableWorker.Result.success(), worker.doWork())
+
+        val vladivostok = work.getWorkInfosForUniqueWork(WorkManagerDailySchedule.DAILY).get().single { !it.state.isFinished }
+        assertTrue("задача не переставлена после смены зоны", vladivostok.id != moscow.id)
+        assertTrue("метка задачи без зоны: ${vladivostok.tags}", vladivostok.tags.any { "Asia/Vladivostok" in it })
     }
 }

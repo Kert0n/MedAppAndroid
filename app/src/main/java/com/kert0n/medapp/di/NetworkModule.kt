@@ -19,6 +19,7 @@ import com.kert0n.medapp.queue.QueueHttpTransport
 import com.kert0n.medapp.network.server.crptHttpClient
 import com.kert0n.medapp.network.server.medAppHttpClient
 import com.kert0n.medapp.queue.QueueTransport
+import com.kert0n.medapp.platform.time.DeviceClock
 import java.time.Clock
 import dagger.Module
 import dagger.Provides
@@ -97,12 +98,13 @@ object NetworkModule {
         QueueHttpTransport(api)
 
     /**
-     * Часы системные, в зоне устройства: по ней сценарии узнают день момента, названного
-     * человеком, — например, просрочена ли коробка на день приёма (PLAN C1). Тесты подставляют свои.
+     * Часы системные, в **нынешней** зоне устройства: по ней сценарии узнают день момента,
+     * названного человеком, — например, просрочена ли коробка на день приёма (PLAN C1). Зона
+     * спрашивается при каждом обращении — переезд её меняет, а процесс живёт. Тесты подставляют свои.
      */
     @Provides
     @Singleton
-    fun clock(): Clock = Clock.systemDefaultZone()
+    fun clock(): Clock = DeviceClock
 
     /**
      * Доменные порты, которые выполняет сеть: знакомство устройства с сервером и пополнение
