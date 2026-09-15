@@ -51,3 +51,12 @@ fun PackageProjection.toAttachmentPresentationDTO(medKitName: String?): PackageA
         medKitName = medKitName,
         availableToMe = availability.availableToMe.toPresentationDTO()
     )
+
+/** Обеспечение словами экрана: числа приёмов и дни в зоне курса (PLAN D5). */
+fun CourseCoverage.toPresentationDTO(): CourseCoveragePresentationDTO = CourseCoveragePresentationDTO(
+    requiredDoses = requiredDoses.count,
+    coveredDoses = coveredDoses.count,
+    missingDoses = missingDoses.count,
+    coveredUntilOn = coveredUntil?.atZone(zone)?.toLocalDate(),
+    firstUncoveredOn = firstUncoveredAt?.atZone(zone)?.toLocalDate()
+)

@@ -365,6 +365,28 @@
         <item quantity="many">Из этой пачки выйдет только %d приёмов.</item>
         <item quantity="other">Из этой пачки выйдет только %d приёма.</item>
     </plurals>
+    <string name="course_card">Лечение</string>
+    <string name="course_edit_action">Изменить</string>
+    <string name="course_cancel_action">Отменить лечение</string>
+    <string name="course_cancel_title">Отменить лечение?</string>
+    <string name="course_cancel_explained">Будущие приёмы уйдут, пачки освободятся. Принятое и пропущенное останется в истории.</string>
+    <string name="course_reductions">Обеспечение сокращалось</string>
+    <string name="course_reduction">Было %1$d приёмов, стало %2$d</string>
+    <string name="course_items">Приёмы</string>
+    <string name="course_item_planned">запланирован</string>
+    <string name="course_item_taken">принят</string>
+    <string name="course_item_taken_at">принят в %1$s</string>
+    <string name="course_item_missed">пропущен</string>
+    <string name="course_item_cancelled">отменён</string>
+    <string name="course_coverage_after_start">Обеспечение считается после начала лечения.</string>
+    <string name="course_coverage_covered">%1$s · обеспечено %2$d</string>
+    <string name="course_coverage_until">%1$s · обеспечен до %2$s</string>
+    <plurals name="course_coverage_required">
+        <item quantity="one">нужен %d приём</item>
+        <item quantity="few">нужно %d приёма</item>
+        <item quantity="many">нужно %d приёмов</item>
+        <item quantity="other">нужно %d приёма</item>
+    </plurals>
     <string name="course_source_doses">Приёмов из %1$d</string>
     <string name="course_source_no_limit">Укажите дозу и число приёмов — тогда будет что выделять.</string>
     <string name="course_source_gives_nothing">Целой дозы здесь уже не наберётся.</string>

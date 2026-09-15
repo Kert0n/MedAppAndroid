@@ -43,6 +43,7 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import com.kert0n.medapp.R
+import com.kert0n.medapp.ui.DAY
 import com.kert0n.medapp.domain.course.CourseRecord
 import com.kert0n.medapp.domain.course.CourseRejected
 import com.kert0n.medapp.presentation.course.CourseFormError
@@ -55,9 +56,6 @@ import com.kert0n.medapp.ui.PickerField
 import com.kert0n.medapp.ui.text
 import java.time.DayOfWeek
 import java.time.LocalTime
-import java.time.format.DateTimeFormatter
-
-private val DAY: DateTimeFormatter = DateTimeFormatter.ofPattern("dd.MM.uuuu")
 
 /**
  * Редактор лечения (PLAN H3 №15). Обязательно одно — название: черновик с одной заметкой —

@@ -124,6 +124,7 @@ class CourseSourcesViewModel @AssistedInject constructor(
                     covered = stored.coverage?.perSource?.firstOrNull { it.pkg == source.pkg }
                 )
             },
+            coverage = stored.coverage?.toPresentationDTO(),
             isWriting = writing.busy,
             asksToDetach = writing.asksToDetach,
             message = writing.message
@@ -296,6 +297,8 @@ class CourseSourcesViewModel @AssistedInject constructor(
 data class CourseSourcesUiState(
     val title: String? = null,
     val sources: List<CourseSourcePresentationDTO> = emptyList(),
+    /** Чем лечение обеспечено; `null` — у черновика: считать обеспечение ему не по чему (B15). */
+    val coverage: CourseCoveragePresentationDTO? = null,
     val isDraft: Boolean = false,
     val isLoading: Boolean = false,
     val isGone: Boolean = false,

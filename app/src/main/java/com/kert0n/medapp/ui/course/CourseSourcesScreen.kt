@@ -54,10 +54,13 @@ import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.zIndex
 import com.kert0n.medapp.R
+import com.kert0n.medapp.ui.DAY
 import com.kert0n.medapp.domain.course.CourseSource
+import com.kert0n.medapp.presentation.course.CourseCoveragePresentationDTO
 import com.kert0n.medapp.presentation.course.CourseSourcePresentationDTO
 import com.kert0n.medapp.presentation.course.CourseSourcesMessage
 import com.kert0n.medapp.presentation.course.CourseSourcesUiState
+import com.kert0n.medapp.presentation.course.ShortagePresentationDTO
 import com.kert0n.medapp.ui.EmptyState
 import com.kert0n.medapp.ui.ErrorMessage
 import com.kert0n.medapp.ui.LoadingState
@@ -183,6 +186,7 @@ private fun Sources(
                 )
             }
         }
+        Coverage(state.coverage, isDraft = state.isDraft, modifier = Modifier.padding(horizontal = 16.dp))
         if (!state.isFinished) {
             Button(
                 onClick = onAdd,
@@ -244,6 +248,53 @@ private fun SourceRow(
                 )
             }
     )
+}
+
+/**
+ * Чем лечение обеспечено: «нужно 28 приёмов · обеспечено 9 · не хватает 19, с 11.09.2026». У
+ * черновика обеспечения нет — оно появится, когда лечение начнётся (PLAN H3 №16, B15). Нехватку
+ * несут слова и значок, а не один цвет.
+ */
+@Composable
+internal fun Coverage(
+    coverage: CourseCoveragePresentationDTO?,
+    isDraft: Boolean,
+    modifier: Modifier = Modifier
+) {
+    if (coverage == null) {
+        if (isDraft) {
+            Text(
+                stringResource(R.string.course_coverage_after_start),
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                modifier = modifier
+            )
+        }
+        return
+    }
+    val required = pluralStringResource(
+        R.plurals.course_coverage_required,
+        coverage.requiredDoses,
+        coverage.requiredDoses
+    )
+    if (coverage.isFullyCovered) {
+        val until = coverage.coveredUntilOn?.format(DAY)
+        Text(
+            if (until == null) required else stringResource(R.string.course_coverage_until, required, until),
+            style = MaterialTheme.typography.bodyMedium,
+            modifier = modifier
+        )
+        return
+    }
+    Column(modifier) {
+        Text(
+            stringResource(R.string.course_coverage_covered, required, coverage.coveredDoses),
+            style = MaterialTheme.typography.bodyMedium
+        )
+        Shortage(
+            ShortagePresentationDTO(coverage.missingDoses, coverage.firstUncoveredOn)
+        )
+    }
 }
 
 /**

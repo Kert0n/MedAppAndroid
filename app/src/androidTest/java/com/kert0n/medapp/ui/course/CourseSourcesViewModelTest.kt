@@ -290,6 +290,23 @@ class CourseSourcesViewModelTest {
         assertEquals(Doses(6), stored.sources.first { it.pkg.id == OTHER_PACK }.allocatedDoses)
     }
 
+    /**
+     * Перестановка источников обеспечения не меняет, пока выделения прежние (PLAN U3): порядок —
+     * это очередь расходования, а не количество лекарства.
+     */
+    @Test
+    fun reorderingLeavesCoverageAloneWhenAllocationsStay() = runBlocking {
+        val id = startedNeeding(5)
+        val model = model(id)
+
+        watching(model.state) { state ->
+            val before = state.awaiting(PATIENTLY) { it.coverage != null }.coverage
+            model.move(0, 1)
+            val after = state.awaiting(PATIENTLY) { it.sources.firstOrNull()?.packageId == OTHER_PACK }
+            assertEquals(before, after.coverage)
+        }
+    }
+
     private companion object {
         /**
          * Сколько ждать нового состояния. Дольше умолчания: между действием и состоянием здесь

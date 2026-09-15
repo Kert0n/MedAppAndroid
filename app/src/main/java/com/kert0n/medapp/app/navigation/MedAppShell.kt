@@ -18,10 +18,12 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import com.kert0n.medapp.presentation.course.CourseFormUiState
 import com.kert0n.medapp.presentation.course.CourseFormViewModel
+import com.kert0n.medapp.presentation.course.CourseCardViewModel
 import com.kert0n.medapp.presentation.course.CourseListViewModel
 import com.kert0n.medapp.presentation.course.CoursePresentationDTO
 import com.kert0n.medapp.presentation.course.CourseSourcesViewModel
 import com.kert0n.medapp.presentation.course.SourcePickingViewModel
+import com.kert0n.medapp.ui.course.CourseCardScreen
 import com.kert0n.medapp.ui.course.CourseFormScreen
 import com.kert0n.medapp.ui.course.CourseSourcesScreen
 import com.kert0n.medapp.ui.course.SourcePickingScreen
@@ -264,7 +266,21 @@ private fun screens(stacks: TabStacks) = entryProvider<NavKey> {
             onBack = stacks::back
         )
     }
-    entry<Screen.CourseCard> { NotReadyYet() }
+    entry<Screen.CourseCard> { key ->
+        val model = hiltViewModel<CourseCardViewModel, CourseCardViewModel.Factory>(
+            key = key.toString(),
+            creationCallback = { factory -> factory.create(key.courseId) }
+        )
+        CourseCardScreen(
+            state = model.state.collectAsStateWithLifecycle().value,
+            onEdit = { stacks.go(Screen.CourseForm(key.courseId)) },
+            onSources = { stacks.go(Screen.CourseSources(key.courseId)) },
+            onAskToCancel = model::askToCancel,
+            onConfirmCancel = model::cancel,
+            onDismissCancel = model::dismissCancel,
+            onBack = stacks::back
+        )
+    }
     entry<Screen.CourseSources> { key ->
         val model = hiltViewModel<CourseSourcesViewModel, CourseSourcesViewModel.Factory>(
             key = key.toString(),

@@ -25,6 +25,7 @@ import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import com.kert0n.medapp.R
+import com.kert0n.medapp.ui.DAY
 import com.kert0n.medapp.domain.attempt
 import com.kert0n.medapp.domain.pack.ExpiryDate
 import com.kert0n.medapp.domain.pack.PackageStatus
@@ -36,10 +37,7 @@ import com.kert0n.medapp.presentation.value.toPresentationDTO
 import com.kert0n.medapp.ui.EmptyState
 import com.kert0n.medapp.ui.LoadingState
 import java.time.LocalDate
-import java.time.format.DateTimeFormatter
 import java.util.Currency
-
-private val DAY: DateTimeFormatter = DateTimeFormatter.ofPattern("dd.MM.uuuu")
 
 /**
  * Карточка упаковки (PLAN H3 №6). Сверху — то, ради чего её открывают: сколько есть. Ниже

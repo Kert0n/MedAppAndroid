@@ -4,6 +4,7 @@ import com.kert0n.medapp.domain.course.CourseRejected
 import com.kert0n.medapp.domain.course.CourseSource
 import com.kert0n.medapp.domain.pack.ExpiryDate
 import com.kert0n.medapp.presentation.value.QuantityPresentationDTO
+import java.time.LocalDate
 import kotlin.uuid.Uuid
 
 /**
@@ -59,4 +60,19 @@ sealed interface CourseSourcesMessage {
     data class BeyondLimit(val name: String?, val limit: Int) : CourseSourcesMessage
 
     data object Finished : CourseSourcesMessage
+}
+
+/**
+ * Чем лечение обеспечено (PLAN H3 №14, №16): сколько приёмов ещё нужно, сколько из них покрывают
+ * коробки и с какого дня их не хватает. Дни — в зоне курса: у полуночи день устройства бывает уже
+ * другим (D5). У черновика обеспечения нет вовсе — считать его не по чему (B15).
+ */
+data class CourseCoveragePresentationDTO(
+    val requiredDoses: Int,
+    val coveredDoses: Int,
+    val missingDoses: Int,
+    val coveredUntilOn: LocalDate?,
+    val firstUncoveredOn: LocalDate?
+) {
+    val isFullyCovered: Boolean get() = missingDoses == 0
 }

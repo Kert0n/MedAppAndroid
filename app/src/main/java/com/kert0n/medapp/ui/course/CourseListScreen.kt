@@ -24,15 +24,13 @@ import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import com.kert0n.medapp.R
+import com.kert0n.medapp.ui.DAY
 import com.kert0n.medapp.presentation.ScreenState
 import com.kert0n.medapp.presentation.course.CourseListPresentationDTO
 import com.kert0n.medapp.presentation.course.CoursePresentationDTO
 import com.kert0n.medapp.presentation.course.ShortagePresentationDTO
 import com.kert0n.medapp.ui.EmptyState
 import com.kert0n.medapp.ui.LoadingState
-import java.time.format.DateTimeFormatter
-
-private val DAY: DateTimeFormatter = DateTimeFormatter.ofPattern("dd.MM.uuuu")
 
 /**
  * Список курсов (PLAN H3 №13) — содержимое места «План» в режиме «Курсы»; шапку и кнопку
