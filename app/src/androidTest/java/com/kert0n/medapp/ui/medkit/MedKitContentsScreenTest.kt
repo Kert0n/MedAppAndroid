@@ -19,6 +19,7 @@ import com.kert0n.medapp.fixture.pack
 import com.kert0n.medapp.fixture.projected
 import com.kert0n.medapp.presentation.medkit.toPresentationDTO
 import com.kert0n.medapp.presentation.pack.MedKitContentsUiState
+import com.kert0n.medapp.presentation.pack.Ordering
 import com.kert0n.medapp.presentation.pack.PackagePresentationDTO
 import com.kert0n.medapp.presentation.pack.RemovalStep
 import com.kert0n.medapp.presentation.pack.toPresentationDTO
@@ -41,6 +42,7 @@ class MedKitContentsScreenTest {
     private var reset = 0
     private var added = 0
     private var opened: Uuid? = null
+    private var ordered: Ordering? = null
 
     private val today: LocalDate = LocalDate.parse("2026-09-15")
 
@@ -61,7 +63,7 @@ class MedKitContentsScreenTest {
                     onEdit = {},
                     onSearch = {},
                     onNarrow = {},
-                    onOrder = {},
+                    onOrder = { ordered = it },
                     onReset = { reset++ },
                     onAskToRemove = {},
                     onPickTarget = {},
@@ -77,7 +79,8 @@ class MedKitContentsScreenTest {
         text: String = "",
         everywhere: Boolean = false,
         placeNames: Map<Uuid, String> = emptyMap(),
-        removing: RemovalStep? = null
+        removing: RemovalStep? = null,
+        ordering: Ordering = Ordering.NAME
     ) = MedKitContentsUiState(
         medKit = if (everywhere) null else home,
         isEverywhere = everywhere,
@@ -85,6 +88,7 @@ class MedKitContentsScreenTest {
         placeNames = placeNames,
         others = listOf(medKit(id = SHARED_KIT, name = "Дача").projection(MedKitContents.EMPTY).toPresentationDTO()),
         text = text,
+        ordering = ordering,
         today = today,
         isLoaded = true,
         removing = removing
@@ -159,6 +163,24 @@ class MedKitContentsScreenTest {
         compose.onNodeWithText("Просроченные").assertIsDisplayed()
         // Полоса сужений прокручивается вбок: сортировка стоит за фильтрами и до неё доезжают.
         compose.onNodeWithText("Сортировка: по названию").performScrollTo().assertIsDisplayed()
+    }
+
+    /**
+     * Порядок есть всегда, поэтому чип сортировки открывает список, а не снимает выбранное:
+     * снять можно сужение, а порядок снимать не во что.
+     *
+     * Красная проверка: обращаться с сортировкой как с фильтром — нажатие на «по сроку»
+     * возвращает порядок к названию, и сменить его на «по остатку» удаётся только со второго
+     * раза.
+     */
+    @Test
+    fun theSortChipOpensTheListEvenWhenAnOrderIsChosen() {
+        show(contents(ordering = Ordering.EXPIRY))
+
+        compose.onNodeWithText("Сортировка: по сроку").performScrollTo().performClick()
+        compose.onNodeWithText("по остатку").performClick()
+
+        assertEquals(Ordering.QUANTITY, ordered)
     }
 
     /** Нажимается вся карточка, а не одна её строка. */

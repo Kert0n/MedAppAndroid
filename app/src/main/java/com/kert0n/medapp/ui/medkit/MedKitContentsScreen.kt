@@ -283,8 +283,7 @@ private fun NarrowingRow(
             selected = state.ordering != Ordering.NAME,
             options = orderings,
             optionText = { named.getValue(it) },
-            onPick = onOrder,
-            onUnselect = { onOrder(Ordering.NAME) }
+            onPick = onOrder
         )
     }
 }
@@ -299,7 +298,14 @@ private fun Chip(text: String, selected: Boolean, onToggle: (Boolean) -> Unit) {
     )
 }
 
-/** Значение выбирается из того, что в этой области действительно есть. */
+/**
+ * Значение выбирается из того, что в этой области действительно есть.
+ *
+ * [onUnselect] есть не у всякого выбора: снять можно сужение — его может не быть вовсе, — а
+ * порядок есть всегда, и снимать его не во что. Без этого различия чип сортировки, показывающий
+ * «по сроку», по нажатию возвращал порядок к названию вместо того, чтобы открыть список: чтобы
+ * сменить «по сроку» на «по количеству», приходилось нажимать дважды.
+ */
 @Composable
 private fun <T> ChoosingChip(
     text: String,
@@ -307,13 +313,13 @@ private fun <T> ChoosingChip(
     options: List<T>,
     optionText: (T) -> String,
     onPick: (T) -> Unit,
-    onUnselect: () -> Unit
+    onUnselect: (() -> Unit)? = null
 ) {
     var open by remember { mutableStateOf(false) }
     Column {
         FilterChip(
             selected = selected,
-            onClick = { if (selected) onUnselect() else open = true },
+            onClick = { if (selected && onUnselect != null) onUnselect() else open = true },
             label = { Text(text) },
             enabled = selected || options.isNotEmpty(),
             trailingIcon = {
