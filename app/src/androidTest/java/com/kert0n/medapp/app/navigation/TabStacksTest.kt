@@ -43,6 +43,34 @@ class TabStacksTest {
         }
     }
 
+    /**
+     * Какой ход был последним — смена места или глубина, — знают стопки, а не ключи: с глубины
+     * чужого места на корень своего ведёт та же смена места. По этому признаку оболочка выбирает
+     * движение — мгновенную смену или сдвиг.
+     */
+    @Test
+    fun theStacksKnowWhetherTheLastMoveChangedThePlace() {
+        given()
+
+        compose.runOnIdle {
+            stacks.go(Deep)
+            assertEquals(false, stacks.switchedPlace)
+            assertEquals(true, stacks.isDeep)
+
+            stacks.go(Place.entries[1].key)
+            assertEquals(true, stacks.switchedPlace)
+            assertEquals(false, stacks.isDeep)
+
+            stacks.back()
+            assertEquals(true, stacks.switchedPlace)
+            assertEquals(Place.first.key, stacks.place)
+
+            stacks.back()
+            assertEquals(false, stacks.switchedPlace)
+            assertEquals(Place.first.key, stacks.screen)
+        }
+    }
+
     @Test
     fun goingDeepPutsALeafOnTopOfItsOwnPlace() {
         given()
