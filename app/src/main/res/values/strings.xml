@@ -57,8 +57,18 @@
     <string name="med_kit_name">Название</string>
     <string name="med_kit_location">Место хранения (необязательно)</string>
     <string name="med_kit_name_empty">Название нужно: без него аптечку не отличить от других.</string>
-    <string name="med_kit_name_too_long">Название длиннее %1$d символов.</string>
-    <string name="med_kit_location_too_long">Место хранения длиннее %1$d символов.</string>
+    <plurals name="med_kit_name_too_long">
+        <item quantity="one">Название длиннее %1$d символа.</item>
+        <item quantity="few">Название длиннее %1$d символов.</item>
+        <item quantity="many">Название длиннее %1$d символов.</item>
+        <item quantity="other">Название длиннее %1$d символа.</item>
+    </plurals>
+    <plurals name="med_kit_location_too_long">
+        <item quantity="one">Место хранения длиннее %1$d символа.</item>
+        <item quantity="few">Место хранения длиннее %1$d символов.</item>
+        <item quantity="many">Место хранения длиннее %1$d символов.</item>
+        <item quantity="other">Место хранения длиннее %1$d символа.</item>
+    </plurals>
     <string name="med_kit_busy">Аптечка ждёт ответа сервера на другое решение — правку пока не записать.</string>
     <string name="med_kit_gone">Этой аптечки больше нет.</string>
 
@@ -126,7 +136,12 @@
     <string name="med_kit_remove">Убрать аптечку</string>
     <string name="med_kit_remove_title">Убрать «%1$s»?</string>
     <string name="med_kit_remove_empty">В ней ничего нет — уйдёт только сама аптечка.</string>
-    <string name="med_kit_remove_with_packages">Внутри %1$d упаковок. Решите, что с ними делать.</string>
+    <plurals name="med_kit_remove_with_packages">
+        <item quantity="one">Внутри %1$d упаковка. Решите, что с ней делать.</item>
+        <item quantity="few">Внутри %1$d упаковки. Решите, что с ними делать.</item>
+        <item quantity="many">Внутри %1$d упаковок. Решите, что с ними делать.</item>
+        <item quantity="other">Внутри %1$d упаковки. Решите, что с ними делать.</item>
+    </plurals>
     <string name="med_kit_remove_transfer">Перенести лекарства в другую аптечку</string>
     <string name="med_kit_remove_with_drugs">Выбросить вместе с лекарствами</string>
     <string name="med_kit_remove_consequences">Упаковки исчезнут. Лечение и приёмы останутся.</string>
@@ -202,7 +217,12 @@
     <string name="pack_med_kit_busy">Аптечка ждёт ответа сервера на другое решение — класть в неё пока рано.</string>
     <string name="pack_unit_missing">Выберите единицу: без неё количество ничего не меряет.</string>
     <string name="pack_name_empty">Название нужно: без него упаковку не найти ни поиском, ни глазами.</string>
-    <string name="pack_too_long">Поле «%1$s» длиннее %2$d символов.</string>
+    <plurals name="pack_too_long">
+        <item quantity="one">Поле «%1$s» длиннее %2$d символа.</item>
+        <item quantity="few">Поле «%1$s» длиннее %2$d символов.</item>
+        <item quantity="many">Поле «%1$s» длиннее %2$d символов.</item>
+        <item quantity="other">Поле «%1$s» длиннее %2$d символа.</item>
+    </plurals>
     <string name="pack_amount_is_zero">Пустую упаковку заводить незачем — укажите, сколько в ней есть.</string>
     <string name="pack_hint_is_zero">Нулевой дозы не бывает.</string>
     <string name="pack_form_clear_unsupported">У общей упаковки форму выпуска нельзя стереть — только заменить другой.</string>

@@ -23,6 +23,7 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.painterResource
+import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
@@ -156,8 +157,10 @@ private fun Fields(
 private fun MedKitFormError.message(): String = when (this) {
     MedKitFormError.Input.NAME_EMPTY -> stringResource(R.string.med_kit_name_empty)
     MedKitFormError.Input.NAME_TOO_LONG ->
-        stringResource(R.string.med_kit_name_too_long, MedKit.NAME_MAX_LENGTH)
+        pluralStringResource(R.plurals.med_kit_name_too_long, MedKit.NAME_MAX_LENGTH, MedKit.NAME_MAX_LENGTH)
     MedKitFormError.Input.LOCATION_TOO_LONG ->
-        stringResource(R.string.med_kit_location_too_long, MedKit.LOCATION_MAX_LENGTH)
+        pluralStringResource(
+            R.plurals.med_kit_location_too_long, MedKit.LOCATION_MAX_LENGTH, MedKit.LOCATION_MAX_LENGTH
+        )
     MedKitFormError.Busy -> stringResource(R.string.med_kit_busy)
 }

@@ -39,6 +39,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.painterResource
+import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
@@ -358,7 +359,7 @@ private fun Removal(
                     if (inside == 0) {
                         Text(stringResource(R.string.med_kit_remove_empty))
                     } else {
-                        Text(stringResource(R.string.med_kit_remove_with_packages, inside))
+                        Text(pluralStringResource(R.plurals.med_kit_remove_with_packages, inside, inside))
                         if (state.others.isEmpty()) {
                             Text(
                                 stringResource(R.string.med_kit_remove_nowhere),

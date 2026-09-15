@@ -31,6 +31,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.painterResource
+import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
@@ -369,7 +370,7 @@ private fun PackageFormError.message(): String = when (this) {
     PackageFormError.UnitMissing -> stringResource(R.string.pack_unit_missing)
     PackageFormError.NameEmpty -> stringResource(R.string.pack_name_empty)
     is PackageFormError.TooLong ->
-        stringResource(R.string.pack_too_long, stringResource(field.label), limit)
+        pluralStringResource(R.plurals.pack_too_long, limit, stringResource(field.label), limit)
     is PackageFormError.Amount -> stringResource(reason.text)
     PackageFormError.AmountIsZero -> stringResource(R.string.pack_amount_is_zero)
     is PackageFormError.Hint -> stringResource(reason.text)

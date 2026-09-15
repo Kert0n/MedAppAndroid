@@ -185,7 +185,7 @@ class MedKitContentsScreenTest {
         show(contents(removing = RemovalStep.ASKING))
 
         compose.onNodeWithText("Убрать «Домашняя»?").assertIsDisplayed()
-        compose.onNodeWithText("Внутри 2 упаковок. Решите, что с ними делать.").assertIsDisplayed()
+        compose.onNodeWithText("Внутри 2 упаковки. Решите, что с ними делать.").assertIsDisplayed()
         compose.onNodeWithText("Перенести лекарства в другую аптечку").assertIsDisplayed()
         compose.onNodeWithText("Выбросить вместе с лекарствами").assertIsDisplayed()
     }
