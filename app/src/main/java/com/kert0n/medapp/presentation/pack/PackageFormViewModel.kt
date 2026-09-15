@@ -4,7 +4,11 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.kert0n.medapp.feature.packages.PackageAdding
 import com.kert0n.medapp.feature.packages.PackageDescribing
+import com.kert0n.medapp.feature.template.TemplateSearching
 import com.kert0n.medapp.feature.time.Today
+import com.kert0n.medapp.domain.Unavailability
+import com.kert0n.medapp.domain.template.PackageTemplates
+import com.kert0n.medapp.domain.template.TemplateQuery
 import com.kert0n.medapp.presentation.ParsedInput
 import com.kert0n.medapp.presentation.medkit.MedKitPresentationDTO
 import com.kert0n.medapp.presentation.medkit.toPresentationDTO
@@ -18,8 +22,18 @@ import dagger.assisted.Assisted
 import dagger.assisted.AssistedFactory
 import dagger.assisted.AssistedInject
 import dagger.hilt.android.lifecycle.HiltViewModel
+import kotlin.time.Duration
+import kotlin.time.Duration.Companion.milliseconds
 import kotlin.uuid.Uuid
 import kotlinx.coroutines.ExperimentalCoroutinesApi
+import kotlinx.coroutines.FlowPreview
+import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.debounce
+import kotlinx.coroutines.flow.distinctUntilChanged
+import kotlinx.coroutines.flow.flow
+import kotlinx.coroutines.flow.flowOf
+import kotlinx.coroutines.flow.map
+import kotlinx.coroutines.flow.onStart
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
@@ -36,12 +50,18 @@ import kotlinx.coroutines.launch
  * **В правке количество и аптечка не правятся.** У пересчёта и переноса свой след, а у правки
  * описания его нет и быть не должно: поправь количество здесь — и учёт разойдётся с тем, что
  * человек видел в коробке.
+ *
+ * **Подсказки справочника — только при заведении** (U2). Запрос уходит, когда человек
+ * остановился на [SUGGESTION_PAUSE], а не на каждую букву; новая пауза отменяет прежний запрос
+ * вместе с его ответом, поэтому старый ответ не перекрывает новый — оба правила держит одно
+ * `flatMapLatest`. Ответ справочника в форму не пишет ничего: пишет только выбор строки.
  */
-@OptIn(ExperimentalCoroutinesApi::class)
+@OptIn(ExperimentalCoroutinesApi::class, FlowPreview::class)
 @HiltViewModel(assistedFactory = PackageFormViewModel.Factory::class)
 class PackageFormViewModel @AssistedInject constructor(
     private val adding: PackageAdding,
     private val describing: PackageDescribing,
+    private val searching: TemplateSearching,
     private val packages: PackageStorageRepository,
     private val vocabulary: VocabularyStorageRepository,
     medKits: MedKitStorageRepository,
@@ -63,6 +83,29 @@ class PackageFormViewModel @AssistedInject constructor(
 
     private val stored = MutableStateFlow<PackagePresentationDTO?>(null)
 
+    /** Что человек печатает в названии. Выбор карточки сюда не пишет — иначе её имя тут же искалось бы заново. */
+    private val typed = MutableStateFlow("")
+
+    private val suggestions: Flow<Suggestions> =
+        if (opened.packageId != null) flowOf<Suggestions>(Suggestions.None) else typed
+            .debounce(SUGGESTION_PAUSE)
+            .map { it.trim().take(TemplateQuery.MAX_LENGTH) }
+            .distinctUntilChanged()
+            .flatMapLatest { text ->
+                if (text.isEmpty()) flowOf<Suggestions>(Suggestions.None)
+                else flow<Suggestions> {
+                    emit(Suggestions.Searching)
+                    emit(
+                        when (val search = searching.search(TemplateQuery(text))) {
+                            is PackageTemplates.Search.Found -> Suggestions.Found(search.templates.map { it.toPresentationDTO() })
+                            is PackageTemplates.Search.Unavailable -> Suggestions.Unavailable(search.reason)
+                        }
+                    )
+                }
+            }
+            // До первой паузы подсказок нет — и состояние формы не ждёт паузы, чтобы появиться.
+            .onStart { emit(Suggestions.None) }
+
     /** Из чего человек выбирает: полки и словарь. Читается вместе — меняется редко. */
     private val choices = combine(
         today.observe().flatMapLatest { day -> medKits.observeAll(day.date) },
@@ -76,7 +119,7 @@ class PackageFormViewModel @AssistedInject constructor(
         )
     }
 
-    val state: StateFlow<PackageFormUiState> = combine(form, progress, stored, choices) { form, progress, stored, choices ->
+    val state: StateFlow<PackageFormUiState> = combine(form, progress, stored, choices, suggestions) { form, progress, stored, choices, suggestions ->
         PackageFormUiState(
             form = form,
             isEditing = opened.packageId != null,
@@ -86,7 +129,8 @@ class PackageFormViewModel @AssistedInject constructor(
             forms = choices.forms,
             error = progress.error,
             isSaving = progress.isSaving,
-            saved = progress.saved
+            saved = progress.saved,
+            suggestions = suggestions
         )
     }.stateIn(
         viewModelScope,
@@ -99,6 +143,7 @@ class PackageFormViewModel @AssistedInject constructor(
     }
 
     fun edit(edited: PackageFormPresentationDTO) {
+        if (edited.name != form.value.name) typed.value = edited.name
         form.value = edited
         // Ввод снимает отказ: человек уже правит то, на что ему указали.
         if (progress.value.error != null) progress.value = progress.value.copy(error = null)
@@ -159,6 +204,11 @@ class PackageFormViewModel @AssistedInject constructor(
         val forms: List<FormPresentationDTO>
     )
 
+    private companion object {
+        /** Пауза печати, после которой человек считается остановившимся (PLAN H3 №7, U2). */
+        val SUGGESTION_PAUSE: Duration = 300.milliseconds
+    }
+
     private data class Progress(
         val isSaving: Boolean = false,
         val error: PackageFormError? = null,
@@ -178,5 +228,18 @@ data class PackageFormUiState(
     val forms: List<FormPresentationDTO> = emptyList(),
     val error: PackageFormError? = null,
     val isSaving: Boolean = false,
-    val saved: Uuid? = null
+    val saved: Uuid? = null,
+    val suggestions: Suggestions = Suggestions.None
 )
+
+/**
+ * Что справочник ответил на напечатанное (PLAN H3 №7). Случаи различает экран: ничего не
+ * спрашивали; ждём; нашлось (пусто — «не нашлось», не ошибка); справочник недоступен — причина
+ * словами, форма живёт.
+ */
+sealed interface Suggestions {
+    data object None : Suggestions
+    data object Searching : Suggestions
+    data class Found(val templates: List<TemplatePresentationDTO>) : Suggestions
+    data class Unavailable(val reason: Unavailability) : Suggestions
+}
