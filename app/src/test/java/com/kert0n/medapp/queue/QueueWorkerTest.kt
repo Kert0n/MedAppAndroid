@@ -118,7 +118,7 @@ class QueueWorkerTest {
         override suspend fun ready(now: Instant): List<StoredSyncOperation> =
             operations.values
                 .filter { !it.status.isClosed }
-                .filter { it.notBefore == null || !it.notBefore!!.isAfter(now) }
+                .filter { it.notBefore?.isAfter(now) != true }
                 .filter { op -> op.dependsOn.all { operations[it]?.status == SyncOperationStatus.APPLIED } }
                 .filter { op ->
                     val pkg = (op.command as? PackageSyncCommand)?.packageId

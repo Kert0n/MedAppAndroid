@@ -34,10 +34,17 @@ if [ -z "$login" ] || [ -z "$key" ]; then
     exit 1
 fi
 
-token=$(curl -sS --fail-with-body -X POST "$base/v1/auth/token" -u "$login:$key" \
+# Секреты уходят curl через stdin (`--config -`), а не аргументами: аргументы видны в списке
+# процессов любому на машине — как и в register-probe-users.sh.
+token=$(printf 'user = "%s:%s"\n' "$login" "$key" |
+    curl -sS --fail-with-body -X POST "$base/v1/auth/token" --config - \
     | python3 -c "import json, sys; print(json.load(sys.stdin)['accessToken'])")
-units=$(curl -sS --fail-with-body "$base/v1/quantity-units" -H "Authorization: Bearer $token")
-forms=$(curl -sS --fail-with-body "$base/v1/form-types" -H "Authorization: Bearer $token")
+authorized() {
+    printf 'header = "Authorization: Bearer %s"\n' "$token" |
+        curl -sS --fail-with-body "$1" --config -
+}
+units=$(authorized "$base/v1/quantity-units")
+forms=$(authorized "$base/v1/form-types")
 
 # Пишем рядом и переносим на место: успешный ответ с испорченным JSON не должен оставить
 # вместо снимка пустой файл — сборка увезла бы его в APK.

@@ -1,3 +1,5 @@
+@file:OptIn(kotlinx.coroutines.ExperimentalCoroutinesApi::class)
+
 package com.kert0n.medapp.network.server
 
 import com.kert0n.medapp.network.account.AccessTokenThrottled

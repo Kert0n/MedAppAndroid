@@ -122,7 +122,7 @@ class ObjectReferencesTest {
         val history = database.intakes().ofCourse(COURSE).map { it.toDomain(VOCABULARY) as CourseIntake }
 
         assertEquals(100, history.size)
-        assertTrue(history.all { it.plannedPackage?.id == PACK && it.plannedPackage?.name == "Парацетамол" })
+        assertTrue(history.all { it.plannedPackage?.let { pkg -> pkg.id == PACK && pkg.name == "Парацетамол" } == true })
         // Room грузит связь одним `IN`-запросом на всю выборку (по одному на каждую из двух ссылок
         // приёма), а не по запросу на строку: сто строк — не сто чтений.
         val recordReads = synchronized(queries) {

@@ -11,7 +11,6 @@ import dagger.hilt.android.testing.HiltAndroidTest
 import kotlinx.coroutines.CoroutineDispatcher
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNotNull
-import org.junit.Assert.assertTrue
 import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
@@ -71,7 +70,7 @@ class AppLaunchTest {
 
         val worker = TestListenableWorkerBuilder<SyncWorker>(context).setWorkerFactory(workerFactory).build()
 
-        assertTrue(worker is SyncWorker)
+        assertNotNull("граф не собрал работника", worker)
     }
 
     @Test

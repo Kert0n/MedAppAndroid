@@ -136,7 +136,7 @@ class IntakeTest {
         // У внепланового факта по типу нет полей курса и расписания; единственный статус — TAKEN.
         val fact = unplannedIntake()
         assertEquals(IntakeStatus.TAKEN, fact.status)
-        assertEquals(PACK, fact.taken.pkg?.id)
+        assertEquals(PACK, fact.taken.pkg.id)
         assertEquals(dose("1"), fact.taken.amount)
     }
 
@@ -177,7 +177,7 @@ class IntakeTest {
         val taken = pack(quantity = tablets("10")).take(dose("2"), LATER).getOrThrow()
         assertEquals(dose("2"), taken.amount)
         assertEquals(LATER, taken.at)
-        assertEquals(PACK, taken.pkg?.id)
+        assertEquals(PACK, taken.pkg.id)
     }
 
     @Test
@@ -186,7 +186,7 @@ class IntakeTest {
         // пачки — ссылка, и её смена историю не переписывает и не делает нечитаемой.
         val recorded = TakenDose(pack(quantity = millilitres("100")).ref, dose("2"), LATER)
         assertEquals(TABLETS, recorded.amount.unit)
-        assertEquals(MILLILITRES, recorded.pkg?.unit)
+        assertEquals(MILLILITRES, recorded.pkg.unit)
     }
 
     @Test

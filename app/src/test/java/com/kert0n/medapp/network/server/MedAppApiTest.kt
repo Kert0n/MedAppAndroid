@@ -199,7 +199,7 @@ class MedAppApiTest {
 
         assertEquals("registration-token", header)
         assertTrue("логин уехал: $body", body!!.contains("${account.login}"))
-        assertTrue("пароль уехал", body!!.contains(account.password))
+        assertTrue("пароль уехал", body.contains(account.password))
     }
 
     /**

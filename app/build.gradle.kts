@@ -159,8 +159,15 @@ android {
      * Условная запись не молчит (PLAN C1): результат записи, помеченной `@CheckResult`, обязан быть
      * прочитан — «ноль строк незаконен» держит сборка, а не внимание.
      */
+    /**
+     * Предупреждение — провал и у lint: список замечаний не откладывается «на потом». Не ошибки
+     * кода, а напоминания об обновлениях, к сборке не относятся и выключены поимённо.
+     */
     lint {
         error += "CheckResult"
+        warningsAsErrors = true
+        abortOnError = true
+        disable += listOf("AndroidGradlePluginVersion", "GradleDependency", "NewerVersionAvailable")
     }
 
     /**
@@ -185,6 +192,8 @@ room {
 kotlin {
     compilerOptions {
         jvmTarget = JvmTarget.JVM_17
+        // Предупреждение компилятора — провал, и у тестов тоже: `w:` в выводе никто не читает.
+        allWarningsAsErrors = true
     }
 }
 

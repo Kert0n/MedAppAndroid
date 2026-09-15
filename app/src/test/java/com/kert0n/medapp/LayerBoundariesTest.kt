@@ -101,6 +101,29 @@ class LayerBoundariesTest {
     }
 
     /**
+     * Домен независим от Android, Room и Ktor (AGENTS «Инварианты», PLAN H1): он импортирует
+     * только `java.*`, `kotlin.*` и себя. Правило о корнях проекта держит [dependenciesPointInwards],
+     * но чужая библиотека — не корень, и без этой проверки `android.os.Build` в домене прошёл бы.
+     */
+    @Test
+    fun theDomainImportsNothingForeign() {
+        val foreign = sources.resolve("domain").walkTopDown()
+            .filter { it.extension == "kt" }
+            .flatMap { file ->
+                file.readLines().withIndex()
+                    .filter { (_, line) -> line.startsWith("import ") }
+                    .map { (index, line) -> Triple(file, index + 1, line.removePrefix("import ").trim()) }
+            }
+            .filterNot { (_, _, name) ->
+                name.startsWith("java.") || name.startsWith("kotlin.") || name.startsWith("com.kert0n.medapp.domain.")
+            }
+            .map { (file, line, name) -> "${file.relativeTo(sources).invariantSeparatorsPath}:$line: import $name" }
+            .toList()
+
+        assertEquals("домен импортирует чужое", emptyList<String>(), foreign)
+    }
+
+    /**
      * Каталог называет понятие, а не вид файла (PLAN H1): `domain/pack/`, а не `domain/model/`.
      * Что это DTO, маппер или строка таблицы, видно по имени типа, а слой — по корню.
      */

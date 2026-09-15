@@ -41,7 +41,7 @@ class PackageSyncCommandPreparationTest {
         assertEquals("PUT", request.method)
         assertEquals("/v1/drugs/$PACK/sync/$INTAKE", request.path)
         assertTrue(request.body!!.contains("\"drugVersion\":3"))
-        assertFalse(request.body!!.contains("reservation"))
+        assertFalse(request.body.contains("reservation"))
         assertEquals(ResourceVersion(3), request.drugVersion)
         assertEquals(tablets("20"), request.quantityBefore)
         assertEquals(EARLIER, request.preparedAt)
@@ -78,13 +78,13 @@ class PackageSyncCommandPreparationTest {
         assertEquals("PUT", request.method)
         assertEquals("/v1/drugs/$PACK/sync/$INTAKE", request.path)
         assertTrue(request.body!!.contains("\"consumed\":\"3\""))
-        assertTrue(request.body!!.contains("\"reservation\":{\"amount\":\"4\",\"version\":5}"))
+        assertTrue(request.body.contains("\"reservation\":{\"amount\":\"4\",\"version\":5}"))
     }
 
     @Test
     fun zeroClaimAfterSendsNoReservationBlock() {
         val request = PackageSyncCommand.Consume(PACK, dose("3"), INTAKE, claimAfter = tablets("0")).prepared()
-        assertFalse(request.body!!.contains("reservation"))
+        assertFalse(requireNotNull(request.body).contains("reservation"))
     }
 
     /**
@@ -124,7 +124,7 @@ class PackageSyncCommandPreparationTest {
         val renamed = pack(name = "Панадол", form = TABLET_FORM)
         val preparation = describe.prepare(INTAKE, renamed, sync, EARLIER) as Preparation.Request
         assertTrue(preparation.request.body!!.contains("\"category\":\"жар\""))
-        assertFalse(preparation.request.body!!.contains("name"))
+        assertFalse(preparation.request.body.contains("name"))
         assertEquals(
             Preparation.AlreadyApplied,
             describe.prepare(INTAKE, pack(category = "жар", form = TABLET_FORM), sync, EARLIER)
@@ -160,11 +160,11 @@ class PackageSyncCommandPreparationTest {
         val create = PackageSyncCommand.Create(PACK, HOME_KIT).prepared(known = facts)
         assertEquals("POST /v1/med-kits/$HOME_KIT/drugs", "${create.method} ${create.path}")
         assertTrue(create.body!!.contains("\"quantity\":\"20\""))
-        assertTrue(create.body!!.contains("\"name\":\"Парацетамол\""))
+        assertTrue(create.body.contains("\"name\":\"Парацетамол\""))
         val describe = PackageSyncCommand.Describe(PACK, facts, facts.copy(category = "жар")).prepared(known = facts)
         assertEquals("PATCH", describe.method)
         assertTrue(describe.body!!.contains("\"category\":\"жар\""))
-        assertFalse(describe.body!!.contains("name"))
+        assertFalse(describe.body.contains("name"))
     }
 
     /** Форма ответа — по контракту операции; «пачки нет» ждут расход и пересчёт, дошедшие до нуля (PLAN B4, B5). */

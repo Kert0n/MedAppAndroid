@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+    То же правило для Android до 12, где `dataExtractionRules` не читаются: каталог DataStore с
+    шифротекстом ключа в копию не уезжает (G2) — см. data_extraction_rules.xml.
+-->
+<full-backup-content>
+    <exclude
+        domain="file"
+        path="datastore" />
+</full-backup-content>

@@ -62,7 +62,7 @@ class QueueOutboxTest {
             reads++
             if (broken) throw IllegalStateException("база недоступна")
             return operations.values
-                .filter { !it.status.isClosed && (it.notBefore == null || !it.notBefore!!.isAfter(now)) }
+                .filter { !it.status.isClosed && (it.notBefore?.isAfter(now) != true) }
                 .map { StoredSyncOperation.Readable(it) }
         }
         override suspend fun nextDueAt(now: Instant): Instant? =

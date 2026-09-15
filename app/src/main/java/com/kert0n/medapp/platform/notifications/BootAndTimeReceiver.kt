@@ -1,5 +1,6 @@
 package com.kert0n.medapp.platform.notifications
 
+import android.annotation.SuppressLint
 import android.app.AlarmManager
 import android.content.BroadcastReceiver
 import android.content.Context
@@ -35,6 +36,9 @@ class BootAndTimeReceiver : BroadcastReceiver() {
         /** Какие сигналы системы требуют перестроить расписание; посторонние — нет. */
         fun restartsTheDay(action: String?): Boolean = action in TRIGGERS
 
+        // Строка-константа: на Android до 12 такого сигнала просто не бывает, и манифест его
+        // объявляет напрасно, но безвредно.
+        @SuppressLint("InlinedApi")
         val TRIGGERS: Set<String> = setOf(
             Intent.ACTION_BOOT_COMPLETED,
             Intent.ACTION_TIMEZONE_CHANGED,
