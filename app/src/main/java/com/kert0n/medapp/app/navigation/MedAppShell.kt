@@ -97,7 +97,18 @@ private fun MedAppBottomBar(navController: NavController) {
  */
 @Composable
 private fun MedAppNavHost(navController: NavHostController, modifier: Modifier = Modifier) {
-    NavHost(navController, startDestination = Route.MedKits, modifier = modifier) {
+    NavHost(
+        navController = navController,
+        startDestination = Route.MedKits,
+        modifier = modifier,
+        // Движение одно на весь граф, и оно само отличает соседей от глубины (`Motion.kt`).
+        // Заданы все четыре перехода: незаданные библиотека подменяет своими, а жест назад —
+        // системным сжатием, и одно действие выглядит по-разному пальцем и кнопкой.
+        enterTransition = entering,
+        exitTransition = leaving,
+        popEnterTransition = returning,
+        popExitTransition = goingBack
+    ) {
         composable<Route.MedKits> {
             MedKitListRoute(
                 onOpen = { navController.navigate(Route.MedKitContents(it)) },
