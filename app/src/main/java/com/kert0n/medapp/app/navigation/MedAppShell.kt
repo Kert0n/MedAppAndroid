@@ -25,6 +25,7 @@ import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
 import com.kert0n.medapp.R
 import com.kert0n.medapp.ui.EmptyState
+import com.kert0n.medapp.ui.medkit.MedKitContentsRoute
 import com.kert0n.medapp.ui.medkit.MedKitFormRoute
 import com.kert0n.medapp.ui.medkit.MedKitListRoute
 import com.kert0n.medapp.ui.pack.PackageAmountRoute

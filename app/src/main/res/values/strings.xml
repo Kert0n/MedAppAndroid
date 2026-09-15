@@ -98,6 +98,45 @@
     <string name="pack_purchased_on">Куплено</string>
     <string name="pack_opened_on">Вскрыто</string>
 
+    <!-- Содержимое аптечки и все лекарства -->
+    <string name="all_medicines_title">Все лекарства</string>
+    <string name="search_here">Поиск по аптечке</string>
+    <string name="search_everywhere">Поиск по всем аптечкам</string>
+    <string name="search_clear">Очистить поиск</string>
+    <string name="search_reset">Сбросить</string>
+    <string name="pack_add">Завести упаковку</string>
+    <string name="pack_none_here">Здесь пока ничего нет.</string>
+    <string name="pack_none_anywhere">Во всех аптечках пока пусто.</string>
+    <string name="pack_nothing_found">Ничего не нашлось.</string>
+    <string name="filter_expired">Просроченные</string>
+    <string name="filter_expiring">Скоро истекают</string>
+    <string name="filter_on_course">На курсе</string>
+    <string name="filter_has_free">Есть свободное</string>
+    <string name="filter_category">Категория</string>
+    <string name="filter_form">Форма</string>
+    <string name="sort_by">Сортировка: %1$s</string>
+    <string name="sort_name">по названию</string>
+    <string name="sort_expiry">по сроку</string>
+    <string name="sort_added">по дате добавления</string>
+    <string name="sort_quantity">по остатку</string>
+
+    <!-- Аптечка: уборка -->
+    <string name="med_kit_menu">Что можно с аптечкой</string>
+    <string name="med_kit_remove">Убрать аптечку</string>
+    <string name="med_kit_remove_title">Убрать «%1$s»?</string>
+    <string name="med_kit_remove_empty">В ней ничего нет — уйдёт только сама аптечка.</string>
+    <string name="med_kit_remove_with_packages">Внутри %1$d упаковок. Решите, что с ними делать.</string>
+    <string name="med_kit_remove_transfer">Перенести лекарства в другую аптечку</string>
+    <string name="med_kit_remove_with_drugs">Выбросить вместе с лекарствами</string>
+    <string name="med_kit_remove_consequences">Упаковки исчезнут. Лечение и приёмы останутся.</string>
+    <string name="med_kit_remove_nowhere">Переносить некуда: другой аптечки пока нет.</string>
+    <string name="med_kit_remove_target_title">Куда перенести лекарства</string>
+    <string name="med_kit_remove_and_transfer">Перенести и убрать</string>
+    <string name="med_kit_remove_target_gone">Выбранной аптечки больше нет — выберите другую.</string>
+    <string name="med_kit_remove_target_busy">Выбранная аптечка ждёт ответа сервера — класть в неё пока рано.</string>
+    <string name="med_kit_remove_contents_busy">Одна из коробок ждёт ответа сервера — подождите его.</string>
+    <string name="med_kit_remove_not_shared">Оставить остальным можно только общую аптечку.</string>
+
     <!-- Упаковка: карточка -->
     <string name="pack_title">Упаковка</string>
     <string name="pack_gone">Этой упаковки больше нет.</string>
