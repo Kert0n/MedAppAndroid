@@ -10,14 +10,11 @@ import com.kert0n.medapp.ui.LoadingState
 
 /**
  * Экран первичной настройки (PLAN H3 №1): пока приложение не настроено, человек видит его, а не
- * пустой список. [AppStartState.Ready] сюда не приходит — в этом состоянии показывают приложение.
+ * пустой список. [AppStartState.Ready] сюда не приходит — в этом состоянии показывают
+ * приложение.
  */
 @Composable
-fun SetupScreen(
-    state: AppStartState,
-    onRetry: () -> Unit,
-    modifier: Modifier = Modifier
-) {
+fun SetupScreen(state: AppStartState, onRetry: () -> Unit, modifier: Modifier = Modifier) {
     when (state) {
         AppStartState.Checking -> LoadingState(modifier)
         is AppStartState.Setup -> ErrorMessage(state.reason, modifier, onRetry)

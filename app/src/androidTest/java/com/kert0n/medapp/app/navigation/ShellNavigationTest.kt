@@ -9,6 +9,7 @@ import androidx.compose.ui.test.assertIsNotSelected
 import androidx.compose.ui.test.assertIsSelected
 import androidx.compose.ui.test.junit4.StateRestorationTester
 import androidx.compose.ui.test.junit4.v2.createComposeRule
+import androidx.compose.ui.test.onAllNodesWithText
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.unit.Density
@@ -32,8 +33,8 @@ class ShellNavigationTest {
     fun allFivePlacesAreThereAndTheFirstIsSelected() {
         compose.setContent { MedAppTheme { MedAppShell() } }
 
-        for (tab in listOf("Аптечки", "План", "Сканер", "Аналитика", "Настройки")) {
-            compose.onNodeWithText(tab).assertIsDisplayed()
+        for (place in listOf("Аптечки", "План", "Сканер", "Отчёты", "Опции")) {
+            compose.onNodeWithText(place).assertIsDisplayed()
         }
         compose.onNodeWithText("Аптечки").assertIsSelected()
     }
@@ -42,30 +43,30 @@ class ShellNavigationTest {
     fun tappingAPlaceGoesThere() {
         compose.setContent { MedAppTheme { MedAppShell() } }
 
-        compose.onNodeWithText("Аналитика").performClick()
+        compose.onNodeWithText("Отчёты").performClick()
 
-        compose.onNodeWithText("Аналитика").assertIsSelected()
+        compose.onNodeWithText("Отчёты").assertIsSelected()
         compose.onNodeWithText("Аптечки").assertIsNotSelected()
     }
 
     /**
-     * Поворот и смерть процесса — не действие человека: место остаётся тем же. Состояние держит
-     * навигация, и восстанавливается оно из `SavedStateHandle`; [StateRestorationTester] проходит
-     * ровно этот путь — сохранение и восстановление, а не построение заново.
+     * Поворот и смерть процесса — не действие человека: место остаётся тем же. Держат его
+     * сохранённые стопки, и [StateRestorationTester] проходит ровно этот путь — сохранение и
+     * восстановление, а не построение заново.
      *
-     * Красная проверка: собрать `NavHostController` мимо `rememberNavController` (без
-     * `rememberSaveable`) — вкладка возвращается к «Аптечкам».
+     * Красная проверка: держать выбранное место обычным `remember` — человек возвращается к
+     * «Аптечкам».
      */
     @Test
     fun thePlaceSurvivesRecreation() {
         val restoration = StateRestorationTester(compose)
         restoration.setContent { MedAppTheme { MedAppShell() } }
-        compose.onNodeWithText("Настройки").performClick()
-        compose.onNodeWithText("Настройки").assertIsSelected()
+        compose.onNodeWithText("Опции").performClick()
+        compose.onNodeWithText("Опции").assertIsSelected()
 
         restoration.emulateSavedInstanceStateRestore()
 
-        compose.onNodeWithText("Настройки").assertIsSelected()
+        compose.onNodeWithText("Опции").assertIsSelected()
         compose.onNodeWithText("Аптечки").assertIsNotSelected()
     }
 
@@ -77,15 +78,22 @@ class ShellNavigationTest {
     fun largeFontKeepsEverythingOnScreen() {
         compose.setContent {
             val density = LocalDensity.current
-            CompositionLocalProvider(
-                LocalDensity provides Density(density.density, fontScale = 2f)
-            ) {
+            CompositionLocalProvider(LocalDensity provides Density(density.density, fontScale = 2f)) {
                 MedAppTheme { MedAppShell(Modifier.fillMaxSize()) }
             }
         }
 
         compose.onNodeWithText("Аптечки").assertIsDisplayed()
-        compose.onNodeWithText("Настройки").assertIsDisplayed()
-        compose.onNodeWithText("Этот экран ещё не готов.").assertIsDisplayed()
+        compose.onNodeWithText("Опции").assertIsDisplayed()
+    }
+
+    /** За местом, экрана у которого ещё нет, стоит общее «показывать нечего». */
+    @Test
+    fun aPlaceWithoutItsScreenSaysSo() {
+        compose.setContent { MedAppTheme { MedAppShell() } }
+
+        compose.waitUntil {
+            compose.onAllNodesWithText("Этот экран ещё не готов.").fetchSemanticsNodes().isNotEmpty()
+        }
     }
 }

@@ -1,5 +1,6 @@
 package com.kert0n.medapp.ui
 
+import androidx.annotation.StringRes
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -13,29 +14,33 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
-import androidx.annotation.StringRes
 import com.kert0n.medapp.R
 import com.kert0n.medapp.domain.Unavailability
 
 /**
- * Ожидание. Подписи нет, но она есть у экранного чтеца: кружок сам по себе ему ничего не говорит.
+ * Показывать нечего — три случая, и путать их нельзя: «ещё не прочитано», «не вышло, вот
+ * почему» и «пусто, потому что человек ничего не завёл». Выглядят они одинаково на всех
+ * экранах — иначе каждый следующий экран изобретает своё.
  */
+
+/** Ожидание. Подписи нет, но она есть у экранного чтеца: кружок сам по себе ему ничего не говорит. */
 @Composable
 fun LoadingState(modifier: Modifier = Modifier) {
     val description = stringResource(R.string.state_loading)
-    StateFrame(modifier) {
+    Middle(modifier) {
         CircularProgressIndicator(Modifier.semantics { contentDescription = description })
     }
 }
 
 /**
- * Ничего не заведено. Это не отказ: показывать нечего, потому что человек ещё ничего не создал, —
- * и [actionText] предлагает создать, если экрану есть что предложить.
+ * Ничего не заведено. Это не отказ: показывать нечего, потому что человек ещё ничего не создал,
+ * — и [actionText] предлагает создать, если экрану есть что предложить.
  */
 @Composable
 fun EmptyState(
@@ -43,26 +48,13 @@ fun EmptyState(
     modifier: Modifier = Modifier,
     actionText: String? = null,
     onAction: (() -> Unit)? = null
-) {
-    StateFrame(modifier) {
-        Column(
-            horizontalAlignment = Alignment.CenterHorizontally,
-            verticalArrangement = Arrangement.spacedBy(16.dp)
-        ) {
-            Text(
-                text = text,
-                style = MaterialTheme.typography.bodyLarge,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                textAlign = TextAlign.Center
-            )
-            if (actionText != null && onAction != null) {
-                Button(onClick = onAction, modifier = Modifier.defaultMinSize(minHeight = 48.dp)) {
-                    Text(actionText)
-                }
-            }
-        }
-    }
-}
+) = Told(
+    text = text,
+    color = MaterialTheme.colorScheme.onSurfaceVariant,
+    modifier = modifier,
+    actionText = actionText,
+    onAction = onAction
+)
 
 /**
  * Не вышло, и сказано почему. Повтор предлагается там, где он осмыслен: у причины без повтора
@@ -73,50 +65,54 @@ fun ErrorMessage(
     reason: Unavailability,
     modifier: Modifier = Modifier,
     onRetry: (() -> Unit)? = null
-) = ErrorMessage(
-    text = stringResource(reason.text),
-    modifier = modifier,
-    onRetry = onRetry.takeIf { reason.isWorthRetrying }
-)
+) = ErrorMessage(stringResource(reason.text), modifier, onRetry.takeIf { reason.isWorthRetrying })
 
 /**
- * Та же беда словами вызывающего — для случаев, у которых своей [Unavailability] нет: утрата ключа
- * это не «не загрузилось», а состояние, из которого человек выходит решением.
+ * Та же беда словами вызывающего — для случаев, у которых своей [Unavailability] нет: утрата
+ * ключа это не «не загрузилось», а состояние, из которого человек выходит решением.
  */
 @Composable
 fun ErrorMessage(
     text: String,
     modifier: Modifier = Modifier,
     onRetry: (() -> Unit)? = null
-) {
-    StateFrame(modifier) {
-        Column(
-            horizontalAlignment = Alignment.CenterHorizontally,
-            verticalArrangement = Arrangement.spacedBy(16.dp)
-        ) {
-            Text(
-                text = text,
-                style = MaterialTheme.typography.bodyLarge,
-                color = MaterialTheme.colorScheme.error,
-                textAlign = TextAlign.Center
-            )
-            if (onRetry != null) {
-                Button(onClick = onRetry, modifier = Modifier.defaultMinSize(minHeight = 48.dp)) {
-                    Text(stringResource(R.string.action_retry))
-                }
+) = Told(
+    text = text,
+    color = MaterialTheme.colorScheme.error,
+    modifier = modifier,
+    actionText = stringResource(R.string.action_retry).takeIf { onRetry != null },
+    onAction = onRetry
+)
+
+/** Сказанное человеку посреди пустого экрана и, если есть что делать, кнопка. */
+@Composable
+private fun Told(
+    text: String,
+    color: Color,
+    modifier: Modifier,
+    actionText: String?,
+    onAction: (() -> Unit)?
+) = Middle(modifier) {
+    Column(
+        horizontalAlignment = Alignment.CenterHorizontally,
+        verticalArrangement = Arrangement.spacedBy(16.dp)
+    ) {
+        Text(text, style = MaterialTheme.typography.bodyLarge, color = color, textAlign = TextAlign.Center)
+        if (actionText != null && onAction != null) {
+            Button(onClick = onAction, modifier = Modifier.defaultMinSize(minHeight = 48.dp)) {
+                Text(actionText)
             }
         }
     }
 }
 
-/** Общая рамка всех трёх состояний: середина экрана и поля, одинаковые везде. */
+/** Общая рамка всех трёх: середина экрана и поля, одинаковые везде. */
 @Composable
-private fun StateFrame(modifier: Modifier, content: @Composable () -> Unit) {
-    Box(
-        modifier = modifier.fillMaxSize().padding(24.dp),
-        contentAlignment = Alignment.Center
-    ) { content() }
-}
+private fun Middle(modifier: Modifier, content: @Composable () -> Unit) = Box(
+    modifier = modifier.fillMaxSize().padding(24.dp),
+    contentAlignment = Alignment.Center,
+    content = { content() }
+)
 
 /** Текст причины — её свойство: экран не выбирает, какими словами называть отказ. */
 @get:StringRes

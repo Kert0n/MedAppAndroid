@@ -13,8 +13,8 @@
     <string name="tab_med_kits">Аптечки</string>
     <string name="tab_plan">План</string>
     <string name="tab_scanner">Сканер</string>
-    <string name="tab_analytics">Аналитика</string>
-    <string name="tab_settings">Настройки</string>
+    <string name="tab_reports">Отчёты</string>
+    <string name="tab_options">Опции</string>
 
     <!-- Первичная настройка -->
     <string name="setup_key_lost">Ключ этого устройства больше не открывается, и учётная запись
