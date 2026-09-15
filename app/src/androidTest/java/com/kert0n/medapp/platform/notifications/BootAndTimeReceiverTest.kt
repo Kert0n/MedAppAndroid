@@ -4,7 +4,12 @@ import android.content.Intent
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import com.kert0n.medapp.feature.notification.ReminderOutbox
 import com.kert0n.medapp.fixture.await
+import com.kert0n.medapp.platform.time.TimeShifts
+import kotlinx.coroutines.CoroutineStart
+import kotlinx.coroutines.async
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.runBlocking
+import kotlinx.coroutines.withTimeoutOrNull
 import dagger.hilt.android.testing.HiltAndroidRule
 import dagger.hilt.android.testing.HiltAndroidTest
 import javax.inject.Inject
@@ -13,6 +18,7 @@ import org.junit.Rule
 import androidx.test.platform.app.InstrumentationRegistry
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
+import org.junit.Assert.assertNotNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
 import org.junit.runner.RunWith
@@ -31,6 +37,9 @@ class BootAndTimeReceiverTest {
 
     @Inject
     lateinit var outbox: ReminderOutbox
+
+    @Inject
+    lateinit var shifts: TimeShifts
 
     @Before
     fun setUp() {
@@ -55,6 +64,27 @@ class BootAndTimeReceiverTest {
         BootAndTimeReceiver().onReceive(context, Intent(android.app.AlarmManager.ACTION_SCHEDULE_EXACT_ALARM_PERMISSION_STATE_CHANGED))
 
         runBlocking { await("владелец постановок разбужен") { outbox.state.value.passes > before } }
+    }
+
+    /**
+     * Будильники — не единственные, кому этот сигнал нужен: открытый экран ждёт границы суток и
+     * после переезда ждёт не того момента. Узнать об этом сам он не может — спит до старой
+     * полуночи.
+     *
+     * Красная проверка: не говорить ждущим — весть не приходит, и до старой полуночи человек
+     * читает вчерашний день.
+     */
+    @Test
+    fun theReceiverTellsThoseWaitingForTheDayBoundary() = runBlocking {
+        val context = InstrumentationRegistry.getInstrumentation().targetContext
+        // Ухо подписывается до сигнала, а не после: сказанное в пустоту не ждёт слушателя.
+        val heard = async(start = CoroutineStart.UNDISPATCHED) {
+            withTimeoutOrNull(5_000) { shifts.signals.first() }
+        }
+
+        BootAndTimeReceiver().onReceive(context, Intent(Intent.ACTION_TIMEZONE_CHANGED))
+
+        assertNotNull("ждущим границы дня не сказали, что она уехала", heard.await())
     }
 
     @Test

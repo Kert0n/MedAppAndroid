@@ -1,13 +1,16 @@
 package com.kert0n.medapp.presentation
 
+import com.kert0n.medapp.platform.time.TimeShifts
 import java.time.Clock
 import java.time.Duration
 import java.time.LocalDate
 import javax.inject.Inject
 import javax.inject.Singleton
-import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.distinctUntilChanged
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.flow
+import kotlinx.coroutines.withTimeoutOrNull
 
 /**
  * Какой сегодня день — и когда он станет другим. Просрочка, «истекает скоро» и план дня зависят
@@ -20,7 +23,14 @@ import kotlinx.coroutines.flow.flow
  * (PLAN C1 «Часы устройства — в его нынешней зоне»).
  */
 @Singleton
-class Today @Inject constructor(private val clock: Clock) {
+class Today @Inject constructor(
+    private val clock: Clock,
+    /**
+     * Значение по умолчанию — ради проверок, которые о переводе часов не спрашивают; графу
+     * достаётся общий на приложение [TimeShifts], тот самый, куда пишет `BootAndTimeReceiver`.
+     */
+    private val shifts: TimeShifts = TimeShifts()
+) {
 
     /** Текущий день сразу и каждый следующий — в его местную полночь. */
     fun observe(): Flow<LocalDate> = flow {
@@ -32,7 +42,11 @@ class Today @Inject constructor(private val clock: Clock) {
             // Пересчитывается от начала следующего дня, а не «через сутки»: перевод часов и
             // смена зоны иначе увели бы границу дня в сторону и больше не вернули.
             val midnight = today.plusDays(1).atStartOfDay(zone).toInstant()
-            delay(Duration.between(now, midnight).toMillis().coerceAtLeast(1))
+            // Ожидание кончается полуночью — или вестью о том, что полночь теперь другая:
+            // переехавший человек иначе досидел бы во вчера до старой границы суток.
+            withTimeoutOrNull(Duration.between(now, midnight).toMillis().coerceAtLeast(1)) {
+                shifts.signals.first()
+            }
         }
-    }
+    }.distinctUntilChanged()
 }
