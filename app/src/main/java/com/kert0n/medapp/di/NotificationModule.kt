@@ -6,6 +6,8 @@ import com.kert0n.medapp.domain.notification.ReminderAlarms
 import com.kert0n.medapp.platform.notifications.AlarmManagerReminders
 import com.kert0n.medapp.platform.notifications.WorkManagerDailySchedule
 import com.kert0n.medapp.feature.notification.DailySchedule
+import com.kert0n.medapp.feature.time.ClockShifts
+import com.kert0n.medapp.platform.time.TimeShifts
 import com.kert0n.medapp.platform.notifications.SystemNotifier
 import dagger.Binds
 import dagger.Module
@@ -33,4 +35,12 @@ abstract class NotificationModule {
     @Binds
     @Singleton
     abstract fun dailySchedule(implementation: WorkManagerDailySchedule): DailySchedule
+
+    /**
+     * Весть о переводе часов — тот же системный сигнал, что будит проход дня: ждущие границы
+     * суток видят его портом, а приносит его платформа (`BootAndTimeReceiver`).
+     */
+    @Binds
+    @Singleton
+    abstract fun clockShifts(implementation: TimeShifts): ClockShifts
 }

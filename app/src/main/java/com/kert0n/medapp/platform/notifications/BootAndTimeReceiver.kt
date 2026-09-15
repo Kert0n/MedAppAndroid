@@ -7,6 +7,7 @@ import android.content.Context
 import android.content.Intent
 import com.kert0n.medapp.feature.notification.DailySchedule
 import com.kert0n.medapp.feature.notification.ReminderOutbox
+import com.kert0n.medapp.platform.time.TimeShifts
 import dagger.hilt.android.AndroidEntryPoint
 import javax.inject.Inject
 
@@ -26,10 +27,15 @@ class BootAndTimeReceiver : BroadcastReceiver() {
     @Inject
     lateinit var outbox: ReminderOutbox
 
+    @Inject
+    lateinit var shifts: TimeShifts
+
     override fun onReceive(context: Context, intent: Intent) {
         if (!restartsTheDay(intent.action)) return
         daily.runNow()
         outbox.runNow()
+        // Ждущие границы дня ждут теперь не того момента: открытый экран узнаёт об этом отсюда.
+        shifts.happened()
     }
 
     companion object {
