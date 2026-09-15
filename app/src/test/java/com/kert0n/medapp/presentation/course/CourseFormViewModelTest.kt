@@ -6,6 +6,21 @@ import com.kert0n.medapp.fixture.COURSE
 import com.kert0n.medapp.fixture.DirectTransactions
 import com.kert0n.medapp.fixture.FakeCourseStorage
 import com.kert0n.medapp.fixture.FakePackages
+import com.kert0n.medapp.fixture.FakeVocabulary
+import com.kert0n.medapp.fixture.MILLILITRES
+import com.kert0n.medapp.fixture.MOSCOW
+import com.kert0n.medapp.fixture.PACK
+import com.kert0n.medapp.fixture.TABLETS
+import com.kert0n.medapp.fixture.TABLET_FORM
+import com.kert0n.medapp.fixture.dose
+import com.kert0n.medapp.fixture.pack
+import com.kert0n.medapp.fixture.source
+import com.kert0n.medapp.presentation.value.toPresentationDTO
+import com.kert0n.medapp.domain.course.CourseRejected
+import com.kert0n.medapp.domain.value.Doses
+import java.time.DayOfWeek
+import java.time.LocalDate
+import java.time.LocalTime
 import com.kert0n.medapp.fixture.HeldTransactions
 import com.kert0n.medapp.fixture.MainDispatcherRule
 import com.kert0n.medapp.fixture.awaiting
@@ -40,6 +55,7 @@ class CourseFormViewModelTest {
         CourseFormViewModel(
             drafting = CourseDrafting(courses, packages, transactions, clock),
             courses = courses,
+            vocabulary = FakeVocabulary(),
             courseId = courseId
         )
 
@@ -171,8 +187,90 @@ class CourseFormViewModelTest {
     fun aNewDraftCannotBeDiscardedBeforeItExists() {
         val model = viewModel()
 
-        model.askToDiscard()
+        val state = watching(model.state) { state ->
+            model.askToDiscard()
+            state.awaiting { it is CourseFormUiState.Editing }
+        }
 
-        assertEquals(false, (model.state.value as CourseFormUiState.Editing).asksToDiscard)
+        assertEquals(false, (state as CourseFormUiState.Editing).asksToDiscard)
+    }
+
+    /**
+     * Черновик пишется по частям: заполненное разобрано и записано, пустое не отправлено —
+     * доза есть, расписания нет, и это не отказ (D5 «Черновик»).
+     */
+    @Test
+    fun aPartlyFilledPrescriptionIsWrittenPartByPart() {
+        val model = viewModel()
+
+        watching(model.state) { state ->
+            model.edit(CourseFormPresentationDTO(title = "Нурофен", doseAmount = "2", unit = TABLETS.toPresentationDTO(), totalDoses = "7"))
+            model.save()
+            state.awaiting { it is CourseFormUiState.Editing && it.isSaved }
+        }
+
+        val draft = courses.drafts.values.single()
+        assertEquals(dose("2"), draft.dose)
+        assertEquals(Doses(7), draft.totalDoses)
+        assertEquals(null, draft.schedule)
+        assertEquals(null, draft.form)
+    }
+
+    /** Отказ разбора называет поле: человек не ищет ошибку глазами. */
+    @Test
+    fun aRefusalNamesItsField() {
+        val model = viewModel()
+
+        val state = watching(model.state) { state ->
+            model.edit(CourseFormPresentationDTO(title = "Нурофен", start = LocalDate.of(2027, 3, 1)))
+            model.save()
+            state.awaiting { it is CourseFormUiState.Editing && it.error != null }
+        }
+
+        assertEquals(CourseFormError.Input.DAYS_EMPTY, (state as CourseFormUiState.Editing).error)
+        assertEquals(CourseFormError.Field.DAYS, state.error?.field)
+        assertTrue(courses.drafts.isEmpty())
+    }
+
+    /** Отказ сценария показан по месту: единицу под подключёнными пачками не сменить. */
+    @Test
+    fun aRejectionFromTheScenarioIsShownAtItsField() {
+        packages.lying(pack(id = PACK, form = TABLET_FORM))
+        courses.holding(course(id = COURSE, title = "Нурофен", dose = dose("2"), form = TABLET_FORM, sources = listOf(source(pack(id = PACK, form = TABLET_FORM), 3))))
+        val model = viewModel(courseId = COURSE)
+
+        val state = watching(model.state) { state ->
+            state.awaiting { it is CourseFormUiState.Editing }
+            val form = (state.value as CourseFormUiState.Editing).form
+            model.edit(form.copy(doseAmount = "5", unit = MILLILITRES.toPresentationDTO()))
+            model.save()
+            state.awaiting { it is CourseFormUiState.Editing && !it.isSaving }
+        }
+
+        assertEquals(CourseFormError.Rejected(CourseRejected.Reason.UNIT_MISMATCH), (state as CourseFormUiState.Editing).error)
+        assertEquals(CourseFormError.Field.DOSE, state.error?.field)
+        assertEquals(dose("2"), courses.drafts.getValue(COURSE).dose)
+    }
+
+    /** Ожидаемый конец считается при вводе: «дата конца» читается, а не вводится. */
+    @Test
+    fun theExpectedEndFollowsTheTyping() {
+        val model = viewModel()
+
+        val state = watching(model.state) { state ->
+            model.edit(
+                CourseFormPresentationDTO(
+                    title = "Нурофен",
+                    start = LocalDate.of(2027, 3, 1),
+                    days = DayOfWeek.entries.toSet(),
+                    times = listOf(LocalTime.of(9, 0)),
+                    totalDoses = "3",
+                    zone = MOSCOW
+                )
+            )
+            state.awaiting { it is CourseFormUiState.Editing && it.expectedEnd != null }
+        }
+
+        assertEquals(LocalDate.of(2027, 3, 3), (state as CourseFormUiState.Editing).expectedEnd)
     }
 }

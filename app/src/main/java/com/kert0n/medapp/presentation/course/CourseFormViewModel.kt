@@ -2,19 +2,26 @@ package com.kert0n.medapp.presentation.course
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
-import com.kert0n.medapp.domain.course.Revision
+import com.kert0n.medapp.domain.course.CourseDraftProjection
 import com.kert0n.medapp.feature.course.CourseDrafting
 import com.kert0n.medapp.presentation.ParsedInput
+import com.kert0n.medapp.presentation.value.FormPresentationDTO
+import com.kert0n.medapp.presentation.value.UnitPresentationDTO
+import com.kert0n.medapp.presentation.value.toPresentationDTO
 import com.kert0n.medapp.storage.course.CourseStorageRepository
+import com.kert0n.medapp.storage.value.VocabularyStorageRepository
 import dagger.assisted.Assisted
 import dagger.assisted.AssistedFactory
 import dagger.assisted.AssistedInject
 import dagger.hilt.android.lifecycle.HiltViewModel
+import java.time.LocalDate
 import kotlin.uuid.Uuid
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
-import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 
 /**
@@ -22,13 +29,15 @@ import kotlinx.coroutines.launch
  *
  * Черновик записывается **с одним названием**: остальное человек дописывает, когда узнает
  * (D5). Записанное дочитывается один раз, до первого ввода: экран показывает то, что человек
- * видел, и не переписывает то, что он печатает (U1). Аргумент приходит значением из ключа
- * маршрута, а не из `SavedStateHandle` (H3 «Оболочка»).
+ * видел, и не переписывает то, что он печатает (U1). При записи уходит только изменённое:
+ * назначение черновика правится по частям, и нетронутое поле сценарию не называют. Аргумент
+ * приходит значением из ключа маршрута, а не из `SavedStateHandle` (H3 «Оболочка»).
  */
 @HiltViewModel(assistedFactory = CourseFormViewModel.Factory::class)
 class CourseFormViewModel @AssistedInject constructor(
     private val drafting: CourseDrafting,
     private val courses: CourseStorageRepository,
+    private val vocabulary: VocabularyStorageRepository,
     @Assisted private val courseId: Uuid?
 ) : ViewModel() {
 
@@ -37,21 +46,30 @@ class CourseFormViewModel @AssistedInject constructor(
         fun create(courseId: Uuid?): CourseFormViewModel
     }
 
-    private val _state = MutableStateFlow<CourseFormUiState>(
+    private val editing = MutableStateFlow<CourseFormUiState>(
         if (courseId == null) CourseFormUiState.Editing(CourseFormPresentationDTO(), CourseFormUiState.Mode.NEW_DRAFT)
         else CourseFormUiState.Loading
     )
 
-    val state: StateFlow<CourseFormUiState> = _state.asStateFlow()
+    /** Из чего человек выбирает: словарь. Приходит к форме, а не в неё — редактор её не пишет. */
+    val state: StateFlow<CourseFormUiState> = combine(
+        editing,
+        vocabulary.observeUnits(),
+        vocabulary.observeForms()
+    ) { state, units, forms ->
+        if (state is CourseFormUiState.Editing) {
+            state.copy(units = units.map { it.toPresentationDTO() }, forms = forms.map { it.toPresentationDTO() })
+        } else state
+    }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), editing.value)
 
     init {
         if (courseId != null) viewModelScope.launch { open(courseId) }
     }
 
     fun edit(form: CourseFormPresentationDTO) {
-        val editing = _state.value as? CourseFormUiState.Editing ?: return
+        val current = editing.value as? CourseFormUiState.Editing ?: return
         // Ввод снимает отказ: человек уже правит то, на что ему указали.
-        _state.value = editing.copy(form = form, error = null)
+        editing.value = current.copy(form = form, error = null, expectedEnd = form.expectedEnd())
     }
 
     /**
@@ -59,38 +77,38 @@ class CourseFormViewModel @AssistedInject constructor(
      * сторожем служит само состояние, а не признак рядом с ним.
      */
     fun save() {
-        val editing = _state.value as? CourseFormUiState.Editing ?: return
-        if (editing.isBusy || editing.isSaved) return
-        when (val parsed = editing.form.parsed()) {
-            is ParsedInput.Rejected -> _state.value = editing.copy(error = parsed.error)
-            is ParsedInput.Parsed -> {
-                val saving = editing.copy(error = null, isSaving = true)
-                _state.value = saving
-                viewModelScope.launch { write(saving, parsed.value) }
+        val current = editing.value as? CourseFormUiState.Editing ?: return
+        if (current.isBusy || current.isSaved) return
+        val saving = current.copy(error = null, isSaving = true)
+        editing.value = saving
+        viewModelScope.launch {
+            when (val parsed = current.form.parsed(vocabulary.snapshot())) {
+                is ParsedInput.Rejected -> editing.value = saving.copy(isSaving = false, error = parsed.error)
+                is ParsedInput.Parsed -> write(saving, parsed.value)
             }
         }
     }
 
     /** Удаление спрашивается **до** сценария: в черновике может лежать единственная запись от врача (H3). */
     fun askToDiscard() {
-        val editing = _state.value as? CourseFormUiState.Editing ?: return
-        if (editing.mode == CourseFormUiState.Mode.DRAFT) _state.value = editing.copy(asksToDiscard = true)
+        val current = editing.value as? CourseFormUiState.Editing ?: return
+        if (current.mode == CourseFormUiState.Mode.DRAFT) editing.value = current.copy(asksToDiscard = true)
     }
 
     fun dismissDiscard() {
-        val editing = _state.value as? CourseFormUiState.Editing ?: return
-        _state.value = editing.copy(asksToDiscard = false)
+        val current = editing.value as? CourseFormUiState.Editing ?: return
+        editing.value = current.copy(asksToDiscard = false)
     }
 
     fun discard() {
-        val editing = _state.value as? CourseFormUiState.Editing ?: return
-        if (!editing.asksToDiscard || editing.isBusy) return
+        val current = editing.value as? CourseFormUiState.Editing ?: return
+        if (!current.asksToDiscard || current.isBusy) return
         val id = courseId ?: return
-        _state.value = editing.copy(asksToDiscard = false, isDiscarding = true)
+        editing.value = current.copy(asksToDiscard = false, isDiscarding = true)
         viewModelScope.launch {
             // Удалять нечего — черновика уже нет: итог для человека тот же, экран уходит.
             drafting.discard(id)
-            _state.value = editing.copy(asksToDiscard = false, isDiscarding = false, isDiscarded = true)
+            editing.value = current.copy(asksToDiscard = false, isDiscarding = false, isDiscarded = true)
         }
     }
 
@@ -98,31 +116,46 @@ class CourseFormViewModel @AssistedInject constructor(
         val draft = courses.observeDrafts().first().firstOrNull { it.id == id }
         // Черновика нет — это отказ, а не пустая форма: заполненную человек сохранил бы и не
         // понял, куда делась его правка.
-        _state.value = draft?.let {
-            CourseFormUiState.Editing(it.toFormPresentationDTO(), CourseFormUiState.Mode.DRAFT, revision = it.revision)
+        editing.value = draft?.let {
+            val form = it.toFormPresentationDTO()
+            CourseFormUiState.Editing(form, CourseFormUiState.Mode.DRAFT, stored = it, expectedEnd = form.expectedEnd())
         } ?: CourseFormUiState.Gone
     }
 
-    private suspend fun write(saving: CourseFormUiState.Editing, description: CourseDescription) {
-        _state.value = when (saving.mode) {
+    private suspend fun write(saving: CourseFormUiState.Editing, described: CourseDescription) {
+        editing.value = when (saving.mode) {
             CourseFormUiState.Mode.NEW_DRAFT -> {
-                drafting.create(description.title, description.note)
-                saving.copy(isSaving = false, isSaved = true)
+                val created = drafting.create(described.title, described.note)
+                val edits = described.editsSince(created)
+                if (edits.isEmpty()) saving.copy(isSaving = false, isSaved = true)
+                else saving.told(drafting.edit(created.id, created.revision, edits))
             }
             CourseFormUiState.Mode.DRAFT -> {
-                val id = checkNotNull(courseId)
-                val revision = checkNotNull(saving.revision)
-                val edits = listOf(CourseDrafting.Edit.Rename(description.title, description.note))
-                when (val outcome = drafting.edit(id, revision, edits)) {
-                    is CourseDrafting.Outcome.Saved -> saving.copy(isSaving = false, isSaved = true)
-                    CourseDrafting.Outcome.Gone -> CourseFormUiState.Gone
-                    CourseDrafting.Outcome.Stale -> saving.copy(isSaving = false, error = CourseFormError.Stale)
-                    // Название и заметку черновик не отвергает: до отказов доходят только доза, форма и пачки.
-                    is CourseDrafting.Outcome.Rejected, CourseDrafting.Outcome.PackageUnusable ->
-                        error("переименование черновика не отвергается: $outcome")
-                }
+                val stored = checkNotNull(saving.stored)
+                val edits = described.editsSince(stored)
+                if (edits.isEmpty()) saving.copy(isSaving = false, isSaved = true)
+                else saving.told(drafting.edit(stored.id, stored.revision, edits))
             }
         }
+    }
+
+    /** Только изменённое: нетронутое поле сценарию не называют — черновик правится по частям. */
+    private fun CourseDescription.editsSince(stored: CourseDraftProjection): List<CourseDrafting.Edit> = buildList {
+        if (title != stored.title || note != stored.note) add(CourseDrafting.Edit.Rename(title, note))
+        dose?.takeIf { it != stored.dose }?.let { add(CourseDrafting.Edit.SetDose(it)) }
+        form?.takeIf { it != stored.form }?.let { add(CourseDrafting.Edit.SetForm(it)) }
+        schedule?.takeIf { it != stored.schedule }?.let { add(CourseDrafting.Edit.SetSchedule(it)) }
+        totalDoses?.takeIf { it != stored.totalDoses }?.let { add(CourseDrafting.Edit.SetTotalDoses(it)) }
+    }
+
+    /** Чем кончилась запись — человеку: записано; черновика нет; устарел; отказ по месту. */
+    private fun CourseFormUiState.Editing.told(outcome: CourseDrafting.Outcome): CourseFormUiState = when (outcome) {
+        is CourseDrafting.Outcome.Saved -> copy(isSaving = false, isSaved = true)
+        CourseDrafting.Outcome.Gone -> CourseFormUiState.Gone
+        CourseDrafting.Outcome.Stale -> copy(isSaving = false, error = CourseFormError.Stale)
+        is CourseDrafting.Outcome.Rejected -> copy(isSaving = false, error = CourseFormError.Rejected(outcome.reason))
+        // Пачки редактор не трогает: до этого исхода его правки не доходят.
+        CourseDrafting.Outcome.PackageUnusable -> error("редактор назначения пачек не подключает: $outcome")
     }
 }
 
@@ -140,7 +173,12 @@ sealed interface CourseFormUiState {
     data class Editing(
         val form: CourseFormPresentationDTO,
         val mode: Mode,
-        val revision: Revision? = null,
+        /** Записанное, с которым сравнивают при записи: уходит только изменённое. */
+        val stored: CourseDraftProjection? = null,
+        val units: List<UnitPresentationDTO> = emptyList(),
+        val forms: List<FormPresentationDTO> = emptyList(),
+        /** Когда ожидается последний приём по тому, что набрано; нечего считать — `null`. */
+        val expectedEnd: LocalDate? = null,
         val error: CourseFormError? = null,
         val isSaving: Boolean = false,
         val isSaved: Boolean = false,

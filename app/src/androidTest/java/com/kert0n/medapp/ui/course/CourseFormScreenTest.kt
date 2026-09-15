@@ -5,11 +5,16 @@ import androidx.compose.ui.test.junit4.v2.createComposeRule
 import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
+import androidx.compose.ui.test.performScrollTo
 import androidx.test.ext.junit.runners.AndroidJUnit4
+import com.kert0n.medapp.domain.course.CourseRejected
 import com.kert0n.medapp.presentation.course.CourseFormError
 import com.kert0n.medapp.presentation.course.CourseFormPresentationDTO
 import com.kert0n.medapp.presentation.course.CourseFormUiState
 import com.kert0n.medapp.ui.theme.MedAppTheme
+import java.time.DayOfWeek
+import java.time.LocalDate
+import java.time.LocalTime
 import org.junit.Assert.assertEquals
 import org.junit.Rule
 import org.junit.Test
@@ -34,7 +39,7 @@ class CourseFormScreenTest {
             MedAppTheme {
                 CourseFormScreen(
                     state = state,
-                    onEdit = {},
+                    onEdit = { edited = it },
                     onSave = { saved++ },
                     onAskToDiscard = { asked++ },
                     onConfirmDiscard = { confirmed++ },
@@ -45,8 +50,15 @@ class CourseFormScreenTest {
         }
     }
 
-    private fun editing(mode: CourseFormUiState.Mode = CourseFormUiState.Mode.NEW_DRAFT, error: CourseFormError? = null, asksToDiscard: Boolean = false) =
-        CourseFormUiState.Editing(CourseFormPresentationDTO(title = "Нурофен"), mode, error = error, asksToDiscard = asksToDiscard)
+    private var edited: CourseFormPresentationDTO? = null
+
+    private fun editing(
+        mode: CourseFormUiState.Mode = CourseFormUiState.Mode.NEW_DRAFT,
+        error: CourseFormError? = null,
+        asksToDiscard: Boolean = false,
+        form: CourseFormPresentationDTO = CourseFormPresentationDTO(title = "Нурофен"),
+        expectedEnd: LocalDate? = null
+    ) = CourseFormUiState.Editing(form, mode, error = error, asksToDiscard = asksToDiscard, expectedEnd = expectedEnd)
 
     /** Кнопка не гаснет: нажатие с пустым названием — названная причина, а не молчание. */
     @Test
@@ -57,6 +69,48 @@ class CourseFormScreenTest {
         compose.onNodeWithText("Сохранить").performClick()
 
         assertEquals(1, saved)
+    }
+
+    /** Дни — плашки по одной на день; нажатие отдаёт форму с этим днём, повторное — без него. */
+    @Test
+    fun daysOfTheWeekAreChipsThatToggle() {
+        show(editing(form = CourseFormPresentationDTO(title = "Нурофен", days = setOf(DayOfWeek.MONDAY))))
+
+        compose.onNodeWithText("вт").performScrollTo().performClick()
+        assertEquals(setOf(DayOfWeek.MONDAY, DayOfWeek.TUESDAY), edited?.days)
+
+        compose.onNodeWithText("пн").performClick()
+        assertEquals(emptySet<DayOfWeek>(), edited?.days)
+    }
+
+    /** Время снимается крестиком на плашке, а новое приходит из часов — строкой его не печатают. */
+    @Test
+    fun timesAreChipsAndANewOneComesFromTheClock() {
+        show(editing(form = CourseFormPresentationDTO(title = "Нурофен", times = listOf(LocalTime.of(9, 0)))))
+
+        compose.onNodeWithText("09:00").performScrollTo().assertIsDisplayed()
+        compose.onNodeWithContentDescription("Убрать 09:00").performClick()
+        assertEquals(emptyList<LocalTime>(), edited?.times)
+
+        compose.onNodeWithText("Добавить время").performClick()
+        compose.onNodeWithText("Выбрать").performClick()
+        assertEquals(listOf(LocalTime.of(9, 0)), edited?.times)
+    }
+
+    /** «Дата конца» читается под числом приёмов, а не вводится (C1 «Курс резиновый»). */
+    @Test
+    fun theExpectedEndIsReadUnderTheCount() {
+        show(editing(expectedEnd = LocalDate.of(2027, 3, 4)))
+
+        compose.onNodeWithText("Последний приём — 04.03.2027").performScrollTo().assertIsDisplayed()
+    }
+
+    /** Отказ сценария — словами у поля: чего не хватает, чтобы начать. */
+    @Test
+    fun aScenarioRefusalIsSaidInWords() {
+        show(editing(error = CourseFormError.Rejected(CourseRejected.Reason.SCHEDULE_MISSING)))
+
+        compose.onNodeWithText("Чтобы начать, укажите расписание.").performScrollTo().assertIsDisplayed()
     }
 
     @Test
