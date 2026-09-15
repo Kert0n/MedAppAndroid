@@ -148,6 +148,15 @@
     <string name="amount_zero_explained">В ней не останется ничего, и она исчезнет. Приёмы из неё останутся в истории.</string>
     <string name="amount_zero_confirm">Да, коробка кончилась</string>
 
+    <!-- Упаковка: перенос -->
+    <string name="transfer_title">Куда перенести</string>
+    <string name="transfer_action">Перенести</string>
+    <string name="transfer_shared">Общая аптечка</string>
+    <string name="transfer_nowhere">Переносить некуда: другой аптечки пока нет. Заведите вторую — и коробку будет куда положить.</string>
+    <string name="transfer_origin_busy">Аптечка, из которой несут, ждёт ответа сервера на своё решение.</string>
+    <string name="transfer_target_gone">Выбранной аптечки больше нет — выберите другую.</string>
+    <string name="transfer_target_busy">Выбранная аптечка ждёт ответа сервера — класть в неё пока рано.</string>
+
     <!-- Упаковка: отказы формы -->
     <string name="pack_med_kit_missing">Выберите аптечку: упаковка лежит в каком-то одном месте.</string>
     <string name="pack_med_kit_gone">Этой аптечки больше нет — выберите другую.</string>
