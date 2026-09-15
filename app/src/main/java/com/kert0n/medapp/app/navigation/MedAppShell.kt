@@ -9,15 +9,24 @@ import androidx.compose.material3.NavigationBarItem
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.navigation3.runtime.NavKey
 import androidx.navigation3.runtime.entryProvider
+import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.navigation3.ui.NavDisplay
 import com.kert0n.medapp.R
+import com.kert0n.medapp.presentation.medkit.MedKitFormUiState
+import com.kert0n.medapp.presentation.medkit.MedKitFormViewModel
+import com.kert0n.medapp.presentation.medkit.MedKitListViewModel
 import com.kert0n.medapp.ui.EmptyState
+import com.kert0n.medapp.ui.medkit.MedKitFormScreen
+import com.kert0n.medapp.ui.medkit.MedKitListScreen
 
 /**
  * Оболочка приложения: пять мест внизу и содержимое над ними. Где человек стоит и как глубоко —
@@ -40,7 +49,7 @@ fun MedAppShell(modifier: Modifier = Modifier, stacks: TabStacks = rememberTabSt
         bottomBar = { Places(stacks) }
     ) { padding ->
         NavDisplay(
-            entries = stacks.entries(places),
+            entries = stacks.entries(remember(stacks) { screens(stacks) }),
             onBack = stacks::back,
             modifier = Modifier.padding(padding).consumeWindowInsets(padding)
         )
@@ -48,11 +57,40 @@ fun MedAppShell(modifier: Modifier = Modifier, stacks: TabStacks = rememberTabSt
 }
 
 /**
- * Что показывает каждое место. Пока своего экрана у места нет, за ним стоит общее «пусто» — то
+ * Что показывает каждый ключ. Пока своего экрана у места нет, за ним стоит общее «пусто» — то
  * самое, которое потом покажет настоящий экран, когда показывать действительно нечего.
+ *
+ * Состояние экрану даёт `hiltViewModel` здесь же, а аргумент приходит **значением из ключа**:
+ * экран получает `state` и действия и больше ничего (PLAN H1).
  */
-private val places = entryProvider<NavKey> {
-    for (place in Place.entries) {
+private fun screens(stacks: TabStacks) = entryProvider<NavKey> {
+    entry(Screen.MedKits) {
+        val model: MedKitListViewModel = hiltViewModel()
+        MedKitListScreen(
+            state = model.state.collectAsStateWithLifecycle().value,
+            // Вглубь отсюда пока некуда: содержимое полки и все лекарства — следующие коммиты.
+            onOpen = {},
+            onAdd = { stacks.go(Screen.MedKitForm()) },
+            onSearch = {}
+        )
+    }
+    entry<Screen.MedKitForm> { key ->
+        val model = hiltViewModel<MedKitFormViewModel, MedKitFormViewModel.Factory>(
+            key = key.toString(),
+            creationCallback = { factory -> factory.create(key.medKitId) }
+        )
+        val state = model.state.collectAsStateWithLifecycle().value
+        // Записанное — повод уйти: человек заводил полку, а не форму, и возвращаться ему в неё
+        // незачем.
+        LaunchedEffect(state) { if (state is MedKitFormUiState.Editing && state.isSaved) stacks.back() }
+        MedKitFormScreen(
+            state = state,
+            onEdit = model::edit,
+            onSave = model::save,
+            onCancel = stacks::back
+        )
+    }
+    for (place in Place.entries - Place.MED_KITS) {
         entry(place.key) { NotReadyYet() }
     }
 }

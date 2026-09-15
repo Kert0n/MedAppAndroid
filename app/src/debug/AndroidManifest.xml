@@ -1,0 +1,16 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  Окно для проверок экрана. `createAndroidComposeRule` поднимает активность, а экраны берут свои
+  ViewModel у Hilt — значит окно должно быть точкой входа графа. Настоящая `MainActivity` для
+  этого не годится: она рисует приложение целиком, а проверять нужно названную часть.
+
+  Только в debug: в распространяемой сборке этой активности нет.
+-->
+<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+    <application>
+        <activity
+            android:name="com.kert0n.medapp.HiltTestActivity"
+            android:exported="false"
+            android:theme="@style/Theme.MedApp" />
+    </application>
+</manifest>

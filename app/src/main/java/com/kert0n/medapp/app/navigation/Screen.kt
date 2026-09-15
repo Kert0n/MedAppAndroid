@@ -1,6 +1,7 @@
 package com.kert0n.medapp.app.navigation
 
 import androidx.navigation3.runtime.NavKey
+import kotlin.uuid.Uuid
 import kotlinx.serialization.Serializable
 
 /**
@@ -34,4 +35,8 @@ sealed interface Screen : NavKey {
 
     @Serializable
     data object Options : Screen
+
+    /** Создание аптечки — без идентификатора, правка — с ним: это один экран (PLAN H3 №3). */
+    @Serializable
+    data class MedKitForm(val medKitId: Uuid? = null) : Screen
 }

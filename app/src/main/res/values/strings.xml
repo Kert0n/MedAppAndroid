@@ -23,6 +23,58 @@
 
     <!-- Аптечки -->
     <string name="med_kit_arrived_name">Общая аптечка</string>
+    <string name="med_kits_title">Аптечки</string>
+    <string name="med_kits_add">Завести аптечку</string>
+    <string name="med_kits_empty">Аптечек пока нет. Заведите первую — в неё и положим лекарства.</string>
+    <string name="med_kit_empty">Пока пусто</string>
+    <string name="med_kit_shared">Общая · %1$s</string>
+    <string name="search_medicines_everywhere">Найти лекарство во всех аптечках</string>
+
+    <!-- Аптечка: создание и правка -->
+    <string name="med_kit_new">Новая аптечка</string>
+    <string name="med_kit_edit">Правка аптечки</string>
+    <string name="med_kit_name">Название</string>
+    <string name="med_kit_location">Место хранения (необязательно)</string>
+    <string name="med_kit_name_empty">Название нужно: без него аптечку не отличить от других.</string>
+    <plurals name="med_kit_name_too_long">
+        <item quantity="one">Название длиннее %1$d символа.</item>
+        <item quantity="few">Название длиннее %1$d символов.</item>
+        <item quantity="many">Название длиннее %1$d символов.</item>
+        <item quantity="other">Название длиннее %1$d символа.</item>
+    </plurals>
+    <plurals name="med_kit_location_too_long">
+        <item quantity="one">Место хранения длиннее %1$d символа.</item>
+        <item quantity="few">Место хранения длиннее %1$d символов.</item>
+        <item quantity="many">Место хранения длиннее %1$d символов.</item>
+        <item quantity="other">Место хранения длиннее %1$d символа.</item>
+    </plurals>
+    <string name="med_kit_busy">Аптечка ждёт ответа сервера на другое решение — правку пока не записать.</string>
+    <string name="med_kit_gone">Этой аптечки больше нет.</string>
+
+    <!-- Действия, общие на весь набор -->
+    <string name="action_save">Сохранить</string>
+    <string name="action_cancel">Отмена</string>
+    <string name="action_back">Назад</string>
+
+    <!-- Русские количества: «1 упаковка», «2 упаковки», «12 упаковок» -->
+    <plurals name="packages_count">
+        <item quantity="one">%d упаковка</item>
+        <item quantity="few">%d упаковки</item>
+        <item quantity="many">%d упаковок</item>
+        <item quantity="other">%d упаковки</item>
+    </plurals>
+    <plurals name="packages_expired">
+        <item quantity="one">%d просрочена</item>
+        <item quantity="few">%d просрочены</item>
+        <item quantity="many">%d просрочено</item>
+        <item quantity="other">%d просрочено</item>
+    </plurals>
+    <plurals name="participants_count">
+        <item quantity="one">%d участник</item>
+        <item quantity="few">%d участника</item>
+        <item quantity="many">%d участников</item>
+        <item quantity="other">%d участника</item>
+    </plurals>
 
     <!-- Экраны, которых ещё нет -->
     <string name="screen_not_ready">Этот экран ещё не готов.</string>
