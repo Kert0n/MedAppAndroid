@@ -14,8 +14,9 @@ import com.kert0n.medapp.domain.pack.PackageStatus
 import com.kert0n.medapp.network.pack.PackageSnapshot
 import com.kert0n.medapp.network.pack.PackageSyncState
 import com.kert0n.medapp.storage.course.CourseDao
+import com.kert0n.medapp.domain.course.PackageFollowing
+import javax.inject.Provider
 import com.kert0n.medapp.storage.course.CourseReallocation
-import com.kert0n.medapp.storage.course.releaseSource
 import com.kert0n.medapp.storage.course.toSourceStorageEntities
 import com.kert0n.medapp.storage.course.toStorageEntity as toCourseStorageEntity
 import com.kert0n.medapp.storage.database.MedAppDatabase
@@ -36,7 +37,9 @@ class PackageRoomRepository @Inject constructor(
     private val courses: CourseDao,
     private val queue: SyncOperationDao,
     private val intakes: IntakeDao,
-    private val vocabulary: VocabularyDao
+    private val vocabulary: VocabularyDao,
+    // Лениво: владелец реакции сам зависит от этого репозитория (PLAN D5).
+    private val following: Provider<PackageFollowing>
 ) : PackageStorageRepository {
 
     /**
@@ -85,7 +88,7 @@ class PackageRoomRepository @Inject constructor(
     }
 
     private suspend fun finish(ending: PackageEnding, at: Instant) =
-        packages.end(ending, courses, vocabulary.snapshot(), at)
+        packages.end(ending, following.get(), courses, at)
 
     override suspend fun contentsOf(medKitId: Uuid): List<Package> = database.withTransaction {
         val words = vocabulary.snapshot()

@@ -14,7 +14,6 @@ import com.kert0n.medapp.domain.pack.Availability
 import com.kert0n.medapp.domain.value.Quantity
 import com.kert0n.medapp.domain.course.Revision
 import com.kert0n.medapp.domain.intake.CourseIntake
-import com.kert0n.medapp.domain.pack.PackageRef
 import com.kert0n.medapp.domain.report.CourseInProgress
 import com.kert0n.medapp.domain.value.Vocabulary
 import com.kert0n.medapp.storage.database.chunkedForQuery
@@ -245,38 +244,3 @@ suspend fun PackageDao.availabilityOf(
     }
 }
 
-/**
- * Источник не переживает коробку: **каждое** лечение, державшее пачку [pkg], теряет её доменным
- * переходом — с ростом редакции и освобождением назначения, — а не молча каскадом схемы
- * (PLAN D5, F5). Зовётся один раз, из двери конца коробки, и только оттуда.
- *
- * Лечение ищется по составу, а не по назначениям: назначения бывают только у начатого, а состав
- * есть и у черновика, и вырезанный каскадом источник черновика человек обнаружил бы сам, вернувшись
- * к недоделанному курсу.
- */
-suspend fun CourseDao.releaseSource(pkg: PackageRef, vocabulary: Vocabulary, at: Instant) {
-    for (courseId in coursesHolding(pkg.id)) {
-        val row = findPlan(courseId) ?: continue
-        if (row.isDraft) {
-            val draft = row.toDraft(vocabulary).detach(pkg, at)
-            saveCourse(
-                course = draft.toStorageEntity(),
-                times = draft.schedule?.toTimeStorageEntities(draft.id).orEmpty(),
-                sources = draft.medicine.toSourceStorageEntities(draft.id)
-            )
-        } else {
-            val plan = row.toPlan(vocabulary)
-            val detached = plan.detach(pkg, at)
-            // Ноль изменённых строк здесь незаконен: план прочитан этой же транзакцией. Молча
-            // пропустить значило бы оставить курс с источником, которого уже нет.
-            check(
-                updateAllocations(
-                    detached.toStorageEntity(),
-                    detached.medicine.toSourceStorageEntities(detached.id),
-                    plan.revision
-                )
-            ) { "курс $courseId прочитан этой же транзакцией, а выделения писать некуда" }
-        }
-    }
-    releasePackage(pkg.id)
-}

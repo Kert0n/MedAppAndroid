@@ -144,6 +144,32 @@ class LayerBoundariesTest {
         assertEquals("пропавший вход сценария — исход, а не падение", emptyList<String>(), offenders)
     }
 
+    /**
+     * Курс следует за коробкой у **одного** владельца — `feature/course` (PLAN C1 «Конец коробки —
+     * у владельца реакции»): переходы курса, которыми лечение отвечает на коробку — отсоединить
+     * источник, зажать выделения, отключить и вернуть источник, — зовёт только он. Пока конец
+     * коробки отсоединял источник расширением DAO, у одного изменения было два входа с разными
+     * следствиями: без события сокращения, без броней.
+     */
+    @Test
+    fun courseTransitionsBelongToTheirOwner() {
+        val transitions = Regex("""\.(detach|clamped|faultSource|restoreSource)\(""")
+        val offenders = sources.walkTopDown()
+            .filter { it.extension == "kt" }
+            .filter { file ->
+                val path = file.relativeTo(sources).invariantSeparatorsPath
+                !path.startsWith("feature/course/") && !path.startsWith("domain/")
+            }
+            .flatMap { file ->
+                file.readLines().withIndex()
+                    .filter { (_, line) -> transitions.containsMatchIn(line) }
+                    .map { (index, line) -> "${file.relativeTo(sources).invariantSeparatorsPath}:${index + 1}: ${line.trim()}" }
+            }
+            .toList()
+
+        assertEquals("переход курса зовут мимо владельца реакции", emptyList<String>(), offenders)
+    }
+
     /** Чей это файл: самый длинный подходящий ключ, чтобы `app/navigation` не считался `app`. */
     private fun File.root(): String? {
         val path = relativeTo(sources).path

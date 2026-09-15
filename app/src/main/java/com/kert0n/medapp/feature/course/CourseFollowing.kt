@@ -29,6 +29,10 @@ import kotlin.uuid.Uuid
  * назначение по пригодности; брони разницей — каждая своей пачке и её полке. Расписание, доза и
  * даты не трогаются: нехватка меняет обеспечение, а не план (C1).
  *
+ * Конец коробки — вторая дверь того же владельца ([lost]): лечение теряет источник её же
+ * переходом, обеспечение упало — событие, брони — разницей; отсоединять источник расширением DAO
+ * значило бы дать одному изменению два входа с разными следствиями.
+ *
  * Читает и пишет одной транзакцией (F5); вложенность безопасна, и внутри транзакции того, кто
  * коробку изменил, следствие ложится вместе с причиной или не ложится вовсе.
  */
@@ -71,6 +75,30 @@ class CourseFollowing @Inject constructor(
                 courses.recordReduction(CoverageReduction(Uuid.random(), courseId, packageId, coveredBefore, coveredAfter, at))
             }
             announceClaims(course, clamped, at)
+        }
+    }
+
+    override suspend fun lost(pkg: PackageRef, at: Instant): Unit = transactions.run {
+        courses.courseHolding(pkg.id)?.let { calendar.missOverdue(courses.openPlan(it), at) }
+        for (courseId in courses.holdersOf(pkg.id)) {
+            val draft = courses.findDraft(courseId)
+            if (draft != null) {
+                courses.saveDraft(draft.detach(pkg, at), draft.revision).readThisTransaction("черновик")
+                continue
+            }
+            val plan = courses.planInProgress(courseId) ?: continue
+            val course = plan.course
+            val detached = course.detach(pkg, at)
+            courses.updateSources(detached, course.revision).readThisTransaction("план")
+            // Источника нет — обеспечение упало ровно на него: событие, как и у зажима (PLAN D5).
+            val required = detached.remainingDoses(plan.progress)
+            val coveredBefore = minOf(course.allocatedDosesTotal, required)
+            val coveredAfter = detached.coverage(plan.progress, packages.availabilityFor(detached)).coveredDoses
+            if (coveredAfter < coveredBefore) {
+                courses.recordReduction(CoverageReduction(Uuid.random(), courseId, pkg.id, coveredBefore, coveredAfter, at))
+            }
+            // Бронь на пропавшую коробку снял её конец; остальным — разницей, если она есть.
+            announceClaims(course, detached, at, except = pkg)
         }
     }
 

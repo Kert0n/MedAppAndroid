@@ -45,6 +45,7 @@ import com.kert0n.medapp.storage.medkit.toStorageEntity as toMedKitStorageEntity
 import com.kert0n.medapp.storage.pack.toStorageEntity
 import com.kert0n.medapp.fixture.COURSE
 import com.kert0n.medapp.fixture.activeCourse
+import com.kert0n.medapp.fixture.courseRecord
 import com.kert0n.medapp.fixture.save
 import com.kert0n.medapp.fixture.source
 import com.kert0n.medapp.domain.course.Revision
@@ -359,6 +360,8 @@ class QueueRoomStorageTest {
             plan.medicine.toSourceStorageEntities(COURSE)
         )
         database.courses().assignPackage(ActivePackageAssignmentStorageEntity(PACK, COURSE))
+        // Событие сокращения держится за запись эпизода: у идущего лечения она есть всегда.
+        database.courses().upsertRecord(courseRecord(prescription = plan.prescription).toCourseStorageEntity())
     }
 
     @Test

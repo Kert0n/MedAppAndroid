@@ -1,5 +1,6 @@
 package com.kert0n.medapp.domain.course
 
+import com.kert0n.medapp.domain.pack.PackageRef
 import java.time.Instant
 import kotlin.uuid.Uuid
 
@@ -14,4 +15,12 @@ interface PackageFollowing {
 
     /** Коробка [packageId] изменилась в момент [at]: каждое лечение, держащее её, следует за ней. */
     suspend fun follow(packageId: Uuid, at: Instant)
+
+    /**
+     * Коробки [pkg] больше нет — то же изменение, только самое резкое (C1 «Конец коробки — у
+     * владельца реакции»): каждое лечение, державшее её, теряет источник её же переходом,
+     * обеспеченных доз стало меньше — событие, брони — разницей. Зовётся из двери конца коробки,
+     * пока её строка ещё есть.
+     */
+    suspend fun lost(pkg: PackageRef, at: Instant)
 }

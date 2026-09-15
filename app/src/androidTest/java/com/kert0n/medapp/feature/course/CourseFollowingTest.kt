@@ -35,6 +35,7 @@ import com.kert0n.medapp.queue.ServerSnapshot
 import com.kert0n.medapp.queue.StoredSyncOperation
 import com.kert0n.medapp.queue.SyncCommand
 import com.kert0n.medapp.queue.pack.PackageSyncCommand
+import com.kert0n.medapp.feature.packages.PackageRelocation
 import com.kert0n.medapp.queue.settlement
 import com.kert0n.medapp.storage.database.MedAppDatabase
 import com.kert0n.medapp.storage.medkit.toStorageEntity as toMedKitStorageEntity
@@ -45,6 +46,7 @@ import kotlin.uuid.Uuid
 import kotlinx.coroutines.test.runTest
 import org.junit.After
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Before
 import org.junit.Test
@@ -152,6 +154,56 @@ class CourseFollowingTest {
         database.queueStorage().settle(claim.id, Delivery.Applied(PackageState.Present(snapshot("12"))).settlement(claim.command), now)
 
         assertFollowed(id, before)
+    }
+
+    /**
+     * **Конец коробки — то же изменение, только самое резкое** (C1 «Конец коробки — у владельца
+     * реакции»). Сервер перестал знать коробку — сосед выбросил её: лечение теряет источник её же
+     * переходом, обеспеченных доз стало меньше — событие, о котором говорят человеку, назначение
+     * снято. Пока конец шёл через расширение DAO, источник отсоединялся молча: сокращения не было,
+     * и `COVERAGE_SHORT` не приходил.
+     */
+    @Test
+    fun aLostBoxIsTheSameConsequence() = runTest {
+        val id = treated()
+        val before = plan(id)
+
+        database.snapshotStorage().lay(ServerSnapshot(mapOf(SHARED_KIT to 2L), emptyList(), emptySet(), setOf(PACK), emptySet(), emptySet()), now)
+
+        val after = plan(id)
+        assertTrue("источник пережил коробку: ${after.sources}", after.sources.isEmpty())
+        assertEquals("расписание, доза и даты не меняются", before.prescription, after.prescription)
+        val reductions = database.courseRepository().reductionsSince(id, now.minusSeconds(1))
+        assertEquals("о потере обеспечения не сказано: $reductions", listOf(Doses(10) to Doses(0)), reductions.map { it.coveredBefore to it.coveredAfter })
+        assertNull(database.courseRepository().courseHolding(PACK))
+        assertNull(database.packageRepository().find(PACK))
+    }
+
+    /**
+     * **«Принёс домой» — тоже изменение коробки**: полка к снятию подтвердила 12, дома она стала
+     * местной с 12 — и лечение следует за новым числом: шесть доз, событие сокращения. Пока ответ
+     * на «унёс домой» менял число мимо владельца, выделение оставалось на 20 таблетках.
+     */
+    @Test
+    fun bringingHomeIsTheSameConsequence() = runTest {
+        database.medKits().upsert(medKit(id = HOME_KIT).toMedKitStorageEntity())
+        val id = treated()
+        val before = plan(id)
+        assertEquals(PackageRelocation.Outcome.MOVED, scenarios.packageRelocation.move(PACK, HOME_KIT))
+        val withdraw = database.syncOperations().all()
+            .map { (it.toDomain(VOCABULARY) as StoredSyncOperation.Readable).operation }
+            .single { it.command is PackageSyncCommand.Withdraw }
+        database.queueStorage().take(withdraw.id, snapshot("12"), now)
+
+        database.queueStorage().settle(withdraw.id, Delivery.Applied(PackageState.Gone).settlement(withdraw.command), now)
+
+        val after = plan(id)
+        assertEquals(tablets("12"), requireNotNull(database.packageRepository().find(PACK)).quantity)
+        assertEquals("лечение не последовало за принесённой домой коробкой", Doses(6), after.sources.single().allocatedDoses)
+        assertEquals("расписание, доза и даты не меняются", before.prescription, after.prescription)
+        val reduction = database.courseRepository().reductionsSince(id, now.minusSeconds(1)).single()
+        assertEquals(Doses(10), reduction.coveredBefore)
+        assertEquals(Doses(6), reduction.coveredAfter)
     }
 
     /**

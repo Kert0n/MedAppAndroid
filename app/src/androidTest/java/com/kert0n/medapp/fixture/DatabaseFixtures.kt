@@ -70,7 +70,7 @@ suspend fun rejectedByDatabase(block: suspend () -> Unit): Throwable =
  * владельцев несколько DAO; собирать их в каждом тесте заново значило бы повторять граф руками.
  */
 fun MedAppDatabase.packageRepository() = com.kert0n.medapp.storage.pack.PackageRoomRepository(
-    this, packages(), courses(), syncOperations(), intakes(), vocabulary()
+    this, packages(), courses(), syncOperations(), intakes(), vocabulary(), javax.inject.Provider { courseFollowing() }
 )
 
 fun MedAppDatabase.courseRepository() = com.kert0n.medapp.storage.course.CourseRoomRepository(
@@ -78,11 +78,11 @@ fun MedAppDatabase.courseRepository() = com.kert0n.medapp.storage.course.CourseR
 )
 
 fun MedAppDatabase.intakeRepository() = com.kert0n.medapp.storage.intake.IntakeRoomRepository(
-    this, intakes(), packages(), courses(), vocabulary()
+    this, intakes(), packages(), courses(), vocabulary(), javax.inject.Provider { courseFollowing() }
 )
 
 fun MedAppDatabase.medKitRepository() = com.kert0n.medapp.storage.medkit.MedKitRoomRepository(
-    this, medKits(), packages(), courses(), syncOperations(), queueStorage(), vocabulary()
+    this, medKits(), packages(), courses(), syncOperations(), queueStorage(), vocabulary(), javax.inject.Provider { courseFollowing() }
 )
 
 fun MedAppDatabase.queueRepository() = com.kert0n.medapp.storage.server.SyncOperationRoomRepository(

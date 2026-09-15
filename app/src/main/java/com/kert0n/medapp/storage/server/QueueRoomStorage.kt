@@ -215,8 +215,12 @@ class QueueRoomStorage @Inject constructor(
             PackageAfter.Left(pkg)
         }
         when (after) {
-            is PackageAfter.Left -> packages.save(after.pkg, PackageSyncState(packageId))
-            is PackageAfter.Ended -> packages.end(after.ending, courses, words, at)
+            is PackageAfter.Left -> {
+                packages.save(after.pkg, PackageSyncState(packageId))
+                // Число у коробки другое, чем с ним уносили: лечение следует за ним (PLAN D5, E6).
+                following.get().follow(packageId, at)
+            }
+            is PackageAfter.Ended -> packages.end(after.ending, following.get(), courses, at)
         }
     }
 
@@ -321,7 +325,7 @@ class QueueRoomStorage @Inject constructor(
     private suspend fun ended(packageId: Uuid, at: Instant) {
         val words = vocabulary.snapshot()
         val pkg = packages.find(packageId)?.toDomain(words) ?: return
-        packages.end(pkg.ended(), courses, words, at)
+        packages.end(pkg.ended(), following.get(), courses, at)
     }
 
     /**
@@ -338,13 +342,13 @@ class QueueRoomStorage @Inject constructor(
         for (row in packages.ofMedKit(medKitId)) {
             val pkg = row.toDomain(words)
             when {
-                transferTo == null -> packages.end(pkg.ended(), courses, words, at)
+                transferTo == null -> packages.end(pkg.ended(), following.get(), courses, at)
                 // Едет коробка вместе с полкой, а не по своему решению, поэтому ждущая
                 // собственного ответа переезжает наравне со всеми. Пометку снимет та команда,
                 // которая её поставила: у переехавших это как раз закрываемая сейчас команда
                 // полки, и снимет она их сама (PLAN E1).
                 target != null -> packages.save(pkg.movedByAnswer(target), row.pack.syncState())
-                else -> packages.end(pkg.ended(), courses, words, at)
+                else -> packages.end(pkg.ended(), following.get(), courses, at)
             }
         }
         medKits.delete(medKitId)
@@ -355,7 +359,7 @@ class QueueRoomStorage @Inject constructor(
      * уходит следом. Курс и его история остаются (E6).
      */
     private suspend fun left(medKitId: Uuid, at: Instant) =
-        medKits.loseAccess(medKitId, packages, courses, vocabulary.snapshot(), at)
+        medKits.loseAccess(medKitId, packages, following.get(), courses, vocabulary.snapshot(), at)
 
     /**
      * Разрешённый снимок поверх подтверждённого остатка и броней; разрешать здесь нечего.
@@ -371,10 +375,12 @@ class QueueRoomStorage @Inject constructor(
         if (carried != null && atHome != null) {
             val row = packages.find(snapshot.pack.id) ?: return
             val laid = row.toDomain(words)
-            if (laid.quantity.unit != carried.unit || atHome.unit != carried.unit) return
-            when (val after = laid.rebased(from = carried, onto = atHome)) {
-                is PackageAfter.Left -> packages.save(after.pkg, row.pack.syncState())
-                is PackageAfter.Ended -> return packages.end(after.ending, courses, words, at)
+            // Единицы разошлись — сводить нечего; коробка всё равно изменилась снимком, и лечение следует.
+            if (laid.quantity.unit == carried.unit && atHome.unit == carried.unit) {
+                when (val after = laid.rebased(from = carried, onto = atHome)) {
+                    is PackageAfter.Left -> packages.save(after.pkg, row.pack.syncState())
+                    is PackageAfter.Ended -> return packages.end(after.ending, following.get(), courses, at)
+                }
             }
         }
         following.get().follow(snapshot.pack.id, at)

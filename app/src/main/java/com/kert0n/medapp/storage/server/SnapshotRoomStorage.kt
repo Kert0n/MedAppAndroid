@@ -100,11 +100,11 @@ class SnapshotRoomStorage @Inject constructor(
         for (packageId in snapshot.gonePackages) {
             if (packageId !in knownPackages) continue
             val pkg = packages.find(packageId)?.toDomain(words) ?: continue
-            packages.end(pkg.ended(), courses, words, at)
+            packages.end(pkg.ended(), following.get(), courses, at)
         }
         for (medKitId in snapshot.goneMedKits) {
             if (medKitId !in knownMedKits) continue
-            medKits.loseAccess(medKitId, packages, courses, words, at)
+            medKits.loseAccess(medKitId, packages, following.get(), courses, words, at)
         }
     }
 }
