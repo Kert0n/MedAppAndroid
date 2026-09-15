@@ -22,9 +22,12 @@ import kotlinx.coroutines.flow.stateIn
  * транзакции ничего не зовёт — цикл тот же, что у [ReminderOutbox] и `QueueOutbox` ([OutboxLoop]):
  * сигналы сворачиваются, сбой сверки записан и повторяется по сроку, а не ждёт чужого сигнала.
  *
- * Начального прохода нет — вход в приложение зовёт [DailyRound], и он же остаётся поводом
- * **времени**: смена дня таблиц не меняет. Что должно быть обещано, решает
- * [NotificationReconciliation]; показывать и будить умеет только [ReminderOutbox].
+ * Старт процесса — тоже повод (C1 «Сверка при старте процесса — тоже повод»): основание могло
+ * измениться перед тем, как процесс умер, а сверка не успела; процесс, поднятый будильником или
+ * работником, входом в приложение не является, и [DailyRound] его не зовёт. Начальный проход
+ * сверяет по состоянию, каким оно лежит сейчас, — повторная сверка без изменений молчит.
+ * [DailyRound] остаётся поводом **времени**: смена дня таблиц не меняет. Что должно быть обещано,
+ * решает [NotificationReconciliation]; показывать и будить умеет только [ReminderOutbox].
  */
 @Singleton
 class NotificationUpkeep @Inject constructor(
@@ -36,7 +39,7 @@ class NotificationUpkeep @Inject constructor(
 
     private val lastReport = MutableStateFlow<NotificationReconciliation.Report?>(null)
 
-    private val loop = OutboxLoop(reminders.groundsChanged(), RETRY_AFTER_FAILURE, clock, scope, initialPass = false) {
+    private val loop = OutboxLoop(reminders.groundsChanged(), RETRY_AFTER_FAILURE, clock, scope) {
         lastReport.value = reconciliation.reconcile(clock.instant(), clock.zone)
         null
     }

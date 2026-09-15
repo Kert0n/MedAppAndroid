@@ -40,7 +40,6 @@ class OutboxLoop(
     private val retryAfterFailure: Duration,
     private val clock: Clock,
     private val scope: CoroutineScope,
-    private val initialPass: Boolean = true,
     private val pass: suspend () -> Instant?
 ) {
 
@@ -68,7 +67,8 @@ class OutboxLoop(
                 if (first) {
                     first = false
                     _ready.value = true
-                    if (initialPass) wake.trySend(Unit)
+                    // Начальный проход — у всех: мир менялся и пока процесса не было (C1).
+                    wake.trySend(Unit)
                 } else {
                     wake.trySend(Unit)
                 }

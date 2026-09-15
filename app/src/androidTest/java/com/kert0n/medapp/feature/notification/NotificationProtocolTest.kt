@@ -263,6 +263,36 @@ class NotificationProtocolTest {
     }
 
     /**
+     * **Сверка при старте процесса — тоже повод** (C1). Срок исправили, транзакция легла, и
+     * процесс умер раньше, чем сверка успела; потом его поднял будильник — входа в приложение и
+     * `DailyRound` не было. Обязательство следует из состояния, каким оно лежит сейчас: старт
+     * сверяет сам, и устаревшее предупреждение не остаётся висеть.
+     */
+    @Test
+    fun aStaleNoticeDiesOnAColdStartWithoutTheDailyRound() = runBlocking {
+        mechanisms.close() // процесса нет: владельцы не следят
+        treated()
+        val soon = ExpiryDate(LocalDate.of(2027, 3, 13))
+        scenarios.packageDescribing.describe(PACK, database.packageRepository().find(PACK)!!.facts.copy(expiresOn = soon))
+        scenarios.dailyRound.run()
+        val key = NotificationKey.expiry(PACK, soon, NotificationKind.EXPIRY_SOURCE_3D)
+        assertEquals(Reminder.State.DUE, requireNotNull(scenarios.reminderStore.find(key)).state)
+        // Срок исправлен — и процесс умер до сверки.
+        scenarios.packageDescribing.describe(PACK, database.packageRepository().find(PACK)!!.facts.copy(expiresOn = ExpiryDate(LocalDate.of(2027, 3, 20))))
+
+        mechanisms = Mechanisms(scenarios, now) // будильник поднял процесс
+
+        mechanisms.await("устаревшее предупреждение отозвано при старте") {
+            scenarios.reminderStore.find(key).let { it == null || it.state == Reminder.State.WITHDRAWN }
+        }
+        mechanisms.settle()
+        assertTrue(
+            "устаревшее предупреждение показано и висит: shown=${scenarios.notifier.shown.map { it.key }}, dismissed=${scenarios.notifier.dismissed}",
+            scenarios.notifier.shown.none { it.key == key } || key in scenarios.notifier.dismissed
+        )
+    }
+
+    /**
      * **Наступившее за время ожидания свежести показывается тем же проходом.** «Сейчас» берётся
      * после ожидания: пока ждали сеть, срок пункта наступил, и он должен уйти в шторку сейчас, а не
      * ждать следующего повода — иначе первый проход процесса, у которого будильника ещё нет,

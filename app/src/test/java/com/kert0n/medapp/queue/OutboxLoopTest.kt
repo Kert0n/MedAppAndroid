@@ -41,14 +41,14 @@ class OutboxLoopTest {
     @Test
     fun readinessComesFromTheFirstValueNotFromTime() = runTest {
         var passes = 0
-        val loop = OutboxLoop(ready(), Duration.ofMinutes(1), Clock.fixed(now, ZoneOffset.UTC), backgroundScope, initialPass = false) { passes++; null }
+        val loop = OutboxLoop(ready(), Duration.ofMinutes(1), Clock.fixed(now, ZoneOffset.UTC), backgroundScope) { passes++; null }
         assertFalse(loop.ready.value)
 
         loop.start()
         runCurrent()
 
         assertTrue("готовность — из первого значения потока", loop.ready.value)
-        assertEquals("первое значение — не изменение: прохода по нему нет", 0, passes)
+        assertEquals("первое значение — не изменение, а старт: проход по нему один, начальный", 1, passes)
     }
 
     /**
