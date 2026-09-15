@@ -7,6 +7,7 @@ import com.kert0n.medapp.fixture.FakeFollowing
 import com.kert0n.medapp.fixture.FakePackages
 import com.kert0n.medapp.fixture.FakeQueue
 import com.kert0n.medapp.fixture.FakeVocabulary
+import com.kert0n.medapp.fixture.HeldPackages
 import com.kert0n.medapp.fixture.HeldVocabulary
 import com.kert0n.medapp.fixture.MainDispatcherRule
 import com.kert0n.medapp.fixture.PACK
@@ -17,11 +18,16 @@ import com.kert0n.medapp.fixture.watching
 import com.kert0n.medapp.presentation.RouteArguments
 import com.kert0n.medapp.presentation.value.QuantityPresentationError
 import com.kert0n.medapp.queue.QueueService
+import com.kert0n.medapp.storage.pack.PackageStorageRepository
 import com.kert0n.medapp.storage.value.VocabularyStorageRepository
 import java.time.Clock
 import java.time.Instant
 import java.time.ZoneId
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.runBlocking
+import kotlinx.coroutines.yield
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Rule
 import org.junit.Test
@@ -40,7 +46,10 @@ class PackageAmountViewModelTest {
 
     private val packages = FakePackages().lying(pack(id = PACK, quantity = tablets("20")))
 
-    private fun viewModel(vocabulary: VocabularyStorageRepository = FakeVocabulary()) = PackageAmountViewModel(
+    private fun viewModel(
+        vocabulary: VocabularyStorageRepository = FakeVocabulary(),
+        reading: PackageStorageRepository = packages
+    ) = PackageAmountViewModel(
         adjusting = PackageAdjusting(
             packages = packages,
             following = FakeFollowing(),
@@ -49,7 +58,7 @@ class PackageAmountViewModelTest {
             clock = clock
         ),
         vocabulary = vocabulary,
-        packages = packages,
+        packages = reading,
         savedState = SavedStateHandle(mapOf(RouteArguments.PACKAGE_ID to PACK.toString()))
     )
 
@@ -270,5 +279,34 @@ class PackageAmountViewModelTest {
 
         assertEquals(1, vocabulary.door.waiting)
         assertEquals(emptyList<Any>(), packages.packages)
+    }
+
+    /**
+     * Пока коробку не прочитали, экран не говорит, что её нет: «ещё не знаю» и «нет» — разные
+     * ответы, и второй человек читает как «её кто-то кончил».
+     *
+     * Смотрят на **все** состояния подряд, а не на последнее: неправда живёт ровно до ответа
+     * базы и сама себя стирает — увидеть её можно только тем же глазом, что и человек.
+     *
+     * Красная проверка: считать непрочитанное отсутствием — первое же состояние говорит «этой
+     * упаковки больше нет».
+     */
+    @Test
+    fun anUnreadBoxIsNotCalledGone() {
+        val reading = HeldPackages(packages)
+        val model = viewModel(reading = reading)
+        val said = mutableListOf<PackageAmountUiState>()
+
+        runBlocking {
+            val eyes = launch { model.state.collect { said += it } }
+            // Глаза открываются не мгновенно: до первого состояния смотреть не на что.
+            while (said.isEmpty()) yield()
+            assertFalse("непрочитанное названо исчезнувшим", said.any { it.isGone })
+            reading.door.release()
+            model.state.awaiting { it.pack != null }
+            eyes.cancel()
+        }
+
+        assertFalse("непрочитанное названо исчезнувшим", said.any { it.isGone })
     }
 }

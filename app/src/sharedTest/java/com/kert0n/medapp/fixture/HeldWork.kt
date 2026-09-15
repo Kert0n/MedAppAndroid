@@ -1,9 +1,15 @@
 package com.kert0n.medapp.fixture
 
+import com.kert0n.medapp.domain.pack.PackageProjection
 import com.kert0n.medapp.domain.value.Vocabulary
 import com.kert0n.medapp.queue.Transactions
+import com.kert0n.medapp.storage.pack.PackageStorageRepository
 import com.kert0n.medapp.storage.value.VocabularyStorageRepository
+import kotlin.uuid.Uuid
+import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.emitAll
+import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.flow.first
 
 /**
@@ -59,5 +65,17 @@ class HeldVocabulary(
     override suspend fun snapshot(): Vocabulary {
         door.pass()
         return real.snapshot()
+    }
+}
+
+/** Хранилище, первое чтение которого проверка держит: до него экран ещё ничего не знает. */
+class HeldPackages(
+    private val real: PackageStorageRepository,
+    val door: Held = Held()
+) : PackageStorageRepository by real {
+
+    override fun observe(id: Uuid): Flow<PackageProjection?> = flow {
+        door.pass()
+        emitAll(real.observe(id))
     }
 }

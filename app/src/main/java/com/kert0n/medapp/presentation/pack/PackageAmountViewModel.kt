@@ -54,19 +54,23 @@ class PackageAmountViewModel @Inject constructor(
      * Коробка, как её прочитали. Держится доменной проекцией, а не строками экрана: от числа,
      * которое человек видел, отсчитывается разница, и собирать его обратно из строки значило бы
      * разбирать то, что уже было величиной.
+     *
+     * Прочитана или ещё нет — часть ответа: `null` внутри [Reading.Read] значит «коробки нет», а
+     * само отсутствие чтения не значит ничего.
      */
-    private val seen = MutableStateFlow<PackageProjection?>(null)
+    private val seen = MutableStateFlow<Reading>(Reading.Unread)
 
     init {
-        viewModelScope.launch { packages.observe(packageId).collect { seen.value = it } }
+        viewModelScope.launch { packages.observe(packageId).collect { seen.value = Reading.Read(it) } }
     }
 
     val state: StateFlow<PackageAmountUiState> =
-        combine(seen, form, progress) { pack, form, progress ->
+        combine(seen, form, progress) { reading, form, progress ->
+            val pack = (reading as? Reading.Read)?.pack
             PackageAmountUiState(
                 pack = pack?.toPresentationDTO(),
                 form = form,
-                isGone = pack == null,
+                isGone = reading is Reading.Read && pack == null,
                 error = progress.error,
                 asksToEmpty = progress.asksToEmpty,
                 isDone = progress.done
@@ -131,7 +135,7 @@ class PackageAmountViewModel @Inject constructor(
      * полке, отвечающей серверу (PLAN C1).
      */
     private suspend fun parse(): ParsedInput<Change, PackageAmountError> {
-        val pack = seen.value ?: return ParsedInput.Rejected(PackageAmountError.Gone)
+        val pack = (seen.value as? Reading.Read)?.pack ?: return ParsedInput.Rejected(PackageAmountError.Gone)
         val shown = pack.availability.effective
         val typed = QuantityPresentationDTO(form.value.amount, shown.unit.toPresentationDTO())
         val amount = when (val parsed = typed.toDomain(vocabulary.snapshot())) {
@@ -170,6 +174,16 @@ class PackageAmountViewModel @Inject constructor(
     }
 
     private class Change(val action: PackageAdjusting.Action, val emptiesTheBox: Boolean)
+
+    /**
+     * Чтение коробки: его ещё не было или оно было и дало вот это. Без этого различия пустое
+     * начальное значение читалось как «коробки нет», и экран успевал сказать это вслух, пока
+     * база ещё отвечала.
+     */
+    private sealed interface Reading {
+        data object Unread : Reading
+        data class Read(val pack: PackageProjection?) : Reading
+    }
 
     private data class Progress(
         val working: Boolean = false,
