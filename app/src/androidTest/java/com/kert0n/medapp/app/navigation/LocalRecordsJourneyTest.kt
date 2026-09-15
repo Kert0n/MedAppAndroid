@@ -142,6 +142,31 @@ class LocalRecordsJourneyTest {
         compose.onNodeWithText("1 упаковка").assertIsDisplayed()
     }
 
+    /**
+     * Подсказка справочника заполняет форму: напечатал «Нуро», выбрал «Нурофен» — название и
+     * производитель встали сами, количество осталось за человеком.
+     */
+    @Test
+    fun aSuggestionFillsTheFormWithWhatTheCardKnows() {
+        compose.onNodeWithText("Завести аптечку").performClick()
+        compose.onNodeWithText("Название").performTextInput("Домашняя")
+        compose.onNodeWithText("Сохранить").performScrollTo().performClick()
+        compose.waitUntil { compose.onAllNodesWithText("Пока пусто").fetchSemanticsNodes().isNotEmpty() }
+        compose.onNodeWithText("Домашняя").performClick()
+        compose.onNodeWithText("Завести упаковку").performClick()
+
+        compose.onNodeWithText("Название").performTextInput("Нуро")
+        compose.waitUntil(3_000) { compose.onAllNodesWithText("Нурофен").fetchSemanticsNodes().isNotEmpty() }
+        compose.onNodeWithText("Нурофен").performClick()
+
+        // На 360×640 dp поле производителя ниже экрана: до него докручивают.
+        compose.onNodeWithText("Reckitt").performScrollTo().assertIsDisplayed()
+        compose.onNodeWithText("Количество").performScrollTo().performTextInput("20")
+        compose.onNodeWithText("Сохранить").performScrollTo().performClick()
+        compose.waitUntil { compose.onAllNodesWithText("Сколько есть").fetchSemanticsNodes().isNotEmpty() }
+        compose.onNodeWithText("Reckitt").performScrollTo().assertIsDisplayed()
+    }
+
     /** Полка «Домашняя» с коробкой «Нурофен, 20 таблетка», открытой карточкой. */
     private fun aShelfWithABox() {
         compose.onNodeWithText("Завести аптечку").performClick()

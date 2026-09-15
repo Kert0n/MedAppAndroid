@@ -19,6 +19,10 @@ import com.kert0n.medapp.presentation.medkit.toPresentationDTO
 import com.kert0n.medapp.presentation.pack.PackageFormError
 import com.kert0n.medapp.presentation.pack.PackageFormPresentationDTO
 import com.kert0n.medapp.presentation.pack.PackageFormUiState
+import com.kert0n.medapp.presentation.pack.TemplatePresentationDTO
+import com.kert0n.medapp.presentation.pack.Suggestions
+import com.kert0n.medapp.fixture.template
+import com.kert0n.medapp.domain.Unavailability
 import com.kert0n.medapp.presentation.pack.toPresentationDTO
 import com.kert0n.medapp.presentation.value.toPresentationDTO
 import com.kert0n.medapp.ui.theme.MedAppTheme
@@ -37,6 +41,7 @@ class PackageFormScreenTest {
     private var saved = 0
     private var cancelled = 0
     private var recounted = 0
+    private var picked: TemplatePresentationDTO? = null
 
     private val shelf = medKit(id = HOME_KIT, name = "Домашняя").projection(MedKitContents.EMPTY).toPresentationDTO()
 
@@ -46,6 +51,7 @@ class PackageFormScreenTest {
                 PackageFormScreen(
                     state = state,
                     onEdit = {},
+                    onPick = { picked = it },
                     onSave = { saved++ },
                     onCancel = { cancelled++ },
                     onRecount = { recounted++ }
@@ -54,12 +60,61 @@ class PackageFormScreenTest {
         }
     }
 
-    private fun adding(error: PackageFormError? = null) = PackageFormUiState(
+    private fun adding(error: PackageFormError? = null, suggestions: Suggestions = Suggestions.None) = PackageFormUiState(
         form = PackageFormPresentationDTO(medKitId = HOME_KIT),
         medKits = listOf(shelf),
         units = listOf(TABLETS.toPresentationDTO()),
-        error = error
+        error = error,
+        suggestions = suggestions
     )
+
+    private val paracetamol = template(name = "Парацетамол", manufacturer = "Фармстандарт").toPresentationDTO()
+
+    /**
+     * Подсказки стоят под названием и узнаются по форме и производителю; нажимается строка
+     * целиком, и в выбор уходит она сама.
+     */
+    @Test
+    fun suggestionsStandUnderTheNameAndTheRowIsTheChoice() {
+        show(adding(suggestions = Suggestions.Found(listOf(paracetamol))))
+
+        compose.onNodeWithText("Парацетамол").assertIsDisplayed()
+        compose.onNodeWithText("таблетки · Фармстандарт").assertIsDisplayed()
+        compose.onNodeWithText("Парацетамол").performClick()
+
+        assertEquals(paracetamol, picked)
+    }
+
+    /** Пока ответа нет, сказано, что его ждут: молчание под полем читалось бы как «подсказок не будет». */
+    @Test
+    fun searchingIsSaidWhileTheAnswerIsAwaited() {
+        show(adding(suggestions = Suggestions.Searching))
+        compose.onNodeWithText("Ищу в справочнике…").assertIsDisplayed()
+    }
+
+    /**
+     * Пустой ответ назван словами и не окрашен ошибкой: «не нашлось» — ответ справочника, а не
+     * отказ. Без слов пустое место под полем неотличимо от «ещё ищу» и от «подсказок не бывает».
+     */
+    @Test
+    fun nothingFoundIsSaidQuietly() {
+        show(adding(suggestions = Suggestions.Found(emptyList())))
+        compose.onNodeWithText("В справочнике не нашлось.").assertIsDisplayed()
+    }
+
+    /**
+     * Недоступный справочник называет причину и не трогает форму: без связи коробку заводят
+     * руками. Форма, которую отказ справочника лишил бы «Сохранить», превратила бы подсказку в
+     * условие записи.
+     */
+    @Test
+    fun anUnavailableCatalogueNamesTheReasonAndKeepsTheForm() {
+        show(adding(suggestions = Suggestions.Unavailable(Unavailability.NO_CONNECTION)))
+
+        compose.onNodeWithText("Подсказок нет: Нет связи с сервером. Проверьте подключение.").assertIsDisplayed()
+        compose.onNodeWithText("Сохранить").performScrollTo().performClick()
+        assertEquals(1, saved)
+    }
 
     /**
      * Все поля видны сразу (ТЗ 4.1.1.1): человек не ищет их в свёрнутом разделе. Обязательные

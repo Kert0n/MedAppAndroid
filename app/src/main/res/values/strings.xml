@@ -97,6 +97,9 @@
     <string name="pack_form_clear_unsupported">У общей упаковки форму выпуска нельзя стереть — только заменить другой.</string>
     <string name="pack_unknown_in_vocabulary">Этого значения нет в справочнике — выберите другое.</string>
     <string name="pack_gone">Этой упаковки больше нет.</string>
+    <string name="pack_suggestions_searching">Ищу в справочнике…</string>
+    <string name="pack_suggestions_none">В справочнике не нашлось.</string>
+    <string name="pack_suggestions_unavailable">Подсказок нет: %1$s</string>
     <string name="pack_busy">Упаковка ждёт ответа сервера на другое решение — правку пока не записать.</string>
     <plurals name="pack_too_long">
         <item quantity="one">Поле длиннее %1$d символа.</item>

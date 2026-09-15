@@ -7,12 +7,10 @@ import io.ktor.client.plugins.logging.Logger
 import com.kert0n.medapp.domain.account.DeviceAccount
 import com.kert0n.medapp.domain.medkit.MedKitInvitations
 import com.kert0n.medapp.domain.scan.PackageCodes
-import com.kert0n.medapp.domain.template.PackageTemplates
 import com.kert0n.medapp.domain.value.VocabularyLibrary
 import com.kert0n.medapp.network.account.ServerDeviceAccount
 import com.kert0n.medapp.network.medkit.ServerMedKitInvitations
 import com.kert0n.medapp.network.crpt.CrptPackageCodes
-import com.kert0n.medapp.network.template.ServerPackageTemplates
 import com.kert0n.medapp.network.server.MedAppApi
 import com.kert0n.medapp.network.value.ServerVocabularyLibrary
 import com.kert0n.medapp.queue.QueueHttpTransport
@@ -121,10 +119,6 @@ object NetworkModule {
     @Provides
     @Singleton
     fun medKitInvitations(implementation: ServerMedKitInvitations): MedKitInvitations = implementation
-
-    @Provides
-    @Singleton
-    fun packageTemplates(implementation: ServerPackageTemplates): PackageTemplates = implementation
 
     /** Код с коробки спрашивают у «Честного знака» — отдельным клиентом без пропуска MedApp (G3). */
     @Provides

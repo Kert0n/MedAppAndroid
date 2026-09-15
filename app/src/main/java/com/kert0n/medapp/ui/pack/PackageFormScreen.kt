@@ -2,6 +2,7 @@ package com.kert0n.medapp.ui.pack
 
 import androidx.annotation.StringRes
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.defaultMinSize
@@ -17,6 +18,7 @@ import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
+import androidx.compose.material3.ListItem
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
@@ -32,6 +34,8 @@ import com.kert0n.medapp.R
 import com.kert0n.medapp.presentation.pack.PackageFormError
 import com.kert0n.medapp.presentation.pack.PackageFormPresentationDTO
 import com.kert0n.medapp.presentation.pack.PackageFormUiState
+import com.kert0n.medapp.presentation.pack.Suggestions
+import com.kert0n.medapp.presentation.pack.TemplatePresentationDTO
 import com.kert0n.medapp.ui.DateField
 import com.kert0n.medapp.ui.PickerField
 import com.kert0n.medapp.ui.text
@@ -52,6 +56,7 @@ import com.kert0n.medapp.ui.text
 fun PackageFormScreen(
     state: PackageFormUiState,
     onEdit: (PackageFormPresentationDTO) -> Unit,
+    onPick: (TemplatePresentationDTO) -> Unit,
     onSave: () -> Unit,
     onCancel: () -> Unit,
     onRecount: () -> Unit,
@@ -118,6 +123,8 @@ fun PackageFormScreen(
                 supportingText = { if (form.name.isBlank()) Text(stringResource(R.string.field_required)) },
                 modifier = Modifier.fillMaxWidth()
             )
+
+            SuggestionList(state.suggestions, onPick)
 
             if (!state.isEditing) {
                 OutlinedTextField(
@@ -272,4 +279,43 @@ private fun PackageFormError.message(): String = when (this) {
     is PackageFormError.Expiry -> stringResource(reason.text)
     is PackageFormError.Price -> stringResource(reason.text)
     is PackageFormError.TooLong -> pluralStringResource(R.plurals.pack_too_long, limit, limit)
+}
+
+/**
+ * Подсказки справочника под полем названия (PLAN H3 №7, U2). Состояния различимы словами: ничего
+ * не спрашивали — ничего; ищем; нашлось — строки; не нашлось — не ошибка; недоступно — причина, и
+ * форма живёт. Список короткий и известен целиком — `Column`, а не `LazyColumn` внутри прокрутки.
+ */
+@Composable
+private fun SuggestionList(suggestions: Suggestions, onPick: (TemplatePresentationDTO) -> Unit) {
+    when (suggestions) {
+        Suggestions.None -> Unit
+        Suggestions.Searching -> Note(stringResource(R.string.pack_suggestions_searching))
+        is Suggestions.Unavailable -> Text(
+            stringResource(R.string.pack_suggestions_unavailable, stringResource(suggestions.reason.text)),
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.error
+        )
+        is Suggestions.Found -> if (suggestions.templates.isEmpty()) {
+            Note(stringResource(R.string.pack_suggestions_none))
+        } else {
+            Column(Modifier.fillMaxWidth()) {
+                for (template in suggestions.templates) {
+                    ListItem(
+                        headlineContent = { Text(template.name) },
+                        // Чем узнать карточку: форма и производитель — что известно; пустое молчит.
+                        supportingContent = listOfNotNull(template.form?.name, template.manufacturer)
+                            .takeIf { it.isNotEmpty() }
+                            ?.let { known -> { Text(known.joinToString(" · ")) } },
+                        modifier = Modifier.clickable { onPick(template) }
+                    )
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun Note(text: String) {
+    Text(text, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
 }

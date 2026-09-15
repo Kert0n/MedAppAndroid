@@ -34,5 +34,7 @@ data class PackageFormPresentationDTO(
     /** Валюта записанной цены: правка описания её не меняет; у новой цены — валюта по умолчанию. */
     val currency: String = DEFAULT_CURRENCY.currencyCode,
     val purchasedOn: LocalDate? = null,
-    val openedOn: LocalDate? = null
+    val openedOn: LocalDate? = null,
+    /** Карточка справочника, из которой заполнили, — «откуда пришло» (PLAN D3); печать её не снимает. */
+    val templateId: Uuid? = null
 )

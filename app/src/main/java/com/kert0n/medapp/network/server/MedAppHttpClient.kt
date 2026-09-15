@@ -62,10 +62,13 @@ fun medAppHttpClient(
         }
     }
     install(ContentNegotiation) { json(medAppJson) }
+    // Пределы — те же, что у клиента «Честного знака»: экран ждёт ответа не дольше, чем человек
+    // готов смотреть на «ищу…». Без сети на эмуляторе соединение не отвергается, а молчит, и
+    // отказ приходит по этому пределу (замечание владельца 2026-09-16).
     install(HttpTimeout) {
-        connectTimeoutMillis = 10_000
-        socketTimeoutMillis = 30_000
-        requestTimeoutMillis = 30_000
+        connectTimeoutMillis = 5_000
+        socketTimeoutMillis = 15_000
+        requestTimeoutMillis = 15_000
     }
     install(HttpRequestRetry) {
         retryIf(READ_RETRIES) { request, response ->

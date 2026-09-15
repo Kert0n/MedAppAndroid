@@ -98,7 +98,8 @@ fun PackageFormPresentationDTO.parsed(vocabulary: Vocabulary): ParsedInput<Packa
                 price = price,
                 purchasedOn = purchasedOn,
                 openedOn = openedOn
-            )
+            ),
+            templateId = templateId
         )
     )
 }
@@ -128,7 +129,8 @@ fun PackageProjection.toFormPresentationDTO(): PackageFormPresentationDTO =
 data class PackageDescription(
     val medKitId: Uuid,
     val quantity: Quantity,
-    val facts: PackageFacts
+    val facts: PackageFacts,
+    val templateId: Uuid? = null
 )
 
 private fun rejected(error: PackageFormError): ParsedInput<PackageDescription, PackageFormError> =

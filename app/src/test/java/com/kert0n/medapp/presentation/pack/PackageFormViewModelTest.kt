@@ -2,10 +2,12 @@ package com.kert0n.medapp.presentation.pack
 
 import com.kert0n.medapp.feature.packages.PackageAdding
 import com.kert0n.medapp.feature.packages.PackageDescribing
+import com.kert0n.medapp.feature.template.TemplateSearching
 import com.kert0n.medapp.feature.time.Today
 import com.kert0n.medapp.fixture.DirectTransactions
 import com.kert0n.medapp.fixture.FakeFollowing
 import com.kert0n.medapp.fixture.FakeMedKits
+import com.kert0n.medapp.fixture.FakePackageTemplates
 import com.kert0n.medapp.fixture.FakePackages
 import com.kert0n.medapp.fixture.FakeQueue
 import com.kert0n.medapp.fixture.FakeVocabulary
@@ -52,6 +54,7 @@ class PackageFormViewModelTest {
     ) = PackageFormViewModel(
         adding = PackageAdding(packages, medKits, queue, DirectTransactions, clock),
         describing = PackageDescribing(packages, FakeFollowing(), queue, DirectTransactions, clock),
+        searching = TemplateSearching(FakePackageTemplates()),
         packages = packages,
         vocabulary = vocabulary,
         medKits = medKits,

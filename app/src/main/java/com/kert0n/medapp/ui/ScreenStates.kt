@@ -114,9 +114,9 @@ private fun Middle(modifier: Modifier, content: @Composable () -> Unit) = Box(
     content = { content() }
 )
 
-/** Текст причины — её свойство: экран не выбирает, какими словами называть отказ. */
+/** Текст причины — её свойство: экран не выбирает, какими словами называть отказ. Общий на все экраны. */
 @get:StringRes
-private val Unavailability.text: Int
+internal val Unavailability.text: Int
     get() = when (this) {
         Unavailability.NO_CONNECTION -> R.string.failure_no_connection
         Unavailability.SERVER_SILENT -> R.string.failure_server_unavailable
