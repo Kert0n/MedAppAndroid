@@ -26,14 +26,12 @@ import kotlin.time.Duration
 import kotlin.time.Duration.Companion.milliseconds
 import kotlin.uuid.Uuid
 import kotlinx.coroutines.ExperimentalCoroutinesApi
-import kotlinx.coroutines.FlowPreview
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.Flow
-import kotlinx.coroutines.flow.debounce
 import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.flow.map
-import kotlinx.coroutines.flow.onStart
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
@@ -52,11 +50,11 @@ import kotlinx.coroutines.launch
  * человек видел в коробке.
  *
  * **Подсказки справочника — только при заведении** (U2). Запрос уходит, когда человек
- * остановился на [SUGGESTION_PAUSE], а не на каждую букву; новая пауза отменяет прежний запрос
- * вместе с его ответом, поэтому старый ответ не перекрывает новый — оба правила держит одно
- * `flatMapLatest`. Ответ справочника в форму не пишет ничего: пишет только выбор строки.
+ * остановился на [SUGGESTION_PAUSE], а не на каждую букву; новая буква отменяет прежний запрос
+ * вместе с его ответом, поэтому под нынешним текстом нет списка к старому — оба правила держит
+ * одно `flatMapLatest`. Ответ справочника в форму не пишет ничего: пишет только выбор строки.
  */
-@OptIn(ExperimentalCoroutinesApi::class, FlowPreview::class)
+@OptIn(ExperimentalCoroutinesApi::class)
 @HiltViewModel(assistedFactory = PackageFormViewModel.Factory::class)
 class PackageFormViewModel @AssistedInject constructor(
     private val adding: PackageAdding,
@@ -88,12 +86,16 @@ class PackageFormViewModel @AssistedInject constructor(
 
     private val suggestions: Flow<Suggestions> =
         if (opened.packageId != null) flowOf<Suggestions>(Suggestions.None) else typed
-            .debounce(SUGGESTION_PAUSE)
             .map { it.trim().take(TemplateQuery.MAX_LENGTH) }
             .distinctUntilChanged()
+            // Пауза — внутри: новая буква отменяет прежний запрос сразу, вместе с его ответом, и
+            // под новым текстом не висит список к старому. Снаружи пауза пропускала бы ответ на
+            // старый текст, пришедший, пока новый ещё ждёт своей паузы.
             .flatMapLatest { text ->
-                if (text.isEmpty()) flowOf<Suggestions>(Suggestions.None)
-                else flow<Suggestions> {
+                flow<Suggestions> {
+                    emit(Suggestions.None)
+                    if (text.isEmpty()) return@flow
+                    delay(SUGGESTION_PAUSE)
                     emit(Suggestions.Searching)
                     emit(
                         when (val search = searching.search(TemplateQuery(text))) {
@@ -103,8 +105,6 @@ class PackageFormViewModel @AssistedInject constructor(
                     )
                 }
             }
-            // До первой паузы подсказок нет — и состояние формы не ждёт паузы, чтобы появиться.
-            .onStart { emit(Suggestions.None) }
 
     /** Из чего человек выбирает: полки и словарь. Читается вместе — меняется редко. */
     private val choices = combine(

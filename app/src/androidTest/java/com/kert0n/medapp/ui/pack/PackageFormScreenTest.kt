@@ -85,19 +85,28 @@ class PackageFormScreenTest {
         assertEquals(paracetamol, picked)
     }
 
-    /** Состояния подсказок различимы словами: ищем, не нашлось (не ошибка), недоступно — с причиной. */
+    /** Пока ответа нет, сказано, что его ждут: молчание под полем читалось бы как «подсказок не будет». */
     @Test
-    fun suggestionStatesAreToldInWords() {
+    fun searchingIsSaidWhileTheAnswerIsAwaited() {
         show(adding(suggestions = Suggestions.Searching))
         compose.onNodeWithText("Ищу в справочнике…").assertIsDisplayed()
     }
 
+    /**
+     * Пустой ответ назван словами и не окрашен ошибкой: «не нашлось» — ответ справочника, а не
+     * отказ. Без слов пустое место под полем неотличимо от «ещё ищу» и от «подсказок не бывает».
+     */
     @Test
     fun nothingFoundIsSaidQuietly() {
         show(adding(suggestions = Suggestions.Found(emptyList())))
         compose.onNodeWithText("В справочнике не нашлось.").assertIsDisplayed()
     }
 
+    /**
+     * Недоступный справочник называет причину и не трогает форму: без связи коробку заводят
+     * руками. Форма, которую отказ справочника лишил бы «Сохранить», превратила бы подсказку в
+     * условие записи.
+     */
     @Test
     fun anUnavailableCatalogueNamesTheReasonAndKeepsTheForm() {
         show(adding(suggestions = Suggestions.Unavailable(Unavailability.NO_CONNECTION)))

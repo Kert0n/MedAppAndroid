@@ -130,6 +130,33 @@ class PackageFormSuggestionsTest {
         assertEquals(listOf("пара", "парац"), templates.asked.map { it.text })
     }
 
+    /**
+     * Новая буква отменяет прежний запрос **сразу**, а не когда истечёт её собственная пауза:
+     * ответ на «пара», пришедший, пока «парац» ещё ждёт своих 300 мс, не показан.
+     *
+     * Красная проверка: держать паузу снаружи отмены (`debounce` перед `flatMapLatest`) — пока
+     * новый текст ждёт паузы, старый запрос жив, и его ответ ложится под новый текст.
+     */
+    @Test
+    fun aNewLetterCancelsTheOldQueryBeforeItsOwnPauseEnds() = runTest {
+        templates.hold("пара")
+        val model = viewModel()
+
+        model.type("пара")
+        advanceTimeBy(400)
+        assertEquals(Suggestions.Searching, model.state.value.suggestions)
+
+        model.type("парац")
+        advanceTimeBy(100)
+        templates.release("пара")
+        advanceTimeBy(10)
+        assertEquals(Suggestions.None, model.state.value.suggestions)
+
+        advanceTimeBy(300)
+        val shown = model.state.value.suggestions as Suggestions.Found
+        assertEquals(listOf("Парацетамол", "Парацетамол-Экстра"), shown.templates.map { it.name })
+    }
+
     /** Без связи подсказок нет, причина названа, а форма живёт: коробку заводят руками. */
     @Test
     fun withoutConnectionTheReasonIsNamedAndTheFormStillWrites() = runTest {
@@ -147,15 +174,19 @@ class PackageFormSuggestionsTest {
         assertEquals("Нурофен", packages.packages.single().name)
     }
 
-    /** Пустое и пробелы запросом не становятся; в правке коробки справочник не спрашивают. */
+    /** Пустое и пробелы запросом не становятся: справочнику нечего искать. */
     @Test
-    fun emptyTextAndEditingAskNothing() = runTest {
+    fun blankTextAsksNothing() = runTest {
         val model = viewModel()
         model.type("   ")
         advanceTimeBy(400)
         assertEquals(Suggestions.None, model.state.value.suggestions)
         assertTrue(templates.asked.isEmpty())
+    }
 
+    /** В правке коробки справочник не спрашивают: название уже записано, подсказывать нечего. */
+    @Test
+    fun editingABoxAsksNothing() = runTest {
         packages.lying(pack(id = PACK, name = "Нурофен"))
         val editing = viewModel(PackageFormViewModel.Opened(packageId = PACK))
         advanceTimeBy(10)
@@ -209,9 +240,19 @@ class PackageFormSuggestionsTest {
         // Выбранное — не напечатанное: справочник о нём заново не спрашивают, список свёрнут.
         assertEquals(Suggestions.None, model.state.value.suggestions)
         assertEquals(1, templates.asked.size)
+    }
+
+    /** Выбранная карточка уходит с записью: коробка помнит, откуда пришла (D3). */
+    @Test
+    fun theChosenCardTravelsWithTheRecord() = runTest {
+        val model = viewModel()
+        model.pick(template(id = EXTRA, name = "Парацетамол-Экстра").toPresentationDTO())
+        advanceTimeBy(10)
+        model.edit(model.state.value.form.copy(amount = "20"))
 
         model.save()
         advanceTimeBy(10)
+
         assertEquals(EXTRA, packages.packages.single().templateId)
     }
 
