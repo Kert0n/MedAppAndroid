@@ -5,7 +5,6 @@ import com.kert0n.medapp.domain.pack.PackageProjection
 import com.kert0n.medapp.feature.medkits.MedKitRemoval
 import com.kert0n.medapp.feature.packages.PackageRelocation
 import com.kert0n.medapp.feature.packages.PackageRemoval
-import com.kert0n.medapp.feature.time.ClockShifts
 import com.kert0n.medapp.feature.time.Today
 import com.kert0n.medapp.fixture.CAPSULE_FORM
 import com.kert0n.medapp.fixture.DirectTransactions
@@ -18,6 +17,7 @@ import com.kert0n.medapp.fixture.HeldTransactions
 import com.kert0n.medapp.fixture.MainDispatcherRule
 import com.kert0n.medapp.fixture.OTHER_PACK
 import com.kert0n.medapp.fixture.PACK
+import com.kert0n.medapp.fixture.QuietClock
 import com.kert0n.medapp.fixture.SHARED_KIT
 import com.kert0n.medapp.fixture.TABLET_FORM
 import com.kert0n.medapp.fixture.awaiting
@@ -35,7 +35,6 @@ import java.time.LocalDate
 import java.time.ZoneId
 import kotlin.uuid.Uuid
 import kotlinx.coroutines.flow.Flow
-import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.runBlocking
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNull
@@ -54,10 +53,6 @@ class MedKitContentsViewModelTest {
     val dispatcher = MainDispatcherRule()
 
     private val clock: Clock = Clock.fixed(Instant.parse("2026-09-15T09:00:00Z"), ZoneId.of("Europe/Moscow"))
-
-    private object Quiet : ClockShifts {
-        override val signals = MutableSharedFlow<Unit>()
-    }
 
     /** Хранение, которое вдобавок запоминает, о чём его спросили: запрос и есть предмет проверки. */
     private class Asked(private val real: FakePackages) : PackageStorageRepository by real {
@@ -98,7 +93,7 @@ class MedKitContentsViewModelTest {
         removal = removal,
         packages = packages,
         medKits = medKits,
-        today = Today(clock, Quiet),
+        today = Today(clock, QuietClock),
         medKitId = medKitId
     )
 

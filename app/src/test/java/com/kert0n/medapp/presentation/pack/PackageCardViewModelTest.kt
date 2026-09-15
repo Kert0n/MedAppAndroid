@@ -4,7 +4,6 @@ import com.kert0n.medapp.domain.medkit.MedKit
 import com.kert0n.medapp.domain.medkit.MedKitProjection
 import com.kert0n.medapp.domain.pack.PackageStatus
 import com.kert0n.medapp.feature.packages.PackageRemoval
-import com.kert0n.medapp.feature.time.ClockShifts
 import com.kert0n.medapp.feature.time.Today
 import com.kert0n.medapp.fixture.COURSE
 import com.kert0n.medapp.fixture.DirectTransactions
@@ -17,6 +16,7 @@ import com.kert0n.medapp.fixture.HeldPackages
 import com.kert0n.medapp.fixture.HeldTransactions
 import com.kert0n.medapp.fixture.MainDispatcherRule
 import com.kert0n.medapp.fixture.PACK
+import com.kert0n.medapp.fixture.QuietClock
 import com.kert0n.medapp.fixture.SHARED_KIT
 import com.kert0n.medapp.fixture.awaiting
 import com.kert0n.medapp.fixture.courseRecord
@@ -33,7 +33,6 @@ import java.time.LocalDate
 import java.time.ZoneId
 import kotlin.uuid.Uuid
 import kotlinx.coroutines.flow.Flow
-import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.runBlocking
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
@@ -52,10 +51,6 @@ class PackageCardViewModelTest {
     val dispatcher = MainDispatcherRule()
 
     private val clock: Clock = Clock.fixed(Instant.parse("2026-09-15T09:00:00Z"), ZoneId.of("Europe/Moscow"))
-
-    private object Quiet : ClockShifts {
-        override val signals = MutableSharedFlow<Unit>()
-    }
 
     /** Полки, которые помнят, спрашивали ли их все разом: ради одного имени этого не делают. */
     private class Counted(private val real: FakeMedKits) : MedKitStorageRepository by real {
@@ -89,7 +84,7 @@ class PackageCardViewModelTest {
         packages = packages,
         medKits = medKits,
         courses = courses,
-        today = Today(clock, Quiet),
+        today = Today(clock, QuietClock),
         packageId = PACK
     )
 

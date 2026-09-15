@@ -11,7 +11,11 @@ import com.kert0n.medapp.domain.pack.Claims
 import com.kert0n.medapp.domain.pack.ExpiryDate
 import com.kert0n.medapp.domain.report.SpendingHorizon
 import com.kert0n.medapp.domain.report.SpendingPeriod
+import com.kert0n.medapp.feature.time.Today
 import com.kert0n.medapp.fixture.MOSCOW
+import com.kert0n.medapp.fixture.QuietClock
+import com.kert0n.medapp.presentation.pack.MedKitContentsViewModel
+import com.kert0n.medapp.presentation.pack.PackageCardViewModel
 import com.kert0n.medapp.fixture.Scenarios
 import com.kert0n.medapp.fixture.TABLET_FORM
 import com.kert0n.medapp.fixture.activeCourse
@@ -39,6 +43,7 @@ import com.kert0n.medapp.storage.intake.toStorageEntity
 import com.kert0n.medapp.storage.medkit.toStorageEntity as toMedKitStorageEntity
 import com.kert0n.medapp.storage.pack.PackageQuery
 import java.math.BigDecimal
+import java.time.Clock
 import java.time.Duration
 import java.time.Instant
 import java.time.LocalDate
@@ -192,6 +197,27 @@ class HundredMedKitsTest {
 
         timed("сверка обещанного", Duration.ofMillis(1_000)) { scenarios.notificationReconciliation.reconcile(now, ZoneOffset.UTC) }
         timed("проход доставки", Duration.ofMillis(300)) { scenarios.reminderOutbox.pass() }
+    }
+
+    /**
+     * Экраны учёта открываются за кадр и на тысяче коробок: первое состояние «всех лекарств» и
+     * карточки собирается в бюджет. Считается всё, что стоит между нажатием и первым кадром —
+     * чтение базы и сборка DTO на каждую коробку; жест человека ждать этого не должен.
+     */
+    @Test
+    fun theContentsScreenAndTheCardOpenWithinTheBenchmark(): Unit = runBlocking {
+        val seed = seeded()
+        val scenarios = Scenarios(database, now)
+        val today = Today(Clock.fixed(now, ZoneOffset.UTC), QuietClock)
+        database.medKitRepository().observeAll(this@HundredMedKitsTest.today).first()
+
+        val contents = MedKitContentsViewModel(scenarios.medKitRemoval, database.packageRepository(), database.medKitRepository(), today, medKitId = null)
+        val shown = timed("все лекарства на экране", Duration.ofMillis(600)) { contents.state.first { it.isLoaded } }
+        assertEquals(1_000, shown.packages.size)
+
+        val card = PackageCardViewModel(scenarios.packageRemoval, database.packageRepository(), database.medKitRepository(), database.courseRepository(), today, seed.packages.first())
+        val opened = timed("карточка коробки", Duration.ofMillis(300)) { card.state.first { !it.isLoading } }
+        assertEquals("Полка 0", opened.medKitName)
     }
 
     /** Сверка не ходит в базу по разу на лечение: запросов при пятидесяти лечениях не больше, чем при пяти, плюс константа. */

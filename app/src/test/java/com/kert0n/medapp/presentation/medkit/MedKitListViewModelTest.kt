@@ -1,10 +1,10 @@
 package com.kert0n.medapp.presentation.medkit
 
 import com.kert0n.medapp.domain.medkit.MedKitContents
-import com.kert0n.medapp.feature.time.ClockShifts
 import com.kert0n.medapp.feature.time.Today
 import com.kert0n.medapp.fixture.FakeMedKits
 import com.kert0n.medapp.fixture.HOME_KIT
+import com.kert0n.medapp.fixture.QuietClock
 import com.kert0n.medapp.fixture.MainDispatcherRule
 import com.kert0n.medapp.fixture.awaiting
 import com.kert0n.medapp.fixture.medKit
@@ -13,7 +13,6 @@ import com.kert0n.medapp.presentation.ScreenState
 import java.time.Clock
 import java.time.Instant
 import java.time.ZoneId
-import kotlinx.coroutines.flow.MutableSharedFlow
 import org.junit.Assert.assertEquals
 import org.junit.Rule
 import org.junit.Test
@@ -29,13 +28,9 @@ class MedKitListViewModelTest {
 
     private val clock: Clock = Clock.fixed(Instant.parse("2026-09-15T09:00:00Z"), ZoneId.of("Europe/Moscow"))
 
-    private object Quiet : ClockShifts {
-        override val signals = MutableSharedFlow<Unit>()
-    }
-
     private val medKits = FakeMedKits(medKit(id = HOME_KIT, name = "Домашняя", location = "В ванной"))
 
-    private fun viewModel() = MedKitListViewModel(medKits, Today(clock, Quiet))
+    private fun viewModel() = MedKitListViewModel(medKits, Today(clock, QuietClock))
 
     /**
      * Пока база не ответила, экран ждёт, а не говорит «пусто».

@@ -1,11 +1,11 @@
 package com.kert0n.medapp.presentation.medkit
 
 import com.kert0n.medapp.feature.medkits.MedKitKeeping
-import com.kert0n.medapp.feature.time.ClockShifts
 import com.kert0n.medapp.feature.time.Today
 import com.kert0n.medapp.fixture.DirectTransactions
 import com.kert0n.medapp.fixture.FakeMedKits
 import com.kert0n.medapp.fixture.HOME_KIT
+import com.kert0n.medapp.fixture.QuietClock
 import com.kert0n.medapp.fixture.HeldTransactions
 import com.kert0n.medapp.fixture.MainDispatcherRule
 import com.kert0n.medapp.fixture.awaiting
@@ -16,7 +16,6 @@ import java.time.Clock
 import java.time.Instant
 import java.time.ZoneId
 import kotlin.uuid.Uuid
-import kotlinx.coroutines.flow.MutableSharedFlow
 import org.junit.Assert.assertEquals
 import org.junit.Rule
 import org.junit.Test
@@ -33,9 +32,6 @@ class MedKitFormViewModelTest {
     private val clock: Clock = Clock.fixed(Instant.parse("2026-09-15T09:00:00Z"), ZoneId.of("Europe/Moscow"))
 
     /** Часы никто не переводил: день этой проверке важен только как дата чтения. */
-    private object Quiet : ClockShifts {
-        override val signals = MutableSharedFlow<Unit>()
-    }
 
     private val medKits = FakeMedKits(medKit(id = HOME_KIT, name = "Домашняя"))
 
@@ -43,7 +39,7 @@ class MedKitFormViewModelTest {
         MedKitFormViewModel(
             keeping = MedKitKeeping(medKits, transactions, clock),
             medKits = medKits,
-            today = Today(clock, Quiet),
+            today = Today(clock, QuietClock),
             medKitId = medKitId
         )
 

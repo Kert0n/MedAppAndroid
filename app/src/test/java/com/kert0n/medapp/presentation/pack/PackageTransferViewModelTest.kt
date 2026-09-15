@@ -4,7 +4,6 @@ import com.kert0n.medapp.domain.medkit.MedKit
 import com.kert0n.medapp.domain.medkit.MedKitStatus
 import com.kert0n.medapp.domain.pack.Package
 import com.kert0n.medapp.feature.packages.PackageRelocation
-import com.kert0n.medapp.feature.time.ClockShifts
 import com.kert0n.medapp.feature.time.Today
 import com.kert0n.medapp.fixture.DirectTransactions
 import com.kert0n.medapp.fixture.FakeCourses
@@ -15,6 +14,7 @@ import com.kert0n.medapp.fixture.HOME_KIT
 import com.kert0n.medapp.fixture.HeldTransactions
 import com.kert0n.medapp.fixture.MainDispatcherRule
 import com.kert0n.medapp.fixture.PACK
+import com.kert0n.medapp.fixture.QuietClock
 import com.kert0n.medapp.fixture.SHARED_KIT
 import com.kert0n.medapp.fixture.awaiting
 import com.kert0n.medapp.fixture.medKit
@@ -27,7 +27,6 @@ import java.time.Clock
 import java.time.Instant
 import java.time.ZoneId
 import kotlin.uuid.Uuid
-import kotlinx.coroutines.flow.MutableSharedFlow
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
@@ -46,10 +45,6 @@ class PackageTransferViewModelTest {
 
     private val clock: Clock = Clock.fixed(Instant.parse("2026-09-15T09:00:00Z"), ZoneId.of("Europe/Moscow"))
 
-    private object Quiet : ClockShifts {
-        override val signals = MutableSharedFlow<Unit>()
-    }
-
     private val stored = FakePackages()
 
     private val medKits = FakeMedKits(
@@ -66,7 +61,7 @@ class PackageTransferViewModelTest {
         relocation = PackageRelocation(stored, medKits, FakeCourses(), queue, transactions, clock),
         packages = stored,
         medKits = medKits,
-        today = Today(clock, Quiet),
+        today = Today(clock, QuietClock),
         packageId = PACK
     ).also { stored.lying(lying) }
 

@@ -19,12 +19,14 @@ import dagger.assisted.AssistedInject
 import dagger.hilt.android.lifecycle.HiltViewModel
 import java.time.LocalDate
 import kotlin.uuid.Uuid
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.flatMapLatest
+import kotlinx.coroutines.flow.flowOn
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
@@ -93,13 +95,17 @@ class MedKitContentsViewModel @AssistedInject constructor(
                 removalRefusal = removing.refusal,
                 isRemoved = removing.removed
             )
-        }.stateIn(
-            viewModelScope,
-            SharingStarted.WhileSubscribed(5_000),
-            // Область известна до первого чтения: она пришла ключом. Не сказать её сразу —
-            // показать на миг чужой заголовок.
-            MedKitContentsUiState(isEverywhere = medKitId == null)
-        )
+        }
+            // Сборка состояния на тысяче коробок стоит около 90 мс (J1) — на главном потоке это
+            // пять кадров при каждом открытии. Считается вне его, показывается на нём.
+            .flowOn(Dispatchers.Default)
+            .stateIn(
+                viewModelScope,
+                SharingStarted.WhileSubscribed(5_000),
+                // Область известна до первого чтения: она пришла ключом. Не сказать её сразу —
+                // показать на миг чужой заголовок.
+                MedKitContentsUiState(isEverywhere = medKitId == null)
+            )
 
     fun search(text: String) {
         query.value = query.value.copy(text = text)

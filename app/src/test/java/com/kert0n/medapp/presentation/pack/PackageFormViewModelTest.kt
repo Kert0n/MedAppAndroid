@@ -2,7 +2,6 @@ package com.kert0n.medapp.presentation.pack
 
 import com.kert0n.medapp.feature.packages.PackageAdding
 import com.kert0n.medapp.feature.packages.PackageDescribing
-import com.kert0n.medapp.feature.time.ClockShifts
 import com.kert0n.medapp.feature.time.Today
 import com.kert0n.medapp.fixture.DirectTransactions
 import com.kert0n.medapp.fixture.FakeFollowing
@@ -14,6 +13,7 @@ import com.kert0n.medapp.fixture.HOME_KIT
 import com.kert0n.medapp.fixture.HeldVocabulary
 import com.kert0n.medapp.fixture.MainDispatcherRule
 import com.kert0n.medapp.fixture.PACK
+import com.kert0n.medapp.fixture.QuietClock
 import com.kert0n.medapp.fixture.TABLETS
 import com.kert0n.medapp.fixture.awaiting
 import com.kert0n.medapp.fixture.medKit
@@ -26,7 +26,6 @@ import com.kert0n.medapp.storage.value.VocabularyStorageRepository
 import java.time.Clock
 import java.time.Instant
 import java.time.ZoneId
-import kotlinx.coroutines.flow.MutableSharedFlow
 import org.junit.Assert.assertEquals
 import org.junit.Rule
 import org.junit.Test
@@ -40,10 +39,6 @@ class PackageFormViewModelTest {
     val dispatcher = MainDispatcherRule()
 
     private val clock: Clock = Clock.fixed(Instant.parse("2026-09-15T09:00:00Z"), ZoneId.of("Europe/Moscow"))
-
-    private object Quiet : ClockShifts {
-        override val signals = MutableSharedFlow<Unit>()
-    }
 
     private val packages = FakePackages()
 
@@ -60,7 +55,7 @@ class PackageFormViewModelTest {
         packages = packages,
         vocabulary = vocabulary,
         medKits = medKits,
-        today = Today(clock, Quiet),
+        today = Today(clock, QuietClock),
         opened = opened
     )
 
