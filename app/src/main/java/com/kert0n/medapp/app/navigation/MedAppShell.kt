@@ -1,13 +1,14 @@
 package com.kert0n.medapp.app.navigation
 
-import androidx.compose.animation.AnimatedContentTransitionScope
+import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.ContentTransform
-import androidx.compose.animation.EnterTransition
-import androidx.compose.animation.ExitTransition
-import androidx.compose.animation.core.Spring
-import androidx.compose.animation.core.spring
-import androidx.compose.animation.slideInHorizontally
-import androidx.compose.animation.slideOutHorizontally
+import androidx.compose.animation.core.tween
+import androidx.compose.animation.expandVertically
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.shrinkVertically
+import androidx.compose.animation.slideInVertically
+import androidx.compose.animation.slideOutVertically
 import androidx.compose.foundation.layout.consumeWindowInsets
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
@@ -25,7 +26,6 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.navigation3.runtime.NavKey
 import androidx.navigation3.runtime.entryProvider
-import androidx.navigation3.scene.Scene
 import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.navigation3.ui.NavDisplay
@@ -51,12 +51,11 @@ import com.kert0n.medapp.ui.pack.PackageTransferScreen
  * Оболочка приложения: пять мест внизу и содержимое над ними. Где человек стоит и как глубоко —
  * живёт в [TabStacks] и переживает поворот и смерть процесса.
  *
- * **Своего движения у оболочки нет — есть три спецификации библиотеке.** Места сменяются
- * мгновенно: они друг другу соседи, а не глубина. Уход вглубь — новый экран въезжает справа
- * поверх стоящего; возврат кнопкой и жестом — то же движение обратно, и ведёт его библиотека.
- * Ни проявления, ни параллакса (владелец, 2026-09-15). Собственная система движения поверх
- * библиотеки, которая ведёт предиктивный жест по-своему, — это борьба с библиотекой, и прошлый
- * заход на ней и кончился (отклонённый PR #33).
+ * **Своего движения у оболочки нет.** Переходы — умолчания библиотеки, как у референса
+ * владельца (HomeMedkit-App); названо одно: жест назад с места — проявление, потому что место не
+ * лист, и снимать его нечем. Собственная система движения поверх библиотеки, которая ведёт
+ * предиктивный жест по-своему, — это борьба с библиотекой, и прошлый заход на ней и кончился
+ * (отклонённый PR #33).
  *
  * **Отступы системы оболочка не только отдаёт, но и поглощает.** `Modifier.padding(padding)`
  * оставляет место под строкой состояния и полосой жестов — и только; сами вставки остаются
@@ -67,48 +66,23 @@ import com.kert0n.medapp.ui.pack.PackageTransferScreen
 fun MedAppShell(modifier: Modifier = Modifier, stacks: TabStacks = rememberTabStacks()) {
     Scaffold(
         modifier = modifier.fillMaxSize(),
-        bottomBar = { Places(stacks) }
+        // Панель мест — у мест: в глубине человек занят одним делом, и пять соседних комнат
+        // ему не нужны; панель уходит вниз и возвращается с корнем места.
+        bottomBar = {
+            AnimatedVisibility(
+                visible = stacks.screen in PLACES,
+                enter = slideInVertically { it } + expandVertically(),
+                exit = slideOutVertically { it } + shrinkVertically()
+            ) { Places(stacks) }
+        }
     ) { padding ->
         NavDisplay(
             entries = stacks.entries(remember(stacks) { screens(stacks) }),
             onBack = stacks::back,
-            modifier = Modifier.padding(padding).consumeWindowInsets(padding),
-            transitionSpec = { if (stacks.switchedPlace) switch() else slideIn() },
-            popTransitionSpec = { if (stacks.switchedPlace) switch() else slideOut() },
-            // Жест начинается до хода: что он сделает, говорит глубина, а не прошлый ход.
-            predictivePopTransitionSpec = { if (stacks.isDeep) slideOut() else switch() }
+            modifier = Modifier.padding(padding).consumeWindowInsets(padding)
         )
     }
 }
-
-/**
- * Смена места — смена соседних комнат, а не глубина: экран просто сменяется, без проявления и
- * движения. Библиотека ведёт переход своим временем и держит оба экрана на виду ещё полсекунды,
- * поэтому у каждого экрана подложка — иначе старый просвечивал бы. Перехода размера нет.
- */
-private fun switch(): ContentTransform =
-    ContentTransform(EnterTransition.None, ExitTransition.None, sizeTransform = null)
-
-/**
- * Уход вглубь: новый экран въезжает справа поверх старого, а старый стоит на месте — ни
- * параллакса, ни проявления. Глубина — z-порядок: тот, кто глубже, лежит выше.
- */
-private fun AnimatedContentTransitionScope<Scene<NavKey>>.slideIn(): ContentTransform = ContentTransform(
-    targetContentEnter = slideInHorizontally(spring(stiffness = Spring.StiffnessMediumLow)) { it },
-    initialContentExit = ExitTransition.KeepUntilTransitionsFinished,
-    targetContentZIndex = targetState.depth,
-    sizeTransform = null
-)
-
-/** Возврат кнопкой и жестом — одно движение: верхний лист уезжает вправо, нижний стоит. */
-private fun AnimatedContentTransitionScope<Scene<NavKey>>.slideOut(): ContentTransform = ContentTransform(
-    targetContentEnter = EnterTransition.None,
-    initialContentExit = slideOutHorizontally(spring(stiffness = Spring.StiffnessMediumLow)) { it },
-    targetContentZIndex = targetState.depth,
-    sizeTransform = null
-)
-
-private val Scene<NavKey>.depth: Float get() = previousEntries.size.toFloat()
 
 /**
  * Что показывает каждый ключ. Пока своего экрана у места нет, за ним стоит общее «пусто» — то
@@ -118,7 +92,7 @@ private val Scene<NavKey>.depth: Float get() = previousEntries.size.toFloat()
  * экран получает `state` и действия и больше ничего (PLAN H1).
  */
 private fun screens(stacks: TabStacks) = entryProvider<NavKey> {
-    entry(Screen.MedKits) {
+    entry(Screen.MedKits, metadata = placeMetadata) {
         val model: MedKitListViewModel = hiltViewModel()
         MedKitListScreen(
             state = model.state.collectAsStateWithLifecycle().value,
@@ -246,8 +220,21 @@ private fun screens(stacks: TabStacks) = entryProvider<NavKey> {
         )
     }
     for (place in Place.entries - Place.MED_KITS) {
-        entry(place.key) { NotReadyYet() }
+        entry(place.key, metadata = placeMetadata) { NotReadyYet() }
     }
+}
+
+private val PLACES: Set<NavKey> = Place.entries.map { it.key }.toSet()
+
+/**
+ * Жест назад с места — проявление, а не уменьшение листа: место не лист, и снимать его нечем.
+ * Остальное движение — умолчания библиотеки (H3 «Оболочка»).
+ */
+private val placeMetadata: Map<String, Any> = NavDisplay.predictivePopTransitionSpec {
+    ContentTransform(
+        targetContentEnter = fadeIn(animationSpec = tween()),
+        initialContentExit = fadeOut(animationSpec = tween())
+    )
 }
 
 /**

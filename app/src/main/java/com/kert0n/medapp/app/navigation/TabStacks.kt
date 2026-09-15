@@ -44,17 +44,6 @@ class TabStacks internal constructor(
     val screen: NavKey? get() = here.lastOrNull()
 
     /**
-     * Последний ход был сменой места, а не уходом вглубь или возвратом внутри него. По этому
-     * признаку оболочка выбирает движение: места сменяются мгновенно, глубина едет. Спрашивать
-     * ключи бесполезно — с глубины чужого места на корень своего ведёт та же смена места.
-     */
-    var switchedPlace: Boolean by mutableStateOf(false)
-        private set
-
-    /** Человек в глубине места: жест назад снимет лист, а не сменит место. */
-    val isDeep: Boolean get() = here.size > 1
-
-    /**
      * Стопки, из которых собирается показ: своя и, если человек не у первого места, стопка
      * первого — под ней. Так возврат с корня чужого места проваливается к первому месту, а не
      * закрывает приложение молча: под верхней стопкой всегда есть что показать.
@@ -67,8 +56,7 @@ class TabStacks internal constructor(
      * стопки. Что перед нами, спрашивается у самих стопок: место — то, у чего стопка есть.
      */
     fun go(target: NavKey) {
-        switchedPlace = target in stacks
-        if (switchedPlace) place = target else here.add(target)
+        if (target in stacks) place = target else here.add(target)
     }
 
     /**
@@ -77,14 +65,12 @@ class TabStacks internal constructor(
      * доходит вовсе, и приложение закрывает система.
      */
     fun back() {
-        switchedPlace = !isDeep
-        if (isDeep) here.removeAt(here.lastIndex) else place = Place.first.key
+        if (here.size > 1) here.removeAt(here.lastIndex) else place = Place.first.key
     }
 
     /** Вернуть место к его началу: повторное нажатие на своё место в нижней панели. */
     fun backToRoot(target: NavKey) {
         val stack = stacks[target] ?: return
-        switchedPlace = false
         while (stack.size > 1) stack.removeAt(stack.lastIndex)
     }
 
