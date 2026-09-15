@@ -25,7 +25,9 @@ data class Spending(
     data class Episode(val record: CourseRecordProjection, val total: Quantity, val intakes: Int)
 
     /**
-     * Истраченное разовыми приёмами из одной коробки. Коробка названа своими величинами, а не
+     * Истраченное разовыми приёмами из одной коробки **в одной единице**: коробку могли
+     * переописать, и приёмы помнят каждый свою — складывать можно только внутри единицы, поэтому
+     * строка — по предмету и единице, как у эпизода (C1). Коробка названа своими величинами, а не
      * ссылкой: ссылка сравнивается по `id`, и переименованная коробка не отличалась бы в строке.
      */
     data class Box(val packageId: Uuid, val name: String, val total: Quantity, val intakes: Int)
@@ -36,7 +38,8 @@ data class Spending(
 
         /**
          * Отчёт из состоявшихся приёмов [taken] и записей эпизодов [records], к которым относятся
-         * курсовые. Эпизоды — от начатых позже, коробки — по названию.
+         * курсовые. Строка — по предмету **и единице**, у эпизодов и коробок одинаково. Эпизоды —
+         * от начатых позже, коробки — по названию.
          */
         fun of(taken: List<Intake>, records: Map<Uuid, CourseRecordProjection>): Spending {
             val facts = taken.mapNotNull { intake -> intake.taken?.let { intake to it } }
@@ -48,12 +51,12 @@ data class Spending(
                 }
                 .sortedWith(compareByDescending<Episode> { it.record.startedAt }.thenBy { it.total.unit.name })
             val packages = facts.filter { (intake, _) -> intake is UnplannedIntake }
-                .groupBy { (_, dose) -> dose.pkg.id }
-                .map { (id, group) ->
+                .groupBy { (_, dose) -> dose.pkg.id to dose.amount.unit }
+                .map { (key, group) ->
                     val latest = group.maxBy { it.second.at }.second.pkg
-                    Box(id, latest.name, group.map { it.second.amount.quantity }.reduce(Quantity::plus), group.size)
+                    Box(key.first, latest.name, group.map { it.second.amount.quantity }.reduce(Quantity::plus), group.size)
                 }
-                .sortedWith(compareBy<Box> { it.name }.thenBy { it.packageId.toString() })
+                .sortedWith(compareBy<Box> { it.name }.thenBy { it.packageId.toString() }.thenBy { it.total.unit.name })
             return Spending(episodes, packages)
         }
 
