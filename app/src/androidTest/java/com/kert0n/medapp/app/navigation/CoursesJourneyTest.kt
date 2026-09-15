@@ -11,7 +11,13 @@ import androidx.compose.ui.test.performTextInput
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import com.kert0n.medapp.HiltTestActivity
 import com.kert0n.medapp.fixture.CAPSULE_FORM
+import com.kert0n.medapp.domain.value.Doses
+import com.kert0n.medapp.feature.course.CourseDrafting
 import com.kert0n.medapp.fixture.HOME_KIT
+import com.kert0n.medapp.fixture.MOSCOW
+import com.kert0n.medapp.fixture.Scenarios
+import com.kert0n.medapp.fixture.dose
+import com.kert0n.medapp.fixture.schedule
 import com.kert0n.medapp.fixture.MILLILITRES
 import com.kert0n.medapp.fixture.PACK
 import com.kert0n.medapp.fixture.medKit
@@ -21,6 +27,8 @@ import com.kert0n.medapp.fixture.pack
 import com.kert0n.medapp.fixture.packageRepository
 import com.kert0n.medapp.fixture.tablets
 import com.kert0n.medapp.storage.database.MedAppDatabase
+import java.time.Instant
+import java.time.LocalDate
 import com.kert0n.medapp.storage.medkit.toStorageEntity as toMedKitStorageEntity
 import com.kert0n.medapp.storage.value.toStorageEntity
 import com.kert0n.medapp.ui.theme.MedAppTheme
@@ -111,6 +119,37 @@ class CoursesJourneyTest {
 
         val held = runBlocking { database.packageRepository().projection(PACK)?.holdingCourseId }
         assertNull(held)
+    }
+
+    /**
+     * Лечение начинается и без лекарства на руках, а карточка сразу говорит, что оно не
+     * обеспечено: пачка подключается, когда её купят (PLAN D5, U3).
+     */
+    @Test
+    fun aCourseWithoutABoxStartsAndSaysItIsNotCovered() {
+        val scenarios = Scenarios(database, Instant.now())
+        runBlocking {
+            val created = scenarios.courseDrafting.create("Нурофен")
+            scenarios.courseDrafting.edit(
+                created.id, created.revision,
+                listOf(
+                    CourseDrafting.Edit.SetDose(dose("2")),
+                    CourseDrafting.Edit.SetForm(TABLET_FORM),
+                    CourseDrafting.Edit.SetSchedule(schedule(start = LocalDate.now(MOSCOW))),
+                    CourseDrafting.Edit.SetTotalDoses(Doses(4))
+                )
+            )
+        }
+
+        compose.waitUntil { compose.onAllNodesWithText("Черновики").fetchSemanticsNodes().isNotEmpty() }
+        compose.onNodeWithText("Нурофен").performClick()
+        compose.onNodeWithText("Начать лечение").performScrollTo().performClick()
+
+        // Начатое ведёт на карточку, и первое, что там сказано, — чем лечение обеспечено.
+        compose.waitUntil {
+            compose.onAllNodesWithText("Не хватает 4 приёмов", substring = true).fetchSemanticsNodes().isNotEmpty()
+        }
+        compose.onNodeWithText("нужно 4 приёма · обеспечено 0").assertIsDisplayed()
     }
 
     /** Черновик открывается редактором из списка и уходит по «удалить» — после вопроса. */

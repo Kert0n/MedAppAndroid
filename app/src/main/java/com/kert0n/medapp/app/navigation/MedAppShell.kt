@@ -250,9 +250,18 @@ private fun screens(stacks: TabStacks) = entryProvider<NavKey> {
             creationCallback = { factory -> factory.create(key.courseId) }
         )
         val state = model.state.collectAsStateWithLifecycle().value
-        // Записанное или удалённое — повод уйти: человек заводил лечение, а не форму.
+        // Записанное или удалённое — повод уйти: человек заводил лечение, а не форму. Начатое
+        // ведёт дальше, к карточке: с этого мига у лечения есть что показывать.
         LaunchedEffect(state) {
-            if (state is CourseFormUiState.Editing && (state.isSaved || state.isDiscarded)) stacks.back()
+            if (state !is CourseFormUiState.Editing) return@LaunchedEffect
+            val started = state.startedId
+            when {
+                started != null -> {
+                    stacks.back()
+                    stacks.go(Screen.CourseCard(started))
+                }
+                state.isSaved || state.isDiscarded -> stacks.back()
+            }
         }
         CourseFormScreen(
             state = state,
@@ -263,6 +272,7 @@ private fun screens(stacks: TabStacks) = entryProvider<NavKey> {
             onDismissDiscard = model::dismissDiscard,
             // Источники записанного черновика: у нового их некуда подключать — он ещё не записан.
             onSources = key.courseId?.let { { stacks.go(Screen.CourseSources(it)) } },
+            onStart = model::start,
             onBack = stacks::back
         )
     }

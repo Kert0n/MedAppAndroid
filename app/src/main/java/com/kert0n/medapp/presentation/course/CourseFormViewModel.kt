@@ -3,6 +3,7 @@ package com.kert0n.medapp.presentation.course
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.kert0n.medapp.domain.course.CourseDraftProjection
+import com.kert0n.medapp.feature.course.CourseActivation
 import com.kert0n.medapp.feature.course.CourseDrafting
 import com.kert0n.medapp.presentation.ParsedInput
 import com.kert0n.medapp.presentation.value.FormPresentationDTO
@@ -36,6 +37,7 @@ import kotlinx.coroutines.launch
 @HiltViewModel(assistedFactory = CourseFormViewModel.Factory::class)
 class CourseFormViewModel @AssistedInject constructor(
     private val drafting: CourseDrafting,
+    private val activation: CourseActivation,
     private val courses: CourseStorageRepository,
     private val vocabulary: VocabularyStorageRepository,
     @Assisted private val courseId: Uuid?
@@ -123,21 +125,74 @@ class CourseFormViewModel @AssistedInject constructor(
     }
 
     private suspend fun write(saving: CourseFormUiState.Editing, described: CourseDescription) {
-        editing.value = when (saving.mode) {
-            CourseFormUiState.Mode.NEW_DRAFT -> {
-                val created = drafting.create(described.title, described.note)
-                val edits = described.editsSince(created)
-                if (edits.isEmpty()) saving.copy(isSaving = false, isSaved = true)
-                else saving.told(drafting.edit(created.id, created.revision, edits))
-            }
-            CourseFormUiState.Mode.DRAFT -> {
-                val stored = checkNotNull(saving.stored)
-                val edits = described.editsSince(stored)
-                if (edits.isEmpty()) saving.copy(isSaving = false, isSaved = true)
-                else saving.told(drafting.edit(stored.id, stored.revision, edits))
+        val written = written(saving, described) ?: return
+        editing.value = saving.copy(isSaving = false, isSaved = true, stored = written)
+    }
+
+    /**
+     * Записывает набранное и отдаёт записанный черновик. `null` — записать не вышло, и человеку
+     * об этом уже сказано: отказ, устаревшая редакция или пропавший черновик.
+     */
+    private suspend fun written(
+        saving: CourseFormUiState.Editing,
+        described: CourseDescription
+    ): CourseDraftProjection? {
+        val base = when (saving.mode) {
+            CourseFormUiState.Mode.NEW_DRAFT -> drafting.create(described.title, described.note)
+            CourseFormUiState.Mode.DRAFT -> checkNotNull(saving.stored)
+        }
+        val edits = described.editsSince(base)
+        if (edits.isEmpty()) return base
+        return when (val outcome = drafting.edit(base.id, base.revision, edits)) {
+            is CourseDrafting.Outcome.Saved -> outcome.draft
+            else -> {
+                editing.value = saving.told(outcome)
+                null
             }
         }
     }
+
+    /**
+     * Начать лечение (PLAN H3 №15, D5). Сначала записывается набранное — человек нажимает
+     * «Начать» с тем назначением, которое видит на экране, — и только потом лечение начинается,
+     * по **свежей** редакции записанного черновика.
+     *
+     * Полноты назначения экран не проверяет: её требует сценарий, и чего не хватает, он называет
+     * сам — второй проверки здесь нет (D5 «Черновик»).
+     */
+    fun start() {
+        val current = editing.value as? CourseFormUiState.Editing ?: return
+        if (current.isBusy || current.isSaved || current.startedId != null) return
+        val starting = current.copy(error = null, isStarting = true)
+        editing.value = starting
+        viewModelScope.launch {
+            when (val parsed = current.form.parsed(vocabulary.snapshot())) {
+                is ParsedInput.Rejected -> editing.value = starting.copy(isStarting = false, error = parsed.error)
+                is ParsedInput.Parsed -> {
+                    val written = written(starting, parsed.value) ?: return@launch
+                    editing.value = starting.copy(stored = written).began(activation.activate(written.id, written.revision))
+                }
+            }
+        }
+    }
+
+    /** Чем кончилось начало лечения — человеку: пошло; уже идёт; отказ по месту; занятая пачка. */
+    private fun CourseFormUiState.Editing.began(outcome: CourseActivation.Outcome): CourseFormUiState = when (outcome) {
+        is CourseActivation.Outcome.Started -> copy(isStarting = false, startedId = outcome.course.id)
+        // Уже идёт — повтор ничего не менял, и человеку нужна та же карточка.
+        CourseActivation.Outcome.AlreadyStarted -> copy(isStarting = false, startedId = stored?.id ?: courseId)
+        CourseActivation.Outcome.Gone -> CourseFormUiState.Gone
+        CourseActivation.Outcome.Stale -> copy(isStarting = false, error = CourseFormError.Stale)
+        is CourseActivation.Outcome.Rejected -> copy(isStarting = false, error = CourseFormError.Rejected(outcome.reason))
+        is CourseActivation.Outcome.PackageTaken ->
+            copy(isStarting = false, error = CourseFormError.PackageTaken(nameOf(outcome.packageId)))
+        is CourseActivation.Outcome.PackageUnusable ->
+            copy(isStarting = false, error = CourseFormError.PackageUnusable(nameOf(outcome.packageId)))
+    }
+
+    /** Имя коробки — из состава черновика: отказ называет коробку так, как человек её знает. */
+    private fun CourseFormUiState.Editing.nameOf(packageId: Uuid): String? =
+        stored?.sources?.firstOrNull { it.pkg.id == packageId }?.pkg?.name
 
     /** Только изменённое: нетронутое поле сценарию не называют — черновик правится по частям. */
     private fun CourseDescription.editsSince(stored: CourseDraftProjection): List<CourseDrafting.Edit> = buildList {
@@ -182,11 +237,14 @@ sealed interface CourseFormUiState {
         val error: CourseFormError? = null,
         val isSaving: Boolean = false,
         val isSaved: Boolean = false,
+        val isStarting: Boolean = false,
+        /** Лечение началось — этот эпизод и открывают карточкой; `null` — ещё черновик. */
+        val startedId: Uuid? = null,
         val asksToDiscard: Boolean = false,
         val isDiscarding: Boolean = false,
         val isDiscarded: Boolean = false
     ) : CourseFormUiState {
-        val isBusy: Boolean get() = isSaving || isDiscarding
+        val isBusy: Boolean get() = isSaving || isDiscarding || isStarting
     }
 
     /** Чем открыт редактор: новым черновиком, записанным черновиком. Идущее лечение — U3 №9. */

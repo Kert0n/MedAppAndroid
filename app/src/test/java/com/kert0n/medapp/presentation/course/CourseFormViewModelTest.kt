@@ -1,7 +1,17 @@
 package com.kert0n.medapp.presentation.course
 
 import com.kert0n.medapp.domain.course.Revision
+import com.kert0n.medapp.feature.course.CourseActivation
+import com.kert0n.medapp.feature.course.CourseCalendar
 import com.kert0n.medapp.feature.course.CourseDrafting
+import com.kert0n.medapp.feature.course.CourseFollowing
+import com.kert0n.medapp.feature.notification.ReminderPromising
+import com.kert0n.medapp.feature.notification.ReminderWithdrawal
+import com.kert0n.medapp.fixture.FakeQueue
+import com.kert0n.medapp.fixture.QuietNotificationSettings
+import com.kert0n.medapp.fixture.UnaskedIntakes
+import com.kert0n.medapp.fixture.UnaskedReminders
+import com.kert0n.medapp.queue.QueueService
 import com.kert0n.medapp.fixture.COURSE
 import com.kert0n.medapp.fixture.DirectTransactions
 import com.kert0n.medapp.fixture.FakeCourseStorage
@@ -54,10 +64,34 @@ class CourseFormViewModelTest {
     private fun viewModel(courseId: Uuid? = null, transactions: Transactions = DirectTransactions) =
         CourseFormViewModel(
             drafting = CourseDrafting(courses, packages, transactions, clock),
+            activation = activation(transactions),
             courses = courses,
             vocabulary = FakeVocabulary(),
             courseId = courseId
         )
+
+    /**
+     * Начало лечения редактору черновика доступно, но здесь не проверяется: оно перестраивает
+     * календарь и брони, и над подделками об этом судить нельзя — это делает
+     * `CourseFormActivationTest` над Room. Соседи сценария поэтому — подделки, которые падают,
+     * если их всё-таки позвать.
+     */
+    private fun activation(transactions: Transactions): CourseActivation {
+        val calendar = CourseCalendar(
+            UnaskedIntakes,
+            packages,
+            ReminderPromising(UnaskedReminders, QuietNotificationSettings, transactions),
+            ReminderWithdrawal(UnaskedReminders, transactions)
+        )
+        return CourseActivation(
+            courses,
+            packages,
+            calendar,
+            CourseFollowing(courses, packages, calendar, QueueService(transactions, FakeQueue()), transactions),
+            transactions,
+            clock
+        )
+    }
 
     /** Черновик с одним названием и заметкой — законная запись: «записал у врача, куплю завтра» (D5). */
     @Test

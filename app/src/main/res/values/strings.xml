@@ -365,6 +365,7 @@
         <item quantity="many">Из этой пачки выйдет только %d приёмов.</item>
         <item quantity="other">Из этой пачки выйдет только %d приёма.</item>
     </plurals>
+    <string name="course_start_treatment">Начать лечение</string>
     <string name="course_card">Лечение</string>
     <string name="course_edit_action">Изменить</string>
     <string name="course_cancel_action">Отменить лечение</string>

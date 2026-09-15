@@ -46,6 +46,16 @@ sealed interface CourseFormError {
             }
     }
 
+    /** Коробку держит другое идущее лечение: одна пачка — один активный курс (PLAN D5). */
+    data class PackageTaken(val name: String?) : CourseFormError {
+        override val field: Field get() = Field.NONE
+    }
+
+    /** Коробку выбрасывают или её полки больше нет — источником ей не быть. */
+    data class PackageUnusable(val name: String?) : CourseFormError {
+        override val field: Field get() = Field.NONE
+    }
+
     /** Черновик правили с другого экрана: то, что здесь, устарело, и писать поверх нельзя (PLAN F5). */
     data object Stale : CourseFormError {
         override val field: Field get() = Field.NONE

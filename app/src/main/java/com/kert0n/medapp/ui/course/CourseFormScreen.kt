@@ -18,6 +18,7 @@ import androidx.compose.material3.Button
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.FilledTonalButton
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -79,7 +80,9 @@ fun CourseFormScreen(
     onBack: () -> Unit,
     modifier: Modifier = Modifier,
     /** Путь к источникам; `null` — записывать пачки ещё некуда: черновик не записан (H3 №16). */
-    onSources: (() -> Unit)? = null
+    onSources: (() -> Unit)? = null,
+    /** Начать лечение; `null` — у идущего лечения начинать уже нечего. */
+    onStart: (() -> Unit)? = null
 ) {
     val editing = state as? CourseFormUiState.Editing
     Scaffold(
@@ -107,7 +110,8 @@ fun CourseFormScreen(
             // Черновика нет — это отказ, а не пустая форма: заполненную человек сохранил бы и
             // не понял, куда делась его правка.
             CourseFormUiState.Gone -> ErrorMessage(text = stringResource(R.string.course_gone), modifier = Modifier.padding(padding))
-            is CourseFormUiState.Editing -> Fields(state, onEdit, onSave, onBack, onSources, Modifier.padding(padding))
+            is CourseFormUiState.Editing ->
+                Fields(state, onEdit, onSave, onBack, onSources, onStart, Modifier.padding(padding))
         }
     }
     if (editing?.asksToDiscard == true) DiscardDialog(onConfirm = onConfirmDiscard, onDismiss = onDismissDiscard)
@@ -121,6 +125,7 @@ private fun Fields(
     onSave: () -> Unit,
     onBack: () -> Unit,
     onSources: (() -> Unit)?,
+    onStart: (() -> Unit)?,
     modifier: Modifier
 ) {
     val form = state.form
@@ -217,6 +222,12 @@ private fun Fields(
             onClick = onSave,
             modifier = Modifier.fillMaxWidth().defaultMinSize(minHeight = 48.dp)
         ) { Text(stringResource(R.string.action_save)) }
+        onStart?.let {
+            FilledTonalButton(
+                onClick = it,
+                modifier = Modifier.fillMaxWidth().defaultMinSize(minHeight = 48.dp)
+            ) { Text(stringResource(R.string.course_start_treatment)) }
+        }
         TextButton(
             onClick = onBack,
             modifier = Modifier.fillMaxWidth().defaultMinSize(minHeight = 48.dp)
@@ -308,6 +319,12 @@ private fun CourseFormError.message(): String = when (this) {
     CourseFormError.Input.TIMES_EMPTY -> stringResource(R.string.course_times_empty)
     CourseFormError.Input.TOTAL_DOSES_INVALID -> stringResource(R.string.course_total_doses_invalid)
     is CourseFormError.Dose -> stringResource(error.text)
+    is CourseFormError.PackageTaken ->
+        name?.let { stringResource(R.string.course_source_taken_named, it) }
+            ?: stringResource(R.string.course_source_taken)
+    is CourseFormError.PackageUnusable ->
+        name?.let { stringResource(R.string.course_source_unusable_named, it) }
+            ?: stringResource(R.string.course_source_unusable)
     is CourseFormError.Rejected -> stringResource(reason.text)
     CourseFormError.Stale -> stringResource(R.string.course_stale)
 }
