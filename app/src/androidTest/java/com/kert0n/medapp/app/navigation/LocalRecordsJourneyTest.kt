@@ -159,8 +159,9 @@ class LocalRecordsJourneyTest {
         compose.waitUntil(3_000) { compose.onAllNodesWithText("Нурофен").fetchSemanticsNodes().isNotEmpty() }
         compose.onNodeWithText("Нурофен").performClick()
 
-        compose.onNodeWithText("Reckitt").assertIsDisplayed()
-        compose.onNodeWithText("Количество").performTextInput("20")
+        // На 360×640 dp поле производителя ниже экрана: до него докручивают.
+        compose.onNodeWithText("Reckitt").performScrollTo().assertIsDisplayed()
+        compose.onNodeWithText("Количество").performScrollTo().performTextInput("20")
         compose.onNodeWithText("Сохранить").performScrollTo().performClick()
         compose.waitUntil { compose.onAllNodesWithText("Сколько есть").fetchSemanticsNodes().isNotEmpty() }
         compose.onNodeWithText("Reckitt").performScrollTo().assertIsDisplayed()
