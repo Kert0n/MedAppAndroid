@@ -69,6 +69,7 @@
     <string name="action_back">Назад</string>
     <string name="action_save">Сохранить</string>
     <string name="action_cancel">Отмена</string>
+    <string name="action_remove">Удалить</string>
     <string name="action_choose">Выбрать</string>
     <string name="action_pick_date">Выбрать дату</string>
     <string name="action_clear_date">Убрать дату</string>
@@ -94,6 +95,40 @@
     <string name="pack_price">Цена, ₽</string>
     <string name="pack_purchased_on">Куплено</string>
     <string name="pack_opened_on">Вскрыто</string>
+
+    <!-- Упаковка: карточка -->
+    <string name="pack_title">Упаковка</string>
+    <string name="pack_gone">Этой упаковки больше нет.</string>
+    <string name="pack_how_much">Сколько есть</string>
+    <string name="pack_left">%1$s %2$s</string>
+    <string name="pack_available_to_me">Доступно мне</string>
+    <string name="pack_free_for_anyone">Свободно любому</string>
+    <string name="pack_reserved_by_others">%1$s заявлены другими</string>
+    <string name="pack_reserved_description">Часть заявлена другими участниками</string>
+    <string name="pack_held_by_course">Занято лечением «%1$s»</string>
+    <string name="pack_held_description">Упаковка отдана лечению</string>
+    <string name="pack_unconfirmed">Изменение ещё не доехало до общей аптечки.</string>
+    <string name="pack_what_it_is">Что это</string>
+    <string name="pack_dates">Сроки и цена</string>
+    <string name="pack_expiry_unknown">Срок не указан</string>
+    <string name="pack_expired_on">Просрочен %1$s</string>
+    <string name="pack_expires_soon">Истекает %1$s</string>
+    <string name="pack_expires_soon_description">Срок годности скоро истечёт</string>
+    <string name="pack_expires_until">Годен до %1$s</string>
+    <string name="pack_last_used">Брали последний раз</string>
+    <string name="pack_price_label">Цена</string>
+    <string name="pack_price_value">%1$s %2$s</string>
+    <string name="pack_where">Где лежит</string>
+    <string name="pack_med_kit_unknown">Аптечка неизвестна</string>
+    <string name="pack_actions">Что можно сделать</string>
+    <string name="pack_action_recount">Пересчитать или выбросить</string>
+    <string name="pack_action_transfer">Перенести</string>
+    <string name="pack_action_edit">Править сведения</string>
+    <string name="pack_action_remove">Удалить</string>
+    <string name="pack_remove_title">Удалить упаковку?</string>
+    <string name="pack_remove_explained">Коробка исчезнет вместе со своими сведениями. Приёмы из неё останутся в истории.</string>
+    <string name="pack_removal_on_the_way">Удаление в пути: общая аптечка ещё не ответила.</string>
+    <string name="pack_busy">Коробка ждёт ответа сервера на другое решение.</string>
 
     <!-- Упаковка: отказы формы -->
     <string name="pack_med_kit_missing">Выберите аптечку: упаковка лежит в каком-то одном месте.</string>

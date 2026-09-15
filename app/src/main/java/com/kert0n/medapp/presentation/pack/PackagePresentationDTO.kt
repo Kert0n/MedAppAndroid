@@ -17,6 +17,8 @@ import kotlin.uuid.Uuid
  * вложенных полей. Перечисления — общий доменный словарь, а не изменяемая сущность.
  * quantity — подтверждённый остаток; effective, availableToMe и freeForAnyone — оценка с
  * незакрытыми командами поверх, чужими бронями и своим выделением (PLAN D4, E1).
+ * reservedByOthers — сколько из неё заявлено не мной: экран называет это числом и словами, а не
+ * одной разницей между двумя другими числами, которую человек считал бы в уме.
  *
  * Версии предусловия здесь нет: человеку она ничего не говорит, а экрану состояния синхронизации
  * нужен момент последней сверки, который маппер получает аргументом.
@@ -48,6 +50,7 @@ data class PackagePresentationDTO(
     val templateId: Uuid?,
     val claims: ClaimsPresentationDTO?,
     val effective: QuantityPresentationDTO,
+    val reservedByOthers: QuantityPresentationDTO,
     val availableToMe: QuantityPresentationDTO,
     val freeForAnyone: QuantityPresentationDTO,
     val hasUnconfirmedChanges: Boolean,

@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Material Symbols «medication», выгружен scripts/add-icon.mjs. Руками не правится. -->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="24dp"
+    android:height="24dp"
+    android:viewportWidth="960"
+    android:viewportHeight="960">
+    <group
+        android:translateX="0"
+        android:translateY="960">
+        <path
+            android:fillColor="#FF000000"
+            android:pathData="M440-269h79v-111h114v-80H519v-111h-79v111H327v80h113v111ZM260-120q-24.75 0-42.37-17.63Q200-155.25 200-180v-479q0-24.75 17.63-42.38Q235.25-719 260-719h440q24.75 0 42.38 17.62Q760-683.75 760-659v479q0 24.75-17.62 42.37Q724.75-120 700-120H260Zm0-60h440v-479H260v479Zm-20-600v-60h481v60H240Zm20 121v479-479Z" />
+    </group>
+</vector>

@@ -28,6 +28,7 @@ import com.kert0n.medapp.ui.EmptyState
 import com.kert0n.medapp.ui.medkit.MedKitFormRoute
 import com.kert0n.medapp.ui.medkit.MedKitListRoute
 import com.kert0n.medapp.ui.pack.PackageFormRoute
+import com.kert0n.medapp.ui.pack.PackageRoute
 import kotlin.reflect.typeOf
 import kotlin.uuid.Uuid
 
@@ -110,7 +111,16 @@ private fun MedAppNavHost(navController: NavHostController, modifier: Modifier =
                 onCancel = { navController.popBackStack() }
             )
         }
-        composable<Route.Package>(typeMap = mapOf(typeOf<Uuid>() to UuidNavType)) { NotReadyYet() }
+        composable<Route.Package>(typeMap = mapOf(typeOf<Uuid>() to UuidNavType)) {
+            PackageRoute(
+                onBack = { navController.popBackStack() },
+                onEdit = { navController.navigate(Route.PackageForm(packageId = it)) },
+                onChangeAmount = { navController.navigate(Route.PackageAmount(it)) },
+                onTransfer = { navController.navigate(Route.PackageTransfer(it)) }
+            )
+        }
+        composable<Route.PackageAmount>(typeMap = mapOf(typeOf<Uuid>() to UuidNavType)) { NotReadyYet() }
+        composable<Route.PackageTransfer>(typeMap = mapOf(typeOf<Uuid>() to UuidNavType)) { NotReadyYet() }
         composable<Route.AllPackages> { NotReadyYet() }
         composable<Route.Plan> { NotReadyYet() }
         composable<Route.Scanner> { NotReadyYet() }
