@@ -73,6 +73,55 @@
     <string name="action_pick_date">Выбрать дату</string>
     <string name="action_clear_date">Убрать дату</string>
 
+    <!-- Упаковка: форма заведения и правки -->
+    <string name="pack_new">Новая упаковка</string>
+    <string name="pack_med_kit">Аптечка</string>
+    <string name="pack_no_med_kits">Сначала заведите аптечку — упаковка лежит в каком-то одном месте.</string>
+    <string name="pack_name">Название</string>
+    <string name="pack_amount">Количество</string>
+    <string name="pack_unit">Единица</string>
+    <string name="pack_optional">Остальное, если известно</string>
+    <string name="pack_form">Форма выпуска</string>
+    <string name="pack_expires_on">Годен до</string>
+    <string name="pack_expires_on_example">03.2027</string>
+    <string name="pack_category">Категория</string>
+    <string name="pack_manufacturer">Производитель</string>
+    <string name="pack_country">Страна</string>
+    <string name="pack_description">Описание</string>
+    <string name="pack_intake_hint">Доза за раз</string>
+    <string name="pack_intake_hint_explained">Сколько обычно принимают за раз — подставится при разовом приёме.</string>
+    <string name="pack_note">Заметка</string>
+    <string name="pack_price">Цена, ₽</string>
+    <string name="pack_purchased_on">Куплено</string>
+    <string name="pack_opened_on">Вскрыто</string>
+
+    <!-- Упаковка: отказы формы -->
+    <string name="pack_med_kit_missing">Выберите аптечку: упаковка лежит в каком-то одном месте.</string>
+    <string name="pack_med_kit_gone">Этой аптечки больше нет — выберите другую.</string>
+    <string name="pack_med_kit_busy">Аптечка ждёт ответа сервера на другое решение — класть в неё пока рано.</string>
+    <string name="pack_unit_missing">Выберите единицу: без неё количество ничего не меряет.</string>
+    <string name="pack_name_empty">Название нужно: без него упаковку не найти ни поиском, ни глазами.</string>
+    <string name="pack_too_long">Поле «%1$s» длиннее %2$d символов.</string>
+    <string name="pack_amount_is_zero">Пустую упаковку заводить незачем — укажите, сколько в ней есть.</string>
+    <string name="pack_hint_is_zero">Нулевой дозы не бывает.</string>
+    <string name="pack_unknown_in_vocabulary">Этого значения нет в справочнике — выберите другое.</string>
+
+    <!-- Разбор количества, срока и цены -->
+    <string name="quantity_empty">Укажите количество.</string>
+    <string name="quantity_too_long">Слишком длинное число.</string>
+    <string name="quantity_not_a_decimal">Количество — это число: только цифры и точка.</string>
+    <string name="quantity_too_many_fraction_digits">Слишком много знаков после точки.</string>
+    <string name="quantity_too_many_integer_digits">Слишком большое число.</string>
+    <string name="quantity_out_of_range">Такого количества не бывает.</string>
+    <string name="expiry_empty">Укажите срок годности.</string>
+    <string name="expiry_unknown_format">Срок пишется как на упаковке: 03.2027 или 31.03.2027.</string>
+    <string name="expiry_impossible_date">Такой даты нет.</string>
+    <string name="price_empty">Укажите цену.</string>
+    <string name="price_too_long">Слишком длинное число.</string>
+    <string name="price_not_a_decimal">Цена — это число: только цифры и точка.</string>
+    <string name="price_unknown_currency">Неизвестная валюта.</string>
+    <string name="price_out_of_range">Такой цены не бывает.</string>
+
     <!-- Уведомления: каналы -->
     <string name="channel_intakes">Приёмы</string>
     <string name="channel_expiry">Сроки годности</string>

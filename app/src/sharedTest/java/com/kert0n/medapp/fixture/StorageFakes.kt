@@ -19,6 +19,14 @@ import com.kert0n.medapp.domain.value.QuantityUnit
 import com.kert0n.medapp.domain.value.Vocabulary
 import com.kert0n.medapp.network.pack.PackageSnapshot
 import com.kert0n.medapp.network.pack.PackageSyncState
+import com.kert0n.medapp.domain.medkit.MedKitRef
+import com.kert0n.medapp.queue.QueuedCommand
+import com.kert0n.medapp.queue.QueueStorage
+import com.kert0n.medapp.network.server.RawResponse
+import com.kert0n.medapp.queue.Settlement
+import com.kert0n.medapp.queue.StoredSyncOperation
+import com.kert0n.medapp.queue.SyncOperation
+import com.kert0n.medapp.queue.Take
 import com.kert0n.medapp.queue.Transactions
 import com.kert0n.medapp.storage.course.CourseReallocation
 import com.kert0n.medapp.storage.medkit.MedKitStorageRepository
@@ -235,6 +243,49 @@ class FakeVocabulary(
     override fun observeUnits(): Flow<List<QuantityUnit>> = MutableStateFlow(units)
 
     override fun observeForms(): Flow<List<DosageForm>> = MutableStateFlow(forms)
+}
+
+/**
+ * Очередь в памяти. Проверкам представления от неё нужно одно: поставленные команды видно, и
+ * поставлены они только тем полкам, которым есть что везти. Остальное — путь доставки: взятие в
+ * отправку, исход, повтор — принадлежит очереди и проверяется на ней (`QueueOutboxTest` и
+ * соседи), поэтому здесь эти двери честно падают, а не отвечают выдуманным.
+ */
+class FakeQueue : QueueStorage {
+
+    /** Что уехало бы серверу: тест спрашивает хранилище, а не следит за вызовами. */
+    val enqueued = mutableListOf<QueuedCommand>()
+
+    override suspend fun enqueue(queued: QueuedCommand, shelf: Uuid, at: Instant): SyncOperation {
+        enqueued += queued
+        return SyncOperation(
+            id = queued.id,
+            command = queued.command,
+            sequence = enqueued.size.toLong(),
+            createdAt = at,
+            payloadVersion = 1
+        )
+    }
+
+    override fun changes(): Flow<Unit> = MutableStateFlow(Unit)
+
+    override suspend fun medKit(id: Uuid): MedKitRef? = null
+
+    override suspend fun ready(now: Instant): List<StoredSyncOperation> = emptyList()
+
+    override suspend fun nextDueAt(now: Instant): Instant? = null
+
+    override suspend fun take(id: Uuid, fresh: PackageSnapshot?, at: Instant): Take? =
+        error("путь доставки проверяется на очереди, а не на экране")
+
+    override suspend fun answered(id: Uuid, answer: RawResponse, at: Instant): Unit =
+        error("путь доставки проверяется на очереди, а не на экране")
+
+    override suspend fun defer(id: Uuid, reason: String, at: Instant, notBefore: Instant): Unit =
+        error("путь доставки проверяется на очереди, а не на экране")
+
+    override suspend fun settle(id: Uuid, settlement: Settlement, at: Instant): Unit =
+        error("путь доставки проверяется на очереди, а не на экране")
 }
 
 /**

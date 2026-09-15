@@ -27,6 +27,7 @@ import com.kert0n.medapp.R
 import com.kert0n.medapp.ui.EmptyState
 import com.kert0n.medapp.ui.medkit.MedKitFormRoute
 import com.kert0n.medapp.ui.medkit.MedKitListRoute
+import com.kert0n.medapp.ui.pack.PackageFormRoute
 import kotlin.reflect.typeOf
 import kotlin.uuid.Uuid
 
@@ -97,6 +98,19 @@ private fun MedAppNavHost(navController: NavHostController, modifier: Modifier =
             MedKitFormRoute(onDone = { navController.popBackStack() })
         }
         composable<Route.MedKitContents>(typeMap = mapOf(typeOf<Uuid>() to UuidNavType)) { NotReadyYet() }
+        composable<Route.PackageForm>(typeMap = mapOf(typeOf<Uuid?>() to UuidOrNoneNavType)) {
+            PackageFormRoute(
+                // Записанная коробка открывается карточкой, а форма со стека уходит: человек
+                // заводил её, чтобы на неё посмотреть, а не чтобы завести вторую такую же.
+                onSaved = { packageId ->
+                    navController.navigate(Route.Package(packageId)) {
+                        popUpTo<Route.PackageForm> { inclusive = true }
+                    }
+                },
+                onCancel = { navController.popBackStack() }
+            )
+        }
+        composable<Route.Package>(typeMap = mapOf(typeOf<Uuid>() to UuidNavType)) { NotReadyYet() }
         composable<Route.AllPackages> { NotReadyYet() }
         composable<Route.Plan> { NotReadyYet() }
         composable<Route.Scanner> { NotReadyYet() }
