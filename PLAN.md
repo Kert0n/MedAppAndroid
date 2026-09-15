@@ -5682,8 +5682,11 @@ ANDROID_SERIAL=emulator-5554 ./gradlew :app:connectedDebugAndroidTest -Pprobe
 втрое; сверка — 51 запрос независимо от числа лечений, и ни один её запрос не перебирает
 растущую таблицу (`EXPLAIN QUERY PLAN`). Тесты поднимают `HiltTestApplication` и
 падений на старте не видят: после правки графа Hilt/WorkManager и после правки схемы запускается
-настоящий `MedApp` на эмуляторе (`adb shell pm clear com.kert0n.medapp`, затем
+настоящий `MedApp` на эмуляторе (`am force-stop`, затем
 `am start -n com.kert0n.medapp/.app.MainActivity`, `logcat` без `FATAL`, `SyncWorker` — `SUCCESS`).
+**`pm clear` при этом не делается**: он стирает учётные данные устройства, и первый же запуск
+заводит новую учётку на боевом сервере — по учётке на каждый запуск (AGENTS, «Эмулятор»).
+Чистить данные приходится только после правки схемы на месте, и это осознанная цена.
 
 **Грабли, на которые уже наступали:**
 

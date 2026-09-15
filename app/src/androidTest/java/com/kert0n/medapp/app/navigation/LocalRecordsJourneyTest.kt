@@ -61,7 +61,10 @@ class LocalRecordsJourneyTest {
         compose.onNodeWithText("Завести аптечку").performClick()
         compose.onNodeWithText("Название").performTextInput("Домашняя")
         compose.onNodeWithText("Сохранить").performScrollTo().performClick()
-        compose.waitUntil { compose.onAllNodesWithText("Домашняя").fetchSemanticsNodes().isNotEmpty() }
+        // Ждать «Домашнюю» нельзя: так называется и поле, в которое её только что напечатали, —
+        // форма ещё на экране, пока её снимает переход. Список узнаётся по тому, чего в форме
+        // нет вовсе.
+        compose.waitUntil { compose.onAllNodesWithText(SEARCH_EVERYWHERE).fetchSemanticsNodes().isNotEmpty() }
 
         // Со списка аптечек — внутрь полки.
         compose.onNodeWithText("Домашняя").performClick()
@@ -96,13 +99,19 @@ class LocalRecordsJourneyTest {
         compose.onNodeWithText("Завести аптечку").performClick()
         compose.onNodeWithText("Название").performTextInput("Домашняя")
         compose.onNodeWithText("Сохранить").performScrollTo().performClick()
-        compose.waitUntil { compose.onAllNodesWithText("Домашняя").fetchSemanticsNodes().isNotEmpty() }
+        compose.waitUntil { compose.onAllNodesWithText(SEARCH_EVERYWHERE).fetchSemanticsNodes().isNotEmpty() }
 
-        compose.onNodeWithText("Найти лекарство во всех аптечках").performClick()
+        compose.onNodeWithText(SEARCH_EVERYWHERE).performClick()
 
         compose.onNodeWithText("Все лекарства").assertIsDisplayed()
         compose.onNodeWithText("Во всех аптечках пока пусто.").assertIsDisplayed()
         // У всех лекарств хозяина нет: править и убирать там нечего.
         compose.onNodeWithContentDescription("Что можно с аптечкой").assertDoesNotExist()
+    }
+
+    private companion object {
+
+        /** Строка, которая есть только на списке аптечек: по ней и узнаётся, что переход прошёл. */
+        const val SEARCH_EVERYWHERE = "Найти лекарство во всех аптечках"
     }
 }

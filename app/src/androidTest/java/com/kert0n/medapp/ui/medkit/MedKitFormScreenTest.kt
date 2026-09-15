@@ -1,5 +1,11 @@
 package com.kert0n.medapp.ui.medkit
 
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.saveable.Saver
+import androidx.compose.runtime.saveable.listSaver
+import androidx.compose.runtime.saveable.rememberSaveable
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.junit4.StateRestorationTester
 import androidx.compose.ui.test.junit4.v2.createComposeRule
@@ -137,24 +143,47 @@ class MedKitFormScreenTest {
     /**
      * Поворот и смерть процесса форму не теряют: что напечатано, держит состояние, а не сам
      * экран (PLAN J3).
+     *
+     * Напечатать обязательно, и держать напечатанное должно то, что переживает пересоздание:
+     * подставить готовое состояние прямо в `setContent` значит собрать его заново после
+     * восстановления — тогда проверка проходит, даже если экран не отдал наружу ни буквы.
      */
     @Test
     fun theFormSurvivesBeingRecreated() {
         val restoration = StateRestorationTester(compose)
         restoration.setContent {
             MedAppTheme {
+                var form by rememberSaveable(stateSaver = FORM_SAVER) {
+                    mutableStateOf(MedKitFormPresentationDTO())
+                }
                 MedKitFormScreen(
-                    state = MedKitFormUiState.Editing(MedKitFormPresentationDTO("Дача", "Сарай")),
-                    onEdit = {},
+                    state = MedKitFormUiState.Editing(form),
+                    onEdit = { form = it },
                     onSave = {},
                     onCancel = {}
                 )
             }
         }
 
+        compose.onNodeWithText("Название").performTextInput("Дача")
+        compose.onNodeWithText("Место хранения (необязательно)").performTextInput("Сарай")
+
         restoration.emulateSavedInstanceStateRestore()
 
         compose.onNodeWithText("Дача").assertIsDisplayed()
         compose.onNodeWithText("Сарай").assertIsDisplayed()
+    }
+
+    private companion object {
+
+        /**
+         * Пересоздание переживает то, что положено в `rememberSaveable`. В приложении форму
+         * держит `SavedStateHandle` у `ViewModel`; здесь её держит проверка — тем же способом,
+         * иначе проверять нечего.
+         */
+        val FORM_SAVER: Saver<MedKitFormPresentationDTO, Any> = listSaver(
+            save = { listOf(it.name, it.location) },
+            restore = { MedKitFormPresentationDTO(it[0], it[1]) }
+        )
     }
 }

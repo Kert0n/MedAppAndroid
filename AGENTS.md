@@ -329,10 +329,12 @@ grep -rh '"[^"]\{15,\}"' --include='*.kt' app/src/main \
 доводом, что и `Doses` с `Revision`.
 
 Второй греп — у экранных PR (PLAN U1): представление и экран не видят ни DAO, ни Room, ни сети,
-ни внутренностей очереди. Пустым он бывает и обязан быть.
+ни очереди. Пустым он бывает и обязан быть. Очередь берётся целым корнем, а не парой имён:
+`LayerBoundariesTest` её не разрешает никому из двоих вовсе, и `QueueService` с `QueueTransport`
+— такое же нарушение, как `QueueWorker`, только незамеченное.
 
 ```bash
-grep -rnE '^import com.kert0n.medapp.(network|storage\..*Dao|storage\.database|queue\.(QueueWorker|QueueStorage))' \
+grep -rnE '^import com\.kert0n\.medapp\.(network\.|storage\..*Dao|storage\.database\.|queue\.)' \
   app/src/main/java/com/kert0n/medapp/{presentation,ui}
 ```
 
