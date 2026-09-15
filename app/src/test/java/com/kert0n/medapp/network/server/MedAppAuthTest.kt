@@ -11,6 +11,7 @@ import io.ktor.client.HttpClient
 import io.ktor.client.engine.mock.MockEngine
 import io.ktor.client.engine.mock.MockRequestHandleScope
 import io.ktor.client.engine.mock.respond
+import com.kert0n.medapp.network.account.AccountRegistration
 import io.ktor.client.plugins.contentnegotiation.ContentNegotiation
 import io.ktor.client.plugins.defaultRequest
 import io.ktor.client.request.HttpRequestData
@@ -389,5 +390,37 @@ class MedAppAuthTest {
 
         assertEquals(0, tokenCalls.get())
         assertNull(seenAuthorization.single())
+    }
+
+    /**
+     * **Пропуск — учётки** (C1). Ключ утрачен, человек начал с новой учёткой: старый пропуск
+     * сервер принимает ещё часы, но он пропуск чужой теперь учётки. Замена учётки обнуляет
+     * пропуск, и следующий запрос идёт уже от нового имени — `t1`, потом `t2`, а не `t1` дважды.
+     */
+    @Test
+    fun replacingTheAccountLeavesNoPassOfTheOldOne() = runTest {
+        val stored = Stored(StoredAccount.Present(account))
+        val tokens = AccessTokens(stored)
+        val client = medAppHttpClient(
+            MockEngine { request ->
+                when (request.url.encodedPath) {
+                    "/v1/auth/token" -> respond("""{"accessToken":"t${tokenCalls.incrementAndGet()}"}""", HttpStatusCode.OK, json)
+                    "/v1/auth/register" -> respond("", HttpStatusCode.Created, json)
+                    else -> {
+                        seenAuthorization += request.headers[HttpHeaders.Authorization]
+                        respond("", HttpStatusCode.OK)
+                    }
+                }
+            },
+            "https://medapp.test",
+            tokens = tokens
+        )
+        client.get("/v1/users/me")
+        stored.account = StoredAccount.Unreadable
+
+        assertEquals(AccountRegistration.Outcome.Ready, AccountRegistration(MedAppApi(client), stored, "build-token", tokens).replaceUnreadable())
+        client.get("/v1/users/me")
+
+        assertEquals("после замены учётки запрос идёт со старым пропуском", listOf("Bearer t1", "Bearer t2"), seenAuthorization)
     }
 }

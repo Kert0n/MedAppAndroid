@@ -1,5 +1,6 @@
 package com.kert0n.medapp.feature.account
 
+import com.kert0n.medapp.network.account.AccessTokens
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import com.kert0n.medapp.domain.course.CourseDraft
 import com.kert0n.medapp.domain.medkit.MedKit
@@ -141,7 +142,7 @@ class AccountReplacementTest {
                 retryDelay = { delayMillis(false) { 0L } }
             )
         )
-        val account = ServerDeviceAccount(AccountRegistration(api, stored, "build-token"))
+        val account = ServerDeviceAccount(AccountRegistration(api, stored, "build-token", AccessTokens(stored)))
         return AccountReplacement(account, database.medKitRepository(), database.transactions(), AppStart(account, KnownWords()), Clock.fixed(LATER, ZoneOffset.UTC))
     }
 
@@ -157,7 +158,7 @@ class AccountReplacementTest {
         val start = AppStart(ServerDeviceAccount(AccountRegistration(MedAppApi(medAppHttpClient(MockEngine { request ->
             requests += "${request.method.value} ${request.url.encodedPath}"
             respond("", HttpStatusCode.Created)
-        }, "https://medapp.test")), stored, "build-token")), KnownWords())
+        }, "https://medapp.test")), stored, "build-token", AccessTokens(stored))), KnownWords())
 
         assertEquals(AppStart.Outcome.KeyLost, start.begin())
 
