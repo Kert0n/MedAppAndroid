@@ -32,11 +32,9 @@ import com.kert0n.medapp.R
 import com.kert0n.medapp.presentation.pack.PackageFormError
 import com.kert0n.medapp.presentation.pack.PackageFormPresentationDTO
 import com.kert0n.medapp.presentation.pack.PackageFormUiState
-import com.kert0n.medapp.presentation.value.ExpiryDatePresentationError
-import com.kert0n.medapp.presentation.value.MoneyPresentationError
-import com.kert0n.medapp.presentation.value.QuantityPresentationError
 import com.kert0n.medapp.ui.DateField
 import com.kert0n.medapp.ui.PickerField
+import com.kert0n.medapp.ui.text
 
 /**
  * Заведение и правка упаковки (PLAN H3 №7, №8).
@@ -275,33 +273,3 @@ private fun PackageFormError.message(): String = when (this) {
     is PackageFormError.Price -> stringResource(reason.text)
     is PackageFormError.TooLong -> pluralStringResource(R.plurals.pack_too_long, limit, limit)
 }
-
-@get:StringRes
-private val QuantityPresentationError.text: Int
-    get() = when (this) {
-        QuantityPresentationError.EMPTY -> R.string.quantity_empty
-        QuantityPresentationError.TOO_LONG -> R.string.quantity_too_long
-        QuantityPresentationError.NOT_A_DECIMAL -> R.string.quantity_not_a_number
-        QuantityPresentationError.TOO_MANY_FRACTION_DIGITS -> R.string.quantity_too_precise
-        QuantityPresentationError.TOO_MANY_INTEGER_DIGITS -> R.string.quantity_too_big
-        QuantityPresentationError.OUT_OF_DOMAIN_RANGE -> R.string.quantity_too_big
-        QuantityPresentationError.UNKNOWN_UNIT -> R.string.pack_unknown_in_vocabulary
-    }
-
-@get:StringRes
-private val ExpiryDatePresentationError.text: Int
-    get() = when (this) {
-        ExpiryDatePresentationError.EMPTY -> R.string.expiry_empty
-        ExpiryDatePresentationError.UNKNOWN_FORMAT -> R.string.expiry_unknown_shape
-        ExpiryDatePresentationError.IMPOSSIBLE_DATE -> R.string.expiry_impossible
-    }
-
-@get:StringRes
-private val MoneyPresentationError.text: Int
-    get() = when (this) {
-        MoneyPresentationError.EMPTY -> R.string.price_empty
-        MoneyPresentationError.TOO_LONG -> R.string.price_too_long
-        MoneyPresentationError.NOT_A_DECIMAL -> R.string.price_not_a_number
-        MoneyPresentationError.UNKNOWN_CURRENCY -> R.string.price_unknown_currency
-        MoneyPresentationError.OUT_OF_CURRENCY_RANGE -> R.string.price_too_big
-    }

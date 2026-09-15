@@ -58,4 +58,8 @@ sealed interface Screen : NavKey {
     /** Карточка упаковки (PLAN H3 №6): сколько есть, что это, где лежит — и что с ней сделать. */
     @Serializable
     data class PackageCard(val packageId: Uuid) : Screen
+
+    /** Пересчёт (PLAN H3 №9): одно число, которое человек увидел в коробке. */
+    @Serializable
+    data class PackageRecount(val packageId: Uuid) : Screen
 }

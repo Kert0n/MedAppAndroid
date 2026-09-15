@@ -1,7 +1,7 @@
 package com.kert0n.medapp.ui
 
 import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.heightIn
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
@@ -35,7 +35,11 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.res.stringResource
+import androidx.annotation.StringRes
 import com.kert0n.medapp.R
+import com.kert0n.medapp.presentation.value.ExpiryDatePresentationError
+import com.kert0n.medapp.presentation.value.MoneyPresentationError
+import com.kert0n.medapp.presentation.value.QuantityPresentationError
 import java.time.Instant
 import java.time.LocalDate
 import java.time.ZoneOffset
@@ -79,8 +83,11 @@ fun SearchEntry(hint: String, onClick: () -> Unit, modifier: Modifier = Modifier
  *
  * **Содержимое меню ленивое.** Меню Material меряет его `IntrinsicSize.Max`, и ленивый список
  * внутрь так не встаёт — поэтому он лежит в рамке заданного размера: рамка отвечает на запрос
- * внутренних размеров сама, и мерить каждый пункт не нужно. Длина списка приходит из словаря
- * сервера, а не из экрана, и снова вырасти она может в любой день (issue #36).
+ * внутренних размеров сама, и мерить каждый пункт не нужно. Размер именно **задан**, а не
+ * ограничен сверху: `heightIn(max)` переспрашивает список, и меню падает при первом открытии.
+ * Высота считается по числу пунктов, чтобы короткий словарь не тянул за собой пустую рамку.
+ * Длина списка приходит из словаря сервера, а не из экрана, и снова вырасти она может в любой
+ * день (issue #36).
  */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -117,7 +124,7 @@ fun <T> PickerField(
                 .defaultMinSize(minHeight = 48.dp)
         )
         ExposedDropdownMenu(expanded = open, onDismissRequest = { open = false }) {
-            LazyColumn(Modifier.width(MENU_WIDTH).heightIn(max = MENU_MAX_HEIGHT)) {
+            LazyColumn(Modifier.width(MENU_WIDTH).height((MENU_ITEM_HEIGHT * options.size).coerceAtMost(MENU_MAX_HEIGHT))) {
                 items(options) { option ->
                     DropdownMenuItem(
                         text = { Text(optionText(option)) },
@@ -137,6 +144,9 @@ private val MENU_WIDTH = 280.dp
 
 /** Насколько отрастает меню, прежде чем начать прокручиваться. */
 private val MENU_MAX_HEIGHT = 320.dp
+
+/** Высота пункта меню Material: по ней рамка считает свою высоту, не меряя пункты. */
+private val MENU_ITEM_HEIGHT = 48.dp
 
 /**
  * Дата, которую называет календарь. Печатать её строкой незачем: выбранная дата уже дата, и
@@ -200,3 +210,37 @@ fun DateField(
 
 /** Как дата выглядит в поле: так же, как её печатают от руки. */
 private val DAY: DateTimeFormatter = DateTimeFormatter.ofPattern("dd.MM.uuuu")
+
+/**
+ * Чем плох напечатанный ввод — словами. Один текст на все поля, где человек печатает количество,
+ * срок или цену: заведение коробки, пересчёт; правило разбора живёт у представления, слова — здесь.
+ */
+@get:StringRes
+internal val QuantityPresentationError.text: Int
+    get() = when (this) {
+        QuantityPresentationError.EMPTY -> R.string.quantity_empty
+        QuantityPresentationError.TOO_LONG -> R.string.quantity_too_long
+        QuantityPresentationError.NOT_A_DECIMAL -> R.string.quantity_not_a_number
+        QuantityPresentationError.TOO_MANY_FRACTION_DIGITS -> R.string.quantity_too_precise
+        QuantityPresentationError.TOO_MANY_INTEGER_DIGITS -> R.string.quantity_too_big
+        QuantityPresentationError.OUT_OF_DOMAIN_RANGE -> R.string.quantity_too_big
+        QuantityPresentationError.UNKNOWN_UNIT -> R.string.pack_unknown_in_vocabulary
+    }
+
+@get:StringRes
+internal val ExpiryDatePresentationError.text: Int
+    get() = when (this) {
+        ExpiryDatePresentationError.EMPTY -> R.string.expiry_empty
+        ExpiryDatePresentationError.UNKNOWN_FORMAT -> R.string.expiry_unknown_shape
+        ExpiryDatePresentationError.IMPOSSIBLE_DATE -> R.string.expiry_impossible
+    }
+
+@get:StringRes
+internal val MoneyPresentationError.text: Int
+    get() = when (this) {
+        MoneyPresentationError.EMPTY -> R.string.price_empty
+        MoneyPresentationError.TOO_LONG -> R.string.price_too_long
+        MoneyPresentationError.NOT_A_DECIMAL -> R.string.price_not_a_number
+        MoneyPresentationError.UNKNOWN_CURRENCY -> R.string.price_unknown_currency
+        MoneyPresentationError.OUT_OF_CURRENCY_RANGE -> R.string.price_too_big
+    }

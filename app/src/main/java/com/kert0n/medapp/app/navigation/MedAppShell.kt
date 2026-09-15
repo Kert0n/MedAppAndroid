@@ -27,12 +27,14 @@ import com.kert0n.medapp.presentation.medkit.MedKitListViewModel
 import com.kert0n.medapp.presentation.pack.MedKitContentsViewModel
 import com.kert0n.medapp.presentation.pack.PackageCardViewModel
 import com.kert0n.medapp.presentation.pack.PackageFormViewModel
+import com.kert0n.medapp.presentation.pack.PackageRecountViewModel
 import com.kert0n.medapp.ui.EmptyState
 import com.kert0n.medapp.ui.medkit.MedKitContentsScreen
 import com.kert0n.medapp.ui.medkit.MedKitFormScreen
 import com.kert0n.medapp.ui.medkit.MedKitListScreen
 import com.kert0n.medapp.ui.pack.PackageCardScreen
 import com.kert0n.medapp.ui.pack.PackageFormScreen
+import com.kert0n.medapp.ui.pack.PackageRecountScreen
 
 /**
  * Оболочка приложения: пять мест внизу и содержимое над ними. Где человек стоит и как глубоко —
@@ -142,8 +144,8 @@ private fun screens(stacks: TabStacks) = entryProvider<NavKey> {
             onEdit = model::edit,
             onSave = model::save,
             onCancel = stacks::back,
-            // Пересчёт — следующий экран набора; пока вести некуда.
-            onRecount = {}
+            // Количество здесь показано, но не правится: у пересчёта свой экран (H3 №8).
+            onRecount = { key.packageId?.let { stacks.go(Screen.PackageRecount(it)) } }
         )
     }
     entry<Screen.PackageCard> { key ->
@@ -157,13 +159,30 @@ private fun screens(stacks: TabStacks) = entryProvider<NavKey> {
         PackageCardScreen(
             state = state,
             onEdit = { stacks.go(Screen.PackageForm(packageId = key.packageId)) },
-            // Пересчёт и перенос — следующие экраны набора; пока вести некуда.
-            onRecount = {},
+            onRecount = { stacks.go(Screen.PackageRecount(key.packageId)) },
+            // Перенос — следующий экран набора; пока вести некуда.
             onTransfer = {},
             onAskToRemove = model::askToRemove,
             onConfirmRemoval = model::remove,
             onDismissRemoval = model::dismissRemoval,
             onBack = stacks::back
+        )
+    }
+    entry<Screen.PackageRecount> { key ->
+        val model = hiltViewModel<PackageRecountViewModel, PackageRecountViewModel.Factory>(
+            key = key.toString(),
+            creationCallback = { factory -> factory.create(key.packageId) }
+        )
+        val state = model.state.collectAsStateWithLifecycle().value
+        // Записано — уходим: кончившейся коробке карточки нет, а у оставшейся число покажет она сама.
+        LaunchedEffect(state.isDone) { if (state.isDone) stacks.back() }
+        PackageRecountScreen(
+            state = state,
+            onEdit = model::edit,
+            onSubmit = model::submit,
+            onCancel = stacks::back,
+            onConfirmEmptying = model::confirmEmptying,
+            onDismissEmptying = model::dismissEmptying
         )
     }
     for (place in Place.entries - Place.MED_KITS) {
