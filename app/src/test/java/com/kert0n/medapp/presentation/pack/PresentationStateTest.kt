@@ -149,4 +149,12 @@ class PresentationStateTest {
         assertEquals(before, after)
         assertNotEquals(before.projected().toPresentationDTO(), after.projected().toPresentationDTO())
     }
+
+    /** Чужие брони приходят на экран числом в единице пачки — тем же, что считает домен (D4). */
+    @Test
+    fun whatOthersClaimedIsAQuantityOfThePackage() {
+        val shown = pack(claims = Claims(BigDecimal("8.500000"), BigDecimal("2.5"))).projected().toPresentationDTO()
+        assertEquals("6", shown.reservedByOthers.amount)
+        assertEquals(TABLETS_ID, shown.reservedByOthers.unit.id)
+    }
 }

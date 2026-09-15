@@ -54,4 +54,8 @@ sealed interface Screen : NavKey {
      */
     @Serializable
     data class PackageForm(val medKitId: Uuid? = null, val packageId: Uuid? = null) : Screen
+
+    /** Карточка упаковки (PLAN H3 №6): сколько есть, что это, где лежит — и что с ней сделать. */
+    @Serializable
+    data class PackageCard(val packageId: Uuid) : Screen
 }

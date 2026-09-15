@@ -340,12 +340,16 @@ class FakeFollowing : PackageFollowing {
  * Лечение, которого нет. Экраны локального учёта курсов не касаются: коробку они заводят,
  * правят и убирают, а что при этом делает курс, проверяется на нём самом
  * (`CourseFollowingTest`, `PackageRelocationTest`). Подделка отвечает только на два вопроса
- * переноса — «кто держит коробку» и «кто на неё ссылается», — и на оба честно: никто.
+ * переноса — «кто держит коробку» и «кто на неё ссылается», — на оба честно: никто, — и на
+ * вопрос карточки «как называется лечение»: по [records], которые положил тест.
  *
  * Остальные двери падают, а не отвечают выдуманным: сценарий, который сюда заглянул, пришёл не
  * за тем, чем занят экран, и молчаливый пустой ответ спрятал бы это от проверки.
  */
 class FakeCourses : CourseStorageRepository {
+
+    /** Записи эпизодов по тождеству: карточка коробки называет держащее лечение именем. */
+    val records = mutableMapOf<Uuid, CourseRecordProjection>()
 
     override suspend fun courseHolding(packageId: Uuid): Uuid? = null
 
@@ -377,7 +381,7 @@ class FakeCourses : CourseStorageRepository {
 
     override fun observeRecords(): Flow<List<CourseRecordProjection>> = noCourses()
 
-    override fun observeRecord(id: Uuid): Flow<CourseRecordProjection?> = noCourses()
+    override fun observeRecord(id: Uuid): Flow<CourseRecordProjection?> = MutableStateFlow(records[id])
 
     override suspend fun findRecord(id: Uuid): CourseRecord? = noCourses()
 

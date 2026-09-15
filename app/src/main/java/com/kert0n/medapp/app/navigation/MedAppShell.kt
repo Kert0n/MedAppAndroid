@@ -25,11 +25,13 @@ import com.kert0n.medapp.presentation.medkit.MedKitFormUiState
 import com.kert0n.medapp.presentation.medkit.MedKitFormViewModel
 import com.kert0n.medapp.presentation.medkit.MedKitListViewModel
 import com.kert0n.medapp.presentation.pack.MedKitContentsViewModel
+import com.kert0n.medapp.presentation.pack.PackageCardViewModel
 import com.kert0n.medapp.presentation.pack.PackageFormViewModel
 import com.kert0n.medapp.ui.EmptyState
 import com.kert0n.medapp.ui.medkit.MedKitContentsScreen
 import com.kert0n.medapp.ui.medkit.MedKitFormScreen
 import com.kert0n.medapp.ui.medkit.MedKitListScreen
+import com.kert0n.medapp.ui.pack.PackageCardScreen
 import com.kert0n.medapp.ui.pack.PackageFormScreen
 
 /**
@@ -110,8 +112,7 @@ private fun screens(stacks: TabStacks) = entryProvider<NavKey> {
             onNarrow = model::narrow,
             onOrder = model::order,
             onReset = model::reset,
-            // Карточка коробки — следующий экран набора; пока вести некуда.
-            onOpen = {},
+            onOpen = { stacks.go(Screen.PackageCard(it)) },
             onAdd = { stacks.go(Screen.PackageForm(medKitId = key.medKitId)) },
             onEdit = { stacks.go(Screen.MedKitForm(key.medKitId)) },
             onAskToRemove = model::askToRemove,
@@ -129,9 +130,13 @@ private fun screens(stacks: TabStacks) = entryProvider<NavKey> {
             }
         )
         val state = model.state.collectAsStateWithLifecycle().value
-        // Записанная коробка открывается карточкой — её пока нет, поэтому просто уходим: форма
-        // своё дело сделала.
-        LaunchedEffect(state.saved) { if (state.saved != null) stacks.back() }
+        // Заведённая коробка открывается карточкой: человек заводил её, чтобы посмотреть.
+        // Поправленная — нет: её карточка и так лежит под формой.
+        LaunchedEffect(state.saved) {
+            val saved = state.saved ?: return@LaunchedEffect
+            stacks.back()
+            if (key.packageId == null) stacks.go(Screen.PackageCard(saved))
+        }
         PackageFormScreen(
             state = state,
             onEdit = model::edit,
@@ -139,6 +144,26 @@ private fun screens(stacks: TabStacks) = entryProvider<NavKey> {
             onCancel = stacks::back,
             // Пересчёт — следующий экран набора; пока вести некуда.
             onRecount = {}
+        )
+    }
+    entry<Screen.PackageCard> { key ->
+        val model = hiltViewModel<PackageCardViewModel, PackageCardViewModel.Factory>(
+            key = key.toString(),
+            creationCallback = { factory -> factory.create(key.packageId) }
+        )
+        val state = model.state.collectAsStateWithLifecycle().value
+        // Выброшенной коробке карточки нет: уходим туда, откуда пришли.
+        LaunchedEffect(state.isRemoved) { if (state.isRemoved) stacks.back() }
+        PackageCardScreen(
+            state = state,
+            onEdit = { stacks.go(Screen.PackageForm(packageId = key.packageId)) },
+            // Пересчёт и перенос — следующие экраны набора; пока вести некуда.
+            onRecount = {},
+            onTransfer = {},
+            onAskToRemove = model::askToRemove,
+            onConfirmRemoval = model::remove,
+            onDismissRemoval = model::dismissRemoval,
+            onBack = stacks::back
         )
     }
     for (place in Place.entries - Place.MED_KITS) {

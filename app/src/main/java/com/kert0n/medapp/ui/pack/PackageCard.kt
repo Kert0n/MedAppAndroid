@@ -92,9 +92,9 @@ fun PackageCard(
     }
 }
 
-/** Значок со словами: цвет уточняет сказанное, а не заменяет его. */
+/** Значок со словами: цвет уточняет сказанное, а не заменяет его. Общий у строки и карточки. */
 @Composable
-private fun Marker(@DrawableRes icon: Int, text: String, color: Color) {
+internal fun Marker(@DrawableRes icon: Int, text: String, color: Color) {
     Row(
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(6.dp)

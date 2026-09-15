@@ -164,6 +164,30 @@
     <string name="med_kit_removal_contents_busy">Одна из упаковок ждёт ответа сервера — дождитесь его и повторите.</string>
     <string name="med_kit_removal_not_shared">Эта аптечка только ваша — оставлять её некому.</string>
 
+    <!-- Карточка упаковки -->
+    <string name="pack_title">Упаковка</string>
+    <string name="pack_how_much">Сколько есть</string>
+    <string name="pack_available_to_me">Доступно мне</string>
+    <string name="pack_free_for_anyone">Свободно любому</string>
+    <string name="pack_reserved_by_others">%1$s заявлены другими</string>
+    <string name="pack_held_by_course">Занято лечением «%1$s»</string>
+    <string name="pack_unconfirmed">Изменение ещё не доехало до общей аптечки.</string>
+    <string name="pack_removal_on_the_way">Удаление в пути: общая аптечка ещё не ответила.</string>
+    <string name="pack_lost">Из этой аптечки вышли — коробка ждёт ответа сервера.</string>
+    <string name="pack_what_it_is">Что это</string>
+    <string name="pack_dates">Сроки и цена</string>
+    <string name="pack_expiry_unknown">Срок не указан</string>
+    <string name="pack_expires_until">Годен до %1$s</string>
+    <string name="pack_last_used">Брали последний раз</string>
+    <string name="pack_price_value">%1$s %2$s</string>
+    <string name="pack_where">Где лежит</string>
+    <string name="pack_action_edit">Править сведения</string>
+    <string name="pack_action_remove">Выбросить</string>
+    <string name="pack_action_transfer">Перенести</string>
+    <string name="pack_remove_title">Выбросить упаковку?</string>
+    <string name="pack_remove_explained">Пачки больше не будет. Приёмы из неё останутся в истории.</string>
+    <string name="pack_remove_busy">Упаковка ждёт ответа сервера на другое решение — выбросить её пока нельзя.</string>
+
     <!-- Русские количества: «1 упаковка», «2 упаковки», «12 упаковок» -->
     <plurals name="packages_count">
         <item quantity="one">%d упаковка</item>
