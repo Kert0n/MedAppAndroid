@@ -1,12 +1,13 @@
 package com.kert0n.medapp.feature.time
 
-import com.kert0n.medapp.platform.time.TimeShifts
+import com.kert0n.medapp.feature.time.ClockShifts
 import java.time.Clock
 import java.time.Duration
 import java.time.Instant
 import java.time.LocalDate
 import java.time.ZoneId
 import kotlinx.coroutines.ExperimentalCoroutinesApi
+import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.take
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.flow.toList
@@ -23,6 +24,21 @@ import org.junit.Test
 @OptIn(ExperimentalCoroutinesApi::class)
 class TodayTest {
 
+    /**
+     * Часы никто не переводил: только полночь. Поток молчит, но **не кончается** — кончившийся
+     * значил бы «вестей больше не будет», и ожидание границы дня сорвалось бы.
+     */
+    private object Quiet : ClockShifts {
+        override val signals = MutableSharedFlow<Unit>()
+    }
+
+    /** Часы перевели столько раз, сколько скажет проверка. */
+    private class Shifts : ClockShifts {
+        private val told = MutableSharedFlow<Unit>(extraBufferCapacity = 1)
+        override val signals = told
+        fun happened() { told.tryEmit(Unit) }
+    }
+
     private val moscow = ZoneId.of("Europe/Moscow")
 
     @Test
@@ -30,7 +46,7 @@ class TodayTest {
         // 21:30 UTC — в Москве это уже следующие сутки: день берётся в местной зоне, а не в UTC.
         val evening = Clock.fixed(Instant.parse("2026-09-15T21:30:00Z"), moscow)
 
-        assertEquals(LocalDate.parse("2026-09-16"), Today(evening).observe().take(1).toList().single())
+        assertEquals(LocalDate.parse("2026-09-16"), Today(evening, Quiet).observe().take(1).toList().single())
     }
 
     /**
@@ -52,7 +68,7 @@ class TodayTest {
             override fun withZone(zone: ZoneId): Clock = this
         }
 
-        val days = Today(running).observe().take(2).toList()
+        val days = Today(running, Quiet).observe().take(2).toList()
 
         assertEquals(listOf(LocalDate.parse("2026-09-15"), LocalDate.parse("2026-09-16")), days)
         // Ждали до полуночи, а не сутки: между двумя днями прошёл ровно час.
@@ -80,7 +96,7 @@ class TodayTest {
 
             override fun withZone(zone: ZoneId): Clock = this
         }
-        val shifts = TimeShifts()
+        val shifts = Shifts()
         val days = mutableListOf<LocalDate>()
 
         backgroundScope.launch { Today(running, shifts).observe().collect { days += it } }

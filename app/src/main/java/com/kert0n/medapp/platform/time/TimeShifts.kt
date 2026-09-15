@@ -1,5 +1,6 @@
 package com.kert0n.medapp.platform.time
 
+import com.kert0n.medapp.feature.time.ClockShifts
 import javax.inject.Inject
 import javax.inject.Singleton
 import kotlinx.coroutines.channels.BufferOverflow
@@ -14,20 +15,20 @@ import kotlinx.coroutines.flow.MutableSharedFlow
  * не может узнать об этом сам — он спит до старой полуночи, и до неё дата остаётся вчерашней.
  *
  * Сигнал, а не опрос: у события есть свой источник, и спрашивать часы каждую минуту значило бы
- * не знать о нём.
+ * не знать о нём. Ждущие видят его портом [ClockShifts]: им нужна весть, а не то, кто её принёс.
  *
  * Прошедшее без слушателей теряется намеренно: экран, которого никто не открыл, считает день
  * заново при открытии, и хранить для него прошлые переводы часов незачем.
  */
 @Singleton
-class TimeShifts @Inject constructor() {
+class TimeShifts @Inject constructor() : ClockShifts {
 
     private val shifts = MutableSharedFlow<Unit>(
         extraBufferCapacity = 1,
         onBufferOverflow = BufferOverflow.DROP_OLDEST
     )
 
-    val signals: Flow<Unit> = shifts
+    override val signals: Flow<Unit> = shifts
 
     fun happened() {
         shifts.tryEmit(Unit)

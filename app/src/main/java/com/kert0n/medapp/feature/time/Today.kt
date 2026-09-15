@@ -1,6 +1,5 @@
 package com.kert0n.medapp.feature.time
 
-import com.kert0n.medapp.platform.time.TimeShifts
 import java.time.Clock
 import java.time.Duration
 import java.time.LocalDate
@@ -24,16 +23,12 @@ import kotlinx.coroutines.withTimeoutOrNull
  * День кончается в **местную** полночь, и зону спрашивают у часов при каждом обороте:
  * переехавший человек получает свой день, а не прежний (PLAN C1 «Часы устройства — в его
  * нынешней зоне»). Ждать одной лишь полуночи мало — переезд и перевод часов двигают саму
- * границу, и о них говорит [TimeShifts].
+ * границу, и о них говорит [ClockShifts].
  */
 @Singleton
 class Today @Inject constructor(
     private val clock: Clock,
-    /**
-     * Значение по умолчанию — ради проверок, которые о переводе часов не спрашивают; графу
-     * достаётся общий на приложение [TimeShifts], тот самый, куда пишет `BootAndTimeReceiver`.
-     */
-    private val shifts: TimeShifts = TimeShifts()
+    private val shifts: ClockShifts
 ) {
 
     /** Текущий день сразу и каждый следующий — в его местную полночь. */
