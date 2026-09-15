@@ -133,6 +133,24 @@ class CourseOffPlanCountingTest {
     }
 
     /** Уменьшение счёта бронь обратно не растит, а устаревшая редакция ничего не пишет. */
+    /**
+     * **Календарь — отражение потребности в обе стороны** (C1 «Потребность перестраивает будущее
+     * одной дверью»). Человек ошибся счётом и вернул его: доз впереди снова столько же, и плановые
+     * пункты возвращаются — пока правка счёта звала только `prune`, вернувшаяся потребность
+     * оставалась без пунктов и без напоминаний до следующей достройки календаря.
+     */
+    @Test
+    fun loweringTheCountBackRestoresTheCalendar() = runTest {
+        val id = treated()
+        val plannedBefore = items(id).count { it.status == IntakeStatus.PLANNED }
+        scenarios.courseOffPlanCounting.set(id, revisionOf(id), Doses(2))
+        assertEquals(plannedBefore - 2, items(id).count { it.status == IntakeStatus.PLANNED })
+
+        scenarios.courseOffPlanCounting.set(id, revisionOf(id), Doses(0))
+
+        assertEquals("потребность вернулась, а пункты — нет", plannedBefore, items(id).count { it.status == IntakeStatus.PLANNED })
+    }
+
     @Test
     fun loweringTheCountKeepsTheAllocationAndAStaleRevisionWritesNothing() = runTest {
         val id = treated()

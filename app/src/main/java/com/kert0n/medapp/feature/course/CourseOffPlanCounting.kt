@@ -25,7 +25,8 @@ import kotlin.uuid.Uuid
  * лечение закончено.
  *
  * Условно по редакции, которую видел экран (F5); прошлое отмечается раньше, чем лечение трогают
- * (F4). Уменьшение счёта бронь обратно не растит: снимать её решал человек.
+ * (F4). Уменьшение счёта бронь обратно не растит: снимать её решал человек, — а календарь
+ * следует за потребностью в обе стороны.
  */
 class CourseOffPlanCounting @Inject constructor(
     private val courses: CourseStorageRepository,
@@ -58,8 +59,9 @@ class CourseOffPlanCounting @Inject constructor(
             closing.close(course, CourseCompletion.Closing.of(amended, CourseRecord.Outcome.COMPLETED, ofCourse, now), now)
             return@run Outcome.Finished
         }
-        // Доз впереди стало меньше — лишние плановые пункты не факты и уходят.
-        calendar.prune(course, course.remainingOccurrences(progress).toSet(), now)
+        // Потребность изменилась — в любую сторону: лишние плановые пункты не факты и уходят, а
+        // вернувшаяся потребность достраивает окно заново той же дверью, что правка лечения (C1).
+        calendar.replan(course, now)
         Outcome.Set(course.projection())
     }
 

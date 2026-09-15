@@ -23,6 +23,11 @@ class HiltTestRunner : AndroidJUnitRunner() {
     override fun onException(obj: Any?, e: Throwable): Boolean {
         if (obj is BroadcastReceiver && e.isMissingTestComponent()) {
             Log.w("HiltTestRunner", "системный сигнал ${obj::class.java.simpleName} до первого теста: графа ещё нет, будить некого")
+            // Система уже закрыла доставку в своём `catch`; оставить результат у приёмника значит
+            // закрыть её второй раз — «Broadcast already finished» уронил бы процесс всё равно.
+            // `goAsync` забирает результат у приёмника (это его единственное открытое действие
+            // с ним); закрывать забранное нечего — оно уже закрыто.
+            obj.goAsync()
             return true
         }
         return super.onException(obj, e)
