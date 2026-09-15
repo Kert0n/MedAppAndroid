@@ -2,6 +2,7 @@ package com.kert0n.medapp.storage.pack
 
 import com.kert0n.medapp.domain.pack.Claims
 import com.kert0n.medapp.fixture.COURSE
+import com.kert0n.medapp.fixture.settle
 import com.kert0n.medapp.fixture.HOME_KIT
 import com.kert0n.medapp.fixture.INTAKE
 import com.kert0n.medapp.fixture.OTHER_INTAKE
@@ -129,7 +130,7 @@ class PackageRoomRepositoryTest {
     @Test
     fun settledOperationStopsAffectingTheAmount() = runTest {
         queue.enqueue(operation, PackageSyncCommand.Consume(PACK, dose("3"), INTAKE), at)
-        queue.settle(operation, SyncOperationStatus.APPLIED)
+        database.syncOperations().settle(operation, SyncOperationStatus.APPLIED)
 
         assertEquals(
             tablets("20"),
@@ -141,7 +142,7 @@ class PackageRoomRepositoryTest {
     @Test
     fun operationWithALostAnswerStillCounts() = runTest {
         queue.enqueue(operation, PackageSyncCommand.Consume(PACK, dose("3"), INTAKE), at)
-        queue.settle(operation, SyncOperationStatus.PENDING, lastError = "обрыв", at = at, attempted = true)
+        database.syncOperations().settle(operation, SyncOperationStatus.PENDING, lastError = "обрыв", at = at, attempted = 1)
 
         val availability = requireNotNull(repository.observe(PACK).first()).availability
         assertEquals(tablets("17"), availability.effective)

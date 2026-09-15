@@ -161,6 +161,12 @@ class Course(
     val allocatedDosesTotal: Doses get() = medicine.allocatedTotal
 
     /**
+     * Тот же курс без выделений — не переход, а точка отсчёта: бронь до начала лечения и после его
+     * конца равна нулю, и разница броней считается от него одной функцией (PLAN D5, E2).
+     */
+    fun unallocated(): Course = changed(medicine = medicine.unallocated())
+
+    /**
      * Выделение пачки **в единицах пачки** — та самая величина, которую видит серверная бронь:
      * целевой объём равен `allocatedDoses × dose` (PLAN D5). `null` — пачка не в препарате курса.
      */
@@ -221,7 +227,7 @@ class Course(
      * хватает (PLAN D5). Потребность — от назначенного числа доз, а не от окна календаря.
      */
     fun coverage(progress: CourseProgress, availability: Availability): CourseCoverage =
-        medicine.coverage(dose, remainingOccurrences(progress), availability)
+        medicine.coverage(dose, remainingOccurrences(progress), availability, schedule.zone)
 
     /**
      * Верхняя граница ползунка пачки в целых дозах: меньшее из того, что пачка даёт, и того, что

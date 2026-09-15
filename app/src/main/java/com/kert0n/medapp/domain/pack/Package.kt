@@ -168,9 +168,8 @@ class Package(
      */
     fun moveTo(target: MedKitRef): Package {
         requireUsable()
-        require(target != medKit) { "пачка уже лежит в этой аптечке" }
         check(target.status.allowsUse) { "полка помечена (${target.status}): в неё не кладут до ответа" }
-        return changed(medKit = target)
+        return relocated(target)
     }
 
     /**
@@ -183,7 +182,10 @@ class Package(
      *
      * Пометку переход не снимает: её снимет ответ по той команде, которая её поставила (PLAN E1).
      */
-    fun movedByAnswer(target: MedKitRef): Package {
+    fun movedByAnswer(target: MedKitRef): Package = relocated(target)
+
+    /** Переезд — на другую полку: ту же самую переездом не называют, кто бы его ни вёз. */
+    private fun relocated(target: MedKitRef): Package {
         require(target != medKit) { "пачка уже лежит в этой аптечке" }
         return changed(medKit = target)
     }

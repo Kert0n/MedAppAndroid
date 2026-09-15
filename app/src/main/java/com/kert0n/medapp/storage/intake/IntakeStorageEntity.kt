@@ -61,7 +61,9 @@ import kotlin.uuid.Uuid
         Index("planned_package_id"),
         Index("taken_package_id"),
         Index("operation_id"),
-        Index("answered_at")
+        Index("answered_at"),
+        // Просроченные пункты сверка находит по состоянию и сроку, а не перебором года приёмов (PLAN D8).
+        Index(value = ["status", "scheduled_at"])
     ]
 )
 class IntakeStorageEntity(

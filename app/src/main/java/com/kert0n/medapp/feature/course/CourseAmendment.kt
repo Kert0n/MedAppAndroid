@@ -11,10 +11,8 @@ import com.kert0n.medapp.domain.intake.CourseIntake
 import com.kert0n.medapp.domain.value.DosageForm
 import com.kert0n.medapp.domain.value.Dose
 import com.kert0n.medapp.domain.value.Doses
-import com.kert0n.medapp.queue.QueueService
-import com.kert0n.medapp.queue.QueuedCommand
 import com.kert0n.medapp.queue.Transactions
-import com.kert0n.medapp.queue.pack.PackageSyncCommand
+import com.kert0n.medapp.queue.readThisTransaction
 import com.kert0n.medapp.storage.course.CourseStorageRepository
 import com.kert0n.medapp.storage.intake.IntakeStorageRepository
 import com.kert0n.medapp.storage.pack.PackageStorageRepository
@@ -39,7 +37,7 @@ class CourseAmendment @Inject constructor(
     private val packages: PackageStorageRepository,
     private val calendar: CourseCalendar,
     private val closing: CourseClosing,
-    private val queue: QueueService,
+    private val following: CourseFollowing,
     private val transactions: Transactions,
     private val clock: Clock
 ) {
@@ -69,29 +67,19 @@ class CourseAmendment @Inject constructor(
         val course = if (completion.reached) {
             changed
         } else {
-            changed.clamped(changed.remainingDoses(progress), calendar.availabilityOf(changed), now)
+            changed.clamped(changed.remainingDoses(progress), packages.availabilityFor(changed), now)
         }
         if (!courses.amend(course, expected)) return@run Outcome.Stale
 
         if (completion.reached) {
-            val amended = checkNotNull(courses.findRecord(id)) { "запись эпизода записана этой же транзакцией" }
+            val amended = courses.findRecord(id).readThisTransaction("запись эпизода")
             val ofCourse = intakes.ofCourse(id).filterIsInstance<CourseIntake>()
             closing.close(course, CourseCompletion.Closing.of(amended, CourseRecord.Outcome.COMPLETED, ofCourse, now), now)
             return@run Outcome.Finished
         }
         calendar.replan(course, now)
         // Бронь — `выделено × доза`: изменилась доза или зажим — изменилась и она (PLAN D5).
-        for (source in course.sources) {
-            val claim = course.allocatedOf(source.pkg)
-            if (before.allocatedOf(source.pkg) == claim) continue
-            val pkg = packages.find(source.pkg.id) ?: continue
-            val command = if (claim == null || claim.isZero) {
-                PackageSyncCommand.ReleaseClaim(pkg.id)
-            } else {
-                PackageSyncCommand.SetClaim(pkg.id, claim)
-            }
-            queue.change(pkg.medKit, listOf(QueuedCommand(Uuid.random(), command)), now) { true }
-        }
+        following.announceClaims(before, course, now)
         Outcome.Amended(course.projection())
     }
 

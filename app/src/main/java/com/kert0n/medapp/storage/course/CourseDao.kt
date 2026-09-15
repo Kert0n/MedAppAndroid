@@ -1,5 +1,6 @@
 package com.kert0n.medapp.storage.course
 
+import androidx.annotation.CheckResult
 import androidx.room.Dao
 import androidx.room.Insert
 import androidx.room.Query
@@ -13,7 +14,6 @@ import com.kert0n.medapp.domain.pack.Availability
 import com.kert0n.medapp.domain.value.Quantity
 import com.kert0n.medapp.domain.course.Revision
 import com.kert0n.medapp.domain.intake.CourseIntake
-import com.kert0n.medapp.domain.pack.PackageRef
 import com.kert0n.medapp.domain.report.CourseInProgress
 import com.kert0n.medapp.domain.value.Vocabulary
 import com.kert0n.medapp.storage.database.chunkedForQuery
@@ -89,6 +89,7 @@ interface CourseDao {
      * расписание меняет изменение лечения, и пересчёт обеспечения их не касается.
      */
     @Transaction
+    @CheckResult
     suspend fun updateAllocations(
         course: CourseStorageEntity,
         sources: List<CourseSourceStorageEntity>,
@@ -178,6 +179,10 @@ interface CourseDao {
     @Query("SELECT * FROM coverage_reductions WHERE course_id = :courseId ORDER BY at")
     suspend fun reductionsOf(courseId: Uuid): List<CoverageReductionStorageEntity>
 
+    /** Сокращения всех лечений разом — сверке, чтобы не ходить по запросу на курс. */
+    @Query("SELECT * FROM coverage_reductions WHERE at >= :since ORDER BY at")
+    suspend fun recentReductions(since: Instant): List<CoverageReductionStorageEntity>
+
     @Query("SELECT * FROM coverage_reductions WHERE course_id = :courseId AND at >= :since ORDER BY at")
     suspend fun reductionsSince(courseId: Uuid, since: Instant): List<CoverageReductionStorageEntity>
 
@@ -239,108 +244,3 @@ suspend fun PackageDao.availabilityOf(
     }
 }
 
-/**
- * Курс следует за коробкой — **одна дверь** для всех, кто коробку изменил: человек пересчётом или
- * разовым приёмом, сосед расходом или бронью, пришедшими снимком или ответом на команду (PLAN D5,
- * E4). Каждое идущее лечение, держащее пачку [packageId], зажимает выделения под то, что доступно
- * ему сейчас, — `Course.clamped` от того же числа, которое видит человек, — и пишется условно по
- * своей редакции. Расписание, доза и даты не трогаются. Зажимать нечего — курс не пишется, и
- * редакция не растёт: снимок, согласный с нами, ничего не меняет.
- *
- * Возвращает пары «до и после» — брони разницей ставит вызывающий, который владеет транзакцией.
- * Зовётся внутри уже открытой транзакции того, кто коробку изменил.
- */
-suspend fun CourseDao.followBox(
-    packageId: Uuid,
-    packages: PackageDao,
-    intakes: IntakeDao,
-    queue: SyncOperationDao,
-    vocabulary: Vocabulary,
-    at: Instant
-): List<CourseFollowed> {
-    val ref = packages.find(packageId)?.toDomain(vocabulary)?.ref ?: return emptyList()
-    val followed = mutableListOf<CourseFollowed>()
-    for (courseId in coursesHolding(packageId)) {
-        val row = findPlan(courseId) ?: continue
-        if (row.isDraft) {
-            followTheBoxAsADraft(row.toDraft(vocabulary), ref, at)
-            continue
-        }
-        val plan = planInProgress(courseId, intakes, vocabulary) ?: continue
-        val course = plan.course
-        // Совместимость — первой: отключённый источник в расклад не входит, и считать по нему нечего.
-        val compatible = when (val fault = course.prescription.faultOf(ref)) {
-            null -> if (courseHolding(packageId) == null || courseHolding(packageId) == courseId) course.restoreSource(ref, at) else course
-            else -> course.faultSource(ref, fault, at)
-        }
-        val availability = packages.availabilityOf(listOf(compatible), queue, intakes, vocabulary).getValue(course.id)
-        val required = compatible.remainingDoses(plan.progress)
-        val clamped = compatible.clamped(required, availability, at)
-        if (clamped === course) continue
-        check(updateAllocations(clamped.toStorageEntity(), clamped.medicine.toSourceStorageEntities(clamped.id), course.revision)) {
-            "план прочитан этой же транзакцией"
-        }
-        // Обеспеченных доз стало меньше — событие (PLAN D5). До — выделенное прежним курсом:
-        // после каждого зажима выделение и есть обеспечение; после — обеспечение нового.
-        val coveredBefore = minOf(course.allocatedDosesTotal, required)
-        val coveredAfter = clamped.coverage(plan.progress, availability).coveredDoses
-        if (coveredAfter < coveredBefore) {
-            insertReduction(CoverageReduction(Uuid.random(), courseId, packageId, coveredBefore, coveredAfter, at).toStorageEntity())
-        }
-        // Назначение коробки следует за пригодностью источника: отключённый её не держит.
-        if (clamped.medicine.faultOf(ref) != null) releasePackage(packageId)
-        else if (course.medicine.faultOf(ref) != null) assignPackage(ActivePackageAssignmentStorageEntity(packageId, courseId))
-        followed += CourseFollowed(course, clamped)
-    }
-    return followed
-}
-
-/** Черновик за коробкой следует только совместимостью: выделений и броней у него нет (PLAN D5). */
-private suspend fun CourseDao.followTheBoxAsADraft(draft: CourseDraft, ref: PackageRef, at: Instant) {
-    val followed = when (val fault = draft.faultOf(ref)) {
-        null -> draft.restoreSource(ref, at)
-        else -> draft.faultSource(ref, fault, at)
-    }
-    if (followed === draft) return
-    saveCourse(
-        course = followed.toStorageEntity(),
-        times = followed.schedule?.toTimeStorageEntities(followed.id).orEmpty(),
-        sources = followed.medicine.toSourceStorageEntities(followed.id)
-    )
-}
-
-/**
- * Источник не переживает коробку: **каждое** лечение, державшее пачку [pkg], теряет её доменным
- * переходом — с ростом редакции и освобождением назначения, — а не молча каскадом схемы
- * (PLAN D5, F5). Зовётся один раз, из двери конца коробки, и только оттуда.
- *
- * Лечение ищется по составу, а не по назначениям: назначения бывают только у начатого, а состав
- * есть и у черновика, и вырезанный каскадом источник черновика человек обнаружил бы сам, вернувшись
- * к недоделанному курсу.
- */
-suspend fun CourseDao.releaseSource(pkg: PackageRef, vocabulary: Vocabulary, at: Instant) {
-    for (courseId in coursesHolding(pkg.id)) {
-        val row = findPlan(courseId) ?: continue
-        if (row.isDraft) {
-            val draft = row.toDraft(vocabulary).detach(pkg, at)
-            saveCourse(
-                course = draft.toStorageEntity(),
-                times = draft.schedule?.toTimeStorageEntities(draft.id).orEmpty(),
-                sources = draft.medicine.toSourceStorageEntities(draft.id)
-            )
-        } else {
-            val plan = row.toPlan(vocabulary)
-            val detached = plan.detach(pkg, at)
-            // Ноль изменённых строк здесь незаконен: план прочитан этой же транзакцией. Молча
-            // пропустить значило бы оставить курс с источником, которого уже нет.
-            check(
-                updateAllocations(
-                    detached.toStorageEntity(),
-                    detached.medicine.toSourceStorageEntities(detached.id),
-                    plan.revision
-                )
-            ) { "курс $courseId прочитан этой же транзакцией, а выделения писать некуда" }
-        }
-    }
-    releasePackage(pkg.id)
-}

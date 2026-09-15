@@ -188,7 +188,7 @@ class PackageAdjustingTest {
     @Test
     fun aBoxWaitingForItsRemovalIsNotAdjusted() = runTest {
         local()
-        database.packageRepository().mark(PACK, PackageStatus.REMOVING, by = Uuid.random())
+        assertTrue(database.packageRepository().mark(PACK, PackageStatus.REMOVING, by = Uuid.random()))
 
         assertEquals(PackageAdjusting.Outcome.UNUSABLE, adjusting.adjust(PACK, PackageAdjusting.Action.Recount(tablets("20"), tablets("7"))))
         assertEquals(tablets("20"), database.packageRepository().find(PACK)?.quantity)

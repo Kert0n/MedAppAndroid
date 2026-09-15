@@ -4,7 +4,6 @@ import com.kert0n.medapp.domain.pack.PackageRef
 import com.kert0n.medapp.domain.value.Doses
 import com.kert0n.medapp.domain.value.Quantity
 import java.time.Instant
-import java.time.LocalDate
 import java.time.ZoneId
 import java.util.Objects
 
@@ -17,6 +16,7 @@ class CourseCoverage(
     val coveredDoses: Doses,         // сколько из них обеспечено
     val coveredUntil: Instant?,      // до какого приёма хватит
     val firstUncoveredAt: Instant?,  // с какого приёма не хватает
+    val zone: ZoneId,                // зона курса: в ней считаются дни предупреждений
     perSource: List<Source>
 ) {
     /** Своя копия: посчитанное обеспечение не меняется вслед за списком у вызывающего. */
@@ -35,11 +35,12 @@ class CourseCoverage(
                 coveredDoses == other.coveredDoses &&
                 coveredUntil == other.coveredUntil &&
                 firstUncoveredAt == other.firstUncoveredAt &&
+                zone == other.zone &&
                 perSource == other.perSource
             )
 
     override fun hashCode(): Int = Objects.hash(
-        requiredDoses, coveredDoses, coveredUntil, firstUncoveredAt, perSource
+        requiredDoses, coveredDoses, coveredUntil, firstUncoveredAt, zone, perSource
     )
 
     override fun toString(): String =
@@ -48,12 +49,14 @@ class CourseCoverage(
     val missingDoses: Doses get() = requiredDoses - coveredDoses
 
     /**
-     * Какое предупреждение о нехватке наступает в день [today] в зоне курса (PLAN D8): за три
-     * календарных дня до первого необеспеченного пункта и в его день. Обеспеченному курсу
+     * Какое предупреждение о нехватке наступает в момент [at] (PLAN D8): за три календарных дня до
+     * первого необеспеченного пункта и в его день. День считается **в зоне курса** — той же, в
+     * которой стоит пункт: день устройства у полуночи может быть уже другим. Обеспеченному курсу
      * предупреждать нечего.
      */
-    fun noticeOn(today: LocalDate, zone: ZoneId, thresholdDays: Long = 3): Notice? {
+    fun noticeOn(at: Instant, thresholdDays: Long = 3): Notice? {
         val uncoveredOn = firstUncoveredAt?.atZone(zone)?.toLocalDate() ?: return null
+        val today = at.atZone(zone).toLocalDate()
         // День исчерпания — первым: при пороге 0 обе даты совпадают, и сказать надо то, что
         // ближе к правде, — «заканчивается», а не «скоро закончится».
         return when (today) {

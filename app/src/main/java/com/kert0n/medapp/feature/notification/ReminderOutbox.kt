@@ -7,23 +7,22 @@ import com.kert0n.medapp.domain.notification.NotificationKind
 import com.kert0n.medapp.domain.notification.Freshness
 import com.kert0n.medapp.domain.notification.Delivery
 import com.kert0n.medapp.domain.notification.Reminder
+import com.kert0n.medapp.domain.notification.NotificationKey
 import com.kert0n.medapp.domain.notification.Notifier
 import com.kert0n.medapp.domain.notification.ReminderAlarms
+import com.kert0n.medapp.queue.OutboxLoop
 import com.kert0n.medapp.storage.notification.ReminderStorageRepository
+import kotlinx.coroutines.flow.update
 import java.time.Clock
 import java.time.Duration
 import java.time.Instant
-import java.util.concurrent.atomic.AtomicBoolean
 import javax.inject.Inject
 import javax.inject.Singleton
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
-import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
-import kotlinx.coroutines.flow.update
-import kotlinx.coroutines.launch
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 
@@ -49,45 +48,29 @@ class ReminderOutbox @Inject constructor(
     @ApplicationScope private val scope: CoroutineScope
 ) {
 
-    private val started = AtomicBoolean(false)
-
     /** Проход один за раз: цикл и приёмник будильника не показывают одно и то же дважды. */
     private val passes = Mutex()
-
-    /** Просьбы о проходе сворачиваются: сколько бы сигналов ни пришло, следующий проход один. */
-    private val wake = Channel<Unit>(Channel.CONFLATED)
 
     private val _state = MutableStateFlow(State())
 
     /** Что происходит с доставкой — для экрана состояния (PLAN H3 №28). */
     val state: StateFlow<State> = _state.asStateFlow()
 
+    /**
+     * Цикл владельца (PLAN C1 «Цикл владельца — один»): сигнал таблицы после коммита → проход →
+     * срок следующего. Срок — ближайшая постановка: в процессе таймер приходит сам, а из мёртвого
+     * процесса будит будильник, который проход ставит тот же.
+     */
+    private val loop = OutboxLoop(reminders.changes(), RETRY_AFTER_FAILURE, clock, scope) { pass().nextAt }
+
+    /** Наблюдатель таблицы встал — для проверок, которые ждут именно сигнала. */
+    val ready: StateFlow<Boolean> get() = loop.ready
+
     /** Один раз на процесс: повторный вызов ничего не делает. */
-    fun start() {
-        if (!started.compareAndSet(false, true)) return
-        scope.launch { reminders.changes().collect { wake.trySend(Unit) } }
-        scope.launch { run() }
-    }
+    fun start() = loop.start()
 
     /** Повод без ожидания: сработал будильник, вошли в приложение, загрузилось устройство. */
-    fun runNow() {
-        if (wake.trySend(Unit).isSuccess) return
-        scope.launch { attempt { pass() } }
-    }
-
-    private suspend fun run() {
-        wake.trySend(Unit)
-        for (signal in wake) {
-            try {
-                pass()
-            } catch (cancelled: CancellationException) {
-                throw cancelled
-            } catch (failure: Exception) {
-                // Сбой прохода не роняет процесс: он записан в состоянии, и следующий повод повторит.
-                _state.update { it.copy(lastFailure = failure.toString()) }
-            }
-        }
-    }
+    fun runNow() = loop.runNow()
 
     /**
      * Один проход: погасить отозванное, сказать наступившее, прибрать давнее и переставить
@@ -95,7 +78,8 @@ class ReminderOutbox @Inject constructor(
      * карточке был свежим, насколько успели (PLAN D8, E4).
      *
      * Под замком: два входа — цикл и приёмник будильника — не должны идти одновременно, иначе один
-     * покажет то, что другой уже пометил сказанным.
+     * покажет то, что другой уже пометил сказанным. Сбой прохода не бросает наружу: он записан,
+     * а возврат назначен — будильником, чтобы пережить смерть процесса, и сроком в отчёте.
      */
     suspend fun pass(): Report = passes.withLock {
         try {
@@ -105,6 +89,8 @@ class ReminderOutbox @Inject constructor(
         } catch (failure: Exception) {
             // Сбой прохода — тоже срок: мы вернёмся, а не замолчим до входа в приложение (E4).
             _state.update { it.copy(passes = it.passes + 1, lastFailure = failure.toString()) }
+            // Переставляется только приблизительная: точная остаётся той, что была, — срок приёма
+            // сбой прохода не двигает.
             val retryAt = clock.instant().plus(RETRY_AFTER_FAILURE)
             attempt { alarms.wakeAt(retryAt, exact = false) }
             Report(shown = 0, dismissed = 0, blocked = 0, nextAt = retryAt)
@@ -112,11 +98,13 @@ class ReminderOutbox @Inject constructor(
     }
 
     private suspend fun attempt(): Report {
-        val dismissed = dismissWithdrawn()
+        var dismissed = dismissGroundless()
+        // Ожидание свежести — окно до двух секунд, и прочитанное до него устаревает: человек
+        // успевает отложить, лечение — отмениться, а срок — наступить. Показывается то, что
+        // наступило **после** него, и «сейчас» берётся после него же.
+        if (due(clock.instant()).any { it.kind == NotificationKind.INTAKE_DUE }) freshness.refreshBriefly(REFRESH_WAIT)
         val now = clock.instant()
-        val awaiting = reminders.awaiting(NoticeDelivery.SYSTEM)
-        val due = awaiting.filter { it.isDue(now) }
-        if (due.any { it.kind == NotificationKind.INTAKE_DUE }) freshness.refreshBriefly(REFRESH_WAIT)
+        val due = due(now)
 
         var shown = 0
         var blocked = 0
@@ -128,56 +116,117 @@ class ReminderOutbox @Inject constructor(
                 blocked++
                 continue
             }
-            if (settle(reminder.key, outcome)) shown += if (outcome == Delivery.SHOWN) 1 else 0
+            when (settle(reminder.key, outcome)) {
+                Settled.RECORDED -> if (outcome == Delivery.SHOWN) shown++
+                // Пока система показывала, обязательство изменилось: карточка висит без основания.
+                // Гасится сейчас; сорвалось — карточка записана за обязательством (`noticedAt`), и
+                // следующий проход погасит её первым шагом (C1).
+                Settled.OUTDATED -> if (outcome == Delivery.SHOWN) {
+                    attempt { notifier.dismiss(reminder.key) }
+                    dismissed++
+                }
+            }
         }
         forgetThePast(now)
 
-        // Будильник ставится по **свежему** чтению: за проход обязательства изменились.
+        // Постановки ставятся по **свежему** чтению: за проход обязательства изменились. Их две —
+        // точная и приблизительная, каждая на ближайший срок своей точности: приблизительную
+        // система вправе задержать, и точный приём за ней не ждёт (D8).
         val left = reminders.awaiting(NoticeDelivery.SYSTEM)
-        val next = left.mapNotNull { it.wakeAt(clock.instant()) }.minOrNull()
-        if (next == null) alarms.stopWaking() else alarms.wakeAt(next, exact = exactnessOf(left, next))
+        val at = clock.instant()
+        val nextExact = left.filter { it.exact }.mapNotNull { it.wakeAt(at) }.minOrNull()
+        val nextInexact = left.filterNot { it.exact }.mapNotNull { it.wakeAt(at) }.minOrNull()
+        keep(nextExact, exact = true)
+        keep(nextInexact, exact = false)
+        val next = listOfNotNull(nextExact, nextInexact).minOrNull()
         val report = Report(shown = shown, dismissed = dismissed, blocked = blocked, nextAt = next)
         _state.update { it.copy(passes = it.passes + 1, lastReport = report, lastFailure = null, pushBlocked = blocked > 0) }
         return report
     }
 
     /**
-     * Записать исход показа — **перечитав** обязательство своей транзакцией. Между чтением до сети
-     * и этой записью прошло до двух секунд: лечение могли отменить, человек мог отложить. Писать
-     * прочитанное тогда значило бы воскресить снятое и потерять отсрочку (F5, C1).
-     *
-     * Изменилось — не трогаем: решение приняли без нас, и оно свежее. Карточку, показанную зря,
-     * погасит следующий проход.
+     * Экран показал баннеры дня (PLAN D8): владелец доставки один и для системы, и для экрана —
+     * отметка показа делается здесь, перечитав обязательство своей транзакцией. Отмечается только
+     * баннер, и только наступивший: системное обязательство экрану не принадлежит.
      */
-    private suspend fun settle(key: com.kert0n.medapp.domain.notification.NotificationKey, outcome: Delivery): Boolean =
+    suspend fun bannerShown(keys: Collection<NotificationKey>) {
+        if (keys.isEmpty()) return
         transactions.run {
-            val fresh = reminders.find(key) ?: return@run false
             val at = clock.instant()
-            if (!fresh.isDue(at)) return@run false
+            val shown = reminders.findAll(keys)
+                .filter { it.delivery == NoticeDelivery.IN_APP_BANNER && it.isDue(at) }
+                .onEach { it.deliveredAt(at) }
+            reminders.saveAll(shown)
+        }
+    }
+
+    /** Наступившее и несказанное этим способом доставки — свежим чтением. */
+    private suspend fun due(now: Instant): List<Reminder> =
+        reminders.awaiting(NoticeDelivery.SYSTEM).filter { it.isDue(now) }
+
+    /**
+     * Записать исход показа — **перечитав** обязательство своей транзакцией. Пока шла система,
+     * лечение могли отменить, человек мог отложить. Писать прочитанное значило бы воскресить снятое
+     * и потерять отсрочку (F5, C1).
+     *
+     * Изменилось — решение приняли без нас, и оно свежее: исход не записывается, а вызывающий
+     * гасит показ, оставшийся без основания. «Следующий проход поправит» здесь не работает: он
+     * снимает отозванное, а отложенное остаётся обещанным на новый срок — с карточкой в шторке.
+     */
+    private suspend fun settle(key: NotificationKey, outcome: Delivery): Settled =
+        transactions.run {
+            val fresh = reminders.find(key) ?: return@run Settled.OUTDATED
+            val at = clock.instant()
+            if (!fresh.isDue(at)) {
+                // Сказали о том, чего уже нет: карточка есть — обязательство это запомнит, чтобы
+                // гашение, сорвавшееся сейчас, повторил следующий проход.
+                if (outcome == Delivery.SHOWN) {
+                    fresh.noticedAt(at)
+                    reminders.saveAll(listOf(fresh))
+                }
+                return@run Settled.OUTDATED
+            }
             when (outcome) {
                 Delivery.SHOWN -> fresh.deliveredAt(at)
                 Delivery.SUBJECT_GONE -> fresh.withdraw()
                 Delivery.FAILED -> fresh.failedAt(at)
-                Delivery.NOT_ALLOWED -> return@run false
+                Delivery.NOT_ALLOWED -> return@run Settled.OUTDATED
             }
             reminders.saveAll(listOf(fresh))
-            true
+            Settled.RECORDED
         }
 
-    /** Точность просит тот, чей срок настал: напоминанию о приёме она нужна, остальному нет. */
-    private fun exactnessOf(awaiting: List<Reminder>, next: java.time.Instant): Boolean =
-        awaiting.any { it.exact && it.wakeAt(next) == null && it.dueAt <= next }
+    /** Исход записан — либо обязательство изменилось, пока система показывала, и показ устарел. */
+    private enum class Settled { RECORDED, OUTDATED }
 
-    /** Повода больше нет: гасим показанное и забываем. Система не откатывается вместе с базой (F5). */
-    private suspend fun dismissWithdrawn(): Int {
-        val withdrawn = reminders.withdrawn()
-        for (reminder in withdrawn) notifier.dismiss(reminder.key)
-        reminders.deleteAll(withdrawn.map { it.key })
-        return withdrawn.size
+    /** Постановка названной точности — на срок, если он есть; иначе снимается. */
+    private suspend fun keep(at: Instant?, exact: Boolean) {
+        if (at == null) alarms.stopWaking(exact) else alarms.wakeAt(at, exact)
     }
 
-    /** Давнее забывается: решает сама сущность, запрос только сужает отбор. */
-    private suspend fun forgetThePast(now: java.time.Instant) {
+    /**
+     * Карточки без основания гасятся первым шагом — все, о ком говорили и кто сейчас не
+     * сказанное-и-наступившее: отозванное и отложенное после показа ([Reminder.cardIsUp]).
+     * Гашение идемпотентно, и сорвавшееся повторится следующим проходом само — память о карточке
+     * у обязательства, а не у прохода. Система не откатывается вместе с базой (F5), поэтому
+     * гашение идёт по прочитанному, а удаление отозванного — **перечитав** в своей транзакции:
+     * пока система гасила, повод мог вернуться, и `promise` воскресил обязательство под тем же
+     * ключом. Удалить его значило бы потерять живое; гашение воскрешённого безвредно.
+     */
+    private suspend fun dismissGroundless(): Int {
+        val groundless = reminders.groundless().filter { it.state == Reminder.State.WITHDRAWN || it.cardIsUp }
+        for (reminder in groundless) notifier.dismiss(reminder.key)
+        val withdrawn = groundless.filter { it.state == Reminder.State.WITHDRAWN }.map { it.key }
+        if (withdrawn.isNotEmpty()) {
+            transactions.run {
+                reminders.deleteAll(reminders.findAll(withdrawn).filter { it.state == Reminder.State.WITHDRAWN }.map { it.key })
+            }
+        }
+        return groundless.size
+    }
+
+    /** Давнее забывается: решает сама сущность, запрос только сужает отбор — и решает, и удаляет одна транзакция. */
+    private suspend fun forgetThePast(now: java.time.Instant) = transactions.run {
         val stale = reminders.stale(now.minus(Reminder.RETENTION))
         reminders.deleteAll(stale.filter { it.forgettable(now) }.map { it.key })
     }

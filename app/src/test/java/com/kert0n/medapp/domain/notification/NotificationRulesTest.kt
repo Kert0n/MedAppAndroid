@@ -75,14 +75,19 @@ class NotificationRulesTest {
         // Первый необеспеченный — четвёртый пункт, 13 марта в 01:00 МСК — 12 марта по UTC.
         val uncoveredOn = LocalDate.of(2027, 3, 13)
         assertEquals(uncoveredOn.atTime(1, 0).atZone(MOSCOW).toInstant(), coverage.firstUncoveredAt)
-        assertEquals(CourseCoverage.Notice.AHEAD, coverage.noticeOn(uncoveredOn.minusDays(3), MOSCOW))
-        assertEquals(CourseCoverage.Notice.END, coverage.noticeOn(uncoveredOn, MOSCOW))
-        assertNull(coverage.noticeOn(uncoveredOn.minusDays(1), MOSCOW))
+        // Зона — курса, и обеспечение несёт её само: полночь по Москве — ещё вчера по UTC.
+        assertEquals(MOSCOW, coverage.zone)
+        fun moscowMidnight(day: LocalDate) = day.atStartOfDay(MOSCOW).toInstant()
+        assertEquals(CourseCoverage.Notice.AHEAD, coverage.noticeOn(moscowMidnight(uncoveredOn.minusDays(3))))
+        assertEquals(CourseCoverage.Notice.END, coverage.noticeOn(moscowMidnight(uncoveredOn)))
+        assertNull(coverage.noticeOn(moscowMidnight(uncoveredOn.minusDays(1))))
+        // По UTC этот миг — ещё 12 марта; по зоне курса — уже день исчерпания.
+        assertEquals(CourseCoverage.Notice.END, coverage.noticeOn(uncoveredOn.atStartOfDay(MOSCOW).toInstant()))
         // Порог 0 — «только в день»: день исчерпания остаётся исчерпанием, а не «скоро».
-        assertEquals(CourseCoverage.Notice.END, coverage.noticeOn(uncoveredOn, MOSCOW, thresholdDays = 0))
+        assertEquals(CourseCoverage.Notice.END, coverage.noticeOn(moscowMidnight(uncoveredOn), thresholdDays = 0))
         // Полностью обеспеченному предупреждать нечего.
         val covered = activeCourse(totalDoses = 3, sources = listOf(source(PACK, 3))).coverage(CourseProgress.none, availability(PACK to tablets("20")))
-        assertNull(covered.noticeOn(uncoveredOn, MOSCOW))
+        assertNull(covered.noticeOn(moscowMidnight(uncoveredOn)))
     }
 
     @Test

@@ -12,13 +12,14 @@ import javax.inject.Inject
 import javax.inject.Singleton
 
 /**
- * Один будильник на всё приложение (PLAN D8): он будит процесс к ближайшему невыполненному
- * обязательству, а что сказать — решает владелец доставки, прочитав таблицу. Поэтому намерение
- * ровно одно, и тождество `PendingIntent` не зависит от хеша ключа: два приёма одного мига не
- * делят одну запись и не снимают будильники друг друга.
+ * Две постановки на всё приложение — точная и приблизительная (PLAN D8): каждая будит процесс к
+ * ближайшему обязательству своей точности, а что сказать — решает владелец доставки, прочитав
+ * таблицу. Тождество постановки — её точность: код запроса и `setIdentifier` намерения, — а не
+ * хеш ключа, и два приёма одного мига не делят одну запись.
  *
- * Точный — при разрешении `SCHEDULE_EXACT_ALARM`, иначе приблизительный; `USE_EXACT_ALARM` не
- * берём. В намерении нет ничего: ни идентификаторов, ни текстов (G3).
+ * Точная — `setExactAndAllowWhileIdle` при разрешении `SCHEDULE_EXACT_ALARM`, иначе она ставится
+ * приблизительно, но остаётся **своей** постановкой; `USE_EXACT_ALARM` не берём. В намерении нет
+ * ничего: ни идентификаторов, ни текстов (G3).
  */
 @Singleton
 class AlarmManagerReminders @Inject constructor(@ApplicationContext private val context: Context) : ReminderAlarms {
@@ -30,7 +31,7 @@ class AlarmManagerReminders @Inject constructor(@ApplicationContext private val 
         get() = Build.VERSION.SDK_INT < Build.VERSION_CODES.S || manager.canScheduleExactAlarms()
 
     override suspend fun wakeAt(at: Instant, exact: Boolean) {
-        val intent = requireNotNull(pending(PendingIntent.FLAG_UPDATE_CURRENT)) { "с FLAG_UPDATE_CURRENT намерение есть всегда" }
+        val intent = requireNotNull(pending(exact, PendingIntent.FLAG_UPDATE_CURRENT)) { "с FLAG_UPDATE_CURRENT намерение есть всегда" }
         if (exact && canBeExact) {
             manager.setExactAndAllowWhileIdle(AlarmManager.RTC_WAKEUP, at.toEpochMilli(), intent)
         } else {
@@ -38,20 +39,27 @@ class AlarmManagerReminders @Inject constructor(@ApplicationContext private val 
         }
     }
 
-    override suspend fun stopWaking() {
-        val intent = pending(PendingIntent.FLAG_NO_CREATE) ?: return
+    override suspend fun stopWaking(exact: Boolean) {
+        val intent = pending(exact, PendingIntent.FLAG_NO_CREATE) ?: return
         manager.cancel(intent)
         intent.cancel()
     }
 
-    /** Стоит ли будильник — для проверок; сама система этого не рассказывает. */
-    fun isScheduled(): Boolean = pending(PendingIntent.FLAG_NO_CREATE) != null
+    /** Стоит ли постановка этой точности — для проверок; сама система этого не рассказывает. */
+    fun isScheduled(exact: Boolean): Boolean = pending(exact, PendingIntent.FLAG_NO_CREATE) != null
 
-    private fun pending(flags: Int): PendingIntent? =
-        PendingIntent.getBroadcast(context, REQUEST, Intent(context, ReminderWakeReceiver::class.java).setAction(ReminderWakeReceiver.ACTION), flags or PendingIntent.FLAG_IMMUTABLE)
+    private fun pending(exact: Boolean, flags: Int): PendingIntent? =
+        PendingIntent.getBroadcast(context, if (exact) REQUEST_EXACT else REQUEST_INEXACT, wakeIntent(context, exact), flags or PendingIntent.FLAG_IMMUTABLE)
 
-    private companion object {
-        /** Будильник один — и код запроса у него один. */
-        const val REQUEST = 0
+    companion object {
+        /** Постановок две — и кода запроса два: по одному на точность. */
+        const val REQUEST_INEXACT = 0
+        const val REQUEST_EXACT = 1
+
+        /** Намерение постановки: приёмник, действие и точность в тождестве — и ничего больше. */
+        fun wakeIntent(context: Context, exact: Boolean): Intent =
+            Intent(context, ReminderWakeReceiver::class.java)
+                .setAction(ReminderWakeReceiver.ACTION)
+                .setIdentifier(if (exact) "exact" else "inexact")
     }
 }

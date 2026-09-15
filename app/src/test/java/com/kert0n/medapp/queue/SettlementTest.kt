@@ -106,7 +106,7 @@ class SettlementTest {
             listOf(
                 Effect.Account(IntakeAccounting.REMOTE_REFUSED),
                 Effect.Withdrawn(PACK),
-                Effect.Cascade(SyncOperationStatus.ACCESS_LOST, IntakeAccounting.REMOTE_REFUSED),
+                Effect.Cascade(Transition.Close.AccessLost, IntakeAccounting.REMOTE_REFUSED),
                 Effect.Settled
             ),
             Delivery.AccessLost.settlement(withdraw).effects
@@ -116,7 +116,7 @@ class SettlementTest {
                 Effect.Account(IntakeAccounting.REMOTE_REFUSED),
                 Effect.Returned(PACK, SHARED_KIT),
                 Effect.LayDown(snapshot),
-                Effect.Cascade(SyncOperationStatus.REFUSED, IntakeAccounting.REMOTE_REFUSED),
+                Effect.Cascade(Transition.Close.Refused(RefusalReason.SUPERSEDED), IntakeAccounting.REMOTE_REFUSED),
                 Effect.Settled
             ),
             Delivery.Refused(RefusalReason.STALE, PackageState.Present(snapshot)).settlement(withdraw).effects
@@ -154,7 +154,7 @@ class SettlementTest {
             listOf(
                 Effect.Account(IntakeAccounting.REMOTE_REFUSED),
                 Effect.LayDown(snapshot),
-                Effect.Cascade(SyncOperationStatus.REFUSED, IntakeAccounting.REMOTE_REFUSED),
+                Effect.Cascade(Transition.Close.Refused(RefusalReason.SUPERSEDED), IntakeAccounting.REMOTE_REFUSED),
                 Effect.Settled
             ),
             settlement.effects
@@ -176,7 +176,7 @@ class SettlementTest {
             listOf(
                 Effect.Account(IntakeAccounting.REMOTE_REFUSED),
                 Effect.PackageEnded(PACK),
-                Effect.Cascade(SyncOperationStatus.ACCESS_LOST, IntakeAccounting.REMOTE_REFUSED),
+                Effect.Cascade(Transition.Close.AccessLost, IntakeAccounting.REMOTE_REFUSED),
                 Effect.Settled
             ),
             settlement.effects
@@ -189,7 +189,7 @@ class SettlementTest {
         assertEquals(
             listOf(
                 Effect.Account(IntakeAccounting.REMOTE_REFUSED),
-                Effect.Cascade(SyncOperationStatus.ACCESS_LOST, IntakeAccounting.REMOTE_REFUSED),
+                Effect.Cascade(Transition.Close.AccessLost, IntakeAccounting.REMOTE_REFUSED),
                 Effect.Settled
             ),
             settlement.effects

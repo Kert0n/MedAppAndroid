@@ -37,8 +37,11 @@ import kotlinx.coroutines.flow.first
  * по-разному (PLAN D8, C1).
  * текст — из строк, данные — из чтений хранения,
  * пара `tag = subject`, `id = kind` — из ключа (PLAN D8). В `PendingIntent` едут только
- * идентификаторы: что открыть по ним, решает приложение (G3, H3). Без разрешения на уведомления
- * показа нет — и об этом отвечается `false`, а не молчанием, чтобы журнал не записал непоказанное.
+ * идентификаторы: что открыть по ним, решает приложение (G3, H3). Тождество намерения для
+ * системы — код запроса и `filterEquals`, extras в него не входят; поэтому полное имя цели
+ * кладётся в `setIdentifier`, и две карточки с совпавшим хешем ключа не делят одно намерение и
+ * не подменяют друг другу цель. Без разрешения на уведомления показа нет — и об этом отвечается
+ * значением, а не молчанием, чтобы журнал не записал непоказанное.
  */
 @Singleton
 class SystemNotifier @Inject constructor(
@@ -48,7 +51,7 @@ class SystemNotifier @Inject constructor(
     private val packages: PackageStorageRepository
 ) : Notifier {
 
-    override suspend fun show(notification: Reminder): Delivery {
+    override suspend fun show(reminder: Reminder): Delivery {
         // Проверка стоит здесь, а не в отдельном методе: lint видит её только рядом с `notify`.
         // `POST_NOTIFICATIONS` — разрешение только с Android 13; ниже его нет, и спрашивать надо систему.
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU &&
@@ -59,24 +62,27 @@ class SystemNotifier @Inject constructor(
         // выключает их по отдельности (PLAN D8). Выключенный канал молчит, а `notify` об этом не
         // скажет — спрашиваем канал **этого вида**.
         val channel = context.getSystemService(android.app.NotificationManager::class.java)
-            .getNotificationChannel(notification.channel.id)
+            .getNotificationChannel(reminder.channel.id)
         if (channel == null || channel.importance == android.app.NotificationManager.IMPORTANCE_NONE) {
             return Delivery.NOT_ALLOWED
         }
         // Текст собирается из чтений по идентификаторам цели: не нашлось — повода больше нет.
-        val text = textOf(notification) ?: return Delivery.SUBJECT_GONE
-        val builder = NotificationCompat.Builder(context, notification.channel.id)
+        val text = textOf(reminder) ?: return Delivery.SUBJECT_GONE
+        val builder = NotificationCompat.Builder(context, reminder.channel.id)
             .setSmallIcon(R.drawable.ic_notification_medication)
             .setContentTitle(text.title)
             .setContentText(text.body)
             .setStyle(NotificationCompat.BigTextStyle().bigText(text.body))
             .setAutoCancel(true)
-            .setContentIntent(openIntent(notification))
-        for (action in notification.actions) {
-            val intake = (notification.target as? NotificationTarget.Intake)?.intakeId ?: continue
-            actionIntent(intake, action, notification.key)?.let { builder.addAction(0, context.getString(action.label), it) }
+            .setContentIntent(openIntent(reminder))
+        for (action in reminder.actions) {
+            val intake = (reminder.target as? NotificationTarget.Intake)?.intakeId ?: continue
+            // «Принял» открывает приложение — с целью и действием в extras, не через приёмник:
+            // запуск активности из приёмника платформа запрещает (trampoline, C1).
+            val intent = if (action.handledInBackground) actionIntent(intake, action, reminder.key) else openIntent(reminder, action)
+            builder.addAction(0, context.getString(action.label), intent)
         }
-        NotificationManagerCompat.from(context).notify(notification.key.subject, notification.kind.ordinal, builder.build())
+        NotificationManagerCompat.from(context).notify(reminder.key.subject, reminder.kind.ordinal, builder.build())
         return Delivery.SHOWN
     }
 
@@ -143,23 +149,30 @@ class SystemNotifier @Inject constructor(
      * [NotificationTargetExtras], который их потом читает. Платформа не знает экранов и их
      * Activity (H1) — открывается то, что пакет объявил точкой входа.
      */
-    private fun openIntent(notification: Reminder): PendingIntent {
+    private fun openIntent(notification: Reminder, action: NotificationAction? = null): PendingIntent {
         val intent = requireNotNull(context.packageManager.getLaunchIntentForPackage(context.packageName)) { "у приложения есть точка входа" }
             .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_SINGLE_TOP)
-        NotificationTargetExtras.put(intent, notification.target)
+            .setIdentifier(identity(notification.key, action))
+        NotificationTargetExtras.put(intent, notification.target, action)
         return PendingIntent.getActivity(context, notification.key.hashCode(), intent, PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE)
     }
 
-    /** Действие едет своему приёмнику; в extras — только идентификатор пункта (G3). */
-    private fun actionIntent(intakeId: Uuid, action: NotificationAction, key: NotificationKey): PendingIntent? {
+    /** Действие без экрана едет своему приёмнику; в extras — только идентификатор пункта (G3). */
+    private fun actionIntent(intakeId: Uuid, action: NotificationAction, key: NotificationKey): PendingIntent {
         val intent = Intent(context, NotificationActionReceiver::class.java)
             .setAction(action.name)
+            .setIdentifier(identity(key, action))
             .putExtra(NotificationActionReceiver.EXTRA_INTAKE_ID, intakeId.toString())
         return PendingIntent.getBroadcast(context, key.hashCode() * 31 + action.ordinal, intent, PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE)
     }
 
+    /** Полное имя намерения: вид, предмет и действие — то, что различает и система. */
+    private fun identity(key: NotificationKey, action: NotificationAction?): String =
+        "${key.kind.name}:${key.subject}" + (action?.let { "/${it.name}" } ?: "")
+
     private val NotificationAction.label: Int
         get() = when (this) {
+            NotificationAction.TAKE -> R.string.action_take
             NotificationAction.SKIP -> R.string.action_skip
             NotificationAction.SNOOZE -> R.string.action_snooze
         }

@@ -4,6 +4,7 @@ import com.kert0n.medapp.domain.medkit.MedKit
 import com.kert0n.medapp.domain.medkit.MedKitContents
 import com.kert0n.medapp.domain.medkit.MedKitProjection
 import com.kert0n.medapp.queue.Transactions
+import com.kert0n.medapp.queue.readThisTransaction
 import com.kert0n.medapp.storage.medkit.MedKitStorageRepository
 import java.time.Clock
 import javax.inject.Inject
@@ -48,7 +49,7 @@ class MedKitKeeping @Inject constructor(
     suspend fun describe(medKitId: Uuid, name: String, location: String?): Outcome = transactions.run {
         val medKit = medKits.find(medKitId) ?: return@run Outcome.GONE
         if (!medKit.status.allowsUse) return@run Outcome.BUSY
-        check(medKits.describe(medKitId, name, location)) { "аптечка прочитана этой же транзакцией" }
+        medKits.describe(medKitId, name, location).readThisTransaction("аптечка")
         Outcome.SAVED
     }
 

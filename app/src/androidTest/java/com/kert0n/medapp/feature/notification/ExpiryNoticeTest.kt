@@ -143,7 +143,7 @@ class ExpiryNoticeTest {
 
         // Человек поправил срок: коробка годна ещё месяц — предупреждать не о чем.
         val corrected = requireNotNull(database.packageRepository().find(PACK)).facts.copy(expiresOn = ExpiryDate(today.plusMonths(1)))
-        database.packageRepository().describe(PACK, corrected)
+        assertTrue(database.packageRepository().describe(PACK, corrected))
         scenarios.notificationReconciliation.reconcile(now, java.time.ZoneOffset.UTC)
         scenarios.reminderOutbox.pass()
 

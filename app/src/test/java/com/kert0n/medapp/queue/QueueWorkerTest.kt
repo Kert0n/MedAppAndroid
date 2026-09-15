@@ -118,7 +118,7 @@ class QueueWorkerTest {
         override suspend fun ready(now: Instant): List<StoredSyncOperation> =
             operations.values
                 .filter { !it.status.isClosed }
-                .filter { it.notBefore == null || !it.notBefore!!.isAfter(now) }
+                .filter { it.notBefore?.isAfter(now) != true }
                 .filter { op -> op.dependsOn.all { operations[it]?.status == SyncOperationStatus.APPLIED } }
                 .filter { op ->
                     val pkg = (op.command as? PackageSyncCommand)?.packageId
@@ -794,7 +794,7 @@ class QueueWorkerTest {
     @Test
     fun unreadableRowIsSkippedAndNamed() = runTest {
         val storage = Storage(emptyList())
-        val broken = StoredSyncOperation.Unreadable(OTHER_PACK, "payload не разбирается")
+        val broken = StoredSyncOperation.Unreadable(OTHER_PACK, "payload не разбирается", SyncOperationState())
         storage.unreadable += broken
         val transport = transport { ApiResult.Success(RawResponse(200, snapshotJson)) }
 
@@ -808,7 +808,7 @@ class QueueWorkerTest {
     fun staleVocabularyIsReadOnceAndThePassRestarts() = runTest {
         val storage = Storage(emptyList())
         val miss = VocabularyMiss(VocabularyMiss.Kind.UNIT, MILLILITRES.id)
-        storage.unreadable += StoredSyncOperation.Stale(OTHER_PACK, miss)
+        storage.unreadable += StoredSyncOperation.Stale(OTHER_PACK, miss, SyncOperationState())
         val transport = transport { ApiResult.Success(RawResponse(200, snapshotJson)) }
 
         val report = worker(storage, transport, online = true).drain()

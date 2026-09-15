@@ -93,13 +93,13 @@ class QueueWorker @Inject constructor(
             }
             val packageId = (operation.command as? PackageSyncCommand)?.packageId
             val stop = try {
-                val step = if (operation.status == SyncOperationStatus.ANSWERED) resume(operation) else attempt(operation, packageId, drain)
+                val step = if (operation.awaitsApplication) resume(operation) else attempt(operation, packageId, drain)
                 drain.record(operation, step)
             } catch (cancelled: CancellationException) {
                 throw cancelled
             } catch (failure: Exception) {
                 // Ответ, записанный до сбоя, остаётся у операции: она ждёт с ним, а не повторяет запрос.
-                val answered = operation.status == SyncOperationStatus.ANSWERED || operation.id in drain.answeredIds
+                val answered = operation.awaitsApplication || operation.id in drain.answeredIds
                 drain.record(operation, Step.Failed(failure, answered))
             }
             if (stop) break

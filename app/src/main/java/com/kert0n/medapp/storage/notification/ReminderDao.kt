@@ -28,8 +28,9 @@ interface ReminderDao {
     @Query("SELECT * FROM reminders WHERE state = 'DUE' AND delivery = :delivery ORDER BY due_at")
     suspend fun awaiting(delivery: String): List<ReminderStorageEntity>
 
-    @Query("SELECT * FROM reminders WHERE state = 'WITHDRAWN'")
-    suspend fun withdrawn(): List<ReminderStorageEntity>
+    /** Грубый отбор: отозванное и то, о чём говорили и что сейчас не сказанное; решает `Reminder`. */
+    @Query("SELECT * FROM reminders WHERE state = 'WITHDRAWN' OR (shown_at IS NOT NULL AND state != 'SHOWN')")
+    suspend fun groundless(): List<ReminderStorageEntity>
 
     /**
      * Грубый отбор старых строк: решает, пора ли забыть, сама сущность — запрос только сужает, а

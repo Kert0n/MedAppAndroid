@@ -54,8 +54,9 @@ class RegistrationProbe {
                 KeystoreKey(alias),
                 Dispatchers.IO
             )
-            val api = MedAppApi(medAppHttpClient(OkHttp.create(), baseUrl!!, tokens = AccessTokens(credentials)))
-            val registration = AccountRegistration(api, credentials, BuildConfig.REGISTRATION_TOKEN)
+            val tokens = AccessTokens(credentials)
+            val api = MedAppApi(medAppHttpClient(OkHttp.create(), baseUrl!!, tokens = tokens))
+            val registration = AccountRegistration(api, credentials, BuildConfig.REGISTRATION_TOKEN, tokens)
 
             assertEquals(AccountRegistration.Outcome.Ready, registration.ensure())
             val stored = credentials.read()

@@ -167,8 +167,8 @@ class PackageAddingTest {
     @Test
     fun aShelfWaitingForItsOwnAnswerTakesNoNewBoxes() = runTest {
         // Публикуемая полка — ещё местная: сервер о ней не слышал, потому и публикуется.
-        database.medKitRepository().mark(SHARED_KIT, MedKitStatus.PUBLISHING)
-        database.medKitRepository().mark(HOME_KIT, MedKitStatus.REMOVING)
+        assertTrue(database.medKitRepository().mark(SHARED_KIT, MedKitStatus.PUBLISHING))
+        assertTrue(database.medKitRepository().mark(HOME_KIT, MedKitStatus.REMOVING))
 
         assertEquals(PackageAdding.Outcome.MedKitBusy, adding.add(SHARED_KIT, facts, tablets("30")))
         assertEquals(PackageAdding.Outcome.MedKitBusy, adding.add(HOME_KIT, facts, tablets("30")))

@@ -5,9 +5,11 @@ import android.content.Intent
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import androidx.test.platform.app.InstrumentationRegistry
 import com.kert0n.medapp.feature.notification.ReminderOutbox
+import com.kert0n.medapp.fixture.await
 import dagger.hilt.android.testing.HiltAndroidRule
 import dagger.hilt.android.testing.HiltAndroidTest
 import javax.inject.Inject
+import kotlinx.coroutines.runBlocking
 import org.junit.Assert.assertTrue
 import org.junit.Before
 import org.junit.Rule
@@ -47,9 +49,7 @@ class ReminderWakeReceiverTest {
 
         context.sendBroadcast(Intent(context, ReminderWakeReceiver::class.java).setAction(ReminderWakeReceiver.ACTION))
 
-        val deadline = System.currentTimeMillis() + 5_000
-        while (outbox.state.value.passes == before && System.currentTimeMillis() < deadline) Thread.sleep(50)
-        assertTrue("проход по будильнику не состоялся", outbox.state.value.passes > before)
+        runBlocking { await("проход по будильнику") { outbox.state.value.passes > before } }
     }
 
     /** Посторонний сигнал проходом не оборачивается: приёмник отвечает только своему действию. */

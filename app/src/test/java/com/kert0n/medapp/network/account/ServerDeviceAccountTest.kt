@@ -56,7 +56,8 @@ class ServerDeviceAccountTest {
                 )
             ),
             stored,
-            "токен"
+            "токен",
+            AccessTokens(stored)
         )
     )
 

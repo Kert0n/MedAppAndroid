@@ -8,6 +8,7 @@ import com.kert0n.medapp.queue.QueueService
 import com.kert0n.medapp.queue.QueuedCommand
 import com.kert0n.medapp.queue.Transactions
 import com.kert0n.medapp.queue.medkit.MedKitSyncCommand
+import com.kert0n.medapp.queue.readThisTransaction
 import com.kert0n.medapp.storage.medkit.MedKitStorageRepository
 import com.kert0n.medapp.storage.pack.PackageStorageRepository
 import java.time.Clock
@@ -62,7 +63,7 @@ class MedKitRemoval @Inject constructor(
                 // здесь, принадлежат выходу: снимет их его ответ, а не первая доехавшая команда.
                 for (pkg in packages.contentsOf(medKitId)) {
                     if (pkg.status.allowsUse) {
-                        check(packages.mark(pkg.id, PackageStatus.LOST, by = leave.id)) { "пачка прочитана этой же транзакцией" }
+                        packages.mark(pkg.id, PackageStatus.LOST, by = leave.id).readThisTransaction("пачка")
                     }
                 }
                 medKits.mark(medKitId, MedKitStatus.REMOVING)
@@ -100,7 +101,7 @@ class MedKitRemoval @Inject constructor(
             queue.change(medKit.ref, listOf(delete), now) {
                 for (pkg in packages.contentsOf(medKitId)) {
                     if (pkg.status.allowsUse) {
-                        check(packages.mark(pkg.id, fate, by = delete.id)) { "пачка прочитана этой же транзакцией" }
+                        packages.mark(pkg.id, fate, by = delete.id).readThisTransaction("пачка")
                     }
                 }
                 medKits.mark(medKitId, MedKitStatus.REMOVING)
@@ -117,7 +118,7 @@ class MedKitRemoval @Inject constructor(
                 check(moved == PackageRelocation.Outcome.MOVED) { "местная коробка переезжает сразу, а не $moved" }
             }
         }
-        check(medKits.delete(medKitId)) { "аптечка прочитана этой же транзакцией" }
+        medKits.delete(medKitId).readThisTransaction("аптечка")
         Outcome.REMOVED
     }
 

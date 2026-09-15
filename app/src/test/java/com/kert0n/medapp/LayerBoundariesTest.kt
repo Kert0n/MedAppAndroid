@@ -101,6 +101,29 @@ class LayerBoundariesTest {
     }
 
     /**
+     * Домен независим от Android, Room и Ktor (AGENTS «Инварианты», PLAN H1): он импортирует
+     * только `java.*`, `kotlin.*` и себя. Правило о корнях проекта держит [dependenciesPointInwards],
+     * но чужая библиотека — не корень, и без этой проверки `android.os.Build` в домене прошёл бы.
+     */
+    @Test
+    fun theDomainImportsNothingForeign() {
+        val foreign = sources.resolve("domain").walkTopDown()
+            .filter { it.extension == "kt" }
+            .flatMap { file ->
+                file.readLines().withIndex()
+                    .filter { (_, line) -> line.startsWith("import ") }
+                    .map { (index, line) -> Triple(file, index + 1, line.removePrefix("import ").trim()) }
+            }
+            .filterNot { (_, _, name) ->
+                name.startsWith("java.") || name.startsWith("kotlin.") || name.startsWith("com.kert0n.medapp.domain.")
+            }
+            .map { (file, line, name) -> "${file.relativeTo(sources).invariantSeparatorsPath}:$line: import $name" }
+            .toList()
+
+        assertEquals("домен импортирует чужое", emptyList<String>(), foreign)
+    }
+
+    /**
      * Каталог называет понятие, а не вид файла (PLAN H1): `domain/pack/`, а не `domain/model/`.
      * Что это DTO, маппер или строка таблицы, видно по имени типа, а слой — по корню.
      */
@@ -118,6 +141,58 @@ class LayerBoundariesTest {
         assertEquals(emptyList<String>(), named)
     }
 
+    /**
+     * Сценарий отвечает на вход исходом, а не падением (PLAN D6, F5). Правило одно на `feature/`:
+     * то, что пришло **снаружи** — идентификатор с экрана, из шторки, из ответа сервера, — может
+     * пропасть, пока его несли, и на это есть исход (`Gone`, `GONE`, `Rejected`); то, что прочитано
+     * **этой же транзакцией**, — инвариант F5, и его держит `readThisTransaction` (правило одним
+     * местом в `queue/`); что следует из уже прочитанного — `checkNotNull` с текстом инварианта:
+     * «записан», «у … есть …». Поэтому `requireNotNull` в сценарии не бывает вовсе.
+     */
+    @Test
+    fun aScenarioAnswersAMissingInputWithAnOutcome() {
+        val invariant = Regex("этой же транзакцией|записан|^у .+ есть ")
+        val offenders = sources.resolve("feature").walkTopDown()
+            .filter { it.extension == "kt" }
+            .flatMap { file ->
+                file.readLines().withIndex()
+                    .filter { (_, line) -> "requireNotNull(" in line || "checkNotNull(" in line }
+                    .filterNot { (_, line) ->
+                        "checkNotNull(" in line && CHECK_MESSAGE.find(line)?.groupValues?.get(1)?.contains(invariant) == true
+                    }
+                    .map { (index, line) -> "${file.relativeTo(sources).invariantSeparatorsPath}:${index + 1}: ${line.trim()}" }
+            }
+            .toList()
+
+        assertEquals("пропавший вход сценария — исход, а не падение", emptyList<String>(), offenders)
+    }
+
+    /**
+     * Курс следует за коробкой у **одного** владельца — `feature/course` (PLAN C1 «Конец коробки —
+     * у владельца реакции»): переходы курса, которыми лечение отвечает на коробку — отсоединить
+     * источник, зажать выделения, отключить и вернуть источник, — зовёт только он. Пока конец
+     * коробки отсоединял источник расширением DAO, у одного изменения было два входа с разными
+     * следствиями: без события сокращения, без броней.
+     */
+    @Test
+    fun courseTransitionsBelongToTheirOwner() {
+        val transitions = Regex("""\.(detach|clamped|faultSource|restoreSource)\(""")
+        val offenders = sources.walkTopDown()
+            .filter { it.extension == "kt" }
+            .filter { file ->
+                val path = file.relativeTo(sources).invariantSeparatorsPath
+                !path.startsWith("feature/course/") && !path.startsWith("domain/")
+            }
+            .flatMap { file ->
+                file.readLines().withIndex()
+                    .filter { (_, line) -> transitions.containsMatchIn(line) }
+                    .map { (index, line) -> "${file.relativeTo(sources).invariantSeparatorsPath}:${index + 1}: ${line.trim()}" }
+            }
+            .toList()
+
+        assertEquals("переход курса зовут мимо владельца реакции", emptyList<String>(), offenders)
+    }
+
     /** Чей это файл: самый длинный подходящий ключ, чтобы `app/navigation` не считался `app`. */
     private fun File.root(): String? {
         val path = relativeTo(sources).path
@@ -131,5 +206,6 @@ class LayerBoundariesTest {
 
     private companion object {
         val NAMED = Regex("""com\.kert0n\.medapp\.([a-z]+)\.""")
+        val CHECK_MESSAGE = Regex("""checkNotNull\(.*\)\s*\{\s*"([^"]*)"""")
     }
 }

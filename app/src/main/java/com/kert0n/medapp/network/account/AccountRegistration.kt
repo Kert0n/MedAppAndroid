@@ -16,14 +16,17 @@ import kotlinx.coroutines.sync.withLock
  * сервер отвечает «такая уже есть». Своя ли это учётка, показывает пропуск по тем же данным.
  *
  * Нечитаемую учётку поверх не перерегистрируют — это решение человека, потому что брони на старой
- * уже не снять; приняв его, [replaceUnreadable] стирает нечитаемое и знакомится заново. Регистрация
- * одна на всех вызывающих: два экрана, спросившие одновременно, не заведут двух учёток.
+ * уже не снять; приняв его, [replaceUnreadable] стирает нечитаемое — и пропуск прежней учётки
+ * вместе с ним ([AccessTokens.forget]): кто учётку пишет, тот и говорит, что она сменилась, — и
+ * знакомится заново. Регистрация одна на всех вызывающих: два экрана, спросившие одновременно, не
+ * заведут двух учёток.
  */
 @Singleton
 class AccountRegistration @Inject constructor(
     private val api: MedAppApi,
     private val credentials: CredentialSource,
-    @RegistrationToken private val registrationToken: String
+    @RegistrationToken private val registrationToken: String,
+    private val tokens: AccessTokens
 ) {
 
     sealed interface Outcome {
@@ -55,8 +58,11 @@ class AccountRegistration @Inject constructor(
      * него нечего.
      */
     suspend fun replaceUnreadable(): Outcome = mutex.withLock {
-        if (credentials.read() == StoredAccount.Unreadable && credentials.forget() == CredentialsSaved.LOST) {
-            return@withLock Outcome.NotStored
+        if (credentials.read() == StoredAccount.Unreadable) {
+            if (credentials.forget() == CredentialsSaved.LOST) return@withLock Outcome.NotStored
+            // Учётки больше нет — и её пропуска тоже: сервер принял бы его ещё часы, но он чужой
+            // теперь (C1 «Пропуск — учётки»).
+            tokens.forget()
         }
         known()
     }

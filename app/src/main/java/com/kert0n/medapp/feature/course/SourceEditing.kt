@@ -6,10 +6,7 @@ import com.kert0n.medapp.domain.course.CourseRejected
 import com.kert0n.medapp.domain.course.Revision
 import com.kert0n.medapp.domain.intake.CourseIntake
 import com.kert0n.medapp.domain.value.Doses
-import com.kert0n.medapp.queue.QueueService
-import com.kert0n.medapp.queue.QueuedCommand
 import com.kert0n.medapp.queue.Transactions
-import com.kert0n.medapp.queue.pack.claimChangesSince
 import com.kert0n.medapp.storage.course.CourseStorageRepository
 import com.kert0n.medapp.storage.intake.IntakeStorageRepository
 import com.kert0n.medapp.storage.pack.PackageStorageRepository
@@ -36,7 +33,7 @@ class SourceEditing @Inject constructor(
     private val intakes: IntakeStorageRepository,
     private val packages: PackageStorageRepository,
     private val calendar: CourseCalendar,
-    private val queue: QueueService,
+    private val following: CourseFollowing,
     private val transactions: Transactions,
     private val clock: Clock
 ) {
@@ -82,7 +79,7 @@ class SourceEditing @Inject constructor(
         calendar.missOverdue(before, now)
         val progress = CourseProgress.of(intakes.ofCourse(id).filterIsInstance<CourseIntake>())
         val required = course.remainingDoses(progress)
-        val availability = calendar.availabilityOf(course)
+        val availability = packages.availabilityFor(course)
         // Предел нарушает прежде всего та пачка, которой прибавили: её человек и двигал.
         course.sources
             .sortedByDescending { source -> before.sources.none { it.pkg == source.pkg && it.allocatedDoses >= source.allocatedDoses } }
@@ -91,11 +88,8 @@ class SourceEditing @Inject constructor(
 
         if (!courses.updateSources(course, expected)) return@run Outcome.Stale
         calendar.replan(course, now)
-        // Брони — разницей, той же функцией, что у зажима и укладки снимка (PLAN E2).
-        for (command in course.claimChangesSince(before)) {
-            val pkg = packages.find(command.packageId) ?: continue
-            queue.change(pkg.medKit, listOf(QueuedCommand(Uuid.random(), command)), now) { true }
-        }
+        // Брони — разницей, тем же владельцем, что у зажима и укладки снимка (PLAN E2).
+        following.announceClaims(before, course, now)
         Outcome.Saved(course.projection())
     }
 

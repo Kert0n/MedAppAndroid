@@ -111,7 +111,7 @@ class IntakeReminderTest {
 
         val owed = store.ofKinds(listOf(NotificationKind.INTAKE_DUE))
         assertEquals(all.drop(1).map { it.id }.toSet(), owed.map { Uuid.parse(it.key.subject) }.toSet())
-        assertTrue(owed.all { it.exact && it.actions == listOf(NotificationAction.SKIP, NotificationAction.SNOOZE) })
+        assertTrue(owed.all { it.exact && it.actions == listOf(NotificationAction.TAKE, NotificationAction.SKIP, NotificationAction.SNOOZE) })
         // Будильник один — на ближайший оставшийся; показывать пока нечего, их час не настал.
         assertEquals(all[1].plannedAt, reminders.wakeAt)
         assertEquals(emptyList<Any>(), notifier.shown)

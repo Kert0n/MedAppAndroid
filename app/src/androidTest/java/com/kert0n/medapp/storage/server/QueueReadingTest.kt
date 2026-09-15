@@ -4,6 +4,7 @@ import androidx.test.ext.junit.runners.AndroidJUnit4
 import com.kert0n.medapp.domain.medkit.MedKit
 import com.kert0n.medapp.feature.packages.PackageAdjusting
 import com.kert0n.medapp.fixture.SHARED_KIT
+import com.kert0n.medapp.fixture.settle
 import com.kert0n.medapp.fixture.INTAKE
 import com.kert0n.medapp.fixture.LATER
 import com.kert0n.medapp.fixture.PACK

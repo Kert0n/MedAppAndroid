@@ -2,6 +2,14 @@ package com.kert0n.medapp.platform.notifications
 
 import android.content.Intent
 import androidx.test.ext.junit.runners.AndroidJUnit4
+import com.kert0n.medapp.feature.notification.ReminderOutbox
+import com.kert0n.medapp.fixture.await
+import kotlinx.coroutines.runBlocking
+import dagger.hilt.android.testing.HiltAndroidRule
+import dagger.hilt.android.testing.HiltAndroidTest
+import javax.inject.Inject
+import org.junit.Before
+import org.junit.Rule
 import androidx.test.platform.app.InstrumentationRegistry
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
@@ -9,9 +17,45 @@ import org.junit.Assert.assertTrue
 import org.junit.Test
 import org.junit.runner.RunWith
 
-/** Загрузка, перевод часов и смена зоны — проход дня сейчас; посторонний сигнал — ничего (PLAN D8). */
+/**
+ * Загрузка, перевод часов, смена зоны и возврат точных будильников — проход дня **и** проход
+ * владельца постановок сейчас; посторонний сигнал — ничего (PLAN D8). Сверка без изменений ничего
+ * не пишет и владельца доставки не разбудит, а будильники в системе — его.
+ */
+@HiltAndroidTest
 @RunWith(AndroidJUnit4::class)
 class BootAndTimeReceiverTest {
+
+    @get:Rule
+    val hilt = HiltAndroidRule(this)
+
+    @Inject
+    lateinit var outbox: ReminderOutbox
+
+    @Before
+    fun setUp() {
+        hilt.inject()
+        // Проход дня — задача планировщика; в тестовом приложении его надо поднять самим.
+        androidx.work.testing.WorkManagerTestInitHelper.initializeTestWorkManager(
+            InstrumentationRegistry.getInstrumentation().targetContext,
+            androidx.work.Configuration.Builder().build()
+        )
+    }
+
+    /** Системные сигналы слать нельзя — приёмник зовётся прямо, как позвала бы система. */
+    @Test
+    fun theReceiverWakesTheOwnerOfTheAlarms() {
+        val context = InstrumentationRegistry.getInstrumentation().targetContext
+        outbox.start()
+        // Начальный проход и готовность наблюдателя — до отсчёта, и дождаться их обязательно:
+        // иначе запоздавший начальный проход засчитали бы за ответ приёмнику.
+        runBlocking { await("наблюдатель встал и начальный проход прошёл") { outbox.ready.value && outbox.state.value.passes >= 1 } }
+        val before = outbox.state.value.passes
+
+        BootAndTimeReceiver().onReceive(context, Intent(android.app.AlarmManager.ACTION_SCHEDULE_EXACT_ALARM_PERMISSION_STATE_CHANGED))
+
+        runBlocking { await("владелец постановок разбужен") { outbox.state.value.passes > before } }
+    }
 
     @Test
     fun eachTriggerRestartsTheDayAndStrangersDoNot() {

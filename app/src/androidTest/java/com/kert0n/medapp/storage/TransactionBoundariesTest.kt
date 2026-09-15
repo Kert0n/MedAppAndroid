@@ -436,10 +436,12 @@ class TransactionBoundariesTest {
         courses.activate(activation)
         courses.close(closing(activation.record.close(CourseRecord.Outcome.CANCELLED, LATER)))
 
-        packages.adjust(
-            PackageAdjustment.Recount(PACK, tablets("17")),
-            reallocation = CourseReallocation(activation.course, activation.course.revision),
-            at = LATER
+        assertTrue(
+            packages.adjust(
+                PackageAdjustment.Recount(PACK, tablets("17")),
+                reallocation = CourseReallocation(activation.course, activation.course.revision),
+                at = LATER
+            )
         )
 
         assertNull(database.courses().findPlan(COURSE))
@@ -488,17 +490,19 @@ class TransactionBoundariesTest {
         val activation = draft()
         courses.activate(activation, planned = listOf(plannedIntake()))
         val stale = CourseReallocation(activation.course, activation.course.revision)
-        database.courses().updateAllocations(
-            activation.course.toCourseStorageEntity().let {
-                CourseStorageEntity(
-                    id = it.id, doseAmount = it.doseAmount, unitId = it.unitId, formId = it.formId,
-                    totalDoses = it.totalDoses, start = it.start, daysOfWeek = it.daysOfWeek,
-                    zone = it.zone, revision = it.revision + 1, createdAt = it.createdAt,
-                    updatedAt = LATER
-                )
-            },
-            emptyList(),
-            activation.course.revision
+        assertTrue(
+            database.courses().updateAllocations(
+                activation.course.toCourseStorageEntity().let {
+                    CourseStorageEntity(
+                        id = it.id, doseAmount = it.doseAmount, unitId = it.unitId, formId = it.formId,
+                        totalDoses = it.totalDoses, start = it.start, daysOfWeek = it.daysOfWeek,
+                        zone = it.zone, revision = it.revision + 1, createdAt = it.createdAt,
+                        updatedAt = LATER
+                    )
+                },
+                emptyList(),
+                activation.course.revision
+            )
         )
 
         val failure = runCatching {
@@ -516,7 +520,7 @@ class TransactionBoundariesTest {
     /** В минус пачка не уходит: выбросили больше, чем было, — коробка кончилась. */
     @Test
     fun disposingMoreThanThereIsEndsThePack() = runTest {
-        packages.adjust(PackageAdjustment.Disposal(PACK, tablets("50")), at = LATER)
+        assertTrue(packages.adjust(PackageAdjustment.Disposal(PACK, tablets("50")), at = LATER))
 
         assertNull(packages.find(PACK))
     }
@@ -567,7 +571,7 @@ class TransactionBoundariesTest {
 
     @Test
     fun recountReplacesTheStock() = runTest {
-        packages.adjust(PackageAdjustment.Recount(PACK, tablets("17")), at = LATER)
+        assertTrue(packages.adjust(PackageAdjustment.Recount(PACK, tablets("17")), at = LATER))
 
         assertEquals(tablets("17"), requireNotNull(packages.find(PACK)).quantity)
     }
@@ -578,9 +582,9 @@ class TransactionBoundariesTest {
      */
     @Test
     fun disposalAppliesToTheStockThatIsActuallyThere() = runTest {
-        packages.adjust(PackageAdjustment.Recount(PACK, tablets("18")), at = LATER)
+        assertTrue(packages.adjust(PackageAdjustment.Recount(PACK, tablets("18")), at = LATER))
 
-        packages.adjust(PackageAdjustment.Disposal(PACK, tablets("3")), at = LATER)
+        assertTrue(packages.adjust(PackageAdjustment.Disposal(PACK, tablets("3")), at = LATER))
 
         assertEquals(tablets("15"), requireNotNull(packages.find(PACK)).quantity)
     }
@@ -588,7 +592,7 @@ class TransactionBoundariesTest {
     /** Кончившаяся коробка строки не оставляет (D3). */
     @Test
     fun disposalToZeroEndsThePack() = runTest {
-        packages.adjust(PackageAdjustment.Disposal(PACK, tablets("20")), at = LATER)
+        assertTrue(packages.adjust(PackageAdjustment.Disposal(PACK, tablets("20")), at = LATER))
 
         assertNull(packages.find(PACK))
     }
@@ -596,9 +600,11 @@ class TransactionBoundariesTest {
     /** Перенос меняет место и только его: остаток он не трогает. */
     @Test
     fun transferMovesThePackageOnly() = runTest {
-        packages.adjust(
-            PackageAdjustment.Transfer(PACK, medKit(id = SHARED_KIT, name = "Дача").ref),
-            at = LATER
+        assertTrue(
+            packages.adjust(
+                PackageAdjustment.Transfer(PACK, medKit(id = SHARED_KIT, name = "Дача").ref),
+                at = LATER
+            )
         )
 
         assertEquals(SHARED_KIT, requireNotNull(packages.find(PACK)).medKit.id)

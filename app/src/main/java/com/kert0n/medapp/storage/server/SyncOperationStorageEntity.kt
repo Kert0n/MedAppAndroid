@@ -5,8 +5,11 @@ import androidx.room.Embedded
 import androidx.room.Entity
 import androidx.room.Index
 import androidx.room.PrimaryKey
+import com.kert0n.medapp.domain.value.Attempts
+import com.kert0n.medapp.network.server.RawResponse
 import com.kert0n.medapp.queue.RefusalReason
 import com.kert0n.medapp.queue.SyncOperation
+import com.kert0n.medapp.queue.SyncOperationState
 import com.kert0n.medapp.queue.SyncOperationStatus
 import java.time.Instant
 import kotlin.uuid.Uuid
@@ -30,7 +33,9 @@ import kotlin.uuid.Uuid
         Index(value = ["sequence"], unique = true),
         Index(value = ["package_id", "sequence"]),
         Index("status"),
-        Index("group_id")
+        Index("group_id"),
+        // Свои команды полка считает по ключу, а не перебором всей истории очереди.
+        Index("med_kit_id")
     ]
 )
 class SyncOperationStorageEntity(
@@ -52,8 +57,46 @@ class SyncOperationStorageEntity(
     @ColumnInfo(name = "answer_body") val answerBody: String? = null,
     @ColumnInfo(name = "not_before") val notBefore: Instant? = null,
     @ColumnInfo(name = "outcome_unknown", defaultValue = "0") val outcomeUnknown: Boolean = false,
-    @ColumnInfo(name = "refusal_reason") val refusalReason: RefusalReason? = null
+    @ColumnInfo(name = "refusal_reason") val refusalReason: RefusalReason? = null,
+    /** Отказ разобран человеком в этот момент: строка остаётся, экрану и вниманию к очереди она больше не нужна (C1). */
+    @ColumnInfo(name = "dismissed_at") val dismissedAt: Instant? = null
 )
+
+/**
+ * Состояние отправки — из колонок, без словаря: его переходы применимы и к строке, которую нечем
+ * прочитать (PLAN C1 «Переходы операции — у типа»).
+ *
+ * Колонки могут разойтись между собой — и лишним, и недостающим: записанный ответ у ждущей,
+ * причина отказа у применённой, `ANSWERED` без ответа, `REFUSED` без причины. Такого состояния не
+ * бывает, и строгий тип его не выражает. Строка от этого не перестаёт существовать: её надо
+ * показать человеку и дать закрыть, а одна порченая строка не должна останавливать чтение очереди
+ * (PLAN F4). Поэтому здесь читается то, что в строке **бесспорно**: статус, подтверждённый своей
+ * колонкой, попытки, сроки, есть ли запрос; статус, которому его колонка противоречит, бесспорным
+ * не считается — не отвеченная на деле строка остаётся ждущей, а закрытая без вида отказа остаётся
+ * закрытой утратой доступа, — а лишнее отбрасывается. Собранная операция строит своё состояние
+ * сама и строго: противоречие делает её нечитаемой, а не чинит её.
+ */
+fun SyncOperationStorageEntity.toState(): SyncOperationState {
+    val answer = answerStatus?.let { RawResponse(it, answerBody.orEmpty()) }
+    val undisputed = when {
+        // Ответа нет — значит, его и не получали: операция ждёт.
+        status == SyncOperationStatus.ANSWERED && answer == null -> SyncOperationStatus.PENDING
+        // Закрытость бесспорна, вид закрытия — нет: отказ без причины не выражается.
+        status == SyncOperationStatus.REFUSED && refusalReason == null -> SyncOperationStatus.ACCESS_LOST
+        else -> status
+    }
+    return SyncOperationState(
+        status = undisputed,
+        attempts = Attempts(attempts),
+        lastError = lastError,
+        lastTriedAt = lastTriedAt,
+        answer = answer.takeIf { undisputed == SyncOperationStatus.ANSWERED },
+        notBefore = notBefore,
+        outcomeUnknown = outcomeUnknown && prepared != null,
+        refusalReason = refusalReason.takeIf { undisputed == SyncOperationStatus.REFUSED },
+        hasRequest = prepared != null
+    )
+}
 
 /**
  * Номер в очереди выдаёт база, поэтому он приходит аргументом: команда его не знает и знать

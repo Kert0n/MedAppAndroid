@@ -1,6 +1,9 @@
 package com.kert0n.medapp.storage.pack
 
+import androidx.annotation.CheckResult
 import com.kert0n.medapp.domain.pack.Claims
+import com.kert0n.medapp.domain.course.Course
+import com.kert0n.medapp.domain.pack.Availability
 import com.kert0n.medapp.domain.pack.Package
 import com.kert0n.medapp.domain.pack.PackageEnding
 import com.kert0n.medapp.domain.pack.PackageProjection
@@ -52,6 +55,7 @@ interface PackageStorageRepository {
      *
      * `false` — пачки больше нет.
      */
+    @CheckResult
     suspend fun describe(packageId: Uuid, facts: PackageFacts): Boolean
 
     /**
@@ -65,6 +69,7 @@ interface PackageStorageRepository {
      *
      * Запись о коробке и приёмы, которые за неё держатся, остаются (D6). `false` — пачки и так нет.
      */
+    @CheckResult
     suspend fun end(ending: PackageEnding, at: Instant): Boolean
 
     /**
@@ -80,11 +85,19 @@ interface PackageStorageRepository {
     suspend fun answersToServer(packageId: Uuid): Boolean
 
     /**
+     * Расклад «сколько доступно мне» по пачкам лечения — от того же числа, которое видит человек:
+     * с незакрытыми командами поверх и без чужих броней (PLAN D4). Пачки, которой уже нет, в
+     * раскладе ничего. По нему лечение зажимается и считает обеспечение.
+     */
+    suspend fun availabilityFor(course: Course): Availability
+
+    /**
      * Решение по коробке принято, а полка ещё не ответила: коробка получает пометку [status] своим
      * переходом и запоминает команду [by], которая решение везёт (PLAN E1). Снимает пометку не
      * сценарий, а закрытие **этой** команды в очереди, поэтому `ACTIVE` сюда не передают.
      * `false` — пачки больше нет.
      */
+    @CheckResult
     suspend fun mark(packageId: Uuid, status: PackageStatus, by: Uuid): Boolean
 
     /**
@@ -122,6 +135,7 @@ interface PackageStorageRepository {
      * Кончившаяся коробка (пересчёт в ноль, утилизация всего) строки не оставляет; запись о ней
      * остаётся (PLAN D3). `false` — пачки больше нет: писать переход некуда.
      */
+    @CheckResult
     suspend fun adjust(
         adjustment: PackageAdjustment,
         reallocation: CourseReallocation? = null,

@@ -17,6 +17,7 @@ import com.kert0n.medapp.fixture.medKit
 import com.kert0n.medapp.fixture.pack
 import com.kert0n.medapp.fixture.unplannedIntake
 import com.kert0n.medapp.fixture.packageRepository
+import com.kert0n.medapp.fixture.queueRepository
 import com.kert0n.medapp.fixture.queueStorage
 import com.kert0n.medapp.fixture.transactions
 import com.kert0n.medapp.fixture.tablets
@@ -44,6 +45,7 @@ import com.kert0n.medapp.storage.medkit.toStorageEntity as toMedKitStorageEntity
 import com.kert0n.medapp.storage.pack.toStorageEntity
 import com.kert0n.medapp.fixture.COURSE
 import com.kert0n.medapp.fixture.activeCourse
+import com.kert0n.medapp.fixture.courseRecord
 import com.kert0n.medapp.fixture.save
 import com.kert0n.medapp.fixture.source
 import com.kert0n.medapp.domain.course.Revision
@@ -57,6 +59,7 @@ import kotlin.uuid.Uuid
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.flow.collectIndexed
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.runBlocking
@@ -249,8 +252,8 @@ class QueueRoomStorageTest {
         val claim = PackageSyncCommand.ReleaseClaim(PACK)
         val older = storage.enqueue(QueuedCommand(Uuid.random(), claim), HOME_KIT, at)
         val removal = storage.enqueue(QueuedCommand(Uuid.random(), MedKitSyncCommand.Delete(HOME_KIT)), HOME_KIT, at.plusSeconds(1))
-        database.packageRepository().mark(PACK, PackageStatus.REMOVING, by = removal.id)
-        database.medKitRepository().mark(HOME_KIT, MedKitStatus.REMOVING)
+        assertTrue(database.packageRepository().mark(PACK, PackageStatus.REMOVING, by = removal.id))
+        assertTrue(database.medKitRepository().mark(HOME_KIT, MedKitStatus.REMOVING))
 
         storage.settle(older.id, Delivery.Applied(PackageState.None), at.plusSeconds(2))
 
@@ -264,8 +267,8 @@ class QueueRoomStorageTest {
     @Test
     fun theRefusalOfTheShelfsCommandReleasesTheBoxesItMarked() = runTest {
         val removal = storage.enqueue(QueuedCommand(Uuid.random(), MedKitSyncCommand.Delete(HOME_KIT)), HOME_KIT, at)
-        database.packageRepository().mark(PACK, PackageStatus.REMOVING, by = removal.id)
-        database.medKitRepository().mark(HOME_KIT, MedKitStatus.REMOVING)
+        assertTrue(database.packageRepository().mark(PACK, PackageStatus.REMOVING, by = removal.id))
+        assertTrue(database.medKitRepository().mark(HOME_KIT, MedKitStatus.REMOVING))
 
         storage.settle(removal.id, Delivery.Refused(RefusalReason.CONFLICT, PackageState.None), at.plusSeconds(1))
 
@@ -282,7 +285,7 @@ class QueueRoomStorageTest {
     @Test
     fun aSnapshotDoesNotReleaseTheMark() = runTest {
         val decision = Uuid.random()
-        database.packageRepository().mark(PACK, PackageStatus.REMOVING, by = decision)
+        assertTrue(database.packageRepository().mark(PACK, PackageStatus.REMOVING, by = decision))
 
         database.packageRepository().applySnapshot(snapshot, at)
 
@@ -357,6 +360,8 @@ class QueueRoomStorageTest {
             plan.medicine.toSourceStorageEntities(COURSE)
         )
         database.courses().assignPackage(ActivePackageAssignmentStorageEntity(PACK, COURSE))
+        // Событие сокращения держится за запись эпизода: у идущего лечения она есть всегда.
+        database.courses().upsertRecord(courseRecord(prescription = plan.prescription).toCourseStorageEntity())
     }
 
     @Test
@@ -552,11 +557,14 @@ class QueueRoomStorageTest {
     @Test
     fun theChangeSignalArrivesAfterTheOuterTransactionCommits() = runBlocking {
         val seen = CompletableDeferred<List<Uuid>>()
+        val subscribed = CompletableDeferred<Unit>()
         val watcher = launch(Dispatchers.IO) {
-            storage.changes().first()
-            seen.complete(storage.ready(at.plusSeconds(1)).map { it.id })
+            // Первое значение — «наблюдатель встал», второе — изменение (OutboxLoop).
+            storage.changes().collectIndexed { index, _ ->
+                if (index == 0) subscribed.complete(Unit) else if (!seen.isCompleted) seen.complete(storage.ready(at.plusSeconds(1)).map { it.id })
+            }
         }
-        delay(300) // подписка на таблицу успела встать
+        withTimeout(5_000) { subscribed.await() }
 
         database.transactions().run {
             storage.enqueue(QueuedCommand(operation, PackageSyncCommand.Consume(PACK, dose("3"), INTAKE)), HOME_KIT, at)
@@ -566,6 +574,115 @@ class QueueRoomStorageTest {
 
         assertEquals(listOf(operation), withTimeout(5_000) { seen.await() })
         watcher.cancel()
+    }
+
+    /**
+     * **Зависимая закрывается тем же переходом, что и своя.** Утрата доступа причины не имеет — ни
+     * у родителя, ни у зависимой: каскад не сочиняет закрытие сам, а несёт `Transition.Close`, и
+     * `last_error` у зависимой такой же, каким его пишет собственное закрытие.
+     */
+    @Test
+    fun accessLostCascadesWithoutARefusalReason() = runTest {
+        val release = Uuid.parse("00000000-0000-4000-8000-000000000092")
+        database.syncOperations().enqueue(operation, PackageSyncCommand.Consume(PACK, dose("3"), INTAKE, claimAfter = tablets("0")), at)
+        database.syncOperations().enqueue(release, PackageSyncCommand.ReleaseClaim(PACK), at, dependsOn = setOf(operation))
+        storage.take(operation, null, at)
+
+        storage.settle(operation, Delivery.AccessLost, at.plusSeconds(1))
+
+        val dependent = (requireNotNull(database.syncOperations().find(release)).toDomain(VOCABULARY) as StoredSyncOperation.Readable).operation
+        assertEquals(SyncOperationStatus.ACCESS_LOST, dependent.status)
+        assertNull("утрата доступа без причины", dependent.refusalReason)
+        assertNull("зависимая закрыта не тем переходом, что своя: last_error", dependent.lastError)
+    }
+
+    /**
+     * **Нечитаемая строка закрывается тем же переходом, что и читаемая.** Состояние отправки
+     * читается без словаря — оно в колонках, — и учётка, которую заменили, закрывает обе одинаково:
+     * `ACCESS_LOST`, без причины и без строки журнала. Пока у нечитаемой была своя SQL-дверь, она
+     * писала «учётка заменена» туда, где читаемая не пишет ничего.
+     */
+    @Test
+    fun anUnreadableRowIsClosedLikeAReadableOne() = runTest {
+        val readable = operation
+        val unreadable = Uuid.parse("00000000-0000-4000-8000-000000000093")
+        database.syncOperations().enqueue(readable, PackageSyncCommand.Consume(PACK, dose("3"), INTAKE), at, medKitId = HOME_KIT)
+        val stored = database.syncOperations().enqueue(unreadable, PackageSyncCommand.Consume(PACK, dose("1"), INTAKE), at, medKitId = HOME_KIT).toStorageEntity(HOME_KIT)
+        database.syncOperations().update(
+            SyncOperationStorageEntity(
+                id = stored.id, kind = stored.kind, payload = stored.payload, payloadVersion = 99,
+                sequence = stored.sequence, status = stored.status, attempts = stored.attempts,
+                createdAt = stored.createdAt, packageId = stored.packageId, medKitId = stored.medKitId
+            )
+        )
+        assertTrue(database.queueRepository().stored(unreadable) is StoredSyncOperation.Unreadable)
+
+        assertEquals(1, database.medKitRepository().abandonServer(at.plusSeconds(1)))
+
+        val closed = listOf(readable, unreadable).map { requireNotNull(database.syncOperations().find(it)).operation }
+        for (row in closed) {
+            assertEquals(SyncOperationStatus.ACCESS_LOST, row.status)
+            assertNull("утрата доступа без причины: ${row.id}", row.refusalReason)
+            assertNull("закрыта не тем переходом, что читаемая: last_error у ${row.id}", row.lastError)
+            assertEquals("момент закрытия — у обеих", at.plusSeconds(1), row.lastTriedAt)
+        }
+    }
+
+    /**
+     * **Строка, противоречащая себе, читается как нечитаемая, а не роняет чтение очереди.**
+     * Колонки состояния могут разойтись между собой — записанный ответ у ждущей, причина отказа у
+     * применённой, — и строгий тип такое состояние не выражает. Нечитаемая строка всё равно должна
+     * читаться, закрываться и уходить с экрана: одна порченая строка не останавливает очередь (F4).
+     */
+    @Test
+    fun aRowThatContradictsItselfIsUnreadableAndStillClosable() = runTest {
+        val broken = Uuid.parse("00000000-0000-4000-8000-000000000094")
+        val stored = database.syncOperations().enqueue(broken, PackageSyncCommand.Consume(PACK, dose("1"), INTAKE), at, medKitId = HOME_KIT).toStorageEntity(HOME_KIT)
+        database.syncOperations().update(
+            SyncOperationStorageEntity(
+                id = stored.id, kind = stored.kind, payload = stored.payload, payloadVersion = stored.payloadVersion,
+                sequence = stored.sequence, status = SyncOperationStatus.PENDING, attempts = stored.attempts,
+                createdAt = stored.createdAt, packageId = stored.packageId, medKitId = stored.medKitId,
+                // Ответ и причина отказа у ждущей строки: так не бывает — строка порчена.
+                answerStatus = 200, answerBody = "{}", refusalReason = RefusalReason.INVALID
+            )
+        )
+
+        val read = database.queueRepository().stored(broken)
+
+        assertTrue("порченая строка не прочиталась как нечитаемая: $read", read is StoredSyncOperation.Unreadable)
+        assertEquals(1, database.medKitRepository().abandonServer(at.plusSeconds(1)))
+        assertEquals(SyncOperationStatus.ACCESS_LOST, requireNotNull(database.syncOperations().find(broken)).operation.status)
+    }
+
+    /**
+     * **Статус без своей колонки бесспорным не считается.** Противоречие бывает и нехваткой:
+     * `ANSWERED` без записанного ответа, `REFUSED` без причины. Такая строка тоже читается —
+     * нечитаемой, — и очередь читается целиком: не отвеченная на деле строка остаётся ждущей и
+     * закрывается, а закрытая без вида отказа остаётся закрытой.
+     */
+    @Test
+    fun aStatusWithoutItsColumnIsNotTakenOnTrust() = runTest {
+        val answeredWithoutAnswer = Uuid.parse("00000000-0000-4000-8000-000000000095")
+        val refusedWithoutReason = Uuid.parse("00000000-0000-4000-8000-000000000096")
+        for ((id, status) in listOf(answeredWithoutAnswer to SyncOperationStatus.ANSWERED, refusedWithoutReason to SyncOperationStatus.REFUSED)) {
+            val stored = database.syncOperations().enqueue(id, PackageSyncCommand.Consume(PACK, dose("1"), INTAKE), at, medKitId = HOME_KIT).toStorageEntity(HOME_KIT)
+            database.syncOperations().update(
+                SyncOperationStorageEntity(
+                    id = stored.id, kind = stored.kind, payload = stored.payload, payloadVersion = stored.payloadVersion,
+                    sequence = stored.sequence, status = status, attempts = stored.attempts,
+                    createdAt = stored.createdAt, packageId = stored.packageId, medKitId = stored.medKitId
+                )
+            )
+        }
+
+        val read = listOf(answeredWithoutAnswer, refusedWithoutReason).map { database.queueRepository().stored(it) }
+
+        assertTrue("строка со статусом без своей колонки не прочиталась: $read", read.all { it is StoredSyncOperation.Unreadable })
+        assertEquals("чтение очереди целиком спотыкается о порченую строку", 2, database.queueRepository().unreadable().size)
+        assertEquals(1, database.medKitRepository().abandonServer(at.plusSeconds(1)))
+        assertEquals(SyncOperationStatus.ACCESS_LOST, requireNotNull(database.syncOperations().find(answeredWithoutAnswer)).operation.status)
+        assertEquals("закрытая остаётся закрытой", SyncOperationStatus.REFUSED, requireNotNull(database.syncOperations().find(refusedWithoutReason)).operation.status)
     }
 
     /** Закрытие одно: закрытую операцию второй исход не переписывает и следствий не оставляет. */

@@ -15,6 +15,10 @@ import kotlinx.coroutines.sync.withLock
  *
  * Отсутствие учётки [AccessTokenIssue.Rejected] тоже, но оно не запоминается: регистрация
  * заводит учётку в том же процессе, и после неё пропуск должен выдаваться.
+ *
+ * **Пропуск — учётки** (C1): сменилась учётка — пропуска нет, и память об отказе тоже. Сервер
+ * принимал бы старый пропуск ещё часы, но он пропуск чужой теперь учётки, и предъявлять его
+ * значило бы действовать от прежнего имени. Об этом говорит тот, кто учётку пишет, — [forget].
  */
 @Singleton
 class AccessTokens @Inject constructor(private val credentials: CredentialSource) {
@@ -29,6 +33,12 @@ class AccessTokens @Inject constructor(private val credentials: CredentialSource
     private var last: AccessTokenIssue? = null
 
     val current: String? get() = (last as? AccessTokenIssue.Issued)?.token
+
+    /** Учётка сменилась: её пропуска у нас больше нет, следующий запрос попросит пропуск по новой. */
+    suspend fun forget() = mutex.withLock {
+        last = null
+        issues++
+    }
 
     /**
      * Новый пропуск вместо [stale]. Если его уже заменил другой запрос — или другой запрос уже

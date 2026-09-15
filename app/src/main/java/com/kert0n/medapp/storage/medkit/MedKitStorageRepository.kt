@@ -1,5 +1,6 @@
 package com.kert0n.medapp.storage.medkit
 
+import androidx.annotation.CheckResult
 import com.kert0n.medapp.domain.medkit.MedKit
 import com.kert0n.medapp.domain.medkit.MedKitProjection
 import com.kert0n.medapp.domain.medkit.MedKitStatus
@@ -40,12 +41,14 @@ interface MedKitStorageRepository {
      * публикацию, число участников, пометку и обвязку синхронизации правка не трогает (PLAN D2,
      * F5). `false` — полки больше нет.
      */
+    @CheckResult
     suspend fun describe(medKitId: Uuid, name: String, location: String?): Boolean
 
     /**
      * Строка аптечки уходит. Содержимое к этому моменту уже переехало или удалено — что с ним
      * делать, решает сценарий, а не хранение (PLAN E6, F5). `false` — аптечки и так нет.
      */
+    @CheckResult
     suspend fun delete(id: Uuid): Boolean
 
     /**
@@ -53,6 +56,7 @@ interface MedKitStorageRepository {
      * переходом (PLAN E1, E6). Снимает её закрытие команды в очереди, поэтому `ACTIVE` сюда не
      * передают. `false` — аптечки больше нет.
      */
+    @CheckResult
     suspend fun mark(medKitId: Uuid, status: MedKitStatus): Boolean
 
     /** Снимок трогает только число участников: остального сервер о нашей аптечке не знает. */

@@ -80,6 +80,7 @@ class WriteContractTest {
         "PackageStorageRepository.contentsOf" to (Shape.READ by "(Uuid): List<Package>"),
         "PackageStorageRepository.observeSyncState" to (Shape.READ by "(Uuid): Flow<PackageSyncState>"),
         "PackageStorageRepository.answersToServer" to (Shape.READ by "(Uuid): Boolean"),
+        "PackageStorageRepository.availabilityFor" to (Shape.READ by "(Course): Availability"),
         "PackageStorageRepository.add" to (Shape.CREATION by "(Package, PackageSyncState): Unit"),
         "PackageStorageRepository.describe" to (Shape.NAMED_FIELDS by "(Uuid, PackageFacts): Boolean"),
         "PackageStorageRepository.saveClaims" to (Shape.NAMED_FIELDS by "(Uuid, Claims): Unit"),
@@ -99,6 +100,7 @@ class WriteContractTest {
         "CourseStorageRepository.observeCoverages" to (Shape.READ by "(): Flow<Map<Uuid, CourseCoverage>>"),
         "CourseStorageRepository.observeReductions" to (Shape.READ by "(Uuid): Flow<List<CoverageReduction>>"),
         "CourseStorageRepository.reductionsSince" to (Shape.READ by "(Uuid, Instant): List<CoverageReduction>"),
+        "CourseStorageRepository.recentReductions" to (Shape.READ by "(Instant): List<CoverageReduction>"),
         "CourseStorageRepository.observeRecords" to (Shape.READ by "(): Flow<List<CourseRecordProjection>>"),
         "CourseStorageRepository.observeRecord" to (Shape.READ by "(Uuid): Flow<CourseRecordProjection>"),
         "CourseStorageRepository.findDraft" to (Shape.READ by "(Uuid): CourseDraft"),
@@ -106,7 +108,9 @@ class WriteContractTest {
         "CourseStorageRepository.planIds" to (Shape.READ by "(): List<Uuid>"),
         "CourseStorageRepository.findRecord" to (Shape.READ by "(Uuid): CourseRecord"),
         "CourseStorageRepository.courseHolding" to (Shape.READ by "(Uuid): Uuid"),
-        "CourseStorageRepository.clampHolding" to (Shape.NAMED_FIELDS by "(Uuid, Instant): List<CourseFollowed>"),
+        "CourseStorageRepository.holdersOf" to (Shape.READ by "(Uuid): List<Uuid>"),
+        "CourseStorageRepository.planInProgress" to (Shape.READ by "(Uuid): CourseInProgress"),
+        "CourseStorageRepository.recordReduction" to (Shape.CREATION by "(CoverageReduction): Unit"),
         "CourseStorageRepository.rename" to (Shape.NAMED_FIELDS by "(Uuid, String, String): Boolean"),
         // `long` — редакция: `value class Revision` на JVM разворачивается в своё число.
         "CourseStorageRepository.amend" to (Shape.GUARDED by "(Course, long): Boolean"),
@@ -142,15 +146,19 @@ class WriteContractTest {
         "IntakeStorageRepository.materialise" to (Shape.CREATION by "(List<CourseIntake>): List<Uuid>"),
         "IntakeStorageRepository.prunePlanned" to (Shape.NAMED_FIELDS by "(Uuid, Set<ScheduledOccurrence>): List<Uuid>"),
         "ReminderStorageRepository.changes" to (Shape.READ by "(): Flow<Unit>"),
+        "ReminderStorageRepository.groundsChanged" to (Shape.READ by "(): Flow<Unit>"),
         "ReminderStorageRepository.find" to (Shape.READ by "(NotificationKey): Reminder"),
         "ReminderStorageRepository.findAll" to (Shape.READ by "(Collection<NotificationKey>): List<Reminder>"),
         "ReminderStorageRepository.awaiting" to (Shape.READ by "(NoticeDelivery): List<Reminder>"),
-        "ReminderStorageRepository.withdrawn" to (Shape.READ by "(): List<Reminder>"),
+        "ReminderStorageRepository.observeAwaiting" to (Shape.READ by "(NoticeDelivery): Flow<List<PendingNotice>>"),
+        "ReminderStorageRepository.groundless" to (Shape.READ by "(): List<Reminder>"),
         "ReminderStorageRepository.stale" to (Shape.READ by "(Instant): List<Reminder>"),
         "ReminderStorageRepository.ofKinds" to (Shape.READ by "(Collection<? extends NotificationKind>): List<Reminder>"),
         // Обязательство считает своё состояние само и приходит сюда целиком: спорить с ним нечем.
         "ReminderStorageRepository.saveAll" to (Shape.IN_TRANSACTION by "(Collection<Reminder>): Unit"),
-        "ReminderStorageRepository.deleteAll" to (Shape.NAMED_FIELDS by "(Collection<NotificationKey>): Unit")
+        // Удаляется то, что перечитано той же транзакцией: отозванное, воскрешённое между гашением и
+        // удалением, живёт дальше.
+        "ReminderStorageRepository.deleteAll" to (Shape.IN_TRANSACTION by "(Collection<NotificationKey>): Unit")
     )
 
     /**
@@ -173,6 +181,10 @@ class WriteContractTest {
             // Отложить по кнопке из шторки.
             "feature/notification/ReminderAnswering.kt",
             // Записать исход показа — перечитав: пока шла система, обязательство могли изменить.
+            "feature/notification/ReminderOutbox.kt"
+        ),
+        "ReminderStorageRepository.deleteAll" to setOf(
+            // Забыть отозванное и давнее — перечитав: воскрешённое между гашением и удалением живёт.
             "feature/notification/ReminderOutbox.kt"
         )
     )
@@ -261,6 +273,25 @@ class WriteContractTest {
                 .toSortedSet()
             assertEquals("$method зовут не только названные шаги-владельцы", owners.toSortedSet(), callers)
         }
+    }
+
+    /**
+     * Условная запись не молчит (PLAN C1): метод, отвечающий `Boolean` «записалось ли», помечен
+     * `@CheckResult`, и проигнорированный ответ роняет lint, а не ждёт ревью. Аннотация живёт в
+     * байткоде без времени выполнения, поэтому читается исходник порта.
+     */
+    @Test
+    fun everyConditionalWriteDemandsItsResultBeRead() {
+        val conditional = contract.filter { (_, clause) ->
+            clause.shape in setOf(Shape.GUARDED, Shape.NAMED_FIELDS, Shape.ACTION) && clause.signature.endsWith(": Boolean")
+        }.keys
+        assertTrue("условных записей не нашлось — проверка сторожила бы пустоту", conditional.isNotEmpty())
+        val unmarked = conditional.filterNot { method ->
+            val (port, name) = method.split('.')
+            val file = sources.walkTopDown().first { it.name == "$port.kt" }
+            file.readText().contains(Regex("@CheckResult\\s+suspend fun $name\\("))
+        }
+        assertEquals("условная запись без @CheckResult", emptyList<String>(), unmarked)
     }
 
     @Test

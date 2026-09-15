@@ -8,6 +8,7 @@ import androidx.room.Upsert
 import java.time.Instant
 import java.time.LocalDate
 import com.kert0n.medapp.domain.value.Vocabulary
+import com.kert0n.medapp.domain.course.PackageFollowing
 import com.kert0n.medapp.storage.course.CourseDao
 import com.kert0n.medapp.storage.pack.PackageDao
 import com.kert0n.medapp.storage.pack.end
@@ -88,12 +89,13 @@ interface MedKitDao {
 suspend fun MedKitDao.loseAccess(
     medKitId: Uuid,
     packages: PackageDao,
+    following: PackageFollowing,
     courses: CourseDao,
     vocabulary: Vocabulary,
     at: Instant
 ) {
     for (row in packages.ofMedKit(medKitId)) {
-        packages.end(row.toDomain(vocabulary).ended(), courses, vocabulary, at)
+        packages.end(row.toDomain(vocabulary).ended(), following, courses, at)
     }
     delete(medKitId)
 }

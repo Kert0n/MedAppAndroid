@@ -40,6 +40,18 @@ class NotificationOwnershipTest {
         )
     )
 
+    /**
+     * Кому позволено **звать сверку**. Обещанное следует из состояния, и повод сверить его —
+     * изменившиеся основания (`NotificationUpkeep`), смена дня (`DailyRound`) и решение человека о
+     * настройках (`SettingsChanging`). Сценарий, позвавший сверку руками «после своей правки»,
+     * оставил бы дыру остальным путям записи — снимку, ответу на команду, соседнему сценарию.
+     */
+    private val mayReconcile: Set<String> = setOf(
+        "feature/notification/NotificationUpkeep.kt",
+        "feature/notification/DailyRound.kt",
+        "feature/settings/SettingsChanging.kt"
+    )
+
     private val sources: File = listOf(
         File("src/main/java/com/kert0n/medapp"),
         File("app/src/main/java/com/kert0n/medapp")
@@ -52,6 +64,20 @@ class NotificationOwnershipTest {
             val file = File(sources, allowed)
             assertTrue("нет файла $allowed — проверка сторожила бы пустоту", file.isFile && file.length() > 0)
         }
+    }
+
+    @Test
+    fun onlyTheNamedReasonsCallTheReconciliation() {
+        for (allowed in mayReconcile) {
+            val file = File(sources, allowed)
+            assertTrue("нет файла $allowed — проверка сторожила бы пустоту", file.isFile && file.length() > 0)
+        }
+        val callers = sources.walkTopDown()
+            .filter { it.extension == "kt" }
+            .filter { file -> file.readText().contains(Regex("\\.reconcile\\s*\\(")) }
+            .map { it.relativeTo(sources).invariantSeparatorsPath }
+            .toSortedSet()
+        assertEquals("сверку зовут мимо названных поводов", mayReconcile.toSortedSet(), callers)
     }
 
     @Test

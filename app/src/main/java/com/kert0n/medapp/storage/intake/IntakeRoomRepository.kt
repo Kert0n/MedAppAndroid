@@ -7,7 +7,10 @@ import com.kert0n.medapp.domain.intake.IntakeProjection
 import com.kert0n.medapp.queue.intake.IntakeSyncState
 import com.kert0n.medapp.domain.intake.UnplannedIntake
 import androidx.room.withTransaction
+import com.kert0n.medapp.queue.readThisTransaction
 import com.kert0n.medapp.storage.course.CourseDao
+import com.kert0n.medapp.domain.course.PackageFollowing
+import javax.inject.Provider
 import com.kert0n.medapp.storage.course.toSourceStorageEntities
 import com.kert0n.medapp.storage.course.toStorageEntity as toCourseStorageEntity
 import com.kert0n.medapp.storage.database.MedAppDatabase
@@ -30,7 +33,9 @@ class IntakeRoomRepository @Inject constructor(
     private val intakes: IntakeDao,
     private val packages: PackageDao,
     private val courses: CourseDao,
-    private val vocabulary: VocabularyDao
+    private val vocabulary: VocabularyDao,
+    // Лениво: владелец реакции сам зависит от репозиториев (PLAN D5).
+    private val following: Provider<PackageFollowing>
 ) : IntakeStorageRepository {
 
     override fun observeOfCourse(courseId: Uuid): Flow<List<IntakeProjection>> =
@@ -111,7 +116,7 @@ class IntakeRoomRepository @Inject constructor(
                 // Коробка кончилась. Приём и есть учётная запись о расходе: держится он за вечную
                 // запись и конец переживает (PLAN D3, D6). Момент записи, а не ответа: редакцию
                 // курса двигает то, когда мы узнали (PLAN D5).
-                is PackageAfter.Ended -> packages.end(spent.ending, courses, words, outcome.recordedAt)
+                is PackageAfter.Ended -> packages.end(spent.ending, following.get(), courses, outcome.recordedAt)
                 // Расход не трогает обвязку доставки: версия и картина броней остаются прежними (E3).
                 is PackageAfter.Left -> packages.save(spent.pkg, it.pack.syncState())
             }
@@ -121,7 +126,7 @@ class IntakeRoomRepository @Inject constructor(
                 course.toCourseStorageEntity(),
                 course.medicine.toSourceStorageEntities(course.id),
                 expected
-            )
+            ).readThisTransaction("план")
         }
         true
     }

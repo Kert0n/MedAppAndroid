@@ -28,7 +28,7 @@ class CrptApi @Inject constructor(@CrptHttp private val client: HttpClient) {
     suspend fun check(code: DataMatrixCode): CrptCheck = try {
         val response = client.post(CHECK) {
             contentType(ContentType.Application.Json)
-            setBody(CrptCheckRequestNetworkDTO(code.wire, CrptCheckRequestNetworkDTO.DATA_MATRIX))
+            setBody(CrptCheckRequestNetworkDTO.of(code))
         }
         when (response.status) {
             HttpStatusCode.OK -> {

@@ -7,10 +7,12 @@ import com.kert0n.medapp.domain.medkit.MedKitProjection
 import com.kert0n.medapp.domain.medkit.MedKitStatus
 import com.kert0n.medapp.queue.Delivery
 import com.kert0n.medapp.queue.QueueStorage
+import com.kert0n.medapp.queue.Settlement
 import com.kert0n.medapp.queue.StoredSyncOperation
-import com.kert0n.medapp.queue.SyncOperationStatus
 import com.kert0n.medapp.queue.settlement
 import com.kert0n.medapp.storage.course.CourseDao
+import com.kert0n.medapp.domain.course.PackageFollowing
+import javax.inject.Provider
 import com.kert0n.medapp.storage.database.MedAppDatabase
 import com.kert0n.medapp.storage.database.observing
 import com.kert0n.medapp.storage.pack.PackageDao
@@ -31,7 +33,9 @@ class MedKitRoomRepository @Inject constructor(
     private val courses: CourseDao,
     private val queue: SyncOperationDao,
     private val queueStorage: QueueStorage,
-    private val vocabulary: VocabularyDao
+    private val vocabulary: VocabularyDao,
+    // Лениво: владелец реакции сам зависит от репозиториев (PLAN D5).
+    private val following: Provider<PackageFollowing>
 ) : MedKitStorageRepository {
 
     override suspend fun abandonServer(at: Instant): Int = database.withTransaction {
@@ -44,12 +48,13 @@ class MedKitRoomRepository @Inject constructor(
                 when (val stored = row.toDomain(words)) {
                     is StoredSyncOperation.Readable ->
                         queueStorage.settle(stored.id, Delivery.AccessLost.settlement(stored.operation.command), at)
-                    // Полки больше нет — дочитывать словарь ради строки, которой некуда ехать, незачем.
+                    // Полки больше нет — дочитывать словарь ради строки, которой некуда ехать, незачем;
+                    // закрывается она тем же переходом, что и собранная, только без следствий команды.
                     is StoredSyncOperation.Stale, is StoredSyncOperation.Unreadable ->
-                        queue.settle(stored.id, SyncOperationStatus.ACCESS_LOST, "учётка заменена", at)
+                        queueStorage.settle(stored.id, Settlement(Settlement.Transition.Close.AccessLost), at)
                 }
             }
-            medKits.loseAccess(shelf.id, packages, courses, words, at)
+            medKits.loseAccess(shelf.id, packages, following.get(), courses, words, at)
         }
         gone.size
     }

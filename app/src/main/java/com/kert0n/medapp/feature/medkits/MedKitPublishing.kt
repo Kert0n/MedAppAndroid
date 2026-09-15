@@ -7,6 +7,7 @@ import com.kert0n.medapp.queue.QueueService
 import com.kert0n.medapp.queue.QueuedCommand
 import com.kert0n.medapp.queue.Transactions
 import com.kert0n.medapp.queue.medkit.MedKitSyncCommand
+import com.kert0n.medapp.queue.readThisTransaction
 import com.kert0n.medapp.storage.medkit.MedKitStorageRepository
 import com.kert0n.medapp.storage.pack.PackageStorageRepository
 import java.time.Clock
@@ -48,13 +49,11 @@ class MedKitPublishing @Inject constructor(
         val contents = packages.contentsOf(medKitId)
         val announcements = contents.associateWith { relocation.announcement(it, publishing.ref, after = setOf(publish.id)) }
         queue.change(publishing.ref, listOf(publish) + announcements.values.flatMap { it.commands }, now) {
-            check(medKits.mark(medKitId, MedKitStatus.PUBLISHING)) { "аптечка прочитана этой же транзакцией" }
+            medKits.mark(medKitId, MedKitStatus.PUBLISHING).readThisTransaction("аптечка")
             // Пометку каждой коробки держит её собственное создание: полка отвечает за себя, а
             // коробка — за то, чем она станет известна серверу (PLAN E1, E5).
             for ((pkg, announcement) in announcements) {
-                check(packages.mark(pkg.id, PackageStatus.CHANGING, by = announcement.create.id)) {
-                    "пачка прочитана этой же транзакцией"
-                }
+                packages.mark(pkg.id, PackageStatus.CHANGING, by = announcement.create.id).readThisTransaction("пачка")
             }
             true
         }

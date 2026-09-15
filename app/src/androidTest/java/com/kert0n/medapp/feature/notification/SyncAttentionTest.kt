@@ -8,6 +8,7 @@ import com.kert0n.medapp.domain.notification.Reminder
 import com.kert0n.medapp.domain.value.Quantity
 import com.kert0n.medapp.domain.value.QuantityUnit
 import com.kert0n.medapp.fixture.INTAKE
+import com.kert0n.medapp.fixture.settle
 import com.kert0n.medapp.fixture.PACK
 import com.kert0n.medapp.fixture.Scenarios
 import com.kert0n.medapp.fixture.TABLET_FORM
@@ -131,6 +132,25 @@ class SyncAttentionTest {
         reconcile()
 
         assertNull(attention().firstOrNull())
+    }
+
+    /**
+     * Человек разобрал отказ — карточка уходит **механизмом**: разбор пишет `sync_operations`, сигнал
+     * зовёт сверку, сверка снимает обещание, владелец доставки гасит показанное. Ни прохода дня,
+     * ни ручной сверки для этого не нужно.
+     */
+    @Test
+    fun aDismissedRefusalWithdrawsTheAttentionByItself() = runTest {
+        refused(first)
+        com.kert0n.medapp.fixture.Mechanisms(scenarios, now).use { mechanisms ->
+            reconcile()
+            mechanisms.await("карточка внимания показана") { scenarios.notifier.shown.any { it.kind == NotificationKind.SYNC_ATTENTION } }
+
+            assertEquals(com.kert0n.medapp.feature.operation.OperationDismissing.Outcome.DISMISSED, scenarios.operationDismissing.dismiss(first))
+
+            mechanisms.await("карточка внимания погашена без прохода дня") { NotificationKey.sync(first) in scenarios.notifier.dismissed }
+            assertTrue(database.queueRepository().observeOutstanding().first().isEmpty())
+        }
     }
 
     /** Ждущая или отправляемая операция — не повод: сервер ещё не отвечал, решать нечего. */

@@ -75,6 +75,26 @@ class SpendingTest {
         assertEquals(setOf(tablets("2"), millilitres("5")), spending.episodes.map { it.total }.toSet())
     }
 
+    /**
+     * **Строка отчёта — по предмету и единице** (C1): коробку за её жизнь переописали из таблеток в
+     * миллилитры, и приёмы из неё помнят каждый свою единицу. Складывать можно только в одной —
+     * строка на каждую, как у эпизода; пока коробки группировались одним `packageId`, отчёт падал
+     * на `Quantity.plus`.
+     */
+    @Test
+    fun aBoxInTwoHistoricalUnitsIsTwoRowsNotAFailure() {
+        val spending = Spending.of(
+            listOf(
+                unplannedIntake(id = INTAKE, taken = pack(id = PACK), takenAmount = dose("1")),
+                unplannedIntake(id = OTHER_INTAKE, taken = pack(id = PACK, quantity = millilitres("100")), takenAmount = dose(millilitres("5")))
+            ),
+            emptyMap()
+        )
+
+        assertEquals(setOf(tablets("1"), millilitres("5")), spending.packages.map { it.total }.toSet())
+        assertTrue(spending.packages.all { it.packageId == PACK })
+    }
+
     @Test
     fun episodesGoFromTheLatestStartedAndBoxesByName() {
         val spending = Spending.of(

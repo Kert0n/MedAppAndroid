@@ -11,6 +11,7 @@ import com.kert0n.medapp.fixture.courseRecord
 import com.kert0n.medapp.fixture.inMemoryDatabase
 import com.kert0n.medapp.fixture.save
 import com.kert0n.medapp.fixture.pack
+import com.kert0n.medapp.fixture.packageRepository
 import com.kert0n.medapp.fixture.rejectedByDatabase
 import com.kert0n.medapp.fixture.schedule
 import com.kert0n.medapp.fixture.source
@@ -80,8 +81,9 @@ class CourseDaoTest {
 
     /**
      * Пачку выбросили: курс теряет её как источник, но сам остаётся — лечение назначено человеку,
-     * а не коробке (PLAN D5, D3). Снимает источник доменный переход, и редакция уходит вперёд:
-     * тот, кто читал курс до этого, узнает, что состав уже другой.
+     * а не коробке (PLAN D5, D3). Снимает источник доменный переход у владельца реакции — дверь
+     * конца коробки зовёт его, — и редакция уходит вперёд: тот, кто читал курс до этого, узнает,
+     * что состав уже другой.
      */
     @Test
     fun aReleasedSourceLeavesTheCourseAndMovesItsRevision() = runTest {
@@ -91,9 +93,11 @@ class CourseDaoTest {
             plan.schedule.toTimeStorageEntities(COURSE),
             plan.medicine.toSourceStorageEntities(COURSE)
         )
+        // Событие сокращения держится за запись эпизода: у идущего лечения она есть всегда.
+        courses.upsertRecord(courseRecord(prescription = plan.prescription).toStorageEntity())
 
-        courses.releaseSource(pack(id = PACK).ref, VOCABULARY, LATER)
-        assertEquals(1, database.packages().delete(PACK))
+        assertTrue(database.packageRepository().end(pack(id = PACK).ended(), LATER))
+        assertNull(database.packages().find(PACK))
 
         val left = requireNotNull(courses.findPlan(COURSE)).toPlan(VOCABULARY)
         assertEquals(listOf(OTHER_PACK), left.sources.map { it.pkg.id })

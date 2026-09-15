@@ -21,8 +21,8 @@ import com.kert0n.medapp.storage.server.SyncOperationStorageRow
 import com.kert0n.medapp.domain.value.Vocabulary
 import com.kert0n.medapp.network.pack.PackageSnapshot
 import com.kert0n.medapp.network.pack.PackageSyncState
+import com.kert0n.medapp.domain.course.PackageFollowing
 import com.kert0n.medapp.storage.course.CourseDao
-import com.kert0n.medapp.storage.course.releaseSource
 import java.time.Instant
 import java.time.LocalDate
 import com.kert0n.medapp.domain.pack.PackageStatus
@@ -361,17 +361,14 @@ suspend fun PackageDao.save(pkg: Package, sync: PackageSyncState = PackageSyncSt
     save(pkg.record.toStorageEntity(), pkg.toStorageEntity(sync), pkg.toDetailsStorageEntity())
 
 /**
- * Конец коробки — **одно место на всё приложение**: расход, утилизация, пересчёт в ноль,
- * выбрасывание, утрата доступа и «на сервере её нет» приходят сюда одним значением [PackageEnding].
- *
- * Источник снимается доменным переходом каждого лечения, которое коробку держало, — с ростом
- * редакции, — потому что состав курса не меняется мимо самого курса (PLAN D5, F5); строка уходит
- * последней, а запись о коробке остаётся: за неё держатся приёмы (D3).
- *
- * Зовётся внутри уже открытой транзакции того сценария, который коробку и кончает.
+ * Дверь конца коробки — одна на все причины (PLAN D3, D5): сначала лечение теряет источник у
+ * своего владельца ([PackageFollowing.lost] — переход, событие сокращения, брони), потом
+ * снимается назначение (целостность: FK не даст удалить занятую строку), потом уходит строка.
+ * Запись о коробке и приёмы, которые за неё держатся, остаются (D6).
  */
-suspend fun PackageDao.end(ending: PackageEnding, courses: CourseDao, vocabulary: Vocabulary, at: Instant) {
-    courses.releaseSource(ending.pkg.ref, vocabulary, at)
+suspend fun PackageDao.end(ending: PackageEnding, following: PackageFollowing, courses: CourseDao, at: Instant) {
+    following.lost(ending.pkg.ref, at)
+    courses.releasePackage(ending.pkg.id)
     delete(ending.record.id)
 }
 

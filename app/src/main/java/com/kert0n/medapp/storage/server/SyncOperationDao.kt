@@ -7,10 +7,10 @@ import androidx.room.Transaction
 import androidx.room.Update
 import com.kert0n.medapp.queue.SyncCommand
 import com.kert0n.medapp.queue.SyncOperation
+import com.kert0n.medapp.queue.SyncOperationState
 import com.kert0n.medapp.queue.RefusalReason
 import com.kert0n.medapp.queue.SyncOperationStatus
 import com.kert0n.medapp.queue.pack.claimChangesSince
-import com.kert0n.medapp.storage.course.CourseFollowed
 import com.kert0n.medapp.storage.pack.PackageDao
 import java.time.Instant
 import kotlin.uuid.Uuid
@@ -135,12 +135,18 @@ interface SyncOperationDao {
 
     /**
      * Что ещё касается человека: незакрытые — ждут, отправляются, ответ записан — и отказанные,
-     * которым нужно его решение. Применённые и утратившие доступ экрану не нужны (PLAN H3 №28).
-     * Чтение, а не поток: нечитаемые строки различает разбор, и поток строит репозиторий.
+     * которым нужно его решение. Применённые, утратившие доступ и разобранные человеком экрану не
+     * нужны (PLAN H3 №28). Чтение, а не поток: нечитаемые строки различает разбор, и поток строит
+     * репозиторий. Состояния названы списком, а не отрицанием: по списку SQLite идёт индексом, а
+     * `NOT IN` перебирал бы всю историю очереди.
      */
     @Transaction
-    @Query("SELECT * FROM sync_operations WHERE status NOT IN ('APPLIED', 'ACCESS_LOST') ORDER BY sequence")
+    @Query("SELECT * FROM sync_operations WHERE status IN ('PENDING', 'SENDING', 'ANSWERED', 'REFUSED') AND dismissed_at IS NULL ORDER BY sequence")
     suspend fun outstanding(): List<SyncOperationStorageRow>
+
+    /** Отказ разобран человеком: отметка, а не удаление — приём держится за учёт своего расхода. */
+    @Query("UPDATE sync_operations SET dismissed_at = :at WHERE id = :id AND dismissed_at IS NULL")
+    suspend fun dismiss(id: Uuid, at: Instant): Int
 
     @Transaction
     @Query("SELECT * FROM sync_operations WHERE status = :status ORDER BY sequence")
@@ -196,121 +202,73 @@ interface SyncOperationDao {
     )
     suspend fun earliestDueOfUnclosed(): Instant?
 
-    /** Замораживает запрос и берёт в отправку — только если операция ещё не закрыта. */
+    /**
+     * Одна дверь для состояния отправки (PLAN C1 «Переходы операции — у типа»): что писать, решил
+     * переход [SyncOperationState], а здесь пишется только строка, которую прочитали той же
+     * транзакцией — статус [was] ещё стоит (F5). Ноль строк — статус сменился между чтением и
+     * записью, и переход не применён. Тождество строки — команда, номер, зависимости — переходом не
+     * меняется и здесь не трогается; `dismissed_at` — отметка человека, не состояние ([dismiss]).
+     */
     @Query(
-        "UPDATE sync_operations SET status = 'SENDING', " +
+        "UPDATE sync_operations SET status = :status, attempts = :attempts, last_error = :lastError, last_tried_at = :lastTriedAt, " +
             "prepared_method = :method, prepared_path = :path, prepared_query = :query, prepared_body = :body, " +
             "prepared_drug_version = :drugVersion, prepared_claims_version = :claimsVersion, " +
             "prepared_quantity_before = :quantityBefore, prepared_mine_before = :mineBefore, " +
-            "prepared_unit_id = :unitId, prepared_at = :preparedAt " +
-            "WHERE id = :id AND status IN ('PENDING', 'SENDING') AND prepared_method IS NULL"
+            "prepared_unit_id = :unitId, prepared_at = :preparedAt, " +
+            "answer_status = :answerStatus, answer_body = :answerBody, not_before = :notBefore, " +
+            "outcome_unknown = :outcomeUnknown, refusal_reason = :refusalReason " +
+            "WHERE id = :id AND status = :was"
     )
-    suspend fun freeze(
+    suspend fun save(
         id: Uuid,
-        method: String,
-        path: String,
-        query: String,
+        was: SyncOperationStatus,
+        status: SyncOperationStatus,
+        attempts: Int,
+        lastError: String?,
+        lastTriedAt: Instant?,
+        method: String?,
+        path: String?,
+        query: String?,
         body: String?,
         drugVersion: Long?,
         claimsVersion: Long?,
         quantityBefore: String?,
         mineBefore: String?,
         unitId: Uuid?,
-        preparedAt: Instant
+        preparedAt: Instant?,
+        answerStatus: Int?,
+        answerBody: String?,
+        notBefore: Instant?,
+        outcomeUnknown: Boolean,
+        refusalReason: RefusalReason?
     ): Int
 
-    /**
-     * Берёт замороженный запрос в отправку снова. Операция, которую застали в `SENDING`, — прошлый
-     * полёт умер вместе с процессом, и его исход неизвестен: факт остаётся у запроса.
-     */
-    @Query(
-        "UPDATE sync_operations SET outcome_unknown = CASE WHEN status = 'SENDING' THEN 1 ELSE outcome_unknown END, " +
-            "status = 'SENDING' WHERE id = :id AND status IN ('PENDING', 'SENDING')"
+    /** Состояние после перехода — в колонки; [prepared] — как его отдал переход (сброшенный запрос — `null`). */
+    suspend fun save(id: Uuid, state: SyncOperationState, prepared: PreparedRequestStorageColumns?, was: SyncOperationStatus): Int = save(
+        id = id, was = was, status = state.status, attempts = state.attempts.count, lastError = state.lastError, lastTriedAt = state.lastTriedAt,
+        method = prepared?.method, path = prepared?.path, query = prepared?.query, body = prepared?.body,
+        drugVersion = prepared?.drugVersion, claimsVersion = prepared?.claimsVersion,
+        quantityBefore = prepared?.quantityBefore, mineBefore = prepared?.mineBefore, unitId = prepared?.unitId, preparedAt = prepared?.at,
+        answerStatus = state.answer?.status, answerBody = state.answer?.body, notBefore = state.notBefore,
+        outcomeUnknown = state.outcomeUnknown, refusalReason = state.refusalReason
     )
-    suspend fun markSending(id: Uuid): Int
-
-    /** Ответ записан до применения: полученное подтверждение не теряется. Только из отправки. */
-    @Query(
-        "UPDATE sync_operations SET status = 'ANSWERED', answer_status = :answerStatus, answer_body = :answerBody, " +
-            "last_tried_at = :at WHERE id = :id AND status = 'SENDING'"
-    )
-    suspend fun answered(id: Uuid, answerStatus: Int, answerBody: String, at: Instant): Int
-
-    /** Ответ есть, применить нечем: остаётся `ANSWERED`, попытка считается — от неё растёт задержка. */
-    @Query(
-        "UPDATE sync_operations SET last_error = :lastError, last_tried_at = :at, attempts = attempts + 1, " +
-            "not_before = :notBefore WHERE id = :id AND status = 'ANSWERED'"
-    )
-    suspend fun defer(id: Uuid, lastError: String, at: Instant, notBefore: Instant): Int
 
     /**
-     * Закрытие или возврат в ожидание — только незакрытой: закрытая второй раз не закрывается.
-     * Записанный ответ стирается: он либо применён, либо будет получен заново. Неизвестный исход
-     * прилипает к запросу: раз неизвестный — неизвестный, пока запрос не переподготовлен.
-     * Причина отказа — значением и ровно у `REFUSED` (PLAN E2); держит это тип операции.
+     * Все операции, которым — прямо или через другие — нужен эффект [dependsOn], каждая один раз,
+     * в порядке очереди (PLAN E2, C1 «Обход зависимостей — запрос»). Граф без циклов по построению:
+     * зависят только от поставленного раньше. Что с ними делать — закрыть незакрытые следом за
+     * родителем, отметить разобранными закрытые каскадом, — решает вызывающий по строке; обход
+     * один и ромб зависимостей в нём не удваивается.
      */
     @Query(
-        "UPDATE sync_operations SET status = :status, last_error = :lastError, refusal_reason = :refusalReason, " +
-            "last_tried_at = :at, attempts = attempts + :attempted, answer_status = NULL, answer_body = NULL, " +
-            "not_before = :notBefore, outcome_unknown = MAX(outcome_unknown, :outcomeUnknown) " +
-            "WHERE id = :id AND status IN ('PENDING', 'SENDING', 'ANSWERED')"
+        "WITH RECURSIVE dependents(id) AS (" +
+            "SELECT operation_id FROM sync_operation_dependencies WHERE depends_on_id = :dependsOn " +
+            "UNION " +
+            "SELECT d.operation_id FROM sync_operation_dependencies d JOIN dependents p ON d.depends_on_id = p.id" +
+            ") SELECT o.* FROM sync_operations o JOIN dependents ON o.id = dependents.id ORDER BY o.sequence"
     )
-    suspend fun settle(
-        id: Uuid,
-        status: SyncOperationStatus,
-        lastError: String? = null,
-        at: Instant? = null,
-        attempted: Int = 0,
-        notBefore: Instant? = null,
-        outcomeUnknown: Int = 0,
-        refusalReason: RefusalReason? = null
-    ): Int
-
-    /**
-     * Сбрасывает собранный запрос: версия устарела, и он готовится заново по свежему состоянию
-     * под тем же номером. Не попытка — задержка от этого не растёт, и счёт попыток остаётся у
-     * операции. Факт «исход неизвестен» принадлежит **запросу** и умирает вместе с ним: по нему
-     * расход решает, значит ли 404 «мы сами опустошили пачку» (PLAN E3).
-     */
-    @Query(
-        "UPDATE sync_operations SET status = 'PENDING', last_error = :lastError, last_tried_at = :at, not_before = :notBefore, outcome_unknown = 0, " +
-            "prepared_method = NULL, prepared_path = NULL, prepared_query = NULL, prepared_body = NULL, " +
-            "prepared_drug_version = NULL, prepared_claims_version = NULL, prepared_quantity_before = NULL, " +
-            "prepared_mine_before = NULL, prepared_unit_id = NULL, prepared_at = NULL, " +
-            "answer_status = NULL, answer_body = NULL " +
-            "WHERE id = :id AND status IN ('SENDING', 'ANSWERED')"
-    )
-    suspend fun reprepare(id: Uuid, lastError: String, at: Instant, notBefore: Instant?): Int
-
-    /**
-     * Незакрытые операции, которым нужен эффект [dependsOn], закрываются тем же статусом: отказ
-     * родителя отказывает зависимым, утрата доступа — теряет их. Возвращает их номера, чтобы
-     * каскад дошёл и до их зависимых.
-     */
-    @Query(
-        "SELECT operation_id FROM sync_operation_dependencies d JOIN sync_operations o ON o.id = d.operation_id " +
-            "WHERE d.depends_on_id = :dependsOn AND o.status IN ('PENDING', 'SENDING')"
-    )
-    suspend fun unclosedDependentsOf(dependsOn: Uuid): List<Uuid>
+    suspend fun dependentsOf(dependsOn: Uuid): List<SyncOperationStorageEntity>
 
     @Query("SELECT depends_on_id FROM sync_operation_dependencies WHERE operation_id = :id")
     suspend fun dependenciesOf(id: Uuid): List<Uuid>
-}
-
-/**
- * Брони после того, как курсы последовали за коробкой, — разницей, каждая команда **своей** пачке
- * и её полке (PLAN D5, E2): зажим мог тронуть и другие источники курса, а они лежат на своих
- * полках. Едет команда только той коробке, чьи изменения отвечают серверу; местной полке и
- * коробке, о которой сервер ещё не слышал, везти нечего — то же правило, что у `QueueService`.
- *
- * Зовётся внутри транзакции того, кто коробку изменил, — укладки снимка или ответа на команду.
- */
-suspend fun SyncOperationDao.enqueueClaimChanges(followed: List<CourseFollowed>, packages: PackageDao, at: Instant) {
-    for (course in followed) {
-        for (command in course.after.claimChangesSince(course.before)) {
-            val row = packages.find(command.packageId) ?: continue
-            if (!row.answersToServer) continue
-            enqueue(Uuid.random(), command, at, medKitId = row.pack.medKitId)
-        }
-    }
 }

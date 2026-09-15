@@ -1,8 +1,10 @@
 package com.kert0n.medapp.storage.course
 
+import androidx.annotation.CheckResult
 import com.kert0n.medapp.domain.course.Course
 import com.kert0n.medapp.domain.course.CourseCompletion
 import com.kert0n.medapp.domain.course.CourseCoverage
+import com.kert0n.medapp.domain.report.CourseInProgress
 import com.kert0n.medapp.domain.course.CoverageReduction
 import com.kert0n.medapp.domain.course.CourseDraft
 import com.kert0n.medapp.domain.course.CourseDraftProjection
@@ -49,6 +51,9 @@ interface CourseStorageRepository {
      */
     suspend fun reductionsSince(courseId: Uuid, since: Instant): List<CoverageReduction>
 
+    /** Сокращения всех лечений с [since] — одним чтением, сверке (PLAN D8). */
+    suspend fun recentReductions(since: Instant): List<CoverageReduction>
+
     suspend fun findDraft(id: Uuid): CourseDraft?
 
     suspend fun findPlan(id: Uuid): Course?
@@ -64,6 +69,7 @@ interface CourseStorageRepository {
      * черновика, ни эпизода. `false` — писать некуда: черновика больше нет, он другой редакции, или
      * номер уже занят (PLAN F5).
      */
+    @CheckResult
     suspend fun saveDraft(draft: CourseDraft, expected: Revision?): Boolean
 
     /**
@@ -71,6 +77,7 @@ interface CourseStorageRepository {
      * него нет, пунктов он не породил (PLAN D5). `false` — черновика нет: удалён или лечение уже
      * началось, и тогда не тронуто ничего.
      */
+    @CheckResult
     suspend fun discardDraft(id: Uuid): Boolean
 
     /** Аналитика читает записи: идущее и законченное лечение для неё одной формы (PLAN H6). */
@@ -87,18 +94,24 @@ interface CourseStorageRepository {
      * Общей записи здесь нет намеренно: экран, загрузивший открытый эпизод, сохранял бы его
      * целиком уже после конца лечения и возвращал бы запись в открытое состояние.
      */
+    @CheckResult
     suspend fun rename(id: Uuid, title: String, note: String?): Boolean
 
     /** Какому активному курсу отдана пачка; `null` — она свободна (PLAN F1, F2). */
     suspend fun courseHolding(packageId: Uuid): Uuid?
 
     /**
-     * Курс следует за коробкой: каждое идущее лечение, держащее пачку, зажимает выделения под то,
-     * что доступно ему сейчас, условно по своей редакции (PLAN D5). Та же дверь, какой пользуется
-     * укладка снимка. Возвращает пары «до и после» — брони разницей ставит сценарий; пусто —
-     * зажимать было нечего. Зовётся внутри транзакции сценария, который коробку изменил.
+     * Какие лечения держат коробку источником — по составу, а не по назначениям: назначения
+     * бывают только у начатого, а состав есть и у черновика (PLAN D5). За коробкой следует
+     * каждое из них (`CourseFollowing`).
      */
-    suspend fun clampHolding(packageId: Uuid, at: Instant): List<CourseFollowed>
+    suspend fun holdersOf(packageId: Uuid): List<Uuid>
+
+    /** Идущее лечение с прогрессом — то, от чего считают потребность и зажим; `null` — плана нет или это черновик. */
+    suspend fun planInProgress(id: Uuid): CourseInProgress?
+
+    /** Событие сокращения обеспечения (PLAN D5): записывается тем, кто зажал курс, той же транзакцией. */
+    suspend fun recordReduction(reduction: CoverageReduction)
 
     /**
      * Изменённое лечение — доза, форма, расписание, число доз, выделения под них — ложится в план,
@@ -106,6 +119,7 @@ interface CourseStorageRepository {
      * [expected], из которой план правили (PLAN D5, F5). Состав пачек изменение не меняет: смена
      * состава — [updateSources]. `false` — плана уже нет либо он другой редакции; не тронуто ничего.
      */
+    @CheckResult
     suspend fun amend(course: Course, expected: Revision): Boolean
 
     /**
@@ -114,6 +128,7 @@ interface CourseStorageRepository {
      * пачек пересчёт не меняет: иначе выделения разошлись бы с назначениями пачек, которые здесь
      * не трогаются, — смена состава идёт через [updateSources].
      */
+    @CheckResult
     suspend fun reallocate(reallocation: CourseReallocation): Boolean
 
     /**
@@ -123,6 +138,7 @@ interface CourseStorageRepository {
      * `false` — писать некуда: плана уже нет, он другой редакции, либо состав называет коробку,
      * которой больше нет (PLAN F5). Пачку, занятую другим курсом, отвергает база.
      */
+    @CheckResult
     suspend fun updateSources(course: Course, expected: Revision): Boolean
 
     /**

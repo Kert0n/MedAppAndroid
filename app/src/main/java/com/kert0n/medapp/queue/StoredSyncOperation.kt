@@ -17,16 +17,35 @@ sealed interface StoredSyncOperation {
 
     val id: Uuid
 
+    /**
+     * Состояние отправки — у всех трёх: оно лежит в колонках и читается без словаря, поэтому
+     * строка, которую нечем прочитать, закрывается тем же переходом, что и собранная (C1
+     * «Переходы операции — у типа»).
+     */
+    val state: SyncOperationState
+
+    /**
+     * Ждёт решения человека: отвергнутое сервером или нечитаемое само не разрешится (PLAN D8,
+     * H3 №28). Строка, которой не хватило словаря, — не повод: её дочитает работник.
+     */
+    val needsDecision: Boolean
+        get() = when (this) {
+            is Readable -> operation.status == SyncOperationStatus.REFUSED
+            is Stale -> false
+            is Unreadable -> true
+        }
+
     data class Readable(val operation: SyncOperation) : StoredSyncOperation {
         override val id: Uuid get() = operation.id
+        override val state: SyncOperationState get() = operation.state
     }
 
     /** Снимок словаря старее строки: дочитать словарь — и строка прочитается. Решать нечего. */
-    data class Stale(override val id: Uuid, val miss: VocabularyMiss) : StoredSyncOperation
+    data class Stale(override val id: Uuid, val miss: VocabularyMiss, override val state: SyncOperationState) : StoredSyncOperation
 
     /**
      * Чужая версия payload, неизвестный вид, повреждённые поля: чтением не лечится. [reason] —
      * словами, для журнала и для экрана.
      */
-    data class Unreadable(override val id: Uuid, val reason: String) : StoredSyncOperation
+    data class Unreadable(override val id: Uuid, val reason: String, override val state: SyncOperationState) : StoredSyncOperation
 }

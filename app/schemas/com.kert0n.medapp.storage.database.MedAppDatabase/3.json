@@ -2,7 +2,7 @@
   "formatVersion": 1,
   "database": {
     "version": 3,
-    "identityHash": "2ac426696572a7c44fe16a608a3a632c",
+    "identityHash": "f4842f2821408b351e3aede9be401441",
     "entities": [
       {
         "tableName": "quantity_units",
@@ -993,6 +993,15 @@
             ],
             "orders": [],
             "createSql": "CREATE INDEX IF NOT EXISTS `index_coverage_reductions_package_id` ON `${TABLE_NAME}` (`package_id`)"
+          },
+          {
+            "name": "index_coverage_reductions_at",
+            "unique": false,
+            "columnNames": [
+              "at"
+            ],
+            "orders": [],
+            "createSql": "CREATE INDEX IF NOT EXISTS `index_coverage_reductions_at` ON `${TABLE_NAME}` (`at`)"
           }
         ],
         "foreignKeys": [
@@ -1216,6 +1225,16 @@
             ],
             "orders": [],
             "createSql": "CREATE INDEX IF NOT EXISTS `index_intakes_answered_at` ON `${TABLE_NAME}` (`answered_at`)"
+          },
+          {
+            "name": "index_intakes_status_scheduled_at",
+            "unique": false,
+            "columnNames": [
+              "status",
+              "scheduled_at"
+            ],
+            "orders": [],
+            "createSql": "CREATE INDEX IF NOT EXISTS `index_intakes_status_scheduled_at` ON `${TABLE_NAME}` (`status`, `scheduled_at`)"
           }
         ],
         "foreignKeys": [
@@ -1256,7 +1275,7 @@
       },
       {
         "tableName": "sync_operations",
-        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`id` TEXT NOT NULL, `kind` TEXT NOT NULL, `payload` TEXT NOT NULL, `payload_version` INTEGER NOT NULL, `sequence` INTEGER NOT NULL, `status` TEXT NOT NULL, `attempts` INTEGER NOT NULL, `created_at` INTEGER NOT NULL, `package_id` TEXT, `med_kit_id` TEXT, `group_id` TEXT, `last_error` TEXT, `last_tried_at` INTEGER, `answer_status` INTEGER, `answer_body` TEXT, `not_before` INTEGER, `outcome_unknown` INTEGER NOT NULL DEFAULT 0, `refusal_reason` TEXT, `prepared_method` TEXT, `prepared_path` TEXT, `prepared_query` TEXT, `prepared_body` TEXT, `prepared_drug_version` INTEGER, `prepared_claims_version` INTEGER, `prepared_quantity_before` TEXT, `prepared_mine_before` TEXT, `prepared_unit_id` TEXT, `prepared_at` INTEGER, PRIMARY KEY(`id`))",
+        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`id` TEXT NOT NULL, `kind` TEXT NOT NULL, `payload` TEXT NOT NULL, `payload_version` INTEGER NOT NULL, `sequence` INTEGER NOT NULL, `status` TEXT NOT NULL, `attempts` INTEGER NOT NULL, `created_at` INTEGER NOT NULL, `package_id` TEXT, `med_kit_id` TEXT, `group_id` TEXT, `last_error` TEXT, `last_tried_at` INTEGER, `answer_status` INTEGER, `answer_body` TEXT, `not_before` INTEGER, `outcome_unknown` INTEGER NOT NULL DEFAULT 0, `refusal_reason` TEXT, `dismissed_at` INTEGER, `prepared_method` TEXT, `prepared_path` TEXT, `prepared_query` TEXT, `prepared_body` TEXT, `prepared_drug_version` INTEGER, `prepared_claims_version` INTEGER, `prepared_quantity_before` TEXT, `prepared_mine_before` TEXT, `prepared_unit_id` TEXT, `prepared_at` INTEGER, PRIMARY KEY(`id`))",
         "fields": [
           {
             "fieldPath": "id",
@@ -1359,6 +1378,11 @@
             "affinity": "TEXT"
           },
           {
+            "fieldPath": "dismissedAt",
+            "columnName": "dismissed_at",
+            "affinity": "INTEGER"
+          },
+          {
             "fieldPath": "prepared.method",
             "columnName": "prepared_method",
             "affinity": "TEXT"
@@ -1452,6 +1476,15 @@
             ],
             "orders": [],
             "createSql": "CREATE INDEX IF NOT EXISTS `index_sync_operations_group_id` ON `${TABLE_NAME}` (`group_id`)"
+          },
+          {
+            "name": "index_sync_operations_med_kit_id",
+            "unique": false,
+            "columnNames": [
+              "med_kit_id"
+            ],
+            "orders": [],
+            "createSql": "CREATE INDEX IF NOT EXISTS `index_sync_operations_med_kit_id` ON `${TABLE_NAME}` (`med_kit_id`)"
           }
         ]
       },
@@ -1637,7 +1670,7 @@
     ],
     "setupQueries": [
       "CREATE TABLE IF NOT EXISTS room_master_table (id INTEGER PRIMARY KEY,identity_hash TEXT)",
-      "INSERT OR REPLACE INTO room_master_table (id,identity_hash) VALUES(42, '2ac426696572a7c44fe16a608a3a632c')"
+      "INSERT OR REPLACE INTO room_master_table (id,identity_hash) VALUES(42, 'f4842f2821408b351e3aede9be401441')"
     ]
   }
 }

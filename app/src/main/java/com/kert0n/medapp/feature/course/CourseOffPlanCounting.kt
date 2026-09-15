@@ -8,9 +8,11 @@ import com.kert0n.medapp.domain.course.Revision
 import com.kert0n.medapp.domain.intake.CourseIntake
 import com.kert0n.medapp.domain.value.Doses
 import com.kert0n.medapp.queue.Transactions
+import com.kert0n.medapp.queue.readThisTransaction
 import com.kert0n.medapp.storage.course.CourseReallocation
 import com.kert0n.medapp.storage.course.CourseStorageRepository
 import com.kert0n.medapp.storage.intake.IntakeStorageRepository
+import com.kert0n.medapp.storage.pack.PackageStorageRepository
 import java.time.Clock
 import javax.inject.Inject
 import kotlin.uuid.Uuid
@@ -23,13 +25,15 @@ import kotlin.uuid.Uuid
  * лечение закончено.
  *
  * Условно по редакции, которую видел экран (F5); прошлое отмечается раньше, чем лечение трогают
- * (F4). Уменьшение счёта бронь обратно не растит: снимать её решал человек.
+ * (F4). Уменьшение счёта бронь обратно не растит: снимать её решал человек, — а календарь
+ * следует за потребностью в обе стороны.
  */
 class CourseOffPlanCounting @Inject constructor(
     private val courses: CourseStorageRepository,
     private val intakes: IntakeStorageRepository,
+    private val packages: PackageStorageRepository,
     private val calendar: CourseCalendar,
-    private val clamping: CourseClamping,
+    private val following: CourseFollowing,
     private val closing: CourseClosing,
     private val transactions: Transactions,
     private val clock: Clock
@@ -42,21 +46,22 @@ class CourseOffPlanCounting @Inject constructor(
         if (before.revision != expected) return@run Outcome.Stale
         val now = clock.instant()
         calendar.missOverdue(before, now)
-        val course = before.setTakenOffPlan(total, calendar.availabilityOf(before), now)
+        val course = before.setTakenOffPlan(total, packages.availabilityFor(before), now)
         if (course === before) return@run Outcome.Set(before.projection())
-        check(courses.reallocate(CourseReallocation(course, expected))) { "план прочитан этой же транзакцией" }
-        clamping.announceClaims(before, course, now)
+        courses.reallocate(CourseReallocation(course, expected)).readThisTransaction("план")
+        following.announceClaims(before, course, now)
 
         val ofCourse = intakes.ofCourse(courseId).filterIsInstance<CourseIntake>()
         val progress = CourseProgress.of(ofCourse)
         val completion = CourseCompletion(course, progress)
         if (completion.reached) {
-            val amended = checkNotNull(courses.findRecord(courseId)) { "запись эпизода прочитана этой же транзакцией" }
+            val amended = courses.findRecord(courseId).readThisTransaction("запись эпизода")
             closing.close(course, CourseCompletion.Closing.of(amended, CourseRecord.Outcome.COMPLETED, ofCourse, now), now)
             return@run Outcome.Finished
         }
-        // Доз впереди стало меньше — лишние плановые пункты не факты и уходят.
-        calendar.prune(course, course.remainingOccurrences(progress).toSet(), now)
+        // Потребность изменилась — в любую сторону: лишние плановые пункты не факты и уходят, а
+        // вернувшаяся потребность достраивает окно заново той же дверью, что правка лечения (C1).
+        calendar.replan(course, now)
         Outcome.Set(course.projection())
     }
 

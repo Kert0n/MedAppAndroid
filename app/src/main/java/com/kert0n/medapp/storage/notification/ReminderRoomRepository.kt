@@ -4,9 +4,11 @@ import com.kert0n.medapp.domain.notification.NoticeDelivery
 import com.kert0n.medapp.domain.notification.NotificationKey
 import com.kert0n.medapp.domain.notification.NotificationKind
 import com.kert0n.medapp.domain.notification.NotificationTarget
+import com.kert0n.medapp.domain.notification.PendingNotice
 import com.kert0n.medapp.domain.notification.Reminder
 import com.kert0n.medapp.domain.value.Attempts
 import com.kert0n.medapp.storage.database.MedAppDatabase
+import com.kert0n.medapp.storage.database.observing
 import java.time.Instant
 import java.time.LocalDate
 import javax.inject.Inject
@@ -20,7 +22,10 @@ class ReminderRoomRepository @Inject constructor(
 ) : ReminderStorageRepository {
 
     override fun changes(): Flow<Unit> =
-        database.invalidationTracker.createFlow("reminders", emitInitialState = false).map { }
+        database.invalidationTracker.createFlow("reminders", emitInitialState = true).map { }
+
+    override fun groundsChanged(): Flow<Unit> =
+        database.invalidationTracker.createFlow(*GROUNDS, emitInitialState = true).map { }
 
     override suspend fun find(key: NotificationKey): Reminder? = reminders.find(key.stored)?.toDomain()
 
@@ -30,7 +35,10 @@ class ReminderRoomRepository @Inject constructor(
     override suspend fun awaiting(delivery: NoticeDelivery): List<Reminder> =
         reminders.awaiting(delivery.name).map { it.toDomain() }
 
-    override suspend fun withdrawn(): List<Reminder> = reminders.withdrawn().map { it.toDomain() }
+    override fun observeAwaiting(delivery: NoticeDelivery): Flow<List<PendingNotice>> =
+        database.observing("reminders") { awaiting(delivery).map { it.projection() } }
+
+    override suspend fun groundless(): List<Reminder> = reminders.groundless().map { it.toDomain() }
 
     override suspend fun stale(before: Instant): List<Reminder> = reminders.olderThan(before).map { it.toDomain() }
 
@@ -45,6 +53,17 @@ class ReminderRoomRepository @Inject constructor(
         if (keys.isNotEmpty()) reminders.deleteAll(keys.map { it.stored })
     }
 }
+
+/**
+ * Таблицы, из которых сверка выводит обещанное: годность и назначение — коробки, обеспечение —
+ * лечение с пунктами, бронями и очередью, сокращения, внимание к очереди; словарь — потому что по
+ * нему собираются проекции. `reminders` здесь нет намеренно.
+ */
+private val GROUNDS = arrayOf(
+    "packages", "package_details", "claims", "med_kits",
+    "courses", "course_sources", "course_times", "active_package_assignments", "coverage_reductions",
+    "intakes", "sync_operations", "quantity_units", "form_types"
+)
 
 /** Ключ строкой: вид и предмет вместе, чтобы разные этапы одного события не склеивались. */
 private val NotificationKey.stored: String get() = "${kind.name}:$subject"

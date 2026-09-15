@@ -5,6 +5,7 @@ import com.kert0n.medapp.queue.RefusalReason
 import com.kert0n.medapp.queue.SyncCommand
 import com.kert0n.medapp.queue.SyncOperation
 import com.kert0n.medapp.queue.SyncOperationStatus
+import androidx.room.withTransaction
 import com.kert0n.medapp.storage.database.MedAppDatabase
 import com.kert0n.medapp.storage.database.observing
 import com.kert0n.medapp.storage.value.VocabularyDao
@@ -14,8 +15,9 @@ import kotlin.uuid.Uuid
 import kotlinx.coroutines.flow.Flow
 
 /**
- * Строки очереди для тех, кто их ставит и читает: поставить, найти, по статусу, сменить статус,
- * назвать нечитаемые. Транзакции работника — взятие в отправку и применение исхода с его
+ * Строки очереди для тех, кто их ставит и читает: поставить, найти, по статусу, назвать
+ * нечитаемые, отметить разобранной. Состояние отправки меняют только переходы операции —
+ * дверь у [QueueRoomStorage]. Транзакции работника — взятие в отправку и применение исхода с его
  * эффектами — живут в [QueueRoomStorage].
  */
 class SyncOperationRoomRepository @Inject constructor(
@@ -42,22 +44,23 @@ class SyncOperationRoomRepository @Inject constructor(
             rows.mapNotNull { (it.toDomain(words) as? StoredSyncOperation.Readable)?.operation }
         }
 
-    override suspend fun settle(
-        id: Uuid,
-        status: SyncOperationStatus,
-        lastError: String?,
-        at: Instant?,
-        attempted: Boolean,
-        refusalReason: RefusalReason?
-    ) {
-        queue.settle(id, status, lastError, at, if (attempted) 1 else 0, refusalReason = refusalReason)
-    }
-
     override fun observeOutstanding(): Flow<List<StoredSyncOperation>> =
         database.observing("sync_operations", "sync_operation_dependencies") {
             val words = vocabulary.snapshot()
             queue.outstanding().map { it.toDomain(words) }
         }
+
+    override suspend fun stored(id: Uuid): StoredSyncOperation? = queue.find(id)?.toDomain(vocabulary.snapshot())
+
+    override suspend fun dismiss(id: Uuid, at: Instant): Boolean = database.withTransaction {
+        if (queue.dismiss(id, at) != 1) return@withTransaction false
+        // Зависимые, закрытые следом за этой (`SUPERSEDED`), — тем же решением: отдельно их не
+        // разбирают. Обход один, каждая операция в нём раз.
+        for (dependent in queue.dependentsOf(id)) {
+            if (dependent.refusalReason == RefusalReason.SUPERSEDED && dependent.dismissedAt == null) queue.dismiss(dependent.id, at)
+        }
+        true
+    }
 
     override suspend fun unreadable(): List<StoredSyncOperation.Unreadable> =
         queue.all().let { rows ->

@@ -17,6 +17,8 @@ import com.kert0n.medapp.domain.value.Quantity
 import com.kert0n.medapp.domain.value.QuantityUnit
 import com.kert0n.medapp.feature.course.CourseClosing
 import com.kert0n.medapp.feature.intake.IntakeConfirmation
+import com.kert0n.medapp.feature.intake.UnplannedIntakeRecording
+import java.time.Instant
 import com.kert0n.medapp.fixture.MOSCOW
 import com.kert0n.medapp.fixture.schedule
 import com.kert0n.medapp.fixture.ProbeAccounts
@@ -526,6 +528,33 @@ class SharedMedKitProbe {
     }
 
     /**
+     * **Гонка версии (PLAN J2.11).** Оба выпили из одной коробки, не видя друг друга: Анна —
+     * офлайн, Борис — и доставил первым. Связь у Анны: расход готовится по **свежему** чтению —
+     * `GET` приносит остаток и версию после Бориса, `sync` уходит с ней, и сервер списывает поверх,
+     * а не отвергает по устаревшей версии (C1 «Синхронизация», E3). Оба приёма — факты, оба учтены,
+     * ни одного отказа.
+     */
+    @Test
+    fun bothConsumeWithoutSeeingEachOtherAndBothIntakesLand(): Unit = runBlocking {
+        val shared = sharedShelfWithBorisTreated()
+        // У Анны коробка — как она её видела: 20 минус то, что успела узнать. Её приём — офлайн.
+        val annas = anna.scenarios().unplannedIntakeRecording.record(shared.box, twoPills(), Instant.now(), acknowledged = true)
+        val recorded = (annas as? UnplannedIntakeRecording.Outcome.Recorded) ?: throw AssertionError("приём Анны не записан: $annas")
+        // Борис доставил свой второй приём раньше: на сервере 16 и новая версия.
+        boris.confirm(shared.intakes[1], shared.box)
+        boris.drain()
+        assertAmount("16", serverAmount(shared.box))
+
+        anna.drain()
+
+        assertAmount("14", serverAmount(shared.box))
+        assertEquals(listOf(SyncOperationStatus.APPLIED), anna.statuses().distinct())
+        assertEquals(IntakeAccounting.REMOTE_APPLIED, anna.accountingOf(recorded.intake.id))
+        assertEquals(IntakeAccounting.REMOTE_APPLIED, boris.accountingOf(shared.intakes[1]))
+        assertAmount("14", requireNotNull(anna.packages.find(shared.box)).quantity.amount)
+    }
+
+    /**
      * Анна переставила полку в общую, куда Борис вступил **только на сервере**: у него на устройстве
      * этой полки нет. Снимок называет незнакомую полку — это не «подождать», а утрата доступа:
      * операция закрыта, а не отложена навсегда; коробки у Бориса нет, лечение без источника (E6).
@@ -587,9 +616,11 @@ class SharedMedKitProbe {
         private val reminderStore = com.kert0n.medapp.storage.notification.ReminderRoomRepository(database, database.reminders())
         private val withdrawal = com.kert0n.medapp.feature.notification.ReminderWithdrawal(reminderStore, transactions)
         private val promising = com.kert0n.medapp.feature.notification.ReminderPromising(reminderStore, com.kert0n.medapp.fixture.FakeSettings(), transactions)
+        private val calendar = CourseCalendar(database.intakeRepository(), packages, promising, withdrawal)
+        private val following = com.kert0n.medapp.feature.course.CourseFollowing(courses, packages, calendar, queue, transactions)
         private val confirmation = IntakeConfirmation(
-            database.intakeRepository(), courses, packages, transactions, queue, CourseClosing(courses, packages, queue, withdrawal),
-            CourseCalendar(database.intakeRepository(), packages, promising, withdrawal), withdrawal, clock
+            database.intakeRepository(), courses, packages, transactions, queue, CourseClosing(courses, following, withdrawal),
+            calendar, withdrawal, clock
         )
 
         fun scenarios() = Scenarios(database, clock.instant())

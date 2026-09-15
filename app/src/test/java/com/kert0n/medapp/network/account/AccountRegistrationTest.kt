@@ -1,5 +1,6 @@
 package com.kert0n.medapp.network.account
 
+import com.kert0n.medapp.network.account.AccessTokens
 import com.kert0n.medapp.network.server.ApiFailure
 import com.kert0n.medapp.network.server.MedAppApi
 import com.kert0n.medapp.network.server.REGISTRATION_TOKEN_HEADER
@@ -83,7 +84,8 @@ class AccountRegistrationTest {
             )
         ),
         stored,
-        registrationToken = "build-token"
+        registrationToken = "build-token",
+        tokens = AccessTokens(stored)
     )
 
     private val registrationTokens = mutableListOf<String?>()

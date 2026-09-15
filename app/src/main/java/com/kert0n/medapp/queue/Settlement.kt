@@ -108,8 +108,13 @@ class Settlement(val transition: Transition, effects: List<Effect> = emptyList()
          */
         data object Settled : Effect
 
-        /** Незакрытые зависимые закрываются [status], их приёмы получают [accounting]; и так до конца цепочки. */
-        data class Cascade(val status: SyncOperationStatus, val accounting: IntakeAccounting) : Effect
+        /**
+         * Незакрытые зависимые закрываются [close] — тем же переходом, каким закрывается своя
+         * операция, а не статусом и колонками, которые каскад сочинял бы сам, — их приёмы
+         * получают [accounting]; и так до конца цепочки. Отказ без причины и закрытие в
+         * незакрытый статус здесь так же невыразимы, как у [Transition.Close].
+         */
+        data class Cascade(val close: Transition.Close, val accounting: IntakeAccounting) : Effect
     }
 }
 
@@ -130,7 +135,7 @@ fun Delivery.settlement(command: SyncCommand): Settlement = when (this) {
     is Delivery.Refused -> Settlement(
         Settlement.Transition.Close.Refused(reason),
         listOf(Settlement.Effect.Account(IntakeAccounting.REMOTE_REFUSED)) + command.returned() + state.effects(command) +
-            Settlement.Effect.Cascade(SyncOperationStatus.REFUSED, IntakeAccounting.REMOTE_REFUSED) +
+            Settlement.Effect.Cascade(Settlement.Transition.Close.Refused(RefusalReason.SUPERSEDED), IntakeAccounting.REMOTE_REFUSED) +
             Settlement.Effect.Settled
     )
     is Delivery.Retry -> Settlement(
@@ -140,7 +145,7 @@ fun Delivery.settlement(command: SyncCommand): Settlement = when (this) {
         Settlement.Transition.Close.AccessLost,
         listOf(Settlement.Effect.Account(IntakeAccounting.REMOTE_REFUSED)) +
             listOfNotNull((command as? PackageSyncCommand)?.gone()) +
-            Settlement.Effect.Cascade(SyncOperationStatus.ACCESS_LOST, IntakeAccounting.REMOTE_REFUSED) +
+            Settlement.Effect.Cascade(Settlement.Transition.Close.AccessLost, IntakeAccounting.REMOTE_REFUSED) +
             Settlement.Effect.Settled
     )
 }

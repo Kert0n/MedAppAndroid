@@ -13,13 +13,15 @@ import com.kert0n.medapp.network.server.RawResponse
 import com.kert0n.medapp.queue.Delivery
 import com.kert0n.medapp.queue.PackageState
 import com.kert0n.medapp.queue.Preparation
+import com.kert0n.medapp.domain.course.PackageFollowing
 import com.kert0n.medapp.queue.QueueStorage
 import com.kert0n.medapp.queue.QueuedCommand
 import com.kert0n.medapp.queue.Settlement
 import com.kert0n.medapp.queue.StoredSyncOperation
 import com.kert0n.medapp.queue.SyncOperation
-import com.kert0n.medapp.queue.RefusalReason
+import com.kert0n.medapp.queue.SyncOperationState
 import com.kert0n.medapp.queue.SyncOperationStatus
+import com.kert0n.medapp.queue.readThisTransaction
 import com.kert0n.medapp.queue.Take
 import com.kert0n.medapp.queue.medkit.MedKitSyncCommand
 import com.kert0n.medapp.queue.pack.PackageSyncCommand
@@ -31,7 +33,6 @@ import com.kert0n.medapp.storage.course.CourseDao
 import com.kert0n.medapp.storage.database.MedAppDatabase
 import com.kert0n.medapp.storage.intake.IntakeDao
 import com.kert0n.medapp.storage.medkit.MedKitDao
-import com.kert0n.medapp.storage.course.followBox
 import com.kert0n.medapp.storage.medkit.loseAccess
 import com.kert0n.medapp.storage.pack.PackageDao
 import com.kert0n.medapp.storage.pack.applySnapshot
@@ -41,6 +42,7 @@ import com.kert0n.medapp.domain.value.Vocabulary
 import com.kert0n.medapp.storage.value.VocabularyDao
 import java.time.Instant
 import javax.inject.Inject
+import javax.inject.Provider
 import kotlin.uuid.Uuid
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.map
@@ -59,12 +61,17 @@ class QueueRoomStorage @Inject constructor(
     private val intakes: IntakeDao,
     private val medKits: MedKitDao,
     private val courses: CourseDao,
-    private val vocabulary: VocabularyDao
+    private val vocabulary: VocabularyDao,
+    /**
+     * Курс следует за коробкой — прикладной владелец реакции (PLAN D5); здесь ему дают транзакцию.
+     * Лениво, потому что он сам ставит команды через эту же очередь, и граф иначе замкнулся бы в кольцо.
+     */
+    private val following: Provider<PackageFollowing>
 ) : QueueStorage {
 
-    /** Room сообщает об изменении таблицы после коммита — то, что outbox и должен услышать. */
+    /** Room сообщает об изменении таблицы после коммита — то, что outbox и должен услышать; первое значение — наблюдатель встал. */
     override fun changes(): Flow<Unit> =
-        database.invalidationTracker.createFlow("sync_operations", emitInitialState = false).map { }
+        database.invalidationTracker.createFlow("sync_operations", emitInitialState = true).map { }
 
     override suspend fun enqueue(queued: QueuedCommand, shelf: Uuid, at: Instant): SyncOperation =
         queue.enqueue(queued.id, queued.command, at, queued.groupId, queued.dependsOn, medKitId = shelf)
@@ -81,23 +88,21 @@ class QueueRoomStorage @Inject constructor(
     /**
      * Свежее состояние ложится в базу первым, предусловия берутся у пачки после этого — в той же
      * транзакции: версии, подтверждённый остаток и своя бронь — то, что у сервера сейчас (PLAN
-     * E2, E3). Второй раз запрос не собирается: `freeze` не трогает строку, где он уже есть.
+     * E2, E3). Берётся только ожидающая или отправлявшаяся — это предусловие переходов
+     * [SyncOperation.taken] и [SyncOperation.resent]; второй раз запрос не собирается.
      */
     override suspend fun take(id: Uuid, fresh: PackageSnapshot?, at: Instant): Take? = database.withTransaction {
         val words = vocabulary.snapshot()
         val stored = queue.find(id)?.toDomain(words) as? StoredSyncOperation.Readable
             ?: return@withTransaction null
         val operation = stored.operation
-        // Берётся только ожидающая или отправлявшаяся: закрытая и получившая ответ — нет.
-        if (operation.status != SyncOperationStatus.PENDING && operation.status != SyncOperationStatus.SENDING) {
-            return@withTransaction null
-        }
+        if (operation.status.isClosed || operation.awaitsApplication) return@withTransaction null
         val command = operation.command
         // Унесённую домой коробку человек мог уже выбросить у себя. Серверу она всё равно должна
         // исчезнуть, а свежий снимок, положенный в базу, завёл бы её обратно: он даёт только версию.
         val carriedAway = command is PackageSyncCommand.Withdraw && packages.find(command.packageId) == null
         if (!carriedAway) fresh?.let { layDown(it, at) }
-        if (operation.prepared == null) {
+        val sending = if (operation.prepared == null) {
             val request = when (command) {
                 // Снимают по версии полки, а её подтверждённое число запоминается в запросе: из него
                 // и из сделанного дома сложится остаток, когда полка ответит (PLAN E6).
@@ -120,35 +125,29 @@ class QueueRoomStorage @Inject constructor(
                 is MedKitSyncCommand -> command.toMedKitPreparedRequest(at)
                 else -> command.unknownRoot()
             }
-            val columns = request.toStorageColumns()
-            val frozen = queue.freeze(
-                id = id,
-                method = columns.method,
-                path = columns.path,
-                query = columns.query,
-                body = columns.body,
-                drugVersion = columns.drugVersion,
-                claimsVersion = columns.claimsVersion,
-                quantityBefore = columns.quantityBefore,
-                mineBefore = columns.mineBefore,
-                unitId = columns.unitId,
-                preparedAt = columns.at
-            )
-            // Ноль строк — операцию закрыли или взяли между чтением и взятием: не наша.
-            if (frozen == 0) return@withTransaction null
+            operation.taken(request)
         } else {
-            if (queue.markSending(id) == 0) return@withTransaction null
-        }
-        (queue.find(id)?.toDomain(words) as? StoredSyncOperation.Readable)?.operation?.let { Take.Sending(it) }
+            operation.resent()
+        } ?: return@withTransaction null
+        save(sending, was = operation.status)
+        Take.Sending(sending)
     }
 
-    override suspend fun answered(id: Uuid, answer: RawResponse, at: Instant) {
-        queue.answered(id, answer.status, answer.body, at)
+    override suspend fun answered(id: Uuid, answer: RawResponse, at: Instant) = database.withTransaction {
+        val operation = operationOf(id) ?: return@withTransaction
+        val answered = operation.answered(answer, at) ?: return@withTransaction
+        save(answered, was = operation.status)
     }
 
-    override suspend fun defer(id: Uuid, reason: String, at: Instant, notBefore: Instant) {
-        queue.defer(id, reason, at, notBefore)
+    override suspend fun defer(id: Uuid, reason: String, at: Instant, notBefore: Instant) = database.withTransaction {
+        val operation = operationOf(id) ?: return@withTransaction
+        val deferred = operation.deferred(reason, at, notBefore) ?: return@withTransaction
+        save(deferred, was = operation.status)
     }
+
+    /** Операция после перехода — в строку, которую прочитали этой же транзакцией (F5). */
+    private suspend fun save(operation: SyncOperation, was: SyncOperationStatus) =
+        (queue.save(operation.id, operation.state, operation.prepared?.toStorageColumns(), was) == 1).readThisTransaction("операция")
 
     /** Подготовка закрыла операцию сама: истина по пачке уже в базе — она только что легла свежим снимком. */
     private suspend fun closedByPreparation(operation: SyncOperation, delivery: Delivery, at: Instant): Take {
@@ -157,27 +156,27 @@ class QueueRoomStorage @Inject constructor(
     }
 
     /**
-     * Переход и его эффекты одной транзакцией. Закрытие одно: строка, которую уже закрыли, второй
-     * раз не закрывается, и следствий у второго закрытия нет — условие стоит в самом запросе.
+     * Переход и его эффекты одной транзакцией. Что переход меняет и из какого статуса возможен,
+     * решает состояние операции ([SyncOperationState]); неприменимый — `null`, и следствий у него
+     * нет: закрытая второй раз не закрывается. Строка, которую нечем прочитать, несёт то же
+     * состояние и закрывается тем же переходом; повторить или переподготовить её нечем.
      */
     override suspend fun settle(id: Uuid, settlement: Settlement, at: Instant) = database.withTransaction {
-        val changed = when (val transition = settlement.transition) {
-            // Закрытая операция не повторяется, а счёт попыток — вход задержки и только он:
-            // закрытию нечего им двигать (PLAN E2, E3).
-            is Settlement.Transition.Close -> queue.settle(
-                id, transition.status, transition.refusalReason?.name, at, attempted = 0,
-                refusalReason = transition.refusalReason
-            )
+        val row = queue.find(id) ?: return@withTransaction
+        val stored = row.toDomain(vocabulary.snapshot())
+        val after: SyncOperationState = when (val transition = settlement.transition) {
+            is Settlement.Transition.Close -> stored.state.closed(transition, at)
             is Settlement.Transition.Reprepare ->
-                queue.reprepare(id, transition.lastError, at, transition.notBefore)
-            is Settlement.Transition.Retry -> queue.settle(
-                id, SyncOperationStatus.PENDING, transition.lastError, at,
-                attempted = if (transition.attempted) 1 else 0,
-                notBefore = transition.notBefore,
-                outcomeUnknown = if (transition.outcomeUnknown) 1 else 0
+                (stored as? StoredSyncOperation.Readable)?.state?.reprepared(transition.lastError, at, transition.notBefore)
+            is Settlement.Transition.Retry -> (stored as? StoredSyncOperation.Readable)?.state?.retried(
+                transition.lastError, at, transition.attempted, transition.outcomeUnknown, transition.notBefore
             )
-        }
-        if (changed == 0) return@withTransaction
+        } ?: return@withTransaction
+        // Переподготовка сбрасывает запрос; остальные переходы его не трогают.
+        val prepared = row.operation.prepared.takeIf { after.hasRequest }
+        // Пишется та строка, которую прочитали, — её статус **как он лежит**: у порченой строки
+        // прочитанное состояние могло взять другой статус, а условие записи говорит о колонке.
+        (queue.save(id, after, prepared, was = row.operation.status) == 1).readThisTransaction("операция")
         for (effect in settlement.effects) apply(id, effect, at)
     }
 
@@ -192,7 +191,7 @@ class QueueRoomStorage @Inject constructor(
             is Settlement.Effect.MedKitLeft -> left(effect.medKitId, at)
             is Settlement.Effect.MedKitPublished -> publishedOnServer(effect.medKitId, at)
             is Settlement.Effect.Account -> intakes.setAccounting(id, effect.accounting)
-            is Settlement.Effect.Cascade -> cascade(id, effect)
+            is Settlement.Effect.Cascade -> cascade(id, effect, at)
             is Settlement.Effect.Settled -> settled(id)
             is Settlement.Effect.Withdrawn -> withdrawn(id, effect.packageId, at)
             is Settlement.Effect.Returned -> returned(effect.packageId, effect.medKitId)
@@ -216,8 +215,12 @@ class QueueRoomStorage @Inject constructor(
             PackageAfter.Left(pkg)
         }
         when (after) {
-            is PackageAfter.Left -> packages.save(after.pkg, PackageSyncState(packageId))
-            is PackageAfter.Ended -> packages.end(after.ending, courses, words, at)
+            is PackageAfter.Left -> {
+                packages.save(after.pkg, PackageSyncState(packageId))
+                // Число у коробки другое, чем с ним уносили: лечение следует за ним (PLAN D5, E6).
+                following.get().follow(packageId, at)
+            }
+            is PackageAfter.Ended -> packages.end(after.ending, following.get(), courses, at)
         }
     }
 
@@ -236,8 +239,8 @@ class QueueRoomStorage @Inject constructor(
      */
     private suspend fun sentFrom(id: Uuid): Quantity? {
         val operation = operationOf(id) ?: return null
-        return when (operation.command) {
-            is PackageSyncCommand.Withdraw -> (operation.command as PackageSyncCommand.Withdraw).carried
+        return when (val command = operation.command) {
+            is PackageSyncCommand.Withdraw -> command.carried
             is PackageSyncCommand.Create -> operation.prepared?.quantityBefore
             else -> null
         }
@@ -322,7 +325,7 @@ class QueueRoomStorage @Inject constructor(
     private suspend fun ended(packageId: Uuid, at: Instant) {
         val words = vocabulary.snapshot()
         val pkg = packages.find(packageId)?.toDomain(words) ?: return
-        packages.end(pkg.ended(), courses, words, at)
+        packages.end(pkg.ended(), following.get(), courses, at)
     }
 
     /**
@@ -339,13 +342,13 @@ class QueueRoomStorage @Inject constructor(
         for (row in packages.ofMedKit(medKitId)) {
             val pkg = row.toDomain(words)
             when {
-                transferTo == null -> packages.end(pkg.ended(), courses, words, at)
+                transferTo == null -> packages.end(pkg.ended(), following.get(), courses, at)
                 // Едет коробка вместе с полкой, а не по своему решению, поэтому ждущая
                 // собственного ответа переезжает наравне со всеми. Пометку снимет та команда,
                 // которая её поставила: у переехавших это как раз закрываемая сейчас команда
                 // полки, и снимет она их сама (PLAN E1).
                 target != null -> packages.save(pkg.movedByAnswer(target), row.pack.syncState())
-                else -> packages.end(pkg.ended(), courses, words, at)
+                else -> packages.end(pkg.ended(), following.get(), courses, at)
             }
         }
         medKits.delete(medKitId)
@@ -356,7 +359,7 @@ class QueueRoomStorage @Inject constructor(
      * уходит следом. Курс и его история остаются (E6).
      */
     private suspend fun left(medKitId: Uuid, at: Instant) =
-        medKits.loseAccess(medKitId, packages, courses, vocabulary.snapshot(), at)
+        medKits.loseAccess(medKitId, packages, following.get(), courses, vocabulary.snapshot(), at)
 
     /**
      * Разрешённый снимок поверх подтверждённого остатка и броней; разрешать здесь нечего.
@@ -372,35 +375,28 @@ class QueueRoomStorage @Inject constructor(
         if (carried != null && atHome != null) {
             val row = packages.find(snapshot.pack.id) ?: return
             val laid = row.toDomain(words)
-            if (laid.quantity.unit != carried.unit || atHome.unit != carried.unit) return
-            when (val after = laid.rebased(from = carried, onto = atHome)) {
-                is PackageAfter.Left -> packages.save(after.pkg, row.pack.syncState())
-                is PackageAfter.Ended -> return packages.end(after.ending, courses, words, at)
+            // Единицы разошлись — сводить нечего; коробка всё равно изменилась снимком, и лечение следует.
+            if (laid.quantity.unit == carried.unit && atHome.unit == carried.unit) {
+                when (val after = laid.rebased(from = carried, onto = atHome)) {
+                    is PackageAfter.Left -> packages.save(after.pkg, row.pack.syncState())
+                    is PackageAfter.Ended -> return packages.end(after.ending, following.get(), courses, at)
+                }
             }
         }
-        followTheBox(snapshot.pack.id, words, at)
+        following.get().follow(snapshot.pack.id, at)
     }
 
     /**
-     * Курс следует за коробкой той же транзакцией, что кладёт ответ сервера: чужой расход или бронь,
-     * увиденные ответом, зажимают выделения, и бронь уезжает разницей — каждая своей пачке и её
-     * полке (PLAN D5, E4).
+     * Зависимость значит «нужен эффект»: не будет его у родителя — не будет и у зависимых, и у их
+     * зависимых. Закрывается всё незакрытое ниже по графу — одним чтением, каждая операция раз.
      */
-    private suspend fun followTheBox(packageId: Uuid, words: Vocabulary, at: Instant) =
-        queue.enqueueClaimChanges(courses.followBox(packageId, packages, intakes, queue, words, at), packages, at)
-
-    /** Зависимость значит «нужен эффект»: не будет его у родителя — не будет и у зависимых, и у их зависимых. */
-    private suspend fun cascade(id: Uuid, effect: Settlement.Effect.Cascade) {
-        val pending = ArrayDeque(listOf(id))
-        while (pending.isNotEmpty()) {
-            for (dependent in queue.unclosedDependentsOf(pending.removeFirst())) {
-                // Зависимая закрывается тем же статусом; причина — значением, и только у отказа.
-                val superseded = RefusalReason.SUPERSEDED.takeIf { effect.status == SyncOperationStatus.REFUSED }
-                queue.settle(dependent, effect.status, RefusalReason.SUPERSEDED.name, at = null, attempted = 0, refusalReason = superseded)
-                intakes.setAccounting(dependent, effect.accounting)
-                settled(dependent)
-                pending += dependent
-            }
+    private suspend fun cascade(id: Uuid, effect: Settlement.Effect.Cascade, at: Instant) {
+        for (dependent in queue.dependentsOf(id)) {
+            // Зависимая закрывается тем же переходом, что и своя; закрытая — не применим.
+            val closed = dependent.toState().closed(effect.close, at) ?: continue
+            (queue.save(dependent.id, closed, dependent.prepared, was = dependent.status) == 1).readThisTransaction("зависимая операция")
+            intakes.setAccounting(dependent.id, effect.accounting)
+            settled(dependent.id)
         }
     }
 }

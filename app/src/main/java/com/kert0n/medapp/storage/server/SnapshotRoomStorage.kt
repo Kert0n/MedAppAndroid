@@ -5,11 +5,11 @@ import com.kert0n.medapp.di.ArrivedMedKitName
 import com.kert0n.medapp.domain.medkit.MedKit
 import com.kert0n.medapp.queue.ServerKnowledge
 import com.kert0n.medapp.queue.ServerSnapshot
+import com.kert0n.medapp.domain.course.PackageFollowing
 import com.kert0n.medapp.queue.SnapshotStorage
 import com.kert0n.medapp.storage.course.CourseDao
 import com.kert0n.medapp.storage.database.MedAppDatabase
 import com.kert0n.medapp.storage.medkit.MedKitDao
-import com.kert0n.medapp.storage.course.followBox
 import com.kert0n.medapp.storage.intake.IntakeDao
 import com.kert0n.medapp.storage.medkit.loseAccess
 import com.kert0n.medapp.storage.medkit.toStorageEntity
@@ -19,6 +19,7 @@ import com.kert0n.medapp.storage.pack.end
 import com.kert0n.medapp.storage.value.VocabularyDao
 import java.time.Instant
 import javax.inject.Inject
+import javax.inject.Provider
 import kotlin.uuid.Uuid
 
 /**
@@ -40,7 +41,12 @@ class SnapshotRoomStorage @Inject constructor(
     private val intakes: IntakeDao,
     private val vocabulary: VocabularyDao,
     private val queue: SyncOperationDao,
-    @ArrivedMedKitName private val arrivedName: String
+    @ArrivedMedKitName private val arrivedName: String,
+    /**
+     * Курс следует за коробкой — прикладной владелец реакции (PLAN D5); здесь ему дают транзакцию.
+     * Лениво, потому что он сам пишет через хранение, и граф иначе замкнулся бы в кольцо.
+     */
+    private val following: Provider<PackageFollowing>
 ) : SnapshotStorage {
 
     override suspend fun serverKnows(): ServerKnowledge = database.withTransaction {
@@ -81,7 +87,7 @@ class SnapshotRoomStorage @Inject constructor(
             packages.applySnapshot(resolved, observedAt = at)
             // Курс следует за коробкой той же транзакцией: чужой расход или бронь зажимают
             // выделения, и бронь уезжает разницей — каждая своей пачке (PLAN D5, E4).
-            queue.enqueueClaimChanges(courses.followBox(packageId, packages, intakes, queue, words, at), packages, at)
+            following.get().follow(packageId, at)
         }
         // «Сервер знал, и ждать нечего» посчитано до запроса, а применяется после него — и за это
         // время человек мог унести коробку домой, пометить её или сделать её полку местной.
@@ -94,11 +100,11 @@ class SnapshotRoomStorage @Inject constructor(
         for (packageId in snapshot.gonePackages) {
             if (packageId !in knownPackages) continue
             val pkg = packages.find(packageId)?.toDomain(words) ?: continue
-            packages.end(pkg.ended(), courses, words, at)
+            packages.end(pkg.ended(), following.get(), courses, at)
         }
         for (medKitId in snapshot.goneMedKits) {
             if (medKitId !in knownMedKits) continue
-            medKits.loseAccess(medKitId, packages, courses, words, at)
+            medKits.loseAccess(medKitId, packages, following.get(), courses, words, at)
         }
     }
 }

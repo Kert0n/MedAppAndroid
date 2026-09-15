@@ -214,6 +214,18 @@ class MedAppDatabaseMigrationTest {
             listOf(listOf("index_intakes_answered_at")),
             rows("SELECT name FROM sqlite_master WHERE type = 'index' AND name = 'index_intakes_answered_at'")
         )
+        // Растущие таблицы сверка читает по индексу, а не перебором (PLAN D8).
+        assertEquals(
+            listOf(
+                listOf("index_coverage_reductions_at"),
+                listOf("index_intakes_status_scheduled_at"),
+                listOf("index_sync_operations_med_kit_id")
+            ),
+            rows(
+                "SELECT name FROM sqlite_master WHERE type = 'index' AND name IN " +
+                    "('index_coverage_reductions_at', 'index_intakes_status_scheduled_at', 'index_sync_operations_med_kit_id') ORDER BY name"
+            )
+        )
         v3.close()
     }
 

@@ -134,7 +134,8 @@ class CourseMedicine(sources: List<CourseSource> = emptyList()) {
     internal fun coverage(
         dose: Dose,
         remaining: List<ScheduledOccurrence>,
-        availability: Availability
+        availability: Availability,
+        zone: java.time.ZoneId
     ): CourseCoverage {
         val capacities = capacities(dose, availability).associateBy { it.pkg }
         val required = Doses(remaining.size)
@@ -145,6 +146,7 @@ class CourseMedicine(sources: List<CourseSource> = emptyList()) {
             coveredDoses = covered,
             coveredUntil = remaining.getOrNull(covered.count - 1)?.at,
             firstUncoveredAt = remaining.getOrNull(covered.count)?.at,
+            zone = zone,
             // Отключённый источник — строкой с причиной: ничего не даёт, но виден (PLAN D5).
             perSource = sources.map { source ->
                 val capacity = capacities[source.pkg]
@@ -288,6 +290,9 @@ class CourseMedicine(sources: List<CourseSource> = emptyList()) {
     ) {
         val covers: Doses get() = minOf(allocated, whole)
     }
+
+    /** Тот же состав без выделений: точка отсчёта для разницы броней — до начала и после конца (PLAN D5). */
+    internal fun unallocated(): CourseMedicine = withSources(sources.map { it.copy(allocatedDoses = 0.doses) })
 
     private fun withSources(sources: List<CourseSource>): CourseMedicine = CourseMedicine(sources)
 

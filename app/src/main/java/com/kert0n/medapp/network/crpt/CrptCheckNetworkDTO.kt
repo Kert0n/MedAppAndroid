@@ -1,5 +1,6 @@
 package com.kert0n.medapp.network.crpt
 
+import com.kert0n.medapp.domain.scan.DataMatrixCode
 import kotlinx.serialization.Serializable
 
 /**
@@ -65,10 +66,19 @@ data class CrptPharmacyNetworkDTO(
 @Serializable
 data class CrptAttributeNetworkDTO(val label: String? = null, val value: String? = null)
 
-/** Тело запроса: код как есть под `{FNC1}` и вид кода — только `datamatrix` (PLAN C1). */
+/**
+ * Тело запроса: код как есть под литеральным `{FNC1}` и вид кода — только `datamatrix` (PLAN C1,
+ * H5). Префикс — формат чужого API, и кладёт его этот маппер, а не величина: смена формата CRPT
+ * правит сетевую границу, а не домен. Правило «байт в байт» держит тест тела запроса.
+ */
 @Serializable
 data class CrptCheckRequestNetworkDTO(val code: String, val codeType: String) {
     companion object {
         const val DATA_MATRIX = "datamatrix"
+
+        /** Литерал из шести символов, а не управляющий байт — так ждёт реестр. */
+        const val FNC1 = "{FNC1}"
+
+        fun of(code: DataMatrixCode): CrptCheckRequestNetworkDTO = CrptCheckRequestNetworkDTO(FNC1 + code.text, DATA_MATRIX)
     }
 }

@@ -182,7 +182,7 @@ class ReportRoomRepositoryTest {
         assertTrue(spent().isEmpty)
 
         scenarios.intakeConfirmation.confirm(items(id).first().id, PACK, dose("2"), now).confirmed()
-        database.courseRepository().rename(id, "Парацетамол от простуды", null)
+        assertTrue(database.courseRepository().rename(id, "Парацетамол от простуды", null))
 
         assertEquals("Парацетамол от простуды", spent().episodes.single().record.title)
     }
@@ -239,7 +239,7 @@ class ReportRoomRepositoryTest {
         scenarios.unplannedIntakeRecording.record(OTHER_PACK, dose("1"), now)
         assertEquals(1, summary.first().packages)
 
-        database.packageRepository().mark(PACK, PackageStatus.REMOVING, by = Uuid.random())
+        assertTrue(database.packageRepository().mark(PACK, PackageStatus.REMOVING, by = Uuid.random()))
         assertEquals(0, summary.first().packages)
     }
 

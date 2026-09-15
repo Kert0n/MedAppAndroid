@@ -25,35 +25,57 @@ class FakeNotifier(var allowed: Boolean = true) : Notifier {
     /** Ключи, у которых повода больше нет: текст собрать не из чего. */
     val vanished = mutableSetOf<NotificationKey>()
 
+    /**
+     * Что успевает случиться, пока система гасит карточку: владелец доставки в этот миг держит
+     * прочитанное до системы, и гонку в этом окне можно смоделировать точно.
+     */
+    var onDismiss: (suspend (NotificationKey) -> Unit)? = null
+
+    /** То же для показа: человек отвечает, пока система рисует карточку. */
+    var onShow: (suspend (Reminder) -> Unit)? = null
+
     override suspend fun show(reminder: Reminder): Delivery {
         if (reminder.key in failing) error("показ сорвался: ${reminder.key}")
         if (!allowed) return Delivery.NOT_ALLOWED
         if (reminder.key in vanished) return Delivery.SUBJECT_GONE
+        onShow?.invoke(reminder)
         shown += reminder
         return Delivery.SHOWN
     }
 
+    /** Ключи, первое гашение которых бросает: система не приняла отмену, карточка осталась висеть. */
+    val dismissFailingOnce = mutableSetOf<NotificationKey>()
+
     override suspend fun dismiss(key: NotificationKey) {
+        if (dismissFailingOnce.remove(key)) error("гашение сорвалось: $key")
         dismissed += key
+        onDismiss?.invoke(key)
     }
 }
 
-/** Один будильник: последняя постановка побеждает, `stopWaking` его снимает. */
+/**
+ * Постановки, какими их видит порт: [exactAt] и [inexactAt] — что стоит у каждой точности,
+ * точная просьба и приблизительная — разные просьбы к системе, и одна другую не заменяет
+ * (PLAN D8). [wakeAt] — ближайшая из двух, то, к чему система разбудит первым; [exact] — её
+ * точность.
+ */
 class FakeReminders(override val canBeExact: Boolean = true) : ReminderAlarms {
-    var wakeAt: Instant? = null
+    var exactAt: Instant? = null
         private set
-    var exact: Boolean = false
+    var inexactAt: Instant? = null
         private set
     val settings = mutableListOf<Instant>()
 
+    val wakeAt: Instant? get() = listOfNotNull(exactAt, inexactAt).minOrNull()
+    val exact: Boolean get() = exactAt != null && exactAt == wakeAt
+
     override suspend fun wakeAt(at: Instant, exact: Boolean) {
-        wakeAt = at
-        this.exact = exact
+        if (exact) exactAt = at else inexactAt = at
         settings += at
     }
 
-    override suspend fun stopWaking() {
-        wakeAt = null
+    override suspend fun stopWaking(exact: Boolean) {
+        if (exact) exactAt = null else inexactAt = null
     }
 }
 
