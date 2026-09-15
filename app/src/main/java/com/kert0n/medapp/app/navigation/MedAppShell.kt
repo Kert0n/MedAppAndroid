@@ -1,5 +1,6 @@
 package com.kert0n.medapp.app.navigation
 
+import androidx.compose.foundation.layout.consumeWindowInsets
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material3.Icon
@@ -8,87 +9,80 @@ import androidx.compose.material3.NavigationBarItem
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.getValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
-import androidx.navigation.NavController
-import androidx.navigation.NavDestination
-import androidx.navigation.NavDestination.Companion.hasRoute
-import androidx.navigation.NavDestination.Companion.hierarchy
-import androidx.navigation.NavGraph.Companion.findStartDestination
-import androidx.navigation.NavHostController
-import androidx.navigation.compose.NavHost
-import androidx.navigation.compose.composable
-import androidx.navigation.compose.currentBackStackEntryAsState
-import androidx.navigation.compose.rememberNavController
+import androidx.compose.ui.text.style.TextOverflow
+import androidx.navigation3.runtime.NavKey
+import androidx.navigation3.runtime.entryProvider
+import androidx.navigation3.ui.NavDisplay
 import com.kert0n.medapp.R
 import com.kert0n.medapp.ui.EmptyState
 
 /**
- * Оболочка приложения: пять мест внизу и содержимое над ними. Место, где стоит человек, живёт в
- * [NavHostController] и переживает поворот и смерть процесса — его хранит навигация, а не экран.
+ * Оболочка приложения: пять мест внизу и содержимое над ними. Где человек стоит и как глубоко —
+ * живёт в [TabStacks] и переживает поворот и смерть процесса.
+ *
+ * **Своего движения у оболочки нет.** Переходы играет библиотека, и возврат выглядит одинаково,
+ * пальцем его сделали или кнопкой. Собственная система движения поверх библиотеки, которая
+ * ведёт предиктивный жест по-своему, — это борьба с библиотекой, и прошлый заход на ней и
+ * кончился (отклонённый PR #33).
+ *
+ * **Отступы системы оболочка не только отдаёт, но и поглощает.** `Modifier.padding(padding)`
+ * оставляет место под строкой состояния и полосой жестов — и только; сами вставки остаются
+ * видны тому, кто внутри, и свой `Scaffold` каждого экрана берёт их второй раз. Беда одна на
+ * все экраны, поэтому и лечится она здесь.
  */
 @Composable
-fun MedAppShell(
-    modifier: Modifier = Modifier,
-    navController: NavHostController = rememberNavController()
-) {
+fun MedAppShell(modifier: Modifier = Modifier, stacks: TabStacks = rememberTabStacks()) {
     Scaffold(
         modifier = modifier.fillMaxSize(),
-        bottomBar = { MedAppBottomBar(navController) }
+        bottomBar = { Places(stacks) }
     ) { padding ->
-        MedAppNavHost(navController, Modifier.padding(padding))
+        NavDisplay(
+            entries = stacks.entries(places),
+            onBack = stacks::back,
+            modifier = Modifier.padding(padding).consumeWindowInsets(padding)
+        )
     }
 }
 
 /**
- * Переключение мест. Повторное нажатие на своё место возвращает к его началу, а переход на чужое
- * сохраняет, где человек был: он вернётся туда же, а не к началу (`saveState`/`restoreState`).
+ * Что показывает каждое место. Пока своего экрана у места нет, за ним стоит общее «пусто» — то
+ * самое, которое потом покажет настоящий экран, когда показывать действительно нечего.
+ */
+private val places = entryProvider<NavKey> {
+    for (place in Place.entries) {
+        entry(place.key) { NotReadyYet() }
+    }
+}
+
+/**
+ * Переключение мест. Повторное нажатие на своё место возвращает его к началу, а переход на
+ * чужое сохраняет, где человек был: он вернётся туда же, а не к началу.
  */
 @Composable
-private fun MedAppBottomBar(navController: NavController) {
-    val entry by navController.currentBackStackEntryAsState()
-    val here = entry?.destination
+private fun Places(stacks: TabStacks) {
     NavigationBar {
-        for (destination in Destination.entries) {
-            val selected = here?.leadsTo(destination) == true
+        for (place in Place.entries) {
+            val selected = stacks.place == place.key
             NavigationBarItem(
                 selected = selected,
-                onClick = { navController.goTo(destination) },
-                icon = { Icon(painterResource(destination.icon(selected)), contentDescription = null) },
-                label = { Text(stringResource(destination.label)) }
+                onClick = { if (selected) stacks.backToRoot(place.key) else stacks.go(place.key) },
+                icon = { Icon(painterResource(place.icon(selected)), contentDescription = null) },
+                // Подпись в одну строку: на 360 dp пять мест делят экран по 72 dp, и подпись из
+                // двух строк полоса обрезала бы (Sm29).
+                label = {
+                    Text(
+                        stringResource(place.label),
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis
+                    )
+                }
             )
         }
     }
 }
 
-/**
- * Содержимое мест. Экранов ещё нет — за каждым стоит общее «пусто», то самое, которое потом
- * покажут настоящие экраны, когда показывать действительно нечего.
- */
-@Composable
-private fun MedAppNavHost(navController: NavHostController, modifier: Modifier = Modifier) {
-    NavHost(navController, startDestination = Route.MedKits, modifier = modifier) {
-        composable<Route.MedKits> { NotReadyYet() }
-        composable<Route.Plan> { NotReadyYet() }
-        composable<Route.Scanner> { NotReadyYet() }
-        composable<Route.Analytics> { NotReadyYet() }
-        composable<Route.Settings> { NotReadyYet() }
-    }
-}
-
 @Composable
 private fun NotReadyYet() = EmptyState(text = stringResource(R.string.screen_not_ready))
-
-/** Своё ли это место — по маршруту, а не по подписи: подпись переводится, маршрут нет. */
-private fun NavDestination.leadsTo(destination: Destination): Boolean =
-    hierarchy.any { it.hasRoute(destination.route::class) }
-
-private fun NavController.goTo(destination: Destination) {
-    navigate(destination.route) {
-        popUpTo(graph.findStartDestination().id) { saveState = true }
-        launchSingleTop = true
-        restoreState = true
-    }
-}

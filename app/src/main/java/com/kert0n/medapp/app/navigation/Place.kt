@@ -13,38 +13,44 @@ import com.kert0n.medapp.R
  * значок сам `Icon` по `LocalContentColor`, поэтому второго набора цветов для тёмной темы нет.
  *
  * Значка два: у выбранного места он залит — так Material отличает, где человек стоит, не одним
- * лишь цветом. Залитого варианта может и не быть: QR-значки — геометрический узор, и заливать в
- * них нечего, поэтому [iconSelected] пуст, а не повторяет обычный файлом-двойником. Выгружены из
- * Material Symbols (`scripts/add-icon.mjs`).
+ * лишь цветом. Залитого варианта может и не быть: у `qr_code_scanner` он совпадает с обычным —
+ * узор заливать нечем (issue #34), поэтому [iconSelected] пуст, а не повторяет файл-двойник.
  *
- * Порядок объявления — порядок на экране.
+ * Подписи короткие: на большом экране с поднятым масштабом пять мест делят ширину по 80 dp, и
+ * «Аналитика» с «Настройками» обрезались многоточием (`BigScaled`). Порядок объявления —
+ * порядок на экране.
  */
-enum class Destination(
-    val route: Route,
+enum class Place(
+    val key: Screen,
     @param:StringRes val label: Int,
     @param:DrawableRes val icon: Int,
     @param:DrawableRes val iconSelected: Int? = null
 ) {
     MED_KITS(
-        Route.MedKits, R.string.tab_med_kits,
+        Screen.MedKits, R.string.tab_med_kits,
         R.drawable.ic_tab_med_kits, R.drawable.ic_tab_med_kits_filled
     ),
     PLAN(
-        Route.Plan, R.string.tab_plan,
+        Screen.Plan, R.string.tab_plan,
         R.drawable.ic_tab_plan, R.drawable.ic_tab_plan_filled
     ),
-    // У `qr_code_scanner` залитого варианта в наборе нет: он совпадает с обычным.
-    SCANNER(Route.Scanner, R.string.tab_scanner, R.drawable.ic_tab_scanner),
-    ANALYTICS(
-        Route.Analytics, R.string.tab_analytics,
+    SCANNER(Screen.Scanner, R.string.tab_scanner, R.drawable.ic_tab_scanner),
+    REPORTS(
+        Screen.Reports, R.string.tab_reports,
         R.drawable.ic_tab_analytics, R.drawable.ic_tab_analytics_filled
     ),
-    SETTINGS(
-        Route.Settings, R.string.tab_settings,
+    OPTIONS(
+        Screen.Options, R.string.tab_options,
         R.drawable.ic_tab_settings, R.drawable.ic_tab_settings_filled
     );
 
     /** Где человек стоит, видно и формой значка, а не только цветом (PLAN H3). */
     @DrawableRes
     fun icon(selected: Boolean): Int = if (selected) iconSelected ?: icon else icon
+
+    companion object {
+
+        /** Место, с которого приложение начинается и в которое возвращает последний возврат. */
+        val first: Place get() = entries.first()
+    }
 }
