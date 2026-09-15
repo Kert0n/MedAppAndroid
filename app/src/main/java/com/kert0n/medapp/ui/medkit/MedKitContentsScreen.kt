@@ -358,7 +358,7 @@ private fun RemovalDialog(
 ) {
     val medKit = state.medKit ?: return
     if (state.removing == RemovalStep.PICKING_TARGET) {
-        TargetDialog(state.others, onDismiss, onRemove)
+        TargetDialog(state.others, state.removalRefusal, onDismiss, onRemove)
         return
     }
     val count = medKit.contents.packages
@@ -405,10 +405,14 @@ private fun RemovalDialog(
     )
 }
 
-/** Куда перенести лекарства. Пока полка не выбрана, переносить нечего — и кнопка молчит. */
+/**
+ * Куда перенести лекарства. Пока полка не выбрана, переносить нечего — и кнопка молчит. Отказ
+ * цели показывается здесь же: другую полку выбирают там, где выбирали эту.
+ */
 @Composable
 private fun TargetDialog(
     others: List<MedKitPresentationDTO>,
+    refusal: RemovalRefusal?,
     onDismiss: () -> Unit,
     onRemove: (Uuid?) -> Unit
 ) {
@@ -433,6 +437,7 @@ private fun TargetDialog(
                         Text(other.name)
                     }
                 }
+                refusal?.let { Text(stringResource(it.text), color = MaterialTheme.colorScheme.error) }
             }
         },
         confirmButton = {

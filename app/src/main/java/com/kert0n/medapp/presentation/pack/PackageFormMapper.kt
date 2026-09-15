@@ -3,6 +3,7 @@ package com.kert0n.medapp.presentation.pack
 import com.kert0n.medapp.domain.pack.PackageFacts
 import com.kert0n.medapp.domain.pack.PackageProjection
 import com.kert0n.medapp.domain.pack.PackageSharedFacts
+import com.kert0n.medapp.domain.value.DEFAULT_CURRENCY
 import com.kert0n.medapp.domain.value.Dose
 import com.kert0n.medapp.domain.value.Quantity
 import com.kert0n.medapp.domain.value.Vocabulary
@@ -15,8 +16,6 @@ import com.kert0n.medapp.presentation.value.toPresentationDTO
 import kotlin.uuid.Uuid
 
 /** Валюта у цены одна: продукт считает в рублях, а поле валюты человеку не показывают (C1). */
-private const val CURRENCY = "RUB"
-
 /**
  * Разбор формы упаковки: строки экрана — в то, что примет сценарий.
  *
@@ -63,7 +62,7 @@ fun PackageFormPresentationDTO.parsed(vocabulary: Vocabulary): ParsedInput<Packa
     }
 
     val price = price.trim().ifEmpty { null }?.let { typed ->
-        when (val parsed = MoneyPresentationDTO(typed, CURRENCY).toDomain()) {
+        when (val parsed = MoneyPresentationDTO(typed, currency).toDomain()) {
             is ParsedInput.Rejected -> return rejected(PackageFormError.Price(parsed.error))
             is ParsedInput.Parsed -> parsed.value
         }
@@ -120,6 +119,7 @@ fun PackageProjection.toFormPresentationDTO(): PackageFormPresentationDTO =
         hintAmount = facts.defaultIntakeAmount?.quantity?.amount?.stripTrailingZeros()?.toPlainString().orEmpty(),
         note = facts.note.orEmpty(),
         price = facts.price?.amount?.stripTrailingZeros()?.toPlainString().orEmpty(),
+        currency = facts.price?.currencyCode ?: DEFAULT_CURRENCY.currencyCode,
         purchasedOn = facts.purchasedOn,
         openedOn = facts.openedOn
     )

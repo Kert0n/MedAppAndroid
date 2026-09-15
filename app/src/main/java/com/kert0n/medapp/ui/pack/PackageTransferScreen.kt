@@ -88,10 +88,13 @@ fun PackageTransferScreen(
                             RadioButton(selected = chosen, onClick = null)
                             Column(Modifier.padding(start = 12.dp)) {
                                 Text(place.name, style = MaterialTheme.typography.bodyLarge)
-                                // Общая полка подписана: коробка на ней станет видна другим.
-                                val note = place.location ?: if (place.isShared) stringResource(R.string.transfer_shared) else null
-                                note?.let {
+                                // Место хранения и «общая» — разные сведения, и одно другое не заслоняет:
+                                // общая полка подписана всегда — коробка на ней станет видна другим.
+                                place.location?.let {
                                     Text(it, style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                                }
+                                if (place.isShared) {
+                                    Text(stringResource(R.string.transfer_shared), style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
                                 }
                             }
                         }

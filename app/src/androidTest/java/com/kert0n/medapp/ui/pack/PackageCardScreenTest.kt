@@ -18,6 +18,7 @@ import com.kert0n.medapp.fixture.tablets
 import com.kert0n.medapp.presentation.pack.PackageCardUiState
 import com.kert0n.medapp.presentation.pack.PackagePresentationDTO
 import com.kert0n.medapp.presentation.pack.toPresentationDTO
+import com.kert0n.medapp.presentation.value.MoneyPresentationDTO
 import com.kert0n.medapp.ui.theme.MedAppTheme
 import java.math.BigDecimal
 import java.time.LocalDate
@@ -152,6 +153,20 @@ class PackageCardScreenTest {
         compose.onNodeWithText("Что это").assertIsDisplayed()
         compose.onNodeWithText("Reckitt").assertIsDisplayed()
         compose.onNodeWithText("Годен до 03.2027").performScrollTo().assertIsDisplayed()
+    }
+
+    /** Цена со знакомой валютой — знаком, с незнакомым кодом — самим кодом, а не падением. */
+    @Test
+    fun aPriceIsShownWithItsCurrencySign() {
+        val priced = box().copy(price = MoneyPresentationDTO("320", "RUB"))
+        show(card(pack = priced))
+        compose.onNodeWithText("320 ₽").performScrollTo().assertIsDisplayed()
+    }
+
+    @Test
+    fun anUnknownCurrencyCodeIsShownAsItself() {
+        show(card(pack = box().copy(price = MoneyPresentationDTO("320", "ZZ"))))
+        compose.onNodeWithText("320 ZZ").performScrollTo().assertIsDisplayed()
     }
 
     /** Просроченная говорит словами, а не одним цветом. */

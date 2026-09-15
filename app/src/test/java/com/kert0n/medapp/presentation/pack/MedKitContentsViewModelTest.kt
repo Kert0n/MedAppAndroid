@@ -281,4 +281,30 @@ class MedKitContentsViewModelTest {
         assertEquals(RemovalStep.ASKING, state.removing)
         assertTrue(medKits.medKits.any { it.id == HOME_KIT })
     }
+
+    /**
+     * Отказала цель — выбор цели остаётся открытым: другую полку выбирают там, где выбирали эту,
+     * а не заново из первого вопроса.
+     *
+     * Красная проверка: любой отказ возвращать к первому вопросу — список полок закрывается, и
+     * человек открывает его снова ради того же выбора.
+     */
+    @Test
+    fun aTargetRefusalKeepsThePickerOpen() {
+        stored.lying(pack(id = PACK))
+        val model = viewModel()
+
+        val state = watching(model.state) { state ->
+            state.awaiting { it.isLoaded }
+            model.askToRemove()
+            model.pickTarget()
+            medKits.forget(SHARED_KIT)
+            model.remove(SHARED_KIT)
+            state.awaiting { it.removalRefusal != null }
+        }
+
+        assertEquals(RemovalRefusal.TARGET_GONE, state.removalRefusal)
+        assertEquals(RemovalStep.PICKING_TARGET, state.removing)
+        assertTrue(medKits.medKits.any { it.id == HOME_KIT })
+    }
 }

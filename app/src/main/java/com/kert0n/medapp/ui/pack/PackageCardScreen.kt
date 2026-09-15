@@ -25,6 +25,7 @@ import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import com.kert0n.medapp.R
+import com.kert0n.medapp.domain.attempt
 import com.kert0n.medapp.domain.pack.ExpiryDate
 import com.kert0n.medapp.domain.pack.PackageStatus
 import com.kert0n.medapp.presentation.pack.PackageCardUiState
@@ -280,7 +281,7 @@ private fun Note(text: String) {
 @Composable
 private fun QuantityPresentationDTO.text(): String = stringResource(R.string.pack_left, amount, unit.name)
 
-/** Цена словами: сумма и знак валюты — по нему человек её и узнаёт. */
+/** Цена словами: сумма и знак валюты — по нему человек её и узнаёт; незнакомый код — сам код. */
 @Composable
 private fun MoneyPresentationDTO.text(): String =
-    stringResource(R.string.pack_price_value, amount, Currency.getInstance(currencyCode).symbol)
+    stringResource(R.string.pack_price_value, amount, attempt { Currency.getInstance(currencyCode).symbol }.getOrDefault(currencyCode))

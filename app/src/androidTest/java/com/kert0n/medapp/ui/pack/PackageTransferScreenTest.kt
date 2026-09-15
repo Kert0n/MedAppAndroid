@@ -55,7 +55,7 @@ class PackageTransferScreenTest {
     }
 
     private fun transfer(
-        places: List<MedKitPresentationDTO> = listOf(place(HOME_KIT, "Домашняя", location = "В ванной"), place(SHARED_KIT, "Дача", shared = true)),
+        places: List<MedKitPresentationDTO> = listOf(place(HOME_KIT, "Домашняя", location = "В ванной"), place(SHARED_KIT, "Дача", location = "За городом", shared = true)),
         chosen: Uuid? = null,
         refusal: PackageTransferRefusal? = null
     ) = PackageTransferUiState(places = places, chosen = chosen, refusal = refusal, isLoaded = true)
@@ -68,14 +68,15 @@ class PackageTransferScreenTest {
         compose.onNodeWithText("Переносить некуда", substring = true).assertDoesNotExist()
     }
 
-    /** Места названы; у общей полки подпись, у местной — её место хранения. */
+    /** Места названы с местом хранения; общая подписана всегда — и когда у неё есть своё место. */
     @Test
-    fun placesAreNamedAndTheSharedOneIsMarked() {
+    fun placesAreNamedAndTheSharedOneIsMarkedEvenWithALocation() {
         show(transfer())
 
         compose.onNodeWithText("Домашняя").assertIsDisplayed()
         compose.onNodeWithText("В ванной").assertIsDisplayed()
         compose.onNodeWithText("Дача").assertIsDisplayed()
+        compose.onNodeWithText("За городом").assertIsDisplayed()
         compose.onNodeWithText("Общая аптечка").assertIsDisplayed()
     }
 

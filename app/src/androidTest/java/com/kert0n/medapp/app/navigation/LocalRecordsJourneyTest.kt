@@ -108,7 +108,8 @@ class LocalRecordsJourneyTest {
         compose.onNodeWithText("Записать").performClick()
 
         compose.waitUntil { compose.onAllNodesWithText("Ноль — это выбросить упаковку: сделайте это с её карточки.").fetchSemanticsNodes().isNotEmpty() }
-        compose.onNodeWithText("Коробки больше не будет?").assertDoesNotExist()
+        // Экран остался пересчётом: ни ухода, ни вопроса — отказ и та же форма.
+        compose.onNodeWithText("Записать").assertIsDisplayed()
         back()
         compose.waitUntil { compose.onAllNodesWithText("20 таблетка").fetchSemanticsNodes().isNotEmpty() }
     }

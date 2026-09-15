@@ -1,5 +1,6 @@
 package com.kert0n.medapp.presentation.pack
 
+import com.kert0n.medapp.domain.value.DEFAULT_CURRENCY
 import com.kert0n.medapp.presentation.value.FormPresentationDTO
 import com.kert0n.medapp.presentation.value.UnitPresentationDTO
 import java.time.LocalDate
@@ -30,6 +31,8 @@ data class PackageFormPresentationDTO(
     val hintAmount: String = "",
     val note: String = "",
     val price: String = "",
+    /** Валюта записанной цены: правка описания её не меняет; у новой цены — валюта по умолчанию. */
+    val currency: String = DEFAULT_CURRENCY.currencyCode,
     val purchasedOn: LocalDate? = null,
     val openedOn: LocalDate? = null
 )

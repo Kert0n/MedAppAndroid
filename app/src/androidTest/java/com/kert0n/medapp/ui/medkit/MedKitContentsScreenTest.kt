@@ -25,6 +25,7 @@ import com.kert0n.medapp.presentation.pack.MedKitContentsUiState
 import com.kert0n.medapp.presentation.pack.Narrowing
 import com.kert0n.medapp.presentation.pack.Ordering
 import com.kert0n.medapp.presentation.pack.PackagePresentationDTO
+import com.kert0n.medapp.presentation.pack.RemovalRefusal
 import com.kert0n.medapp.presentation.pack.RemovalStep
 import com.kert0n.medapp.presentation.pack.toPresentationDTO
 import com.kert0n.medapp.ui.theme.MedAppTheme
@@ -92,7 +93,8 @@ class MedKitContentsScreenTest {
         others: List<MedKitPresentationDTO> = listOf(
             medKit(id = SHARED_KIT, name = "Дача").projection(MedKitContents.EMPTY).toPresentationDTO()
         ),
-        removing: RemovalStep? = null
+        removing: RemovalStep? = null,
+        removalRefusal: RemovalRefusal? = null
     ) = MedKitContentsUiState(
         medKit = if (everywhere) null else shelf(packages.size),
         isEverywhere = everywhere,
@@ -105,7 +107,8 @@ class MedKitContentsScreenTest {
         ordering = ordering,
         today = today,
         isLoaded = true,
-        removing = removing
+        removing = removing,
+        removalRefusal = removalRefusal
     )
 
     /** Пока база не ответила, экран ждёт: сказать «пусто» раньше — неправда. */
@@ -289,6 +292,15 @@ class MedKitContentsScreenTest {
         compose.onNodeWithText("Переносить некуда: другой аптечки нет.").assertIsDisplayed()
         compose.onNodeWithText("Перенести и убрать").assertDoesNotExist()
         compose.onNodeWithText("Убрать вместе с лекарствами").assertIsDisplayed()
+    }
+
+    /** Отказ цели виден там же, где выбирают цель: другую полку выбирают, не начиная сначала. */
+    @Test
+    fun aTargetRefusalIsToldInThePicker() {
+        show(contents(removing = RemovalStep.PICKING_TARGET, removalRefusal = RemovalRefusal.TARGET_GONE))
+
+        compose.onNodeWithText("Куда перенести лекарства?").assertIsDisplayed()
+        compose.onNodeWithText("Той аптечки больше нет — выберите другую.").assertIsDisplayed()
     }
 
     /** Цель переноса выбирается по имени, и пока не выбрана — переносить нечего. */

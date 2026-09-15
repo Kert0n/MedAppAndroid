@@ -103,6 +103,6 @@ class PackageRecountScreenTest {
         show(recount(amount = "0", error = PackageRecountError.Zero))
 
         compose.onNodeWithText("Ноль — это выбросить упаковку: сделайте это с её карточки.").assertIsDisplayed()
-        compose.onNodeWithText("Коробки больше не будет?").assertDoesNotExist()
+        compose.onNodeWithText("Записать").assertIsDisplayed()
     }
 }

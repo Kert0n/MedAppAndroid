@@ -156,16 +156,18 @@ class MedKitContentsViewModel @AssistedInject constructor(
                 MedKitRemoval.Outcome.REMOVED, MedKitRemoval.Outcome.MARKED,
                 MedKitRemoval.Outcome.MED_KIT_GONE -> Removing(removed = true)
                 MedKitRemoval.Outcome.BUSY -> refused(RemovalRefusal.BUSY)
+                // Отказала цель — человек выбирает другую там же, где выбирал эту.
                 MedKitRemoval.Outcome.TARGET_GONE, MedKitRemoval.Outcome.TARGET_IS_THE_SAME ->
-                    refused(RemovalRefusal.TARGET_GONE)
-                MedKitRemoval.Outcome.TARGET_BUSY -> refused(RemovalRefusal.TARGET_BUSY)
+                    refused(RemovalRefusal.TARGET_GONE, now.step)
+                MedKitRemoval.Outcome.TARGET_BUSY -> refused(RemovalRefusal.TARGET_BUSY, now.step)
                 MedKitRemoval.Outcome.CONTENTS_BUSY -> refused(RemovalRefusal.CONTENTS_BUSY)
                 MedKitRemoval.Outcome.NOT_SHARED -> refused(RemovalRefusal.NOT_SHARED)
             }
         }
     }
 
-    private fun refused(refusal: RemovalRefusal) = Removing(step = RemovalStep.ASKING, refusal = refusal)
+    private fun refused(refusal: RemovalRefusal, step: RemovalStep = RemovalStep.ASKING) =
+        Removing(step = step, refusal = refusal)
 
     private fun Narrowing.asFilter(): PackageQuery.Filter = when (this) {
         Narrowing.Expired -> PackageQuery.Filter.Expired

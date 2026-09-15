@@ -1,16 +1,22 @@
 package com.kert0n.medapp.presentation.pack
 
 import com.kert0n.medapp.domain.pack.PackageSharedFacts
+import com.kert0n.medapp.domain.value.DEFAULT_CURRENCY
+import com.kert0n.medapp.domain.value.Money
 import com.kert0n.medapp.fixture.HOME_KIT
 import com.kert0n.medapp.fixture.TABLETS
 import com.kert0n.medapp.fixture.TABLET_FORM
 import com.kert0n.medapp.fixture.VOCABULARY
+import com.kert0n.medapp.fixture.pack
+import com.kert0n.medapp.fixture.projected
 import com.kert0n.medapp.fixture.tablets
 import com.kert0n.medapp.presentation.ParsedInput
 import com.kert0n.medapp.presentation.value.ExpiryDatePresentationError
 import com.kert0n.medapp.presentation.value.QuantityPresentationError
 import com.kert0n.medapp.presentation.value.toPresentationDTO
+import java.math.BigDecimal
 import java.time.LocalDate
+import java.util.Currency
 import kotlin.uuid.Uuid
 import org.junit.Assert.assertEquals
 import org.junit.Test
@@ -117,5 +123,25 @@ class PackageFormMapperTest {
     @Test
     fun aZeroHintIsNonsenseRatherThanAbsence() {
         assertEquals(ParsedInput.Rejected(PackageFormError.HintIsZero), form(hint = "0").parsed(VOCABULARY))
+    }
+
+    /**
+     * Правка описания не меняет валюту записанной цены: открытая на правку форма помнит её, и
+     * записанное уходит в домен той же валютой. У новой цены — валюта по умолчанию.
+     *
+     * Красная проверка: собирать цену всегда в рублях — правка одного поля молча переписывала бы
+     * долларовую цену в рублёвую.
+     */
+    @Test
+    fun editingKeepsTheCurrencyOfTheStoredPrice() {
+        val dollars = Money(BigDecimal("12.50"), Currency.getInstance("USD"))
+        val opened = pack(price = dollars).projected().toFormPresentationDTO()
+        assertEquals("USD", opened.currency)
+
+        val parsed = opened.copy(note = "в дверце").parsed(VOCABULARY) as ParsedInput.Parsed
+        assertEquals(dollars, parsed.value.facts.price)
+
+        val fresh = form(price = "320").parsed(VOCABULARY) as ParsedInput.Parsed
+        assertEquals(DEFAULT_CURRENCY, fresh.value.facts.price?.currency)
     }
 }
