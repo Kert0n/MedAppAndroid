@@ -150,6 +150,29 @@ class PackageFormViewModel @AssistedInject constructor(
     }
 
     /**
+     * Выбор подсказки заполняет только то, что знает карточка (PLAN H3 №7): название — её,
+     * человек выбирал именно его; остальное — в пустые поля, введённое руками не затирается;
+     * количество и срок не трогаются — их в справочнике нет. Печать после выбора ищет заново, а
+     * карточка остаётся «откуда пришло».
+     */
+    fun pick(template: TemplatePresentationDTO) {
+        val now = form.value
+        form.value = now.copy(
+            name = template.name,
+            form = now.form ?: template.form,
+            unit = now.unit ?: template.unit,
+            category = now.category.ifBlank { template.category.orEmpty() },
+            manufacturer = now.manufacturer.ifBlank { template.manufacturer.orEmpty() },
+            country = now.country.ifBlank { template.country.orEmpty() },
+            description = now.description.ifBlank { template.description.orEmpty() },
+            templateId = template.id
+        )
+        // Выбранное — не напечатанное: искать имя карточки заново незачем, и список сворачивается.
+        typed.value = ""
+        if (progress.value.error != null) progress.value = progress.value.copy(error = null)
+    }
+
+    /**
      * Записать. Второе нажатие, пока идёт первое или пока уже записано, ничего не начинает:
      * человек ждёт от него той же коробки, а не второй. Признак работы ставится **до**
      * обращения к сценарию: между нажатием и записью стоит чтение словаря.
@@ -178,7 +201,7 @@ class PackageFormViewModel @AssistedInject constructor(
         }
         val packageId = opened.packageId
         progress.value = if (packageId == null) {
-            when (val outcome = adding.add(described.medKitId, described.facts, described.quantity)) {
+            when (val outcome = adding.add(described.medKitId, described.facts, described.quantity, described.templateId)) {
                 is PackageAdding.Outcome.Added -> Progress(saved = outcome.packageId)
                 PackageAdding.Outcome.MedKitGone -> Progress(error = PackageFormError.MedKitGone)
                 PackageAdding.Outcome.MedKitBusy -> Progress(error = PackageFormError.MedKitBusy)

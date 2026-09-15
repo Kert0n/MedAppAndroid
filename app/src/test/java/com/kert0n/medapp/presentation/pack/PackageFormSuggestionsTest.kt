@@ -17,6 +17,7 @@ import com.kert0n.medapp.fixture.HOME_KIT
 import com.kert0n.medapp.fixture.PACK
 import com.kert0n.medapp.fixture.QuietClock
 import com.kert0n.medapp.fixture.TABLETS
+import com.kert0n.medapp.fixture.TABLET_FORM
 import com.kert0n.medapp.fixture.medKit
 import com.kert0n.medapp.fixture.pack
 import com.kert0n.medapp.fixture.template
@@ -171,6 +172,76 @@ class PackageFormSuggestionsTest {
         model.type("Ибупрофен")
         advanceTimeBy(400)
         assertEquals(Suggestions.Found(emptyList()), model.state.value.suggestions)
+    }
+
+    /**
+     * Выбор заполняет только то, что знает карточка: название — её; пустые поля — из неё;
+     * введённое руками не затирается; количество и срок не трогаются; карточка запомнена и
+     * уходит с записью.
+     *
+     * Красная проверка: писать поля карточки поверх введённого — производитель, который человек
+     * напечатал сам, исчезает.
+     */
+    @Test
+    fun pickingFillsOnlyWhatTheCardKnowsAndKeepsWhatWasTyped() = runTest {
+        val card = template(
+            id = EXTRA, name = "Парацетамол-Экстра", form = TABLET_FORM, category = "Обезболивающие",
+            manufacturer = "Фармстандарт", country = "Россия", unit = TABLETS
+        )
+        templates.answer = PackageTemplates.Search.Found(listOf(card))
+        val model = viewModel()
+        model.edit(model.state.value.form.copy(name = "парац", manufacturer = "Bayer", amount = "20"))
+        advanceTimeBy(400)
+
+        model.pick(card.toPresentationDTO())
+        advanceTimeBy(400)
+        val form = model.state.value.form
+
+        assertEquals("Парацетамол-Экстра", form.name)
+        assertEquals("Bayer", form.manufacturer)
+        assertEquals("Обезболивающие", form.category)
+        assertEquals("Россия", form.country)
+        assertEquals(TABLET_FORM.toPresentationDTO(), form.form)
+        assertEquals(TABLETS.toPresentationDTO(), form.unit)
+        assertEquals("20", form.amount)
+        assertEquals("", form.expiresOn)
+        assertEquals(EXTRA, form.templateId)
+        // Выбранное — не напечатанное: справочник о нём заново не спрашивают, список свёрнут.
+        assertEquals(Suggestions.None, model.state.value.suggestions)
+        assertEquals(1, templates.asked.size)
+
+        model.save()
+        advanceTimeBy(10)
+        assertEquals(EXTRA, packages.packages.single().templateId)
+    }
+
+    /** Карточка, у которой словарь не знает формы и единицы, оставляет их пустыми — не выдумывает. */
+    @Test
+    fun aCardWithoutAKnownFormLeavesTheFormEmpty() = runTest {
+        val model = viewModel()
+        model.pick(template(name = "Микстура", form = null, unit = null).toPresentationDTO())
+        advanceTimeBy(10)
+        val form = model.state.value.form
+        assertEquals("Микстура", form.name)
+        assertEquals(null, form.form)
+        assertEquals(null, form.unit)
+    }
+
+    /** Название, напечатанное после выбора, не перезаписывается поздним ответом: ответ в форму не пишет. */
+    @Test
+    fun aLateAnswerNeverWritesIntoTheForm() = runTest {
+        templates.hold("парац")
+        val model = viewModel()
+        model.type("парац")
+        advanceTimeBy(400)
+        model.pick(template(id = PARACETAMOL, name = "Парацетамол").toPresentationDTO())
+        advanceTimeBy(10)
+        model.type("Парацетамол детский")
+        templates.release("парац")
+        advanceTimeBy(400)
+
+        assertEquals("Парацетамол детский", model.state.value.form.name)
+        assertEquals(PARACETAMOL, model.state.value.form.templateId)
     }
 
     private companion object {

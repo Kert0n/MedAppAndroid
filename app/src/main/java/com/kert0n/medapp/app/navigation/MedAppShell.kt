@@ -152,8 +152,7 @@ private fun screens(stacks: TabStacks) = entryProvider<NavKey> {
         PackageFormScreen(
             state = state,
             onEdit = model::edit,
-            // Заполнение по выбору — следующий коммит U2; пока строка ничего не делает.
-            onPick = {},
+            onPick = model::pick,
             onSave = model::save,
             onCancel = stacks::back,
             // Количество здесь показано, но не правится: у пересчёта свой экран (H3 №8).

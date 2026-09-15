@@ -144,4 +144,12 @@ class PackageFormMapperTest {
         val fresh = form(price = "320").parsed(VOCABULARY) as ParsedInput.Parsed
         assertEquals(DEFAULT_CURRENCY, fresh.value.facts.price?.currency)
     }
+
+    /** Карточка справочника, из которой заполнили, доходит до записи: коробка помнит, откуда пришла. */
+    @Test
+    fun theTemplateTravelsToTheDescription() {
+        val id = Uuid.parse("00000000-0000-4000-8000-000000000071")
+        val parsed = form().copy(templateId = id).parsed(VOCABULARY) as ParsedInput.Parsed
+        assertEquals(id, parsed.value.templateId)
+    }
 }
