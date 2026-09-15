@@ -1,0 +1,81 @@
+# yaml-language-server: $schema=https://coderabbit.ai/integrations/schema.v2.json
+# Разбор CodeRabbit: снят шум, которого не держат наши правила, и названы правила по корням
+# (AGENTS «Порядок мышления», «Проверки», PLAN H1). Разбор запускается `@coderabbitai trigger`
+# после `gh pr ready`; черновики не разбираются.
+
+tone_instructions: >-
+  Treat every finding as a pattern, not a single spot: name the pattern and list every other place
+  in the diff that matches it. Prefer the smallest fix inside existing types over new abstractions.
+
+reviews:
+  profile: chill
+  suggested_labels: false
+  suggested_reviewers: false
+  auto_review:
+    drafts: false
+  path_filters:
+    - "!docs/screens/**"
+    - "!app/schemas/**"
+    - "!app/src/main/res/drawable/ic_*.xml"
+    - "!**/*.png"
+  path_instructions:
+    - path: "app/src/main/java/com/kert0n/medapp/domain/**"
+      instructions: >-
+        Domain is the center: no imports from network, storage, queue, platform, presentation or ui;
+        time comes only through Clock. A rule lives on its own type (require in a value constructor),
+        not in helper functions over foreign types. Entities are plain classes equal by id with
+        transitions instead of copy(); values and DTOs are data classes. No human-readable text —
+        a refusal is an enum value. Domain requires ready values; input parsing belongs to
+        presentation, wire and column formats to network/storage mappers.
+    - path: "app/src/main/java/com/kert0n/medapp/feature/**"
+      instructions: >-
+        A scenario is one human action in one transaction: read the entity inside the transaction,
+        apply the transition, re-read after each write (readThisTransaction). Outcomes are enums
+        that the screen can tell apart. feature never imports ui, app or platform internals except
+        ports. Text for humans does not belong here.
+    - path: "app/src/main/java/com/kert0n/medapp/{presentation,ui}/**"
+      instructions: >-
+        Screen rules: one ViewModel, one state, one DTO per screen — never a domain entity inside
+        state (entities are equal by id and hide content changes). ViewModel receives route data as
+        primitives (Uuid?) via assisted injection, never Screen keys. presentation and ui must not
+        import network, storage DAOs/database or queue. The busy flag is set before calling the
+        scenario so a second tap never starts a second job. Before the first read the state is
+        loading, never empty or gone. Every scenario outcome is shown, never swallowed. Colour is
+        never the only carrier of meaning: icon and words accompany it. Strings live in R.string,
+        Russian counts use plurals.
+    - path: "app/src/main/java/com/kert0n/medapp/storage/**"
+      instructions: >-
+        Room repositories live entirely in storage and are unknown to the domain. Flows expose
+        projections built by the entity itself; suspend finds return entities only inside a
+        transaction. Constraints belong to the schema, not to code. Decimal amounts are stored as
+        strings with a derived sort key; CAST(... AS REAL) is forbidden. Corrupt stored values
+        degrade to "absent", never crash the whole read.
+    - path: "app/src/{test,androidTest,sharedTest}/**"
+      instructions: >-
+        One test per rule, named by the behaviour it stops, with a KDoc saying what would go wrong
+        without the rule. Fakes answer only the questions the test is about and fail loudly on
+        everything else. Instrumented time budgets are valid only on the reference emulator and
+        must skip elsewhere. Do not suggest generated tests or docstrings.
+  tools:
+    detekt:
+      enabled: false
+    languagetool:
+      enabled: false
+    markdownlint:
+      enabled: false
+  finishing_touches:
+    docstrings:
+      enabled: false
+    unit_tests:
+      enabled: false
+  pre_merge_checks:
+    docstrings:
+      mode: off
+    title:
+      mode: off
+
+knowledge_base:
+  code_guidelines:
+    enabled: true
+    filePatterns:
+      - "AGENTS.md"

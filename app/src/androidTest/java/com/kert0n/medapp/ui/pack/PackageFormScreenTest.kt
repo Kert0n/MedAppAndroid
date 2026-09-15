@@ -1,0 +1,142 @@
+package com.kert0n.medapp.ui.pack
+
+import androidx.compose.ui.test.assertIsDisplayed
+import androidx.compose.ui.test.junit4.v2.createComposeRule
+import androidx.compose.ui.test.onAllNodesWithText
+import androidx.compose.ui.test.onNodeWithText
+import androidx.compose.ui.test.performClick
+import androidx.compose.ui.test.performScrollTo
+import androidx.test.ext.junit.runners.AndroidJUnit4
+import com.kert0n.medapp.domain.medkit.MedKitContents
+import com.kert0n.medapp.fixture.HOME_KIT
+import com.kert0n.medapp.fixture.PACK
+import com.kert0n.medapp.fixture.TABLETS
+import com.kert0n.medapp.fixture.medKit
+import com.kert0n.medapp.fixture.pack
+import com.kert0n.medapp.fixture.projected
+import com.kert0n.medapp.fixture.tablets
+import com.kert0n.medapp.presentation.medkit.toPresentationDTO
+import com.kert0n.medapp.presentation.pack.PackageFormError
+import com.kert0n.medapp.presentation.pack.PackageFormPresentationDTO
+import com.kert0n.medapp.presentation.pack.PackageFormUiState
+import com.kert0n.medapp.presentation.pack.toPresentationDTO
+import com.kert0n.medapp.presentation.value.toPresentationDTO
+import com.kert0n.medapp.ui.theme.MedAppTheme
+import org.junit.Assert.assertEquals
+import org.junit.Rule
+import org.junit.Test
+import org.junit.runner.RunWith
+
+/** Форма упаковки (PLAN H3 №7, №8): что человек видит и что он может нажать. */
+@RunWith(AndroidJUnit4::class)
+class PackageFormScreenTest {
+
+    @get:Rule
+    val compose = createComposeRule()
+
+    private var saved = 0
+    private var cancelled = 0
+    private var recounted = 0
+
+    private val shelf = medKit(id = HOME_KIT, name = "Домашняя").projection(MedKitContents.EMPTY).toPresentationDTO()
+
+    private fun show(state: PackageFormUiState) {
+        compose.setContent {
+            MedAppTheme {
+                PackageFormScreen(
+                    state = state,
+                    onEdit = {},
+                    onSave = { saved++ },
+                    onCancel = { cancelled++ },
+                    onRecount = { recounted++ }
+                )
+            }
+        }
+    }
+
+    private fun adding(error: PackageFormError? = null) = PackageFormUiState(
+        form = PackageFormPresentationDTO(medKitId = HOME_KIT),
+        medKits = listOf(shelf),
+        units = listOf(TABLETS.toPresentationDTO()),
+        error = error
+    )
+
+    /**
+     * Все поля видны сразу (ТЗ 4.1.1.1): человек не ищет их в свёрнутом разделе. Обязательные
+     * отличает подпись, а не место.
+     *
+     * Красная проверка: спрятать необязательные под «Остальное, если известно» — половина того,
+     * что человек знает о коробке, исчезает с глаз.
+     */
+    @Test
+    fun everyFieldIsInSightAndRequiredOnesAreMarked() {
+        show(adding())
+
+        for (field in listOf("Название", "Количество", "Единица", "Форма выпуска", "Срок годности")) {
+            compose.onNodeWithText(field).performScrollTo().assertIsDisplayed()
+        }
+        for (field in listOf("Категория", "Производитель", "Страна", "Описание", "Заметка", "Цена", "Куплено", "Вскрыто")) {
+            compose.onNodeWithText(field).performScrollTo().assertIsDisplayed()
+        }
+        compose.onAllNodesWithTextCount("обязательно", atLeast = 2)
+    }
+
+    /**
+     * Кнопка не гаснет: нажатие с пустой формой — не «ничего не произошло», а названная
+     * причина.
+     */
+    @Test
+    fun theSaveButtonStaysAliveAndTheRefusalIsInWords() {
+        show(adding(error = PackageFormError.NameEmpty))
+
+        compose.onNodeWithText("Название нужно: без него упаковку не найти ни поиском, ни глазами.")
+            .performScrollTo().assertIsDisplayed()
+        compose.onNodeWithText("Сохранить").performScrollTo().performClick()
+
+        assertEquals(1, saved)
+    }
+
+    /**
+     * В правке количество и аптечка показаны, но не правятся: у пересчёта и переноса свой след.
+     * Рядом с количеством — ссылка на пересчёт, иначе человек ищет действие по экранам.
+     *
+     * Красная проверка: дать править количество здесь — учёт разойдётся с тем, что человек
+     * видел в коробке, и следа не останется.
+     */
+    @Test
+    fun editingShowsTheAmountWithoutLettingItBeTyped() {
+        show(
+            PackageFormUiState(
+                form = PackageFormPresentationDTO(medKitId = HOME_KIT, name = "Нурофен"),
+                isEditing = true,
+                stored = pack(id = PACK, name = "Нурофен", quantity = tablets("20")).projected().toPresentationDTO(),
+                medKits = listOf(shelf),
+                units = listOf(TABLETS.toPresentationDTO())
+            )
+        )
+
+        compose.onNodeWithText("20 таблетка").performScrollTo().assertIsDisplayed()
+        compose.onNodeWithText("Пересчитать").performScrollTo().performClick()
+
+        assertEquals(1, recounted)
+    }
+
+    @Test
+    fun cancellingWritesNothing() {
+        show(adding())
+
+        compose.onNodeWithText("Отмена").performScrollTo().performClick()
+
+        assertEquals(1, cancelled)
+        assertEquals(0, saved)
+    }
+}
+
+/** Подписи «обязательно» несколько: на пустой форме их столько, сколько незаполненных полей. */
+private fun androidx.compose.ui.test.junit4.ComposeContentTestRule.onAllNodesWithTextCount(
+    text: String,
+    atLeast: Int
+) {
+    val found = onAllNodesWithText(text).fetchSemanticsNodes().size
+    check(found >= atLeast) { "подписей «$text» найдено $found, ожидалось не меньше $atLeast" }
+}
