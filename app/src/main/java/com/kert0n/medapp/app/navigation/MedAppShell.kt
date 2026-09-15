@@ -1,14 +1,8 @@
 package com.kert0n.medapp.app.navigation
 
-import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.ContentTransform
-import androidx.compose.animation.core.tween
-import androidx.compose.animation.expandVertically
-import androidx.compose.animation.fadeIn
-import androidx.compose.animation.fadeOut
-import androidx.compose.animation.shrinkVertically
-import androidx.compose.animation.slideInVertically
-import androidx.compose.animation.slideOutVertically
+import androidx.compose.animation.EnterTransition
+import androidx.compose.animation.ExitTransition
 import androidx.compose.foundation.layout.consumeWindowInsets
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
@@ -51,11 +45,10 @@ import com.kert0n.medapp.ui.pack.PackageTransferScreen
  * Оболочка приложения: пять мест внизу и содержимое над ними. Где человек стоит и как глубоко —
  * живёт в [TabStacks] и переживает поворот и смерть процесса.
  *
- * **Своего движения у оболочки нет.** Переходы — умолчания библиотеки, как у референса
- * владельца (HomeMedkit-App); названо одно: жест назад с места — проявление, потому что место не
- * лист, и снимать его нечем. Собственная система движения поверх библиотеки, которая ведёт
- * предиктивный жест по-своему, — это борьба с библиотекой, и прошлый заход на ней и кончился
- * (отклонённый PR #33).
+ * **Движения у оболочки нет вовсе: экран просто сменяется** (решение владельца 2026-09-15).
+ * Раскладка — как у референса (HomeMedkit-App): содержимое места и панель мест, панель только у
+ * мест. Собственная система движения поверх библиотеки, которая ведёт предиктивный жест
+ * по-своему, — это борьба с библиотекой, и прошлый заход на ней и кончился (отклонённый PR #33).
  *
  * **Отступы системы оболочка не только отдаёт, но и поглощает.** `Modifier.padding(padding)`
  * оставляет место под строкой состояния и полосой жестов — и только; сами вставки остаются
@@ -67,19 +60,16 @@ fun MedAppShell(modifier: Modifier = Modifier, stacks: TabStacks = rememberTabSt
     Scaffold(
         modifier = modifier.fillMaxSize(),
         // Панель мест — у мест: в глубине человек занят одним делом, и пять соседних комнат
-        // ему не нужны; панель уходит вниз и возвращается с корнем места.
-        bottomBar = {
-            AnimatedVisibility(
-                visible = stacks.screen in PLACES,
-                enter = slideInVertically { it } + expandVertically(),
-                exit = slideOutVertically { it } + shrinkVertically()
-            ) { Places(stacks) }
-        }
+        // ему не нужны. Появляется и исчезает вместе с экраном, без своего движения.
+        bottomBar = { if (stacks.screen in PLACES) Places(stacks) }
     ) { padding ->
         NavDisplay(
             entries = stacks.entries(remember(stacks) { screens(stacks) }),
             onBack = stacks::back,
-            modifier = Modifier.padding(padding).consumeWindowInsets(padding)
+            modifier = Modifier.padding(padding).consumeWindowInsets(padding),
+            transitionSpec = { SWITCH },
+            popTransitionSpec = { SWITCH },
+            predictivePopTransitionSpec = { SWITCH }
         )
     }
 }
@@ -92,7 +82,7 @@ fun MedAppShell(modifier: Modifier = Modifier, stacks: TabStacks = rememberTabSt
  * экран получает `state` и действия и больше ничего (PLAN H1).
  */
 private fun screens(stacks: TabStacks) = entryProvider<NavKey> {
-    entry(Screen.MedKits, metadata = placeMetadata) {
+    entry(Screen.MedKits) {
         val model: MedKitListViewModel = hiltViewModel()
         MedKitListScreen(
             state = model.state.collectAsStateWithLifecycle().value,
@@ -220,22 +210,19 @@ private fun screens(stacks: TabStacks) = entryProvider<NavKey> {
         )
     }
     for (place in Place.entries - Place.MED_KITS) {
-        entry(place.key, metadata = placeMetadata) { NotReadyYet() }
+        entry(place.key) { NotReadyYet() }
     }
 }
 
 private val PLACES: Set<NavKey> = Place.entries.map { it.key }.toSet()
 
 /**
- * Жест назад с места — проявление, а не уменьшение листа: место не лист, и снимать его нечем.
- * Остальное движение — умолчания библиотеки (H3 «Оболочка»).
+ * Экран просто сменяется: ни проявления, ни движения, ни перехода размера. Переход, у которого
+ * есть длительность, быстрые «открыть → назад» перебивают на середине: оба экрана живут вместе,
+ * а движение каждый раз стартует с другой точки и выглядит по-разному. У мгновенной смены
+ * перебивать нечего.
  */
-private val placeMetadata: Map<String, Any> = NavDisplay.predictivePopTransitionSpec {
-    ContentTransform(
-        targetContentEnter = fadeIn(animationSpec = tween()),
-        initialContentExit = fadeOut(animationSpec = tween())
-    )
-}
+private val SWITCH = ContentTransform(EnterTransition.None, ExitTransition.None, sizeTransform = null)
 
 /**
  * Переключение мест. Повторное нажатие на своё место возвращает его к началу, а переход на
