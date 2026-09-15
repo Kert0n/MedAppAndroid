@@ -1,5 +1,7 @@
 package com.kert0n.medapp.ui.course
 
+import androidx.lifecycle.ViewModel
+import androidx.lifecycle.viewModelScope
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import com.kert0n.medapp.domain.value.Doses
 import com.kert0n.medapp.feature.course.CourseDrafting
@@ -27,6 +29,7 @@ import java.time.Instant
 import java.time.LocalDate
 import java.time.ZoneOffset
 import kotlin.uuid.Uuid
+import kotlinx.coroutines.cancel
 import kotlinx.coroutines.runBlocking
 import org.junit.After
 import org.junit.Assert.assertEquals
@@ -62,7 +65,15 @@ class SourcePickingViewModelTest {
     }
 
     @After
-    fun tearDown() = database.close()
+    fun tearDown() {
+        // Экран закрывают до базы: его чтения живут, пока жив он, и закрытая из-под них база
+        // роняет соседнюю проверку, а не эту.
+        opened.forEach { it.viewModelScope.cancel() }
+        database.close()
+    }
+
+    /** Что открыто: закрывается в обратном порядке — сначала экраны, потом база. */
+    private val opened = mutableListOf<ViewModel>()
 
     private fun model(courseId: Uuid) = SourcePickingViewModel(
         drafting = scenarios.courseDrafting,
@@ -72,7 +83,7 @@ class SourcePickingViewModelTest {
         medKits = database.medKitRepository(),
         today = Today(clock, QuietClock),
         courseId = courseId
-    )
+    ).also { opened += it }
 
     private suspend fun draft(vararg edits: CourseDrafting.Edit): Uuid {
         val created = scenarios.courseDrafting.create("Ибупрофен")

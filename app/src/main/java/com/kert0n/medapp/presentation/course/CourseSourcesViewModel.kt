@@ -6,6 +6,7 @@ import com.kert0n.medapp.domain.course.CourseCoverage
 import com.kert0n.medapp.domain.course.CourseSource
 import com.kert0n.medapp.domain.course.Revision
 import com.kert0n.medapp.domain.value.Dose
+import com.kert0n.medapp.domain.value.Doses
 import com.kert0n.medapp.feature.course.CourseDrafting
 import com.kert0n.medapp.feature.course.SourceEditing
 import com.kert0n.medapp.feature.time.Today
@@ -142,6 +143,19 @@ class CourseSourcesViewModel @AssistedInject constructor(
         }
     }
 
+    /**
+     * Выделить коробке столько приёмов, сколько человек отпустил на ползунке или дописал в поле.
+     * Число зажимается к пределу строки: выше него оно всё равно не запишется, а зажатое видно
+     * сразу (PLAN D5, C1 «Ползунок»). Ползунок в движении сюда не заходит — только отпущенный.
+     */
+    fun allocate(packageId: Uuid, doses: Int) {
+        val source = state.value.sources.firstOrNull { it.packageId == packageId } ?: return
+        if (source.fault != null) return
+        val wanted = doses.coerceIn(0, source.maxDoses ?: doses)
+        if (wanted == source.allocatedDoses) return
+        intents.trySend(Intent.Allocate(packageId, Doses(wanted)))
+    }
+
     /** Переставить источник: место в списке — очередь расходования (PLAN D5). */
     fun move(from: Int, to: Int) {
         val count = state.value.sources.size
@@ -232,18 +246,24 @@ class CourseSourcesViewModel @AssistedInject constructor(
 
         data class Detach(val packageId: Uuid) : Intent
 
+        data class Allocate(val packageId: Uuid, val doses: Doses) : Intent
+
         /** Состав после намерения; `null` — применять уже не к чему. */
         fun appliedTo(sources: List<CourseSource>): List<CourseSource>? = when (this) {
             is Move ->
                 if (from !in sources.indices || to !in sources.indices) null
                 else sources.toMutableList().apply { add(to, removeAt(from)) }
             is Detach -> sources.filterNot { it.pkg.id == packageId }.takeIf { it.size != sources.size }
+            is Allocate -> sources
+                .map { if (it.pkg.id == packageId) it.copy(allocatedDoses = doses) else it }
+                .takeIf { it != sources }
         }
 
         /** То же намерение словами черновика: он правится названными действиями, а не составом. */
         fun asEdits(): List<CourseDrafting.Edit> = when (this) {
             is Move -> listOf(CourseDrafting.Edit.Reorder(from, to))
             is Detach -> listOf(CourseDrafting.Edit.Detach(packageId))
+            is Allocate -> listOf(CourseDrafting.Edit.Allocate(packageId, doses))
         }
     }
 

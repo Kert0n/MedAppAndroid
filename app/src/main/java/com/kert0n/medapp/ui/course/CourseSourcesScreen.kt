@@ -1,6 +1,8 @@
 package com.kert0n.medapp.ui.course
 
 import androidx.compose.foundation.gestures.detectDragGesturesAfterLongPress
+import androidx.compose.foundation.text.KeyboardActions
+import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
@@ -9,6 +11,7 @@ import androidx.compose.foundation.layout.defaultMinSize
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.material3.AlertDialog
@@ -19,7 +22,9 @@ import androidx.compose.material3.IconButton
 import androidx.compose.material3.ListItem
 import androidx.compose.material3.ListItemDefaults
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
+import androidx.compose.material3.Slider
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
@@ -30,10 +35,14 @@ import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
+import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.text.input.ImeAction
+import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.res.painterResource
@@ -68,6 +77,7 @@ import kotlin.uuid.Uuid
 fun CourseSourcesScreen(
     state: CourseSourcesUiState,
     onMove: (Int, Int) -> Unit,
+    onAllocate: (Uuid, Int) -> Unit,
     onDetach: (Uuid) -> Unit,
     onConfirmDetach: () -> Unit,
     onDismissDetach: () -> Unit,
@@ -104,7 +114,7 @@ fun CourseSourcesScreen(
                 actionText = stringResource(R.string.course_sources_add).takeUnless { state.isFinished },
                 onAction = onAdd.takeUnless { state.isFinished }
             )
-            else -> Sources(state, onMove, onDetach, onDismissMessage, onAdd, Modifier.padding(padding))
+            else -> Sources(state, onMove, onAllocate, onDetach, onDismissMessage, onAdd, Modifier.padding(padding))
         }
     }
     state.asksToDetach?.let {
@@ -116,6 +126,7 @@ fun CourseSourcesScreen(
 private fun Sources(
     state: CourseSourcesUiState,
     onMove: (Int, Int) -> Unit,
+    onAllocate: (Uuid, Int) -> Unit,
     onDetach: (Uuid) -> Unit,
     onDismissMessage: () -> Unit,
     onAdd: () -> Unit,
@@ -141,6 +152,7 @@ private fun Sources(
                 SourceRow(
                     source = source,
                     isFinished = state.isFinished,
+                    onAllocate = onAllocate,
                     onDetach = { onDetach(source.packageId) },
                     onMoveUp = { if (index > 0) onMove(index, index - 1) },
                     onMoveDown = { if (index < count - 1) onMove(index, index + 1) },
@@ -184,6 +196,7 @@ private fun Sources(
 private fun SourceRow(
     source: CourseSourcePresentationDTO,
     isFinished: Boolean,
+    onAllocate: (Uuid, Int) -> Unit,
     onDetach: () -> Unit,
     onMoveUp: () -> Unit,
     onMoveDown: () -> Unit,
@@ -199,7 +212,10 @@ private fun SourceRow(
             Column {
                 Text(source.place(), style = MaterialTheme.typography.bodySmall)
                 when (val fault = source.fault) {
-                    null -> Text(source.allocation())
+                    null -> {
+                        Text(source.allocation())
+                        Allocation(source, enabled = !isFinished, onAllocate = onAllocate)
+                    }
                     else -> Text(fault.words(), color = MaterialTheme.colorScheme.error)
                 }
             }
@@ -228,6 +244,63 @@ private fun SourceRow(
                 )
             }
     )
+}
+
+/**
+ * Ползунок и поле — **одно число приёмов**: `Float` здесь только координата, а значение целое и
+ * проходит ту же проверку, что ручной ввод (PLAN D5 «Почему выделение в дозах»). Во время
+ * движения не зовётся ничего — запись уходит по отпусканию (C1 «Ползунок»).
+ *
+ * Предела нет — выделять нечего: у черновика без дозы и числа приёмов, у коробки, которая не
+ * даёт ни одной целой дозы. Тогда сказано словами, а не показан ползунок, который не двигается.
+ */
+@Composable
+private fun Allocation(
+    source: CourseSourcePresentationDTO,
+    enabled: Boolean,
+    onAllocate: (Uuid, Int) -> Unit
+) {
+    val limit = source.maxDoses
+    if (limit == null || limit == 0) {
+        Text(
+            stringResource(if (limit == null) R.string.course_source_no_limit else R.string.course_source_gives_nothing),
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant
+        )
+        return
+    }
+    // Пока палец на ползунке или в поле, число — человека; отпустил — снова записанное.
+    var held by remember(source.packageId) { mutableStateOf<Int?>(null) }
+    val shown = held ?: source.allocatedDoses
+    val commit = {
+        held?.let { onAllocate(source.packageId, it) }
+        held = null
+    }
+    Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+        Slider(
+            value = shown.coerceIn(0, limit).toFloat(),
+            onValueChange = { held = it.roundToInt() },
+            onValueChangeFinished = commit,
+            valueRange = 0f..limit.toFloat(),
+            steps = (limit - 1).coerceAtLeast(0),
+            enabled = enabled,
+            modifier = Modifier.weight(1f)
+        )
+        OutlinedTextField(
+            value = shown.toString(),
+            // Число приёмов целое: в поле идут только цифры, а предел держит сам курс.
+            onValueChange = { typed -> held = typed.filter(Char::isDigit).take(MAX_TYPED).toIntOrNull() ?: 0 },
+            label = { Text(stringResource(R.string.course_source_doses, limit)) },
+            singleLine = true,
+            enabled = enabled,
+            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number, imeAction = ImeAction.Done),
+            keyboardActions = KeyboardActions(onDone = { commit() }),
+            modifier = Modifier
+                .width(112.dp)
+                // Ушёл из поля — значит, дописал: число уезжает так же, как отпущенный ползунок.
+                .onFocusChanged { if (!it.isFocused && held != null) commit() }
+        )
+    }
 }
 
 /** Где коробка лежит и сколько в ней моего: полка, срок, свободное — одной строкой. */
@@ -267,6 +340,9 @@ internal fun CourseSourcesMessage.words(): String = when (this) {
         pluralStringResource(R.plurals.course_source_beyond_limit, limit, limit)
     CourseSourcesMessage.Finished -> stringResource(R.string.course_finished)
 }
+
+/** Больше трёх цифр в приёмах не бывает: это поле числа, а не место для вставленной простыни. */
+private const val MAX_TYPED = 3
 
 @Composable
 private fun DetachDialog(onConfirm: () -> Unit, onDismiss: () -> Unit) {

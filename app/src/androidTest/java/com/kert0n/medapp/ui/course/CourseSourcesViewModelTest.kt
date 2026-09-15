@@ -1,5 +1,7 @@
 package com.kert0n.medapp.ui.course
 
+import androidx.lifecycle.ViewModel
+import androidx.lifecycle.viewModelScope
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import com.kert0n.medapp.domain.value.Doses
 import com.kert0n.medapp.feature.course.CourseDrafting
@@ -28,6 +30,7 @@ import java.time.ZoneOffset
 import kotlin.time.Duration
 import kotlin.time.Duration.Companion.seconds
 import kotlin.uuid.Uuid
+import kotlinx.coroutines.cancel
 import kotlinx.coroutines.runBlocking
 import org.junit.After
 import org.junit.Assert.assertEquals
@@ -66,7 +69,15 @@ class CourseSourcesViewModelTest {
     }
 
     @After
-    fun tearDown() = database.close()
+    fun tearDown() {
+        // Экран закрывают до базы: его чтения живут, пока жив он, и закрытая из-под них база
+        // роняет соседнюю проверку, а не эту.
+        opened.forEach { it.viewModelScope.cancel() }
+        database.close()
+    }
+
+    /** Что открыто: закрывается в обратном порядке — сначала экраны, потом база. */
+    private val opened = mutableListOf<ViewModel>()
 
     private fun model(courseId: Uuid) = CourseSourcesViewModel(
         drafting = scenarios.courseDrafting,
@@ -76,7 +87,7 @@ class CourseSourcesViewModelTest {
         medKits = database.medKitRepository(),
         today = Today(clock, QuietClock),
         courseId = courseId
-    )
+    ).also { opened += it }
 
     /** Черновик с назначением и двумя подключёнными коробками: первая — с тремя приёмами. */
     private suspend fun draft(): Uuid {
@@ -101,6 +112,24 @@ class CourseSourcesViewModelTest {
         val stored = requireNotNull(database.courseRepository().findDraft(id))
         scenarios.courseDrafting.edit(id, stored.revision, listOf(CourseDrafting.Edit.Attach(third, Doses(0))))
         return id
+    }
+
+    /** Идущее лечение, которому нужно [total] приёмов: на нём видно, чем ограничен ползунок. */
+    private suspend fun startedNeeding(total: Int): Uuid {
+        val created = scenarios.courseDrafting.create("Ибупрофен")
+        val saved = scenarios.courseDrafting.edit(
+            created.id, created.revision,
+            listOf(
+                CourseDrafting.Edit.SetDose(dose("2")),
+                CourseDrafting.Edit.SetForm(TABLET_FORM),
+                CourseDrafting.Edit.SetSchedule(schedule(start = start)),
+                CourseDrafting.Edit.SetTotalDoses(Doses(total)),
+                CourseDrafting.Edit.Attach(PACK, Doses(3)),
+                CourseDrafting.Edit.Attach(OTHER_PACK, Doses(0))
+            )
+        ) as CourseDrafting.Outcome.Saved
+        scenarios.courseActivation.activate(saved.draft.id, saved.draft.revision)
+        return saved.draft.id
     }
 
     private suspend fun started(): Uuid {
@@ -203,6 +232,62 @@ class CourseSourcesViewModelTest {
         assertEquals(listOf(third, OTHER_PACK, PACK), stored.sources.map { it.pkg.id })
         // Обе записи дошли: редакция выросла дважды, а не один раз.
         assertEquals(before.number + 2, stored.revision.number)
+    }
+
+    /**
+     * Ползунок второй коробки останавливается на своём пределе и **не двигает первую**:
+     * перераспределяет человек, а не автоматика (PLAN C1 «Ползунок»). Нужно пять приёмов, первой
+     * выделено три — второй остаётся два, сколько бы человек ни тянул.
+     */
+    @Test
+    fun theSecondSliderStopsAtItsLimitAndLeavesTheFirstAlone() = runBlocking {
+        val id = startedNeeding(5)
+        val model = model(id)
+
+        watching(model.state) { state ->
+            val shown = state.awaiting(PATIENTLY) { it.sources.getOrNull(1)?.maxDoses != null }
+            assertEquals(2, shown.sources[1].maxDoses)
+            model.allocate(OTHER_PACK, 99)
+            state.awaiting(PATIENTLY) { it.sources.getOrNull(1)?.allocatedDoses == 2 }
+        }
+
+        val plan = requireNotNull(database.courseRepository().findPlan(id))
+        assertEquals(Doses(2), plan.sources.first { it.pkg.id == OTHER_PACK }.allocatedDoses)
+        assertEquals(Doses(3), plan.sources.first { it.pkg.id == PACK }.allocatedDoses)
+    }
+
+    /** Освободив первую коробку, человек сразу может отдать её приёмы второй — без кнопок. */
+    @Test
+    fun freeingTheFirstBoxRaisesTheLimitOfTheSecond(): Unit = runBlocking {
+        val id = startedNeeding(5)
+        val model = model(id)
+
+        watching(model.state) { state ->
+            state.awaiting(PATIENTLY) { it.sources.getOrNull(1)?.maxDoses == 2 }
+            model.allocate(PACK, 0)
+            state.awaiting(PATIENTLY) { it.sources.getOrNull(1)?.maxDoses == 5 }
+        }
+    }
+
+    /**
+     * У черновика обеспечения нет, и потолок — сколько даёт коробка: двадцать таблеток по две —
+     * десять приёмов, двенадцать — шесть (PLAN H3 №16).
+     */
+    @Test
+    fun aDraftSliderIsCappedByWhatTheBoxGives() = runBlocking {
+        val id = draft()
+        val model = model(id)
+
+        watching(model.state) { state ->
+            val shown = state.awaiting(PATIENTLY) { it.sources.size == 2 && it.sources[0].maxDoses != null }
+            assertEquals(10, shown.sources[0].maxDoses)
+            assertEquals(6, shown.sources[1].maxDoses)
+            model.allocate(OTHER_PACK, 99)
+            state.awaiting(PATIENTLY) { it.sources.getOrNull(1)?.allocatedDoses == 6 }
+        }
+
+        val stored = requireNotNull(database.courseRepository().findDraft(id))
+        assertEquals(Doses(6), stored.sources.first { it.pkg.id == OTHER_PACK }.allocatedDoses)
     }
 
     private companion object {

@@ -365,6 +365,9 @@
         <item quantity="many">Из этой пачки выйдет только %d приёмов.</item>
         <item quantity="other">Из этой пачки выйдет только %d приёма.</item>
     </plurals>
+    <string name="course_source_doses">Приёмов из %1$d</string>
+    <string name="course_source_no_limit">Укажите дозу и число приёмов — тогда будет что выделять.</string>
+    <string name="course_source_gives_nothing">Целой дозы здесь уже не наберётся.</string>
     <string name="course_source_fault_unit">Другая единица — снимите пачку или поправьте её сведения.</string>
     <string name="course_source_fault_form">Другая форма — снимите пачку или поправьте её сведения.</string>
     <string name="course_source_taken">Эта пачка занята другим лечением.</string>

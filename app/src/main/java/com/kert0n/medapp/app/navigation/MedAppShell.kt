@@ -273,6 +273,7 @@ private fun screens(stacks: TabStacks) = entryProvider<NavKey> {
         CourseSourcesScreen(
             state = model.state.collectAsStateWithLifecycle().value,
             onMove = model::move,
+            onAllocate = model::allocate,
             onDetach = model::askToDetach,
             onConfirmDetach = model::detach,
             onDismissDetach = model::dismissDetach,

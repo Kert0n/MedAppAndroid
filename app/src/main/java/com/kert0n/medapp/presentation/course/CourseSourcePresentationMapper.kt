@@ -4,6 +4,7 @@ import com.kert0n.medapp.domain.course.CourseCoverage
 import com.kert0n.medapp.domain.course.CourseSource
 import com.kert0n.medapp.domain.pack.PackageProjection
 import com.kert0n.medapp.domain.value.Dose
+import com.kert0n.medapp.domain.value.Doses
 import com.kert0n.medapp.presentation.value.toPresentationDTO
 
 /**
@@ -28,9 +29,19 @@ fun CourseSource.toPresentationDTO(
     allocatedDoses = allocatedDoses.count,
     allocatedAmount = dose?.times(allocatedDoses)?.toPresentationDTO(),
     coveredDoses = covered?.coveredDoses?.count,
-    maxDoses = covered?.maxDoses?.count,
+    maxDoses = (covered?.maxDoses ?: dose?.let { pack?.gives(it, fault) })?.count,
     fault = fault
 )
+
+/**
+ * Сколько целых доз даёт коробка — потолок ползунка там, где обеспечения нет (PLAN H3 №16):
+ * у черновика оно не считается, а «не больше потребности» держит зажим при начале лечения.
+ * Отключённому источнику коробка не даёт ничего: он не в той единице, чтобы считать в нём дозы.
+ */
+private fun PackageProjection.gives(dose: Dose, fault: CourseSource.Fault?): Doses? {
+    if (fault != null || availability.availableToMe.unit != dose.unit) return null
+    return availability.availableToMe.dosesIn(dose)
+}
 
 /** Коробка в выборе источника: то, чем человек её узнаёт, и сколько в ней свободно ему. */
 fun PackageProjection.toAttachmentPresentationDTO(medKitName: String?): PackageAttachmentPresentationDTO =

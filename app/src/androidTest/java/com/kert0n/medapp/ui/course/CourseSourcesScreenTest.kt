@@ -1,6 +1,11 @@
 package com.kert0n.medapp.ui.course
 
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.semantics.SemanticsActions
+import androidx.compose.ui.test.SemanticsMatcher
+import androidx.compose.ui.test.assertCountEquals
 import androidx.compose.ui.test.assertIsDisplayed
+import androidx.compose.ui.test.performTouchInput
 import androidx.compose.ui.test.junit4.v2.createComposeRule
 import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithText
@@ -31,7 +36,11 @@ class CourseSourcesScreenTest {
     @get:Rule
     val compose = createComposeRule()
 
+    /** Ползунок узнаётся по тому, что он умеет: сдвинуть значение (`SetProgress`). */
+    private val slider = SemanticsMatcher.keyIsDefined(SemanticsActions.SetProgress)
+
     private var moved: Pair<Int, Int>? = null
+    private val allocations = mutableListOf<Pair<Uuid, Int>>()
     private var detached: Uuid? = null
     private var confirmed = 0
     private var added = 0
@@ -42,6 +51,7 @@ class CourseSourcesScreenTest {
                 CourseSourcesScreen(
                     state = state,
                     onMove = { from, to -> moved = from to to },
+                    onAllocate = { id, doses -> allocations += id to doses },
                     onDetach = { detached = it },
                     onConfirmDetach = { confirmed++ },
                     onDismissDetach = {},
@@ -57,6 +67,7 @@ class CourseSourcesScreenTest {
         packageId: Uuid = PACK,
         name: String = "Нурофен",
         allocatedDoses: Int = 3,
+        maxDoses: Int? = 7,
         fault: CourseSource.Fault? = null
     ) = CourseSourcePresentationDTO(
         packageId = packageId,
@@ -67,7 +78,7 @@ class CourseSourcesScreenTest {
         allocatedDoses = allocatedDoses,
         allocatedAmount = QuantityPresentationDTO("6", TABLETS.toPresentationDTO()),
         coveredDoses = 3,
-        maxDoses = 7,
+        maxDoses = maxDoses,
         fault = fault
     )
 
@@ -136,6 +147,31 @@ class CourseSourcesScreenTest {
 
         compose.onNodeWithText("Отвязать").assertDoesNotExist()
         compose.onNodeWithText("Подключить ещё").assertDoesNotExist()
+    }
+
+    /**
+     * Во время движения ползунка не зовётся ничего, по отпусканию — ровно один раз (C1
+     * «Ползунок»): иначе каждая дрожь пальца была бы отдельным решением человека.
+     */
+    @Test
+    fun theSliderSaysNothingWhileItMovesAndOnceWhenReleased() {
+        show(CourseSourcesUiState(sources = listOf(source())))
+
+        compose.onNode(slider).performTouchInput { down(center); moveBy(Offset(120f, 0f)) }
+        assertEquals(emptyList<Pair<Uuid, Int>>(), allocations)
+
+        compose.onNode(slider).performTouchInput { up() }
+        assertEquals(1, allocations.size)
+        assertEquals(PACK, allocations.single().first)
+    }
+
+    /** Без предела выделять нечего — сказано словами, а не показан ползунок, который не двигается. */
+    @Test
+    fun withoutALimitThereIsNoSliderButThereAreWords() {
+        show(CourseSourcesUiState(sources = listOf(source(maxDoses = null))))
+
+        compose.onNodeWithText("Укажите дозу и число приёмов — тогда будет что выделять.").assertIsDisplayed()
+        compose.onAllNodes(slider).assertCountEquals(0)
     }
 
     /** Лечения больше нет — это отказ, а не пустой стек. */
