@@ -5348,10 +5348,12 @@ ANDROID_SERIAL=emulator-5554 ./gradlew :app:connectedDebugAndroidTest -Pprobe
 
 плюс греп AGENTS «Проверки» о повторе правила: границы и раскладку держит `LayerBoundariesTest`,
 и отдельными грепами их больше не смотрят.
-Эмулятор в работе — `BigLatest`; **сдаточный прогон идёт на трёх** — `BigLatest` (API 37,
-448×997 dp), `Sm29` (API 29, 360×640 dp) и `BigScaled` (масштаб 540 dpi, шрифт ×1.3, 398×887 dp),
-без `ANDROID_SERIAL` и без `-Pprobe`, а следом живой проход по экранам PR на каждом
-(AGENTS «Эмулятор»).
+Эмулятор в работе — `BigLatest` (API 37, 448×997 dp), и прогон на нём уже есть после последнего
+коммита; **перед сдачей добираются два края** — `Sm29` (API 29, 360×640 dp) и `BigScaled`
+(масштаб 540 dpi, шрифт ×1.3, 398×887 dp), **по одному за раз** (`ANDROID_SERIAL`) и без
+`-Pprobe`, а следом живой проход по экранам PR на каждом (AGENTS «Эмулятор»). Разом эмуляторы на
+одной машине мешают друг другу: замеры времени врут, а система под нагрузкой отказывает в показе
+уведомлений.
 Итог инструментальных читать из
 `app/build/outputs/androidTest-results/connected/debug/TEST-*.xml`: `AssumptionViolatedException` у
 `RegistrationProbe` — пропуск, не провал. **Эталон после приёмки 47e8f9e: 830 unit, 553
