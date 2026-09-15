@@ -84,6 +84,7 @@
     <string name="pack_amount">Количество</string>
     <string name="pack_unit">Единица</string>
     <string name="pack_optional">Остальное, если известно</string>
+    <string name="field_required">Обязательно</string>
     <string name="pack_form">Форма выпуска</string>
     <string name="pack_expires_on">Годен до</string>
     <string name="pack_expires_on_example">03.2027</string>
@@ -161,8 +162,7 @@
     <string name="pack_price_value">%1$s %2$s</string>
     <string name="pack_where">Где лежит</string>
     <string name="pack_med_kit_unknown">Аптечка неизвестна</string>
-    <string name="pack_actions">Что можно сделать</string>
-    <string name="pack_action_recount">Пересчитать или выбросить</string>
+    <string name="pack_action_recount">Пересчитать</string>
     <string name="pack_action_transfer">Перенести</string>
     <string name="pack_action_edit">Править сведения</string>
     <string name="pack_action_remove">Удалить</string>

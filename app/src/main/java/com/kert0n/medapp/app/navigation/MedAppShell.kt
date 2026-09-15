@@ -1,5 +1,6 @@
 package com.kert0n.medapp.app.navigation
 
+import androidx.compose.foundation.layout.consumeWindowInsets
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material3.Icon
@@ -38,6 +39,12 @@ import kotlin.uuid.Uuid
 /**
  * Оболочка приложения: пять мест внизу и содержимое над ними. Место, где стоит человек, живёт в
  * [NavHostController] и переживает поворот и смерть процесса — его хранит навигация, а не экран.
+ *
+ * **Отступы системы оболочка не только отдаёт, но и поглощает.** `Modifier.padding(padding)`
+ * оставляет место под строкой состояния и полосой жестов — и только; сами вставки остаются
+ * видны тому, кто внутри. Свой `Scaffold` каждого экрана берёт их второй раз, и над заголовком
+ * вырастает пустая полоса в высоту строки состояния, а под содержимым — в высоту полосы жестов.
+ * Беда одна на все экраны, поэтому и лечится она здесь, а не отключением вставок в каждом.
  */
 @Composable
 fun MedAppShell(
@@ -48,7 +55,7 @@ fun MedAppShell(
         modifier = modifier.fillMaxSize(),
         bottomBar = { MedAppBottomBar(navController) }
     ) { padding ->
-        MedAppNavHost(navController, Modifier.padding(padding))
+        MedAppNavHost(navController, Modifier.padding(padding).consumeWindowInsets(padding))
     }
 }
 
@@ -101,7 +108,14 @@ private fun MedAppNavHost(navController: NavHostController, modifier: Modifier =
         composable<Route.MedKitForm>(typeMap = mapOf(typeOf<Uuid?>() to UuidOrNoneNavType)) {
             MedKitFormRoute(onDone = { navController.popBackStack() })
         }
-        composable<Route.MedKitContents>(typeMap = mapOf(typeOf<Uuid>() to UuidNavType)) { NotReadyYet() }
+        composable<Route.MedKitContents>(typeMap = mapOf(typeOf<Uuid>() to UuidNavType)) {
+            MedKitContentsRoute(
+                onBack = { navController.popBackStack() },
+                onOpen = { navController.navigate(Route.Package(it)) },
+                onAdd = { navController.navigate(Route.PackageForm(medKitId = it)) },
+                onEdit = { navController.navigate(Route.MedKitForm(it)) }
+            )
+        }
         composable<Route.PackageForm>(typeMap = mapOf(typeOf<Uuid?>() to UuidOrNoneNavType)) {
             PackageFormRoute(
                 // Записанная коробка открывается карточкой, а форма со стека уходит: человек
@@ -131,7 +145,16 @@ private fun MedAppNavHost(navController: NavHostController, modifier: Modifier =
         composable<Route.PackageTransfer>(typeMap = mapOf(typeOf<Uuid>() to UuidNavType)) {
             PackageTransferRoute(onDone = { navController.popBackStack() })
         }
-        composable<Route.AllPackages> { NotReadyYet() }
+        // Все лекарства — тот же экран без области: аптечка не названа (PLAN H3 №5). Заводить
+        // отсюда нечего и править нечего: у всех лекарств хозяина нет.
+        composable<Route.AllPackages> {
+            MedKitContentsRoute(
+                onBack = { navController.popBackStack() },
+                onOpen = { navController.navigate(Route.Package(it)) },
+                onAdd = {},
+                onEdit = {}
+            )
+        }
         composable<Route.Plan> { NotReadyYet() }
         composable<Route.Scanner> { NotReadyYet() }
         composable<Route.Analytics> { NotReadyYet() }

@@ -256,4 +256,23 @@ class MedKitContentsViewModelTest {
         assertTrue(state.packages.isEmpty())
         assertEquals(emptyList<String>(), state.categories)
     }
+
+    /**
+     * Порядок, в котором список пришёл из чтения, состояние не переставляет: просроченные идут
+     * первыми при любой сортировке, и решает это запрос (PLAN H4), а не экран.
+     *
+     * Красная проверка: отсортировать список в состоянии — этот порядок перестанет совпадать с
+     * прочитанным.
+     */
+    @Test
+    fun theReadingOrderIsKept() {
+        val model = viewModel()
+
+        val state = watching(model.state) { it.loaded() }
+
+        assertEquals(
+            packages.packages.map { it.id },
+            state.packages.map { it.id }
+        )
+    }
 }

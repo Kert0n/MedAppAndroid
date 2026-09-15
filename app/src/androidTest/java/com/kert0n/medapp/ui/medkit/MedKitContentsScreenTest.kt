@@ -2,6 +2,7 @@ package com.kert0n.medapp.ui.medkit
 
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.junit4.v2.createComposeRule
+import androidx.compose.ui.test.onAllNodesWithText
 import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
@@ -9,6 +10,7 @@ import androidx.compose.ui.test.performScrollTo
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import com.kert0n.medapp.domain.medkit.MedKitContents
 import com.kert0n.medapp.fixture.HOME_KIT
+import com.kert0n.medapp.fixture.OTHER_PACK
 import com.kert0n.medapp.fixture.PACK
 import com.kert0n.medapp.fixture.SHARED_KIT
 import com.kert0n.medapp.fixture.expiry
@@ -24,6 +26,7 @@ import com.kert0n.medapp.ui.theme.MedAppTheme
 import java.time.LocalDate
 import kotlin.uuid.Uuid
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertTrue
 import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
@@ -193,5 +196,39 @@ class MedKitContentsScreenTest {
 
         compose.onNodeWithText("Куда перенести лекарства").assertIsDisplayed()
         compose.onNodeWithText("Дача").assertIsDisplayed()
+    }
+
+    /**
+     * Просроченная стоит первой и при любой сортировке, и экран её не переставляет: порядок —
+     * свойство чтения (PLAN H4, REQ-026), а список рисует то, что ему дали.
+     *
+     * Красная проверка: отсортировать список на экране — просроченная уедет вниз к своей букве.
+     */
+    @Test
+    fun theOrderIsTheOneTheReadingGave() {
+        show(
+            contents(
+                packages = listOf(
+                    row(PACK, "Ярлык", expiresOn = "2025-03-31"),
+                    row(OTHER_PACK, "Аспирин")
+                )
+            )
+        )
+
+        val shown = compose.onAllNodesWithText("Просрочен 03.2025").fetchSemanticsNodes()
+        assertEquals(1, shown.size)
+        // Просроченная «Ярлык» нарисована выше «Аспирина», хотя по алфавиту была бы ниже.
+        val expired = compose.onNodeWithText("Ярлык").fetchSemanticsNode().positionInRoot.y
+        val other = compose.onNodeWithText("Аспирин").fetchSemanticsNode().positionInRoot.y
+        assertTrue("просроченная уехала вниз", expired < other)
+    }
+
+    /** Просроченная не исчезает сама: без фильтра она всё равно в списке (REQ-027). */
+    @Test
+    fun anExpiredPackageDoesNotVanishOnItsOwn() {
+        show(contents(packages = listOf(row(PACK, "Ярлык", expiresOn = "2025-03-31"))))
+
+        compose.onNodeWithText("Ярлык").assertIsDisplayed()
+        compose.onNodeWithText("Просрочен 03.2025").assertIsDisplayed()
     }
 }

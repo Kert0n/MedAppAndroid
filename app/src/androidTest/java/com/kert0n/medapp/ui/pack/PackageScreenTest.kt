@@ -152,11 +152,28 @@ class PackageScreenTest {
      *
      * Красная проверка: звать сценарий прямо из кнопки — коробка исчезает без вопроса.
      */
+    /**
+     * Действия вплетены в те части, к которым относятся: пересчёт — там, где число, перенос —
+     * там, где место, а правка и удаление трогают коробку целиком и живут у окна.
+     *
+     * Красная проверка: свалить их списком в конце — человек будет искать, к чему относится
+     * кнопка, вместо того чтобы нажать на то, на что смотрит.
+     */
+    @Test
+    fun theActionsLiveWhereTheyBelong() {
+        show(card())
+
+        compose.onNodeWithContentDescription("Пересчитать").assertIsDisplayed()
+        compose.onNodeWithContentDescription("Перенести").assertIsDisplayed()
+        compose.onNodeWithContentDescription("Править сведения").assertIsDisplayed()
+        compose.onNodeWithText("Что можно сделать").assertDoesNotExist()
+    }
+
     @Test
     fun removalAsksBeforeItRemoves() {
         show(card())
 
-        compose.onNodeWithText("Удалить").performScrollTo().performClick()
+        compose.onNodeWithContentDescription("Удалить").performClick()
 
         assertEquals(1, removalAsked)
         assertEquals(0, removed)

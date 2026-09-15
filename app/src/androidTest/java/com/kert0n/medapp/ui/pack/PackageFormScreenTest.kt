@@ -1,6 +1,8 @@
 package com.kert0n.medapp.ui.pack
 
+import androidx.compose.ui.test.assertCountEquals
 import androidx.compose.ui.test.assertIsDisplayed
+import androidx.compose.ui.test.onAllNodesWithText
 import androidx.compose.ui.test.junit4.v2.createComposeRule
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
@@ -71,40 +73,50 @@ class PackageFormScreenTest {
      * Четыре обязательных поля видны сразу, а остальные есть, но не мешают: человек заводит
      * коробку, зная о ней четыре вещи (PLAN C1).
      */
+    /**
+     * Видны сразу **все** поля: прятать необязательные в свёрнутый раздел значило бы прятать
+     * половину того, что человек про коробку знает (ТЗ 4.1.1.1).
+     *
+     * Красная проверка: свернуть остальные поля — «Производитель» со «Страной» исчезнут.
+     */
     @Test
-    fun theFourRequiredFieldsAreVisibleAtOnceAndTheRestDoNotGetInTheWay() {
+    fun everyFieldIsVisibleAtOnce() {
         show()
 
         for (field in listOf("Аптечка", "Название", "Количество", "Единица")) {
             compose.onNodeWithText(field).assertIsDisplayed()
         }
-        compose.onNodeWithText("Остальное, если известно").assertIsDisplayed()
-        compose.onNodeWithText("Производитель").assertDoesNotExist()
-    }
-
-    /** Раскрытый раздел показывает все поля до одного (ТЗ 4.1.1.1). */
-    @Test
-    fun theOptionalSectionHoldsEveryOtherField() {
-        show()
-
-        compose.onNodeWithText("Остальное, если известно").performClick()
-
         for (field in listOf("Форма выпуска", "Годен до", "Категория", "Производитель", "Страна")) {
             compose.onNodeWithText(field).performScrollTo().assertIsDisplayed()
         }
     }
 
     /**
-     * Отказ в необязательном поле раскрывает раздел: подсветить свёрнутое поле значит указать
-     * человеку туда, куда он не смотрит.
-     *
-     * Красная проверка: не раскрывать раздел — поле с ошибкой остаётся невидимым.
+     * Главные поля отличает не место, а подпись «обязательно» — и она исчезает, как только поле
+     * заполнено.
      */
     @Test
-    fun aRefusalInsideTheFoldedSectionOpensIt() {
-        show(error = PackageFormError.TooLong(PackageFormError.Field.COUNTRY))
+    fun theRequiredFieldsSaySoWhileTheyAreEmpty() {
+        show()
 
-        compose.onNodeWithText("Страна").performScrollTo().assertIsDisplayed()
+        // Аптечка подставлена той, из которой человек пришёл, и о себе не просит: просят
+        // остальные три — название, количество и единица.
+        compose.onAllNodesWithText("Обязательно").assertCountEquals(3)
+    }
+
+    /** Пришли не из аптечки — просит и она: без неё коробка нигде не лежит. */
+    @Test
+    fun withoutAShelfItAsksForOneToo() {
+        show(form = PackageFormPresentationDTO())
+
+        compose.onAllNodesWithText("Обязательно").assertCountEquals(4)
+    }
+
+    @Test
+    fun aFilledRequiredFieldStopsAskingForItself() {
+        show(form = PackageFormPresentationDTO(medKitId = HOME_KIT, name = "Нурофен"))
+
+        compose.onAllNodesWithText("Обязательно").assertCountEquals(2)
     }
 
     /** Кнопка не гаснет: погашенная не объясняет, чего не хватает. */

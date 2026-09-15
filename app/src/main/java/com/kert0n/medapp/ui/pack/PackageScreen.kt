@@ -110,6 +110,22 @@ fun PackageScreen(
                             contentDescription = stringResource(R.string.action_back)
                         )
                     }
+                },
+                actions = {
+                    if (pack != null) {
+                        IconButton(onClick = onEdit) {
+                            Icon(
+                                painterResource(R.drawable.ic_edit),
+                                contentDescription = stringResource(R.string.pack_action_edit)
+                            )
+                        }
+                        IconButton(onClick = onAskToRemove) {
+                            Icon(
+                                painterResource(R.drawable.ic_delete),
+                                contentDescription = stringResource(R.string.pack_action_remove)
+                            )
+                        }
+                    }
                 }
             )
         }
@@ -128,11 +144,10 @@ fun PackageScreen(
                     .padding(16.dp),
                 verticalArrangement = Arrangement.spacedBy(12.dp)
             ) {
-                HowMuchIsThere(pack, state.holdingCourseTitle)
+                HowMuchIsThere(pack, state.holdingCourseTitle, onChangeAmount)
                 WhatItIs(pack)
                 DatesAndPrice(pack, state)
-                WhereItLies(pack, state.medKitName)
-                Actions(onChangeAmount, onTransfer, onEdit, onAskToRemove)
+                WhereItLies(pack, state.medKitName, onTransfer)
                 state.refusal?.let {
                     Text(
                         stringResource(it.text),
@@ -151,8 +166,17 @@ fun PackageScreen(
  * брони янтарным: они не беда и не просрочка, просто это лекарство заявлено не мной (PLAN D4).
  */
 @Composable
-private fun HowMuchIsThere(pack: PackagePresentationDTO, holdingCourseTitle: String?) {
-    Section(stringResource(R.string.pack_how_much)) {
+private fun HowMuchIsThere(
+    pack: PackagePresentationDTO,
+    holdingCourseTitle: String?,
+    onChangeAmount: () -> Unit
+) {
+    Section(
+        title = stringResource(R.string.pack_how_much),
+        action = R.drawable.ic_calculate,
+        actionDescription = stringResource(R.string.pack_action_recount),
+        onAction = onChangeAmount
+    ) {
         Text(pack.effective.text(), style = MaterialTheme.typography.headlineMedium)
         if (pack.availableToMe != pack.effective) {
             Fact(stringResource(R.string.pack_available_to_me), pack.availableToMe.text())
@@ -241,32 +265,18 @@ private fun DatesAndPrice(pack: PackagePresentationDTO, state: PackageUiState) {
 
 /** Где лежит: аптечка и заметка человека — то, что помогает найти коробку руками. */
 @Composable
-private fun WhereItLies(pack: PackagePresentationDTO, medKitName: String?) {
-    Section(stringResource(R.string.pack_where)) {
+private fun WhereItLies(pack: PackagePresentationDTO, medKitName: String?, onTransfer: () -> Unit) {
+    Section(
+        title = stringResource(R.string.pack_where),
+        action = R.drawable.ic_move_down,
+        actionDescription = stringResource(R.string.pack_action_transfer),
+        onAction = onTransfer
+    ) {
         Fact(
             stringResource(R.string.pack_med_kit),
             medKitName ?: stringResource(R.string.pack_med_kit_unknown)
         )
         pack.note?.let { Fact(stringResource(R.string.pack_note), it) }
-    }
-}
-
-/**
- * Что с упаковкой можно сделать. Правка меняет описание и только его: количество двигают пересчёт
- * и утилизация, место — перенос. Удаление стоит последним и спрашивается: остальное обратимо.
- */
-@Composable
-private fun Actions(
-    onChangeAmount: () -> Unit,
-    onTransfer: () -> Unit,
-    onEdit: () -> Unit,
-    onRemove: () -> Unit
-) {
-    Section(stringResource(R.string.pack_actions)) {
-        Action(R.drawable.ic_calculate, R.string.pack_action_recount, onChangeAmount)
-        Action(R.drawable.ic_move_down, R.string.pack_action_transfer, onTransfer)
-        Action(R.drawable.ic_edit, R.string.pack_action_edit, onEdit)
-        Action(R.drawable.ic_delete, R.string.pack_action_remove, onRemove)
     }
 }
 
@@ -286,22 +296,36 @@ private fun RemovalDialog(onConfirm: () -> Unit, onDismiss: () -> Unit) {
     )
 }
 
+/**
+ * Часть карточки. Действие живёт **в заголовке своей части**, а не списком в конце: пересчёт
+ * стоит там, где число, перенос — там, где место. Так человек нажимает на то, на что смотрит, а
+ * не ищет по экрану, к чему относится кнопка. Правка и удаление трогают коробку целиком, и живут
+ * они у окна — в верхней панели.
+ */
 @Composable
-private fun Action(@DrawableRes icon: Int, @StringRes text: Int, onClick: () -> Unit) {
-    TextButton(
-        onClick = onClick,
-        modifier = Modifier.fillMaxWidth().defaultMinSize(minHeight = 48.dp)
-    ) {
-        Icon(painterResource(icon), contentDescription = null)
-        Text(stringResource(text), modifier = Modifier.padding(start = 8.dp).weight(1f))
-    }
-}
-
-@Composable
-private fun Section(title: String, content: @Composable () -> Unit) {
-    ElevatedCard(Modifier.fillMaxWidth()) {
+private fun Section(
+    title: String,
+    modifier: Modifier = Modifier,
+    @DrawableRes action: Int? = null,
+    actionDescription: String? = null,
+    onAction: (() -> Unit)? = null,
+    content: @Composable () -> Unit
+) {
+    ElevatedCard(modifier.fillMaxWidth()) {
         Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-            Text(title, style = MaterialTheme.typography.titleSmall, color = MaterialTheme.colorScheme.primary)
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Text(
+                    title,
+                    style = MaterialTheme.typography.titleSmall,
+                    color = MaterialTheme.colorScheme.primary,
+                    modifier = Modifier.weight(1f)
+                )
+                if (action != null && onAction != null) {
+                    IconButton(onClick = onAction) {
+                        Icon(painterResource(action), contentDescription = actionDescription)
+                    }
+                }
+            }
             content()
         }
     }

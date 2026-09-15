@@ -5,9 +5,15 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.defaultMinSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.items
 import androidx.compose.material3.DatePicker
+import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.items
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.DatePickerDialog
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
@@ -47,6 +53,7 @@ private val DAY: DateTimeFormatter = DateTimeFormatter.ofPattern("dd.MM.uuuu")
  * по проверке.
  *
  * Пустой список — не молчание: сказать «выбирать не из чего» важнее, чем показать пустое меню.
+ * [supporting] — подпись для всего остального: например, «обязательно» у незаполненного поля.
  */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -58,7 +65,8 @@ fun <T> PickerField(
     onPick: (T) -> Unit,
     modifier: Modifier = Modifier,
     isError: Boolean = false,
-    emptyText: String? = null
+    emptyText: String? = null,
+    supporting: String? = null
 ) {
     var open by remember { mutableStateOf(false) }
     ExposedDropdownMenuBox(
@@ -72,10 +80,10 @@ fun <T> PickerField(
             readOnly = true,
             isError = isError,
             label = { Text(label) },
-            supportingText = if (options.isEmpty() && emptyText != null) {
-                { Text(emptyText) }
-            } else {
-                null
+            // «Выбирать не из чего» важнее, чем «обязательно»: второе человек и так исправить
+            // не может, пока нечего выбрать.
+            supportingText = (emptyText?.takeIf { options.isEmpty() } ?: supporting)?.let {
+                { Text(it) }
             },
             trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(open) },
             modifier = Modifier
@@ -83,19 +91,75 @@ fun <T> PickerField(
                 .fillMaxWidth()
                 .defaultMinSize(minHeight = 48.dp)
         )
-        ExposedDropdownMenu(expanded = open, onDismissRequest = { open = false }) {
-            for (option in options) {
-                DropdownMenuItem(
-                    text = { Text(optionText(option)) },
-                    onClick = {
-                        onPick(option)
-                        open = false
-                    }
-                )
+        // Короткий список показывается меню, длинный — списком в окне: меню Material меряет
+        // содержимое `IntrinsicSize.Max`, и ленивый список внутрь него не встаёт вовсе.
+        if (options.size <= MENU_MAX_OPTIONS) {
+            ExposedDropdownMenu(expanded = open, onDismissRequest = { open = false }) {
+                for (option in options) {
+                    DropdownMenuItem(
+                        text = { Text(optionText(option)) },
+                        onClick = {
+                            onPick(option)
+                            open = false
+                        }
+                    )
+                }
             }
         }
     }
+    if (open && options.size > MENU_MAX_OPTIONS) {
+        LongChoice(label, options, optionText, onPick = {
+            onPick(it)
+            open = false
+        }, onDismiss = { open = false })
+    }
 }
+
+/**
+ * Длинный список — **окном с ленивым списком**, а не выпадающим меню.
+ *
+ * Меню Material меряет своё содержимое `IntrinsicSize.Max`, и ленивый список туда не встаёт:
+ * он отвечает только за то, что видно, а «сколько ты хочешь в идеале» не знает. Обычная же
+ * колонка складывает и перемеряет **все** пункты сразу — на двухстах формах выпуска из
+ * встроенного словаря это шестьсот с лишним узлов, и прокрутка спотыкается. Отсюда правило:
+ * пока пунктов немного, меню; как только их много — список, который держит только видимое.
+ *
+ * Длина приходит не от экрана, а из словаря, и длинной она может стать снова (issue #36).
+ */
+@Composable
+private fun <T> LongChoice(
+    label: String,
+    options: List<T>,
+    optionText: (T) -> String,
+    onPick: (T) -> Unit,
+    onDismiss: () -> Unit
+) {
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text(label) },
+        text = {
+            LazyColumn(Modifier.heightIn(max = LONG_CHOICE_MAX_HEIGHT)) {
+                items(options) { option ->
+                    TextButton(
+                        onClick = { onPick(option) },
+                        modifier = Modifier.fillMaxWidth().defaultMinSize(minHeight = 48.dp)
+                    ) {
+                        Text(optionText(option), modifier = Modifier.fillMaxWidth())
+                    }
+                }
+            }
+        },
+        confirmButton = {
+            TextButton(onClick = onDismiss) { Text(stringResource(R.string.action_cancel)) }
+        }
+    )
+}
+
+/** Сколько пунктов ещё показывает меню: дальше начинается список. */
+private const val MENU_MAX_OPTIONS = 12
+
+/** Насколько отрастает список выбора, прежде чем начать прокручиваться. */
+private val LONG_CHOICE_MAX_HEIGHT = 420.dp
 
 /**
  * Дата, которую называет календарь. Печатать её строкой незачем: выбранная дата уже дата, и

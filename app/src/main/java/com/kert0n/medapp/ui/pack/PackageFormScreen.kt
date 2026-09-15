@@ -95,13 +95,6 @@ fun PackageFormScreen(
     onChangeAmount: () -> Unit = {}
 ) {
     val form = state.form
-    // Раскрыт ли раздел — дело самого экрана, а не состояния: за ним не стоит ни записи, ни
-    // действия, и переживать смерть процесса ему достаточно через rememberSaveable.
-    var optionalShown by rememberSaveable { mutableStateOf(false) }
-    // Отказ в необязательном поле бесполезен, пока раздел свёрнут: человек не видит, что чинить.
-    LaunchedEffect(state.error) {
-        if (state.error?.field?.isRequired == false) optionalShown = true
-    }
     Scaffold(
         modifier = modifier.fillMaxSize(),
         topBar = {
@@ -152,13 +145,15 @@ fun PackageFormScreen(
                     optionText = { it.name },
                     onPick = { onEdit(form.copy(medKitId = it.id)) },
                     isError = state.error?.field == PackageFormError.Field.MED_KIT,
-                    emptyText = stringResource(R.string.pack_no_med_kits)
+                    emptyText = stringResource(R.string.pack_no_med_kits),
+                    supporting = if (form.medKitId == null) stringResource(R.string.field_required) else null
                 )
             }
             OutlinedTextField(
                 value = form.name,
                 onValueChange = { onEdit(form.copy(name = it)) },
                 label = { Text(stringResource(R.string.pack_name)) },
+                supportingText = required(form.name.isBlank()),
                 isError = state.error?.field == PackageFormError.Field.NAME,
                 singleLine = true,
                 modifier = Modifier.fillMaxWidth()
@@ -168,6 +163,7 @@ fun PackageFormScreen(
                     value = form.amount,
                     onValueChange = { onEdit(form.copy(amount = it)) },
                     label = { Text(stringResource(R.string.pack_amount)) },
+                    supportingText = required(form.amount.isBlank()),
                     isError = state.error?.field == PackageFormError.Field.AMOUNT,
                     singleLine = true,
                     keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
@@ -180,17 +176,17 @@ fun PackageFormScreen(
                     optionText = { it.name },
                     onPick = { onEdit(form.copy(unit = it)) },
                     isError = state.error?.field == PackageFormError.Field.UNIT,
+                    supporting = if (form.unit == null) stringResource(R.string.field_required) else null,
                     modifier = Modifier.weight(1f)
                 )
             }
 
-            ExpandableSection(
-                title = stringResource(R.string.pack_optional),
-                expanded = optionalShown,
-                onToggle = { optionalShown = !optionalShown }
-            ) {
-                Optional(state, onEdit)
-            }
+            Text(
+                stringResource(R.string.pack_optional),
+                style = MaterialTheme.typography.titleSmall,
+                color = MaterialTheme.colorScheme.primary
+            )
+            Optional(state, onEdit)
 
             state.error?.let { reason ->
                 Text(
@@ -290,6 +286,20 @@ private fun Optional(state: PackageFormUiState, onEdit: (PackageFormPresentation
         )
     }
 }
+
+/**
+ * Подпись «обязательно» у незаполненного главного поля. Полей четырнадцать, и все они видны
+ * сразу — прятать необязательные в свёрнутый раздел значило бы прятать половину того, что
+ * человек про коробку знает. Отличает главные не место, а эта подпись: она исчезает, как только
+ * поле заполнено.
+ */
+@Composable
+private fun required(empty: Boolean): (@Composable () -> Unit)? =
+    if (empty) {
+        { Text(stringResource(R.string.field_required)) }
+    } else {
+        null
+    }
 
 /**
  * Сведение, которое форма показывает, но не правит: его меняют другим действием и с другим
