@@ -4757,18 +4757,28 @@ API», «`followBox`» — закрыто, «Отказ разобран», «С
 
 | # | коммит | содержание |
 |---|---|---|
-| 29 | `PLAN: приёмка 47e8f9e — четыре болезни` | модель до кода: C1, D5, D8, E6, I3 |
-| 30 | `Конец коробки — у владельца реакции` | `PackageFollowing.lost`, `CourseFollowing.lost`; `CourseDao.releaseSource` удалён; `PackageDao.end` и `QueueRoomStorage.withdrawn`/`layDown` зовут владельца; страж переходов курса |
-| 31 | `Потребность перестраивает будущее одной дверью` | `CourseOffPlanCounting` → `calendar.replan` |
-| 32 | `Карточка без основания гасится, пока не погашена` | `Reminder.cardIsUp`, `noticedAt`; проход гасит первым шагом |
-| 33 | `Сверка при старте процесса — тоже повод` | `NotificationUpkeep` с начальным проходом |
-| 34 | `Пропуск — учётки` | `AccessTokens.forget`, зовёт `AccountRegistration.replaceUnreadable` |
-| 35 | `Часы устройства — в его нынешней зоне` | `platform/DeviceClock`; метка ежедневной задачи с зоной; `DailyWorker` зовёт `keepDaily` |
-| 36 | `Строка отчёта — по предмету и единице` | `Spending.of` — коробки по `(packageId, unit)` |
-| 37 | `Предупреждение — провал везде` | `allWarningsAsErrors` у Kotlin, `warningsAsErrors` у lint, предупреждения сняты; домен без чужих импортов (`LayerBoundariesTest`); `capture-vocabulary.sh` — секреты через stdin |
-| 38 | `PLAN: итог приёмки` | I3, эталон J1 |
+| 29 | `PLAN: приёмка 47e8f9e — четыре болезни` | **сделан** — модель до кода: C1, D5, D8, E6, I3 |
+| 30 | `Конец коробки — у владельца реакции` | **сделан** — `PackageFollowing.lost`, `CourseFollowing.lost`; `CourseDao.releaseSource` удалён; `PackageDao.end` и `QueueRoomStorage.withdrawn`/`layDown` зовут владельца; страж `LayerBoundariesTest.courseTransitionsBelongToTheirOwner` |
+| 31 | `Потребность перестраивает будущее одной дверью` | **сделан** — `CourseOffPlanCounting` → `calendar.replan` |
+| 32 | `Карточка без основания гасится, пока не погашена` | **сделан** — `Reminder.cardIsUp`, `noticedAt`; проход гасит первым шагом; `groundless()` вместо `withdrawn()` |
+| 33 | `Сверка при старте процесса — тоже повод` | **сделан** — начальный проход у всех трёх циклов, `initialPass` ушёл |
+| 34 | `Пропуск — учётки` | **сделан** — `AccessTokens.forget`, зовёт `AccountRegistration.replaceUnreadable` |
+| 35 | `Часы устройства — в его нынешней зоне` | **сделан** — `platform/time/DeviceClock`; метка ежедневной задачи с зоной; `DailyWorker` зовёт `keepDaily` |
+| 36 | `Строка отчёта — по предмету и единице` | **сделан** — `Spending.of` — коробки по `(packageId, unit)` |
+| 37 | `Предупреждение — провал везде` | **сделан** — `allWarningsAsErrors` у Kotlin, `warningsAsErrors` у lint, 34 + 11 сняты; значок запуска — PNG-запаски удалены, тематический слой тем же передним планом (свой значок — U-серия); домен без чужих импортов (`LayerBoundariesTest.theDomainImportsNothingForeign`); `capture-vocabulary.sh` — секреты через stdin |
+| 38 | `PLAN: итог приёмки` | **сделан** — I3, эталон J1 |
 
-**Тесты.** Тесты до фиксов, красные прогоны — в описании #31.
+**Тесты.** Тесты до фиксов, красные прогоны — в описании #31: `CourseFollowingTest.aLostBoxIsTheSameConsequence`
+(«о потере обеспечения не сказано: []»), `…bringingHomeIsTheSameConsequence` («лечение не последовало …
+expected:<Doses(6)> but was:<Doses(10)>»), `LayerBoundariesTest.courseTransitionsBelongToTheirOwner`
+(назвал `CourseDao.releaseSource`), `CourseOffPlanCountingTest.loweringTheCountBackRestoresTheCalendar`
+(«expected:<6> but was:<4>»), `NotificationProtocolTest.aFailedDismissIsRepeatedByTheNextPass` и
+`…aStaleNoticeDiesOnAColdStartWithoutTheDailyRound» («не дождались: …»),
+`MedAppAuthTest.replacingTheAccountLeavesNoPassOfTheOldOne» («[Bearer t1, Bearer t1]»),
+`DeviceClockTest.theZoneFollowsTheDevice`, `DailyWorkerTest.aZoneChangeReschedulesTheDay`,
+`SpendingTest.aBoxInTwoHistoricalUnitsIsTwoRowsNotAFailure` («величины в разных единицах не считаются
+вместе»), `LayerBoundariesTest.theDomainImportsNothingForeign`. На эмуляторе: настоящий `MedApp` после
+30, 33, 35 и 37, смена зоны `cmd alarm set-timezone` — `DailyWorker` `SUCCESS`, `FATAL` нет.
 
 ### B21 — переходы операции у типа (#32, `queue/operation-transitions`, стеком на #31) — **сделан**
 
@@ -5315,8 +5325,8 @@ ANDROID_SERIAL=emulator-5554 ./gradlew :app:connectedDebugAndroidTest -Pprobe
 и отдельными грепами их больше не смотрят.
 Эмулятор — уже запущенный `emulator-5554`, новых не поднимать. Итог инструментальных читать из
 `app/build/outputs/androidTest-results/connected/debug/TEST-*.xml`: `AssumptionViolatedException` у
-`RegistrationProbe` — пропуск, не провал. **Эталон после B21: 825 unit, 547
-инструментальных, 2 пропуска (`RegistrationProbe`, `CrptProbe`), 0 провалов** (после B20 — 813 и 544; после B19 — 788 и 506; после B18 — 764 и 505; после B17 — 752 и 475; после третьей части B17 было 747 и 468; после первой части B17 было 738 и 452 — журнал показов
+`RegistrationProbe` — пропуск, не провал. **Эталон после приёмки 47e8f9e: 830 unit, 553
+инструментальных, 2 пропуска (`RegistrationProbe`, `CrptProbe`), 0 провалов** (после B21 — 825 и 547; после B20 — 813 и 544; после B19 — 788 и 506; после B18 — 764 и 505; после B17 — 752 и 475; после третьей части B17 было 747 и 468; после первой части B17 было 738 и 452 — журнал показов
 ушёл вместе со своими проверками, а обязательства принесли свои; после B16 — 730 и 422) —
 каждый PR записывает свой. **Эталон времени после B20** (`HundredMedKitsTest`, `BigLatest`, 100 полок /
 1 000 пачек / 50 лечений / год приёмов): список полок 1 мс, все лекарства 46 мс, снимок ста полок
