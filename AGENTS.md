@@ -323,12 +323,14 @@ node scripts/add-icon.mjs medical_services --as tab_med_kits
 ```bash
 # `*` у gradle идёт сквозь точки, поэтому корневые тесты называются поимённо, а не `medapp.*Test`
 ./gradlew :app:testDebugUnitTest --tests 'com.kert0n.medapp.presentation.pack.*' \
-  --tests 'com.kert0n.medapp.LayerBoundariesTest' --tests 'com.kert0n.medapp.CancellationSafetyTest'
-# `package=` берёт один пакет с подпакетами; список через запятую молча теряет всё после первого
-for p in ui.pack app; do
-  ANDROID_SERIAL=emulator-5554 ./gradlew :app:connectedDebugAndroidTest \
-    -Pandroid.testInstrumentationRunnerArguments.package=com.kert0n.medapp.$p || break
-done
+  --tests 'com.kert0n.medapp.LayerBoundariesTest' --tests 'com.kert0n.medapp.CancellationSafetyTest' \
+  --tests 'com.kert0n.medapp.ClaimOwnershipTest' --tests 'com.kert0n.medapp.NotificationOwnershipTest'
+# `package=` берёт один пакет с подпакетами; список через запятую молча теряет всё после первого,
+# поэтому пакеты идут по одному через `&&` — провал первого останавливает второй и остаётся провалом
+ANDROID_SERIAL=emulator-5554 ./gradlew :app:connectedDebugAndroidTest \
+  -Pandroid.testInstrumentationRunnerArguments.package=com.kert0n.medapp.ui.pack &&
+ANDROID_SERIAL=emulator-5554 ./gradlew :app:connectedDebugAndroidTest \
+  -Pandroid.testInstrumentationRunnerArguments.package=com.kert0n.medapp.app
 ```
 
 Отфильтрованный прогон пишет отчёты только по своим классам, и счёт из XML — счёт группы, а не
