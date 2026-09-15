@@ -28,6 +28,7 @@ import com.kert0n.medapp.presentation.pack.MedKitContentsViewModel
 import com.kert0n.medapp.presentation.pack.PackageCardViewModel
 import com.kert0n.medapp.presentation.pack.PackageFormViewModel
 import com.kert0n.medapp.presentation.pack.PackageRecountViewModel
+import com.kert0n.medapp.presentation.pack.PackageTransferViewModel
 import com.kert0n.medapp.ui.EmptyState
 import com.kert0n.medapp.ui.medkit.MedKitContentsScreen
 import com.kert0n.medapp.ui.medkit.MedKitFormScreen
@@ -35,6 +36,7 @@ import com.kert0n.medapp.ui.medkit.MedKitListScreen
 import com.kert0n.medapp.ui.pack.PackageCardScreen
 import com.kert0n.medapp.ui.pack.PackageFormScreen
 import com.kert0n.medapp.ui.pack.PackageRecountScreen
+import com.kert0n.medapp.ui.pack.PackageTransferScreen
 
 /**
  * Оболочка приложения: пять мест внизу и содержимое над ними. Где человек стоит и как глубоко —
@@ -160,8 +162,7 @@ private fun screens(stacks: TabStacks) = entryProvider<NavKey> {
             state = state,
             onEdit = { stacks.go(Screen.PackageForm(packageId = key.packageId)) },
             onRecount = { stacks.go(Screen.PackageRecount(key.packageId)) },
-            // Перенос — следующий экран набора; пока вести некуда.
-            onTransfer = {},
+            onTransfer = { stacks.go(Screen.PackageTransfer(key.packageId)) },
             onAskToRemove = model::askToRemove,
             onConfirmRemoval = model::remove,
             onDismissRemoval = model::dismissRemoval,
@@ -183,6 +184,21 @@ private fun screens(stacks: TabStacks) = entryProvider<NavKey> {
             onCancel = stacks::back,
             onConfirmEmptying = model::confirmEmptying,
             onDismissEmptying = model::dismissEmptying
+        )
+    }
+    entry<Screen.PackageTransfer> { key ->
+        val model = hiltViewModel<PackageTransferViewModel, PackageTransferViewModel.Factory>(
+            key = key.toString(),
+            creationCallback = { factory -> factory.create(key.packageId) }
+        )
+        val state = model.state.collectAsStateWithLifecycle().value
+        // Переехала или поехала — решение принято, и экран уходит: новое место покажет карточка.
+        LaunchedEffect(state.isDone) { if (state.isDone) stacks.back() }
+        PackageTransferScreen(
+            state = state,
+            onChoose = model::choose,
+            onTransfer = model::transfer,
+            onBack = stacks::back
         )
     }
     for (place in Place.entries - Place.MED_KITS) {

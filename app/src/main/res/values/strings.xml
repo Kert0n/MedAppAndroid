@@ -198,6 +198,15 @@
     <string name="recount_zero_confirm">Да, коробка кончилась</string>
     <string name="recount_busy">Упаковка ждёт ответа сервера на другое решение — пересчёт пока не записать.</string>
 
+    <!-- Перенос упаковки -->
+    <string name="transfer_title">Куда перенести</string>
+    <string name="transfer_shared">Общая аптечка</string>
+    <string name="transfer_nowhere">Переносить некуда: другой аптечки пока нет. Заведите вторую — и коробку будет куда положить.</string>
+    <string name="transfer_busy">Упаковка ждёт ответа сервера на другое решение — перенести её пока нельзя.</string>
+    <string name="transfer_origin_busy">Аптечка, из которой несут, ждёт ответа сервера на своё решение.</string>
+    <string name="transfer_target_gone">Выбранной аптечки больше нет — выберите другую.</string>
+    <string name="transfer_target_busy">Выбранная аптечка ждёт ответа сервера — класть в неё пока рано.</string>
+
     <!-- Русские количества: «1 упаковка», «2 упаковки», «12 упаковок» -->
     <plurals name="packages_count">
         <item quantity="one">%d упаковка</item>

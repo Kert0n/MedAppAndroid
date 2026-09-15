@@ -3,6 +3,7 @@ package com.kert0n.medapp.app.navigation
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.junit4.v2.createAndroidComposeRule
 import androidx.compose.ui.test.onAllNodesWithText
+import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performScrollTo
@@ -85,6 +86,47 @@ class LocalRecordsJourneyTest {
      */
     @Test
     fun aBoxIsAddedOpenedAndRecountedAndTheCardShowsTheNewNumber() {
+        aShelfWithABox()
+
+        compose.onNodeWithText("Пересчитать").performClick()
+        compose.waitUntil { compose.onAllNodesWithText("Сейчас записано: 20 таблетка").fetchSemanticsNodes().isNotEmpty() }
+        compose.onNodeWithText("Пересчитал и увидел").performTextInput("17")
+        compose.onNodeWithText("Записать").performClick()
+
+        compose.waitUntil { compose.onAllNodesWithText("17 таблетка").fetchSemanticsNodes().isNotEmpty() }
+        compose.onNodeWithText("Сколько есть").assertIsDisplayed()
+    }
+
+    /**
+     * До каждого экрана набора можно дойти руками и вернуться: правка, пересчёт, перенос — с
+     * карточки, и назад к ней; с карточки — на полку, с полки — к списку.
+     */
+    @Test
+    fun everyScreenOfTheSetIsReachableAndLeadsBack() {
+        aShelfWithABox()
+
+        compose.onNodeWithText("Перенести").performScrollTo().performClick()
+        compose.waitUntil { compose.onAllNodesWithText("Куда перенести").fetchSemanticsNodes().isNotEmpty() }
+        compose.onNodeWithText("Переносить некуда", substring = true).assertIsDisplayed()
+        back()
+        compose.waitUntil { compose.onAllNodesWithText("Сколько есть").fetchSemanticsNodes().isNotEmpty() }
+
+        compose.onNodeWithContentDescription("Править сведения").performClick()
+        compose.waitUntil { compose.onAllNodesWithText("Правка упаковки").fetchSemanticsNodes().isNotEmpty() }
+        back()
+        compose.waitUntil { compose.onAllNodesWithText("Сколько есть").fetchSemanticsNodes().isNotEmpty() }
+
+        back()
+        compose.waitUntil { compose.onAllNodesWithText("Поиск по аптечке").fetchSemanticsNodes().isNotEmpty() }
+        compose.onNodeWithText("Нурофен").assertIsDisplayed()
+
+        back()
+        compose.waitUntil { compose.onAllNodesWithText("Найти лекарство во всех аптечках").fetchSemanticsNodes().isNotEmpty() }
+        compose.onNodeWithText("1 упаковка").assertIsDisplayed()
+    }
+
+    /** Полка «Домашняя» с коробкой «Нурофен, 20 таблетка», открытой карточкой. */
+    private fun aShelfWithABox() {
         compose.onNodeWithText("Завести аптечку").performClick()
         compose.onNodeWithText("Название").performTextInput("Домашняя")
         compose.onNodeWithText("Сохранить").performScrollTo().performClick()
@@ -101,13 +143,8 @@ class LocalRecordsJourneyTest {
         // Заведённая коробка открывается карточкой: человек заводил её, чтобы посмотреть.
         compose.waitUntil { compose.onAllNodesWithText("Сколько есть").fetchSemanticsNodes().isNotEmpty() }
         compose.onNodeWithText("20 таблетка").assertIsDisplayed()
-
-        compose.onNodeWithText("Пересчитать").performClick()
-        compose.waitUntil { compose.onAllNodesWithText("Сейчас записано: 20 таблетка").fetchSemanticsNodes().isNotEmpty() }
-        compose.onNodeWithText("Пересчитал и увидел").performTextInput("17")
-        compose.onNodeWithText("Записать").performClick()
-
-        compose.waitUntil { compose.onAllNodesWithText("17 таблетка").fetchSemanticsNodes().isNotEmpty() }
-        compose.onNodeWithText("Сколько есть").assertIsDisplayed()
     }
+
+    /** Возврат кнопкой: у каждого экрана набора она в панели. */
+    private fun back() = compose.onNodeWithContentDescription("Назад").performClick()
 }

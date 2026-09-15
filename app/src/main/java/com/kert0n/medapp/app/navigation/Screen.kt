@@ -62,4 +62,8 @@ sealed interface Screen : NavKey {
     /** Пересчёт (PLAN H3 №9): одно число, которое человек увидел в коробке. */
     @Serializable
     data class PackageRecount(val packageId: Uuid) : Screen
+
+    /** Перенос на другую полку (PLAN H3 №11): выбор места, куда положить коробку. */
+    @Serializable
+    data class PackageTransfer(val packageId: Uuid) : Screen
 }
