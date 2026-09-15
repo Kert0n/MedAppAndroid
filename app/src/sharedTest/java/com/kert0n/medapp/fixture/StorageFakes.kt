@@ -30,7 +30,19 @@ import com.kert0n.medapp.queue.StoredSyncOperation
 import com.kert0n.medapp.queue.SyncOperation
 import com.kert0n.medapp.queue.Take
 import com.kert0n.medapp.queue.Transactions
+import com.kert0n.medapp.domain.course.CourseCompletion
+import com.kert0n.medapp.domain.course.CourseCoverage
+import com.kert0n.medapp.domain.course.CourseDraft
+import com.kert0n.medapp.domain.course.CourseDraftProjection
+import com.kert0n.medapp.domain.course.CourseProjection
+import com.kert0n.medapp.domain.course.CourseRecord
+import com.kert0n.medapp.domain.course.CourseRecordProjection
+import com.kert0n.medapp.domain.course.CoverageReduction
+import com.kert0n.medapp.domain.course.Revision
+import com.kert0n.medapp.domain.intake.CourseIntake
+import com.kert0n.medapp.domain.report.CourseInProgress
 import com.kert0n.medapp.storage.course.CourseReallocation
+import com.kert0n.medapp.storage.course.CourseStorageRepository
 import com.kert0n.medapp.storage.medkit.MedKitStorageRepository
 import com.kert0n.medapp.storage.pack.PackageAdjustment
 import com.kert0n.medapp.storage.pack.PackageQuery
@@ -322,4 +334,68 @@ class FakeFollowing : PackageFollowing {
     override suspend fun lost(pkg: PackageRef, at: Instant) {
         followed += pkg.id
     }
+}
+
+/**
+ * Лечение, которого нет. Экраны локального учёта курсов не касаются: коробку они заводят,
+ * правят и убирают, а что при этом делает курс, проверяется на нём самом
+ * (`CourseFollowingTest`, `PackageRelocationTest`). Подделка отвечает только на два вопроса
+ * переноса — «кто держит коробку» и «кто на неё ссылается», — и на оба честно: никто.
+ *
+ * Остальные двери падают, а не отвечают выдуманным: сценарий, который сюда заглянул, пришёл не
+ * за тем, чем занят экран, и молчаливый пустой ответ спрятал бы это от проверки.
+ */
+class FakeCourses : CourseStorageRepository {
+
+    override suspend fun courseHolding(packageId: Uuid): Uuid? = null
+
+    override suspend fun holdersOf(packageId: Uuid): List<Uuid> = emptyList()
+
+    override fun observeDrafts(): Flow<List<CourseDraftProjection>> = noCourses()
+
+    override fun observePlan(id: Uuid): Flow<CourseProjection?> = noCourses()
+
+    override fun observeCoverage(id: Uuid): Flow<CourseCoverage?> = noCourses()
+
+    override fun observeCoverages(): Flow<Map<Uuid, CourseCoverage>> = noCourses()
+
+    override fun observeReductions(courseId: Uuid): Flow<List<CoverageReduction>> = noCourses()
+
+    override suspend fun reductionsSince(courseId: Uuid, since: Instant): List<CoverageReduction> = noCourses()
+
+    override suspend fun recentReductions(since: Instant): List<CoverageReduction> = noCourses()
+
+    override suspend fun findDraft(id: Uuid): CourseDraft? = noCourses()
+
+    override suspend fun findPlan(id: Uuid): Course? = noCourses()
+
+    override suspend fun planIds(): List<Uuid> = noCourses()
+
+    override suspend fun saveDraft(draft: CourseDraft, expected: Revision?): Boolean = noCourses()
+
+    override suspend fun discardDraft(id: Uuid): Boolean = noCourses()
+
+    override fun observeRecords(): Flow<List<CourseRecordProjection>> = noCourses()
+
+    override fun observeRecord(id: Uuid): Flow<CourseRecordProjection?> = noCourses()
+
+    override suspend fun findRecord(id: Uuid): CourseRecord? = noCourses()
+
+    override suspend fun rename(id: Uuid, title: String, note: String?): Boolean = noCourses()
+
+    override suspend fun planInProgress(id: Uuid): CourseInProgress? = noCourses()
+
+    override suspend fun recordReduction(reduction: CoverageReduction): Unit = noCourses()
+
+    override suspend fun amend(course: Course, expected: Revision): Boolean = noCourses()
+
+    override suspend fun reallocate(reallocation: CourseReallocation): Boolean = noCourses()
+
+    override suspend fun updateSources(course: Course, expected: Revision): Boolean = noCourses()
+
+    override suspend fun activate(activation: CourseDraft.Activation, planned: List<CourseIntake>): Unit = noCourses()
+
+    override suspend fun close(closing: CourseCompletion.Closing): Unit = noCourses()
+
+    private fun noCourses(): Nothing = error("курсы проверяются на себе, а не на экране учёта")
 }

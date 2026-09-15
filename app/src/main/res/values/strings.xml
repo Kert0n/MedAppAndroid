@@ -118,6 +118,52 @@
     <string name="price_unknown_currency">Валюта неизвестна.</string>
     <string name="price_too_big">Такой цены не бывает.</string>
 
+    <!-- Содержимое полки и все лекарства -->
+    <string name="contents_everywhere_title">Все лекарства</string>
+    <string name="contents_search_here">Поиск по аптечке</string>
+    <string name="contents_search_everywhere">Поиск по всем аптечкам</string>
+    <string name="contents_search_clear">Очистить поиск</string>
+    <string name="contents_menu">Что сделать с аптечкой</string>
+    <string name="contents_edit">Править</string>
+    <string name="contents_remove">Убрать</string>
+    <string name="contents_add">Завести упаковку</string>
+    <string name="contents_empty_here">Здесь пока ничего нет. Заведите упаковку — и она появится в списке.</string>
+    <string name="contents_empty_everywhere">Во всех аптечках пока пусто.</string>
+    <string name="contents_nothing_found">Ничего не нашлось.</string>
+    <string name="contents_reset">Сбросить</string>
+    <string name="narrow_expired">Просроченные</string>
+    <string name="narrow_expiring_soon">Скоро истекают</string>
+    <string name="narrow_on_course">На курсе</string>
+    <string name="narrow_has_free">Есть свободное</string>
+    <string name="narrow_category">Категория</string>
+    <string name="narrow_form">Форма</string>
+    <string name="order_label">Сортировка: %1$s</string>
+    <string name="order_name">по названию</string>
+    <string name="order_expiry">по сроку</string>
+    <string name="order_added_at">по добавлению</string>
+    <string name="order_quantity">по количеству</string>
+    <string name="pack_expired_on">Просрочен %1$s</string>
+    <string name="pack_expires_on">Истекает %1$s</string>
+
+    <!-- Уборка аптечки -->
+    <string name="med_kit_remove_title">Убрать «%1$s»?</string>
+    <string name="med_kit_remove_empty">В аптечке ничего не лежит — убрать её можно сразу.</string>
+    <plurals name="med_kit_remove_contents">
+        <item quantity="one">В аптечке %d упаковка. Решите, что с ней будет.</item>
+        <item quantity="few">В аптечке %d упаковки. Решите, что с ними будет.</item>
+        <item quantity="many">В аптечке %d упаковок. Решите, что с ними будет.</item>
+        <item quantity="other">В аптечке %d упаковки. Решите, что с ними будет.</item>
+    </plurals>
+    <string name="med_kit_remove_nowhere">Переносить некуда: другой аптечки нет.</string>
+    <string name="med_kit_remove_throw_away">Убрать вместе с лекарствами</string>
+    <string name="med_kit_remove_move">Перенести и убрать</string>
+    <string name="med_kit_remove_target_title">Куда перенести лекарства?</string>
+    <string name="med_kit_removal_busy">Аптечка ждёт ответа сервера на другое решение — убрать её пока нельзя.</string>
+    <string name="med_kit_removal_target_gone">Той аптечки больше нет — выберите другую.</string>
+    <string name="med_kit_removal_target_busy">Та аптечка ждёт ответа сервера — переносить в неё пока рано.</string>
+    <string name="med_kit_removal_contents_busy">Одна из упаковок ждёт ответа сервера — дождитесь его и повторите.</string>
+    <string name="med_kit_removal_not_shared">Эта аптечка только ваша — оставлять её некому.</string>
+
     <!-- Русские количества: «1 упаковка», «2 упаковки», «12 упаковок» -->
     <plurals name="packages_count">
         <item quantity="one">%d упаковка</item>

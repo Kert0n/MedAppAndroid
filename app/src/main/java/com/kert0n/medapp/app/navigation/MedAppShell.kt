@@ -24,8 +24,10 @@ import com.kert0n.medapp.R
 import com.kert0n.medapp.presentation.medkit.MedKitFormUiState
 import com.kert0n.medapp.presentation.medkit.MedKitFormViewModel
 import com.kert0n.medapp.presentation.medkit.MedKitListViewModel
+import com.kert0n.medapp.presentation.pack.MedKitContentsViewModel
 import com.kert0n.medapp.presentation.pack.PackageFormViewModel
 import com.kert0n.medapp.ui.EmptyState
+import com.kert0n.medapp.ui.medkit.MedKitContentsScreen
 import com.kert0n.medapp.ui.medkit.MedKitFormScreen
 import com.kert0n.medapp.ui.medkit.MedKitListScreen
 import com.kert0n.medapp.ui.pack.PackageFormScreen
@@ -70,10 +72,11 @@ private fun screens(stacks: TabStacks) = entryProvider<NavKey> {
         val model: MedKitListViewModel = hiltViewModel()
         MedKitListScreen(
             state = model.state.collectAsStateWithLifecycle().value,
-            // Вглубь отсюда пока некуда: содержимое полки и все лекарства — следующие коммиты.
-            onOpen = {},
+            onOpen = { stacks.go(Screen.MedKitContents(it)) },
             onAdd = { stacks.go(Screen.MedKitForm()) },
-            onSearch = {}
+            // Ища лекарство, человек не помнит, в какой оно аптечке: поиск ведёт в область
+            // «везде», то есть в тот же экран без названной полки.
+            onSearch = { stacks.go(Screen.MedKitContents()) }
         )
     }
     entry<Screen.MedKitForm> { key ->
@@ -90,6 +93,32 @@ private fun screens(stacks: TabStacks) = entryProvider<NavKey> {
             onEdit = model::edit,
             onSave = model::save,
             onCancel = stacks::back
+        )
+    }
+    entry<Screen.MedKitContents> { key ->
+        val model = hiltViewModel<MedKitContentsViewModel, MedKitContentsViewModel.Factory>(
+            key = key.toString(),
+            creationCallback = { factory -> factory.create(key.medKitId) }
+        )
+        val state = model.state.collectAsStateWithLifecycle().value
+        // Полки больше нет — смотреть её содержимое незачем. Дождалась ли она сервера или
+        // ушла сразу, видно в списке: там она либо исчезла, либо помечена.
+        LaunchedEffect(state.isRemoved) { if (state.isRemoved) stacks.back() }
+        MedKitContentsScreen(
+            state = state,
+            onSearch = model::search,
+            onNarrow = model::narrow,
+            onOrder = model::order,
+            onReset = model::reset,
+            // Карточка коробки — следующий экран набора; пока вести некуда.
+            onOpen = {},
+            onAdd = { stacks.go(Screen.PackageForm(medKitId = key.medKitId)) },
+            onEdit = { stacks.go(Screen.MedKitForm(key.medKitId)) },
+            onAskToRemove = model::askToRemove,
+            onPickTarget = model::pickTarget,
+            onDismissRemoval = model::dismissRemoval,
+            onRemove = model::remove,
+            onBack = stacks::back
         )
     }
     entry<Screen.PackageForm> { key ->
