@@ -18,9 +18,9 @@ import org.junit.Test
 class CrptSuggestionTest {
 
     private val tablets = DosageForm(Uuid.parse("00000000-0000-4000-8000-000000000101"), "таблетки")
-    private val coated = DosageForm(Uuid.parse("00000000-0000-4000-8000-000000000102"), "таблетки покрытые пленочной оболочкой")
+    private val other = DosageForm(Uuid.parse("00000000-0000-4000-8000-000000000102"), "другие")
     private val cream = DosageForm(Uuid.parse("00000000-0000-4000-8000-000000000103"), "крем")
-    private val words = Vocabulary(emptyList(), listOf(tablets, coated, cream))
+    private val words = Vocabulary(emptyList(), listOf(tablets, other, cream))
 
     /** Тот же нестрогий разбор, что у клиента (G3). */
     private val json = Json { ignoreUnknownKeys = true; explicitNulls = false }
@@ -34,7 +34,7 @@ class CrptSuggestionTest {
 
         assertEquals("Цетрин", suggestion.name)
         assertEquals("таблетки покрытые пленочной оболочкой", suggestion.formText)
-        assertEquals(coated, suggestion.form)
+        assertEquals(tablets, suggestion.form)
         assertEquals("Д-Р РЕДДИ`С ЛАБОРАТОРИС ЛТД.", suggestion.manufacturer)
         assertEquals("ИНДИЯ", suggestion.country)
         assertEquals(LocalDate.of(2028, 3, 31), suggestion.expiresOn?.lastDay)
@@ -51,11 +51,10 @@ class CrptSuggestionTest {
      */
     @Test
     fun aCompoundDosageStaysTextAndFewerBlocksAreNotAnError() {
-        val lozenges = DosageForm(Uuid.parse("00000000-0000-4000-8000-000000000105"), "таблетки для рассасывания")
-        val suggestion = dto(CrptFixtures.lozenge).toSuggestion(Vocabulary(emptyList(), listOf(tablets, coated, lozenges)))
+        val suggestion = dto(CrptFixtures.lozenge).toSuggestion(words)
 
         assertEquals("Доритрицин", suggestion.name)
-        assertEquals(lozenges, suggestion.form)
+        assertEquals(tablets, suggestion.form)
         assertEquals("1.5 мг+1 мг+0.5 мг", suggestion.dosageText)
         assertEquals("ГЕРМАНИЯ", suggestion.country)
         assertEquals("МЕДИЦЕ ФАРМА ГМБХ & КО. КГ", suggestion.manufacturer)
@@ -74,16 +73,20 @@ class CrptSuggestionTest {
         assertNull(suggestion.manufacturer)
     }
 
-    /** Форма, на которую ничего не похоже, — пусто, но текст реестра остаётся; похожая — догадка. */
+    /** Редкий известный вид — «другие»; незнакомое слово остаётся только текстом. */
     @Test
     fun anUnknownFormStaysEmptyWithItsTextAndASimilarOneIsGuessed() {
         val unknown = dto("""{"codeFounded": true, "category": "drugs", "screen": {"items": [{"pharmacyData": {"form": "пластырь"}}]}}""").toSuggestion(words)
-        assertNull(unknown.form)
+        assertEquals(other, unknown.form)
         assertEquals("пластырь", unknown.formText)
 
-        val withoutPlainTablets = Vocabulary(emptyList(), listOf(coated, cream))
+        val trulyUnknown = dto("""{"codeFounded": true, "category": "drugs", "screen": {"items": [{"pharmacyData": {"form": "неведомая форма"}}]}}""").toSuggestion(words)
+        assertNull(trulyUnknown.form)
+        assertEquals("неведомая форма", trulyUnknown.formText)
+
+        val withoutPlainTablets = Vocabulary(emptyList(), listOf(other, cream))
         val other = dto("""{"codeFounded": true, "category": "drugs", "screen": {"items": [{"attrList": [{"label": "Форма выпуска", "value": "Таблетки"}]}]}}""")
-        assertEquals(coated, other.toSuggestion(withoutPlainTablets).form)
+        assertNull(other.toSuggestion(withoutPlainTablets).form)
     }
 
     /** Без аптечного блока и атрибутов — только имя: остальное не придумывается. */
