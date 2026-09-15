@@ -51,7 +51,7 @@ class ShellNavigationTest {
     fun allFivePlacesAreThereAndTheFirstIsSelected() {
         compose.setContent { MedAppTheme { MedAppShell() } }
 
-        for (tab in listOf("Аптечки", "План", "Сканер", "Аналитика", "Настройки")) {
+        for (tab in listOf("Аптечки", "План", "Сканер", "Отчёты", "Опции")) {
             compose.tab(tab).assertIsDisplayed()
         }
         compose.tab("Аптечки").assertIsSelected()
@@ -61,9 +61,9 @@ class ShellNavigationTest {
     fun tappingAPlaceGoesThere() {
         compose.setContent { MedAppTheme { MedAppShell() } }
 
-        compose.tab("Аналитика").performClick()
+        compose.tab("Отчёты").performClick()
 
-        compose.tab("Аналитика").assertIsSelected()
+        compose.tab("Отчёты").assertIsSelected()
         compose.tab("Аптечки").assertIsNotSelected()
     }
 
@@ -79,12 +79,12 @@ class ShellNavigationTest {
     fun thePlaceSurvivesRecreation() {
         val restoration = StateRestorationTester(compose)
         restoration.setContent { MedAppTheme { MedAppShell() } }
-        compose.tab("Настройки").performClick()
-        compose.tab("Настройки").assertIsSelected()
+        compose.tab("Опции").performClick()
+        compose.tab("Опции").assertIsSelected()
 
         restoration.emulateSavedInstanceStateRestore()
 
-        compose.tab("Настройки").assertIsSelected()
+        compose.tab("Опции").assertIsSelected()
         compose.tab("Аптечки").assertIsNotSelected()
     }
 
@@ -104,7 +104,7 @@ class ShellNavigationTest {
         }
 
         compose.tab("Аптечки").assertIsDisplayed()
-        compose.tab("Настройки").assertIsDisplayed()
+        compose.tab("Опции").assertIsDisplayed()
     }
 }
 
