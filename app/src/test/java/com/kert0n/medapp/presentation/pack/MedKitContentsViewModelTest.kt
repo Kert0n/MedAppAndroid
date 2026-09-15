@@ -10,6 +10,7 @@ import com.kert0n.medapp.fixture.FakeMedKits
 import com.kert0n.medapp.fixture.FakePackages
 import com.kert0n.medapp.fixture.FakeQueue
 import com.kert0n.medapp.fixture.HOME_KIT
+import com.kert0n.medapp.fixture.HeldTransactions
 import com.kert0n.medapp.fixture.MainDispatcherRule
 import com.kert0n.medapp.fixture.OTHER_PACK
 import com.kert0n.medapp.fixture.PACK
@@ -21,6 +22,7 @@ import com.kert0n.medapp.fixture.watching
 import com.kert0n.medapp.presentation.RouteArguments
 import com.kert0n.medapp.presentation.Today
 import com.kert0n.medapp.queue.QueueService
+import com.kert0n.medapp.queue.Transactions
 import java.time.Clock
 import java.time.Instant
 import java.time.ZoneId
@@ -55,14 +57,17 @@ class MedKitContentsViewModelTest {
 
     private val queue = QueueService(DirectTransactions, FakeQueue())
 
-    private fun viewModel(medKitId: Uuid? = HOME_KIT) = MedKitContentsViewModel(
+    private fun viewModel(
+        medKitId: Uuid? = HOME_KIT,
+        transactions: Transactions = DirectTransactions
+    ) = MedKitContentsViewModel(
         removal = MedKitRemoval(
             medKits = medKits,
             packages = packages,
             removal = PackageRemoval(packages, queue, DirectTransactions, clock),
             relocation = PackageRelocation(packages, medKits, FakeCourses(), queue, DirectTransactions, clock),
             queue = queue,
-            transactions = DirectTransactions,
+            transactions = transactions,
             clock = clock
         ),
         packages = packages,
@@ -274,5 +279,29 @@ class MedKitContentsViewModelTest {
             packages.packages.map { it.id },
             state.packages.map { it.id }
         )
+    }
+
+    /**
+     * Пока уборка в пути, второй не начинается: разговор больше не открывается, и второе решение
+     * не уходит сценарию поверх первого.
+     *
+     * Красная проверка: снять замок — второе нажатие «Убрать» начинает вторую уборку.
+     */
+    @Test
+    fun aSecondRemovalIsNotStartedWhileTheFirstIsOnItsWay() {
+        val transactions = HeldTransactions()
+        val model = viewModel(transactions = transactions)
+
+        watching(model.state) { state ->
+            state.loaded()
+            model.askToRemove()
+            model.remove()
+            model.askToRemove()
+            model.remove()
+            transactions.door.release()
+            state.awaiting { it.isRemoved }
+        }
+
+        assertEquals(1, transactions.door.waiting)
     }
 }

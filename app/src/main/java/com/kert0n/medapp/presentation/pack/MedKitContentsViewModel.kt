@@ -112,14 +112,17 @@ class MedKitContentsViewModel @Inject constructor(
     }
 
     fun askToRemove() {
+        if (removing.value.working) return
         removing.value = Removing(step = RemovalStep.ASKING)
     }
 
     fun pickTarget() {
+        if (removing.value.working) return
         removing.value = Removing(step = RemovalStep.PICKING_TARGET)
     }
 
     fun dismissRemoval() {
+        if (removing.value.working) return
         removing.value = Removing()
     }
 
@@ -129,7 +132,9 @@ class MedKitContentsViewModel @Inject constructor(
      */
     fun remove(transferTo: Uuid? = null) {
         val medKitId = medKitId ?: return
-        if (removing.value.step == null) return
+        val now = removing.value
+        if (now.step == null || now.working) return
+        removing.value = now.copy(working = true)
         viewModelScope.launch {
             val fate = transferTo?.let(MedKitRemoval.Fate::MoveTo) ?: MedKitRemoval.Fate.ThrowAway
             removing.value = when (removal.remove(medKitId, fate)) {
@@ -188,6 +193,8 @@ class MedKitContentsViewModel @Inject constructor(
 
     private data class Removing(
         val step: RemovalStep? = null,
+        /** Решение уже отдано сценарию: второго такого же не начинается. */
+        val working: Boolean = false,
         val refusal: RemovalRefusal? = null,
         val removed: Boolean = false
     )

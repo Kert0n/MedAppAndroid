@@ -7,6 +7,7 @@ import com.kert0n.medapp.fixture.FakeFollowing
 import com.kert0n.medapp.fixture.FakePackages
 import com.kert0n.medapp.fixture.FakeQueue
 import com.kert0n.medapp.fixture.FakeVocabulary
+import com.kert0n.medapp.fixture.HeldVocabulary
 import com.kert0n.medapp.fixture.MainDispatcherRule
 import com.kert0n.medapp.fixture.PACK
 import com.kert0n.medapp.fixture.awaiting
@@ -16,6 +17,7 @@ import com.kert0n.medapp.fixture.watching
 import com.kert0n.medapp.presentation.RouteArguments
 import com.kert0n.medapp.presentation.value.QuantityPresentationError
 import com.kert0n.medapp.queue.QueueService
+import com.kert0n.medapp.storage.value.VocabularyStorageRepository
 import java.time.Clock
 import java.time.Instant
 import java.time.ZoneId
@@ -38,7 +40,7 @@ class PackageAmountViewModelTest {
 
     private val packages = FakePackages().lying(pack(id = PACK, quantity = tablets("20")))
 
-    private fun viewModel() = PackageAmountViewModel(
+    private fun viewModel(vocabulary: VocabularyStorageRepository = FakeVocabulary()) = PackageAmountViewModel(
         adjusting = PackageAdjusting(
             packages = packages,
             following = FakeFollowing(),
@@ -46,7 +48,7 @@ class PackageAmountViewModelTest {
             transactions = DirectTransactions,
             clock = clock
         ),
-        vocabulary = FakeVocabulary(),
+        vocabulary = vocabulary,
         packages = packages,
         savedState = SavedStateHandle(mapOf(RouteArguments.PACKAGE_ID to PACK.toString()))
     )
@@ -221,5 +223,52 @@ class PackageAmountViewModelTest {
         }
 
         assertEquals(null, state.error)
+    }
+
+    /**
+     * Второе нажатие, пока идёт первое, ничего не начинает — в том числе пока первое ещё читает
+     * словарь: между нажатием и записью стоит это чтение, и окно ровно такой длины.
+     *
+     * Красная проверка: ставить замок внутри записи — «выбросил 3» спишет шесть.
+     */
+    @Test
+    fun aSecondTapDuringTheFirstStartsNothing() {
+        val vocabulary = HeldVocabulary()
+        val model = viewModel(vocabulary)
+
+        watching(model.state) { state ->
+            state.awaiting { it.pack != null }
+            model.edit(type("3", AmountChange.DISPOSAL))
+            model.submit()
+            model.submit()
+            vocabulary.door.release()
+            state.awaiting { it.isDone }
+        }
+
+        assertEquals(1, vocabulary.door.waiting)
+        assertEquals(tablets("17"), packages.packages.single().quantity)
+    }
+
+    /** Второе согласие на конец коробки — то же самое согласие, а не второе списание. */
+    @Test
+    fun aSecondAgreementIsTheSameAgreement() {
+        val vocabulary = HeldVocabulary()
+        val model = viewModel(vocabulary)
+
+        watching(model.state) { state ->
+            vocabulary.door.release()
+            state.awaiting { it.pack != null }
+            model.edit(type("0"))
+            model.submit()
+            state.awaiting { it.asksToEmpty }
+            vocabulary.door.hold()
+            model.confirmEmptying()
+            model.confirmEmptying()
+            vocabulary.door.release()
+            state.awaiting { it.isDone }
+        }
+
+        assertEquals(1, vocabulary.door.waiting)
+        assertEquals(emptyList<Any>(), packages.packages)
     }
 }

@@ -7,6 +7,7 @@ import com.kert0n.medapp.fixture.FakeCourses
 import com.kert0n.medapp.fixture.FakeMedKits
 import com.kert0n.medapp.fixture.FakePackages
 import com.kert0n.medapp.fixture.FakeQueue
+import com.kert0n.medapp.fixture.HeldTransactions
 import com.kert0n.medapp.fixture.HOME_KIT
 import com.kert0n.medapp.fixture.MainDispatcherRule
 import com.kert0n.medapp.fixture.PACK
@@ -17,6 +18,7 @@ import com.kert0n.medapp.fixture.watching
 import com.kert0n.medapp.presentation.RouteArguments
 import com.kert0n.medapp.presentation.Today
 import com.kert0n.medapp.queue.QueueService
+import com.kert0n.medapp.queue.Transactions
 import java.time.Clock
 import java.time.Instant
 import java.time.ZoneId
@@ -41,8 +43,8 @@ class PackageViewModelTest {
 
     private val medKits = FakeMedKits(medKit(id = HOME_KIT, name = "Домашняя"))
 
-    private fun viewModel() = PackageViewModel(
-        removal = PackageRemoval(packages, QueueService(DirectTransactions, FakeQueue()), DirectTransactions, clock),
+    private fun viewModel(transactions: Transactions = DirectTransactions) = PackageViewModel(
+        removal = PackageRemoval(packages, QueueService(DirectTransactions, FakeQueue()), transactions, clock),
         packages = packages,
         medKits = medKits,
         courses = FakeCourses(),
@@ -134,5 +136,30 @@ class PackageViewModelTest {
 
         assertTrue(state.isGone)
         assertTrue(!state.isLoading)
+    }
+
+    /**
+     * Пока удаление в пути, второго не начинается: разговор больше не открывается, и ответ на
+     * второе не подменяет собой ответ на первое.
+     *
+     * Красная проверка: снять замок — второе решение уходит сценарию, и «удаление в пути»
+     * сменяется на «коробка занята», хотя занята она этим же удалением.
+     */
+    @Test
+    fun aSecondRemovalIsNotStartedWhileTheFirstIsOnItsWay() {
+        val transactions = HeldTransactions()
+        val model = viewModel(transactions)
+
+        watching(model.state) { state ->
+            state.awaiting { it.pack != null }
+            model.askToRemove()
+            model.remove()
+            model.askToRemove()
+            model.remove()
+            transactions.door.release()
+            state.awaiting { it.isRemoved }
+        }
+
+        assertEquals(1, transactions.door.waiting)
     }
 }

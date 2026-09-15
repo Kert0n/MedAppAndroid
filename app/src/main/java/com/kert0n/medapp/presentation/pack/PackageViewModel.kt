@@ -75,17 +75,25 @@ class PackageViewModel @Inject constructor(
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), PackageUiState())
 
     fun askToRemove() {
+        if (removing.value.working) return
         removing.value = Removing(asking = true)
     }
 
     fun dismissRemoval() {
+        if (removing.value.working) return
         removing.value = Removing()
     }
 
-    /** Удаление — опасное действие, и зовётся оно только после подтверждения (PLAN H3). */
+    /**
+     * Удаление — опасное действие, и зовётся оно только после подтверждения (PLAN H3). Пока
+     * первое удаление в пути, второго не начинается: разговор больше не открывается, и ответ на
+     * второе не подменяет собой ответ на первое — «удаление в пути» иначе сменялось бы на
+     * «коробка занята», хотя занята она этим же удалением.
+     */
     fun remove() {
-        if (!removing.value.asking) return
-        removing.value = Removing()
+        val now = removing.value
+        if (!now.asking || now.working) return
+        removing.value = Removing(working = true)
         viewModelScope.launch {
             removing.value = when (removal.remove(packageId)) {
                 // Удалена или уже удалена — карточке показывать нечего: уходим.
@@ -99,6 +107,8 @@ class PackageViewModel @Inject constructor(
 
     private data class Removing(
         val asking: Boolean = false,
+        /** Решение уже отдано сценарию: второго такого же не начинается. */
+        val working: Boolean = false,
         val refusal: PackageRefusal? = null,
         val removed: Boolean = false
     )

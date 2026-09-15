@@ -81,10 +81,15 @@ class PackageAmountViewModel @Inject constructor(
     /**
      * Записать. Ноль сначала спрашивается: коробки после него не будет. Второе нажатие, пока
      * идёт первое, ничего не начинает.
+     *
+     * Замок ставится **до** `launch`, а не внутри записи: между нажатием и ею стоит чтение
+     * словаря, и пока оно шло, второе нажатие проходило мимо замка — «выбросил 3» списывало
+     * шесть.
      */
     fun submit() {
         val now = progress.value
         if (now.working || now.done) return
+        progress.value = Progress(working = true)
         viewModelScope.launch {
             when (val parsed = parse()) {
                 is ParsedInput.Rejected -> reject(parsed.error)
@@ -95,16 +100,20 @@ class PackageAmountViewModel @Inject constructor(
         }
     }
 
-    /** Человек согласился, что коробки не станет. */
+    /** Человек согласился, что коробки не станет. Второе согласие — то же самое согласие. */
     fun confirmEmptying() {
-        if (!progress.value.asksToEmpty) return
+        val now = progress.value
+        if (!now.asksToEmpty || now.working) return
+        progress.value = Progress(asksToEmpty = true, working = true)
         viewModelScope.launch {
             val parsed = parse()
             if (parsed is ParsedInput.Parsed) apply(parsed.value) else progress.value = Progress()
         }
     }
 
+    /** Пока согласие исполняется, отказаться уже не от чего: запись идёт. */
     fun dismissEmptying() {
+        if (progress.value.working) return
         progress.value = Progress()
     }
 
