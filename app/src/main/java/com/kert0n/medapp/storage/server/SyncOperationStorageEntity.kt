@@ -62,16 +62,26 @@ class SyncOperationStorageEntity(
     @ColumnInfo(name = "dismissed_at") val dismissedAt: Instant? = null
 )
 
-/** Состояние отправки — из колонок, без словаря: его переходы применимы и к строке, которую нечем прочитать. */
+/**
+ * Состояние отправки — из колонок, без словаря: его переходы применимы и к строке, которую нечем
+ * прочитать (PLAN C1 «Переходы операции — у типа»).
+ *
+ * Колонки могут разойтись между собой — записанный ответ у ждущей, причина отказа у применённой:
+ * такого состояния не бывает, и строгий тип его не выражает. Строка от этого не перестаёт
+ * существовать: её надо показать человеку и дать закрыть, а одна порченая строка не должна
+ * останавливать чтение очереди (PLAN F4). Поэтому здесь читается то, что в строке бесспорно, —
+ * статус, попытки, сроки, есть ли запрос, — а противоречащее статусу отбрасывается. Собранная
+ * операция строит своё состояние сама и строго: противоречие делает её нечитаемой, а не чинит её.
+ */
 fun SyncOperationStorageEntity.toState(): SyncOperationState = SyncOperationState(
     status = status,
     attempts = Attempts(attempts),
     lastError = lastError,
     lastTriedAt = lastTriedAt,
-    answer = answerStatus?.let { RawResponse(it, answerBody.orEmpty()) },
+    answer = answerStatus?.let { RawResponse(it, answerBody.orEmpty()) }.takeIf { status == SyncOperationStatus.ANSWERED },
     notBefore = notBefore,
-    outcomeUnknown = outcomeUnknown,
-    refusalReason = refusalReason,
+    outcomeUnknown = outcomeUnknown && prepared != null,
+    refusalReason = refusalReason.takeIf { status == SyncOperationStatus.REFUSED },
     hasRequest = prepared != null
 )
 

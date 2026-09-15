@@ -51,7 +51,10 @@ class QueueWriteDoorTest {
             "queue/SyncOperationStatus.kt",
             "queue/StoredSyncOperation.kt",
             // Описание перехода называет свой статус, не сравнивает.
-            "queue/Settlement.kt"
+            "queue/Settlement.kt",
+            // Граница, где колонки становятся состоянием: она не решает переход, а отбрасывает
+            // то, что статусу противоречит, — иначе порченая строка не читалась бы вовсе.
+            "storage/server/SyncOperationStorageEntity.kt"
         )
         val offenders = kotlin()
             .map { it.relativeTo(sources).invariantSeparatorsPath to it.readText() }
@@ -63,6 +66,22 @@ class QueueWriteDoorTest {
             }
             .toList()
         assertEquals("статус сравнивают мимо переходов состояния", emptyList<String>(), offenders)
+    }
+
+    /**
+     * Строгое состояние строит только сама операция: чтение строки терпимо — иначе одна строка,
+     * противоречащая себе, роняла бы чтение очереди на пути, которым её как раз и объявляют
+     * нечитаемой.
+     */
+    @Test
+    fun theRowReaderIsTolerantWhileTheOperationIsStrict() {
+        val reader = File(sources, "storage/server/SyncOperationStorageEntity.kt").readText()
+        val body = reader.substringAfter("fun SyncOperationStorageEntity.toState()").substringBefore("\n\n")
+        for (guard in listOf("status == SyncOperationStatus.ANSWERED", "status == SyncOperationStatus.REFUSED", "prepared != null")) {
+            assertTrue("чтение строки не отбрасывает противоречащее статусу: $guard", body.contains(guard))
+        }
+        val operation = File(sources, "queue/SyncOperation.kt").readText()
+        assertTrue("операция строит состояние не сама — строгости нет", operation.contains("val state: SyncOperationState = SyncOperationState("))
     }
 
     /** Каждая запись хранилища очереди — чтение, переход и запись одной транзакцией (F5). */

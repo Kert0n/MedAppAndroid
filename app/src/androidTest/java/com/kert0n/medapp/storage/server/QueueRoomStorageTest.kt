@@ -625,6 +625,33 @@ class QueueRoomStorageTest {
         }
     }
 
+    /**
+     * **Строка, противоречащая себе, читается как нечитаемая, а не роняет чтение очереди.**
+     * Колонки состояния могут разойтись между собой — записанный ответ у ждущей, причина отказа у
+     * применённой, — и строгий тип такое состояние не выражает. Нечитаемая строка всё равно должна
+     * читаться, закрываться и уходить с экрана: одна порченая строка не останавливает очередь (F4).
+     */
+    @Test
+    fun aRowThatContradictsItselfIsUnreadableAndStillClosable() = runTest {
+        val broken = Uuid.parse("00000000-0000-4000-8000-000000000094")
+        val stored = database.syncOperations().enqueue(broken, PackageSyncCommand.Consume(PACK, dose("1"), INTAKE), at, medKitId = HOME_KIT).toStorageEntity(HOME_KIT)
+        database.syncOperations().update(
+            SyncOperationStorageEntity(
+                id = stored.id, kind = stored.kind, payload = stored.payload, payloadVersion = stored.payloadVersion,
+                sequence = stored.sequence, status = SyncOperationStatus.PENDING, attempts = stored.attempts,
+                createdAt = stored.createdAt, packageId = stored.packageId, medKitId = stored.medKitId,
+                // Ответ и причина отказа у ждущей строки: так не бывает — строка порчена.
+                answerStatus = 200, answerBody = "{}", refusalReason = RefusalReason.INVALID
+            )
+        )
+
+        val read = database.queueRepository().stored(broken)
+
+        assertTrue("порченая строка не прочиталась как нечитаемая: $read", read is StoredSyncOperation.Unreadable)
+        assertEquals(1, database.medKitRepository().abandonServer(at.plusSeconds(1)))
+        assertEquals(SyncOperationStatus.ACCESS_LOST, requireNotNull(database.syncOperations().find(broken)).operation.status)
+    }
+
     /** Закрытие одно: закрытую операцию второй исход не переписывает и следствий не оставляет. */
     @Test
     fun aClosedOperationIsNotClosedAgain() = runTest {
