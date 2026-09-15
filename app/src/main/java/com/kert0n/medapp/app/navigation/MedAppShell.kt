@@ -24,9 +24,11 @@ import com.kert0n.medapp.R
 import com.kert0n.medapp.presentation.medkit.MedKitFormUiState
 import com.kert0n.medapp.presentation.medkit.MedKitFormViewModel
 import com.kert0n.medapp.presentation.medkit.MedKitListViewModel
+import com.kert0n.medapp.presentation.pack.PackageFormViewModel
 import com.kert0n.medapp.ui.EmptyState
 import com.kert0n.medapp.ui.medkit.MedKitFormScreen
 import com.kert0n.medapp.ui.medkit.MedKitListScreen
+import com.kert0n.medapp.ui.pack.PackageFormScreen
 
 /**
  * Оболочка приложения: пять мест внизу и содержимое над ними. Где человек стоит и как глубоко —
@@ -88,6 +90,26 @@ private fun screens(stacks: TabStacks) = entryProvider<NavKey> {
             onEdit = model::edit,
             onSave = model::save,
             onCancel = stacks::back
+        )
+    }
+    entry<Screen.PackageForm> { key ->
+        val model = hiltViewModel<PackageFormViewModel, PackageFormViewModel.Factory>(
+            key = key.toString(),
+            creationCallback = { factory ->
+                factory.create(PackageFormViewModel.Opened(key.medKitId, key.packageId))
+            }
+        )
+        val state = model.state.collectAsStateWithLifecycle().value
+        // Записанная коробка открывается карточкой — её пока нет, поэтому просто уходим: форма
+        // своё дело сделала.
+        LaunchedEffect(state.saved) { if (state.saved != null) stacks.back() }
+        PackageFormScreen(
+            state = state,
+            onEdit = model::edit,
+            onSave = model::save,
+            onCancel = stacks::back,
+            // Пересчёт — следующий экран набора; пока вести некуда.
+            onRecount = {}
         )
     }
     for (place in Place.entries - Place.MED_KITS) {

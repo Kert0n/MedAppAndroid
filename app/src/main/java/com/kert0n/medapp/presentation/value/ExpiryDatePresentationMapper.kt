@@ -77,3 +77,26 @@ private fun resolve(
     onSuccess = { ParsedInput.Parsed(it) },
     onFailure = { ParsedInput.Rejected(ExpiryDatePresentationError.IMPOSSIBLE_DATE) }
 )
+
+/**
+ * Срок обратно в строку — для формы, открытой на правку: человек должен увидеть записанное в
+ * том виде, в каком он его печатал.
+ *
+ * Месяц показывается месяцем. Домен хранит последний годный день, и «03.2027» лежит там как
+ * 31.03.2027; показать его днём значило бы дописать за человека точность, которой он не
+ * называл. День показывается днём — его и печатали.
+ *
+ * Названный день, совпавший с последним днём месяца, вернётся месяцем: в домене это **одно и
+ * то же значение** (`ExpiryDate.of(YearMonth)`), и различить два написания здесь нечем. Срок от
+ * этого не меняется, меняется написание.
+ */
+fun ExpiryDate.toPresentationDTO(): ExpiryDatePresentationDTO {
+    val month = YearMonth.from(lastDay)
+    return ExpiryDatePresentationDTO(
+        if (lastDay == month.atEndOfMonth()) month.format(MONTH_OUT) else lastDay.format(DAY_OUT)
+    )
+}
+
+private val MONTH_OUT: DateTimeFormatter = DateTimeFormatter.ofPattern("MM.uuuu")
+
+private val DAY_OUT: DateTimeFormatter = DateTimeFormatter.ofPattern("dd.MM.uuuu")

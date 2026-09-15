@@ -39,4 +39,11 @@ sealed interface Screen : NavKey {
     /** Создание аптечки — без идентификатора, правка — с ним: это один экран (PLAN H3 №3). */
     @Serializable
     data class MedKitForm(val medKitId: Uuid? = null) : Screen
+
+    /**
+     * Заведение и правка упаковки — тоже один экран (PLAN H3 №7, №8): [packageId] назван —
+     * правка, не назван — заведение, и тогда [medKitId] говорит, откуда человек пришёл.
+     */
+    @Serializable
+    data class PackageForm(val medKitId: Uuid? = null, val packageId: Uuid? = null) : Screen
 }

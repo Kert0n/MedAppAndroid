@@ -4,7 +4,7 @@ import com.kert0n.medapp.domain.pack.Package
 import com.kert0n.medapp.domain.pack.PackageAfter
 import com.kert0n.medapp.domain.pack.PackageStatus
 import com.kert0n.medapp.domain.value.Quantity
-import com.kert0n.medapp.feature.course.CourseFollowing
+import com.kert0n.medapp.domain.course.PackageFollowing
 import com.kert0n.medapp.queue.QueueService
 import com.kert0n.medapp.queue.QueuedCommand
 import com.kert0n.medapp.queue.Transactions
@@ -33,7 +33,7 @@ import kotlin.uuid.Uuid
  */
 class PackageAdjusting @Inject constructor(
     private val packages: PackageStorageRepository,
-    private val following: CourseFollowing,
+    private val following: PackageFollowing,
     private val queue: QueueService,
     private val transactions: Transactions,
     private val clock: Clock
