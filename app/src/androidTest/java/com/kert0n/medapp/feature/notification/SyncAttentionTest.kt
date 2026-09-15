@@ -30,6 +30,7 @@ import java.time.Instant
 import java.time.ZoneOffset
 import kotlin.uuid.Uuid
 import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.test.runTest
 import org.junit.After
 import org.junit.Assert.assertEquals
@@ -138,9 +139,15 @@ class SyncAttentionTest {
      * Человек разобрал отказ — карточка уходит **механизмом**: разбор пишет `sync_operations`, сигнал
      * зовёт сверку, сверка снимает обещание, владелец доставки гасит показанное. Ни прохода дня,
      * ни ручной сверки для этого не нужно.
+     *
+     * `runBlocking`, а не `runTest`: механизмы живут на `Dispatchers.IO` и в потоках Room, то
+     * есть по часам машины. Под виртуальным временем срок ожидания истекал раньше, чем настоящая
+     * работа успевала начаться, и проверка была гонкой — зелёной в одиночку и красной в полном
+     * прогоне, где машина занята соседними классами. Теперь так сказать нельзя: `await` сам
+     * отвергает виртуальное время.
      */
     @Test
-    fun aDismissedRefusalWithdrawsTheAttentionByItself() = runTest {
+    fun aDismissedRefusalWithdrawsTheAttentionByItself() = runBlocking {
         refused(first)
         com.kert0n.medapp.fixture.Mechanisms(scenarios, now).use { mechanisms ->
             reconcile()

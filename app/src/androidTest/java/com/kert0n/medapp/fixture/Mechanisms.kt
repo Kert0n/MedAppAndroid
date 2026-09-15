@@ -50,8 +50,14 @@ class Mechanisms(scenarios: Scenarios, at: java.time.Instant) : AutoCloseable {
     suspend fun await(what: String, timeoutMillis: Long = 5_000, condition: suspend () -> Boolean) =
         com.kert0n.medapp.fixture.await(what, timeoutMillis, condition)
 
-    /** Механизмы затихли: число проходов владельца доставки не менялось [quietMillis]. */
+    /**
+     * Механизмы затихли: число проходов владельца доставки не менялось [quietMillis].
+     *
+     * Тишина меряется теми же часами, что и ожидание: под виртуальным временем полсекунды
+     * проходят мгновенно, и «затихли» означало бы «не успели начать».
+     */
     suspend fun settle(quietMillis: Long = 500) {
+        requireRealTime()
         var seen = outbox.state.value.passes
         var quietFor = 0L
         while (quietFor < quietMillis) {
