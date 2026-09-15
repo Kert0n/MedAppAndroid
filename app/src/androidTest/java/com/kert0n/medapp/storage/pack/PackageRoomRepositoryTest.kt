@@ -12,6 +12,7 @@ import com.kert0n.medapp.fixture.activeCourse
 import com.kert0n.medapp.fixture.dose
 import com.kert0n.medapp.domain.medkit.MedKit
 import com.kert0n.medapp.fixture.inMemoryDatabase
+import com.kert0n.medapp.domain.value.Money
 import com.kert0n.medapp.fixture.medKit
 import com.kert0n.medapp.fixture.millilitres
 import com.kert0n.medapp.fixture.left
@@ -35,6 +36,7 @@ import com.kert0n.medapp.storage.server.SyncOperationRoomRepository
 import java.math.BigDecimal
 import java.time.Instant
 import java.time.LocalDate
+import java.util.Currency
 import kotlin.uuid.Uuid
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.test.runTest
@@ -84,6 +86,25 @@ class PackageRoomRepositoryTest {
     @After
     fun closeDatabase() {
         database.close()
+    }
+
+    /**
+     * Порченая валюта в колонке — это «цены нет», а не «коробки нет» (issue #40): одна такая
+     * строка иначе роняла бы карточку, полку и все лекарства разом.
+     *
+     * Красная проверка: восстанавливать валюту `Currency.getInstance` без защиты — чтение
+     * бросает, и коробка не читается вовсе.
+     */
+    @Test
+    fun aCorruptCurrencyCodeLosesThePriceButNotThePackage() = runTest {
+        assertTrue(repository.describe(PACK, paracetamol.facts.copy(price = Money(BigDecimal("320"), Currency.getInstance("RUB")))))
+        assertEquals("320", requireNotNull(repository.observe(PACK).first()).facts.price?.amount?.toPlainString())
+
+        database.openHelper.writableDatabase.execSQL("UPDATE package_details SET currency = 'ZZ' WHERE package_id = ?", arrayOf(PACK.toString()))
+
+        val observed = requireNotNull(repository.observe(PACK).first())
+        assertNull(observed.facts.price)
+        assertEquals(1, repository.list(PackageQuery(), today).first().size)
     }
 
     /** Наружу уходит проекция — величина с доступностью внутри, а не сущность (PLAN H1). */

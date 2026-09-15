@@ -35,6 +35,7 @@ import java.time.LocalDate
 import java.time.ZoneId
 import kotlin.uuid.Uuid
 import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.runBlocking
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNull
@@ -54,13 +55,17 @@ class MedKitContentsViewModelTest {
 
     private val clock: Clock = Clock.fixed(Instant.parse("2026-09-15T09:00:00Z"), ZoneId.of("Europe/Moscow"))
 
-    /** Хранение, которое вдобавок запоминает, о чём его спросили: запрос и есть предмет проверки. */
+    /**
+     * Хранение, которое вдобавок запоминает, о чём его спросили: запрос и есть предмет проверки.
+     * Запросы — поток: экран собирает состояние вне главного потока, и запрос к базе приходит
+     * не раньше состояния, а рядом с ним, — проверка ждёт запроса, а не читает его наугад.
+     */
     private class Asked(private val real: FakePackages) : PackageStorageRepository by real {
 
-        val queries = mutableListOf<PackageQuery>()
+        val queries = MutableStateFlow<List<PackageQuery>>(emptyList())
 
         override fun list(query: PackageQuery, today: LocalDate): Flow<List<PackageProjection>> {
-            queries += query
+            queries.value += query
             return real.list(query, today)
         }
     }
@@ -97,8 +102,10 @@ class MedKitContentsViewModelTest {
         medKitId = medKitId
     )
 
-    /** Запрос, с которым экран в последний раз пришёл в базу. */
-    private val lastQuery: PackageQuery get() = packages.queries.last()
+    /** Запрос, с которым экран пришёл в базу последним, — когда он до неё дошёл. */
+    private fun lastQuery(expected: (PackageQuery) -> Boolean = { true }): PackageQuery = runBlocking {
+        packages.queries.awaiting { it.isNotEmpty() && expected(it.last()) }.last()
+    }
 
     /**
      * **Три независимых поля, а не история нажатий.** Искал, потом сузил — и сузил, потом искал
@@ -116,7 +123,7 @@ class MedKitContentsViewModelTest {
             first.narrow(Narrowing.Expired)
             state.awaiting { it.narrowing == Narrowing.Expired && it.text == "нуро" }
         }
-        val searchedThenNarrowed = lastQuery
+        val searchedThenNarrowed = lastQuery { it.text == "нуро" && it.filter == PackageQuery.Filter.Expired }
 
         val second = viewModel()
         watching(second.state) { state ->
@@ -126,7 +133,7 @@ class MedKitContentsViewModelTest {
             state.awaiting { it.narrowing == Narrowing.Expired && it.text == "нуро" }
         }
 
-        assertEquals(searchedThenNarrowed, lastQuery)
+        assertEquals(searchedThenNarrowed, lastQuery { it.text == "нуро" && it.filter == PackageQuery.Filter.Expired })
     }
 
     /**
@@ -146,7 +153,7 @@ class MedKitContentsViewModelTest {
         }
 
         assertEquals(Narrowing.OnCourse, state.narrowing)
-        assertEquals(PackageQuery.Filter.OnCourse, lastQuery.filter)
+        assertEquals(PackageQuery.Filter.OnCourse, lastQuery { it.filter == PackageQuery.Filter.OnCourse }.filter)
     }
 
     /**
@@ -170,7 +177,7 @@ class MedKitContentsViewModelTest {
             state.awaiting { it.text.isEmpty() && it.narrowing == null && it.ordering == Ordering.NAME }
         }
 
-        assertEquals(PackageQuery(medKitId = HOME_KIT), lastQuery)
+        assertEquals(PackageQuery(medKitId = HOME_KIT), lastQuery { it.text.isEmpty() && it.filter == null })
     }
 
     /**
