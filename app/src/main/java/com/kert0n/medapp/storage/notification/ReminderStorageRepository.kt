@@ -49,8 +49,11 @@ interface ReminderStorageRepository {
      */
     fun observeAwaiting(delivery: NoticeDelivery): Flow<List<PendingNotice>>
 
-    /** Отозванное: его надо погасить в системе и забыть. */
-    suspend fun withdrawn(): List<Reminder>
+    /**
+     * Без основания: отозванное — погасить и забыть — и то, о чём говорили, а оно теперь не
+     * сказанное (отложено после показа) — погасить. Отбор грубый; решает [Reminder.cardIsUp].
+     */
+    suspend fun groundless(): List<Reminder>
 
     /** Строки старше названного момента — грубый отбор; забывать ли, решает [Reminder]. */
     suspend fun stale(before: java.time.Instant): List<Reminder>

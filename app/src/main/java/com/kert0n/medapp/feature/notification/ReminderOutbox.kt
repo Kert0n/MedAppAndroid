@@ -98,7 +98,7 @@ class ReminderOutbox @Inject constructor(
     }
 
     private suspend fun attempt(): Report {
-        var dismissed = dismissWithdrawn()
+        var dismissed = dismissGroundless()
         // Ожидание свежести — окно до двух секунд, и прочитанное до него устаревает: человек
         // успевает отложить, лечение — отмениться, а срок — наступить. Показывается то, что
         // наступило **после** него, и «сейчас» берётся после него же.
@@ -119,6 +119,8 @@ class ReminderOutbox @Inject constructor(
             when (settle(reminder.key, outcome)) {
                 Settled.RECORDED -> if (outcome == Delivery.SHOWN) shown++
                 // Пока система показывала, обязательство изменилось: карточка висит без основания.
+                // Гасится сейчас; сорвалось — карточка записана за обязательством (`noticedAt`), и
+                // следующий проход погасит её первым шагом (C1).
                 Settled.OUTDATED -> if (outcome == Delivery.SHOWN) {
                     attempt { notifier.dismiss(reminder.key) }
                     dismissed++
@@ -175,7 +177,15 @@ class ReminderOutbox @Inject constructor(
         transactions.run {
             val fresh = reminders.find(key) ?: return@run Settled.OUTDATED
             val at = clock.instant()
-            if (!fresh.isDue(at)) return@run Settled.OUTDATED
+            if (!fresh.isDue(at)) {
+                // Сказали о том, чего уже нет: карточка есть — обязательство это запомнит, чтобы
+                // гашение, сорвавшееся сейчас, повторил следующий проход.
+                if (outcome == Delivery.SHOWN) {
+                    fresh.noticedAt(at)
+                    reminders.saveAll(listOf(fresh))
+                }
+                return@run Settled.OUTDATED
+            }
             when (outcome) {
                 Delivery.SHOWN -> fresh.deliveredAt(at)
                 Delivery.SUBJECT_GONE -> fresh.withdraw()
@@ -195,20 +205,24 @@ class ReminderOutbox @Inject constructor(
     }
 
     /**
-     * Повода больше нет: гасим показанное и забываем. Система не откатывается вместе с базой (F5),
-     * поэтому гашение идёт по прочитанному, а удаление — **перечитав** в своей транзакции: пока
-     * система гасила, повод мог вернуться, и `promise` воскресил обязательство под тем же ключом.
-     * Удалить его значило бы потерять живое; гашение воскрешённого безвредно — сказано о нём не было.
+     * Карточки без основания гасятся первым шагом — все, о ком говорили и кто сейчас не
+     * сказанное-и-наступившее: отозванное и отложенное после показа ([Reminder.cardIsUp]).
+     * Гашение идемпотентно, и сорвавшееся повторится следующим проходом само — память о карточке
+     * у обязательства, а не у прохода. Система не откатывается вместе с базой (F5), поэтому
+     * гашение идёт по прочитанному, а удаление отозванного — **перечитав** в своей транзакции:
+     * пока система гасила, повод мог вернуться, и `promise` воскресил обязательство под тем же
+     * ключом. Удалить его значило бы потерять живое; гашение воскрешённого безвредно.
      */
-    private suspend fun dismissWithdrawn(): Int {
-        val withdrawn = reminders.withdrawn()
-        for (reminder in withdrawn) notifier.dismiss(reminder.key)
-        transactions.run {
-            reminders.deleteAll(
-                reminders.findAll(withdrawn.map { it.key }).filter { it.state == Reminder.State.WITHDRAWN }.map { it.key }
-            )
+    private suspend fun dismissGroundless(): Int {
+        val groundless = reminders.groundless().filter { it.state == Reminder.State.WITHDRAWN || it.cardIsUp }
+        for (reminder in groundless) notifier.dismiss(reminder.key)
+        val withdrawn = groundless.filter { it.state == Reminder.State.WITHDRAWN }.map { it.key }
+        if (withdrawn.isNotEmpty()) {
+            transactions.run {
+                reminders.deleteAll(reminders.findAll(withdrawn).filter { it.state == Reminder.State.WITHDRAWN }.map { it.key })
+            }
         }
-        return withdrawn.size
+        return groundless.size
     }
 
     /** Давнее забывается: решает сама сущность, запрос только сужает отбор — и решает, и удаляет одна транзакция. */

@@ -217,6 +217,30 @@ class NotificationProtocolTest {
     }
 
     /**
+     * **Карточка без основания гасится, пока не погашена** (C1). Отложили, пока система показывала;
+     * компенсация — гашение — сорвалась. Прежде сбой проглатывался, а следующий проход гасил только
+     * отозванное: отложенное обязательство `DUE` на новый срок, и карточка висела до него. Карточка
+     * — факт о мире, и помнит его обязательство: следующий проход гасит её сам.
+     */
+    @Test
+    fun aFailedDismissIsRepeatedByTheNextPass() = runBlocking {
+        val reminder = intake()
+        val intakeId = (reminder.target as NotificationTarget.Intake).intakeId
+        scenarios.notifier.onShow = { scenarios.reminderAnswering.snooze(intakeId) }
+        scenarios.notifier.dismissFailingOnce += reminder.key
+
+        scenarios.reminderStore.saveAll(listOf(reminder))
+        mechanisms.await("показ") { scenarios.notifier.shown.any { it.key == reminder.key } }
+
+        // Запись о карточке — сигнал таблицы, и следующий проход приходит сам; хватит и его.
+        mechanisms.await("карточка погашена следующим проходом") { reminder.key in scenarios.notifier.dismissed }
+        assertTrue("первое гашение не срывалось — проверять нечего", reminder.key !in scenarios.notifier.dismissFailingOnce)
+        val deferred = requireNotNull(scenarios.reminderStore.find(reminder.key))
+        assertEquals(Reminder.State.DUE, deferred.state)
+        assertTrue("отсрочка потеряна", deferred.dueAt.isAfter(now))
+    }
+
+    /**
      * **Исправленный срок годности гасит предупреждение без прохода дня.** Коробка-источник кончалась
      * через три дня — сказано; человек исправил дату на десять дней вперёд. Прежде предупреждение
      * висело до следующего `DailyRound`: изменение коробки сверку не звало. Теперь основания сами

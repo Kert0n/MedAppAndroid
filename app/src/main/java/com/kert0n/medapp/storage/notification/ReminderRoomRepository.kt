@@ -38,7 +38,7 @@ class ReminderRoomRepository @Inject constructor(
     override fun observeAwaiting(delivery: NoticeDelivery): Flow<List<PendingNotice>> =
         database.observing("reminders") { awaiting(delivery).map { it.projection() } }
 
-    override suspend fun withdrawn(): List<Reminder> = reminders.withdrawn().map { it.toDomain() }
+    override suspend fun groundless(): List<Reminder> = reminders.groundless().map { it.toDomain() }
 
     override suspend fun stale(before: Instant): List<Reminder> = reminders.olderThan(before).map { it.toDomain() }
 

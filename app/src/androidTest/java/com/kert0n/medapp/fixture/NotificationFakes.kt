@@ -31,15 +31,23 @@ class FakeNotifier(var allowed: Boolean = true) : Notifier {
      */
     var onDismiss: (suspend (NotificationKey) -> Unit)? = null
 
+    /** То же для показа: человек отвечает, пока система рисует карточку. */
+    var onShow: (suspend (Reminder) -> Unit)? = null
+
     override suspend fun show(reminder: Reminder): Delivery {
         if (reminder.key in failing) error("показ сорвался: ${reminder.key}")
         if (!allowed) return Delivery.NOT_ALLOWED
         if (reminder.key in vanished) return Delivery.SUBJECT_GONE
+        onShow?.invoke(reminder)
         shown += reminder
         return Delivery.SHOWN
     }
 
+    /** Ключи, первое гашение которых бросает: система не приняла отмену, карточка осталась висеть. */
+    val dismissFailingOnce = mutableSetOf<NotificationKey>()
+
     override suspend fun dismiss(key: NotificationKey) {
+        if (dismissFailingOnce.remove(key)) error("гашение сорвалось: $key")
         dismissed += key
         onDismiss?.invoke(key)
     }
