@@ -66,4 +66,15 @@ sealed interface Screen : NavKey {
     /** Перенос на другую полку (PLAN H3 №11): выбор места, куда положить коробку. */
     @Serializable
     data class PackageTransfer(val packageId: Uuid) : Screen
+
+    /**
+     * Редактор лечения (PLAN H3 №15): без [courseId] — новый черновик, с ним — записанный
+     * черновик или идущее лечение; что из двух, экран узнаёт у базы.
+     */
+    @Serializable
+    data class CourseForm(val courseId: Uuid? = null) : Screen
+
+    /** Карточка курса (PLAN H3 №14): обеспечение, назначение, источники, пункты. */
+    @Serializable
+    data class CourseCard(val courseId: Uuid) : Screen
 }

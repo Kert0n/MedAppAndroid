@@ -12,6 +12,17 @@ import androidx.compose.material3.NavigationBarItem
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.saveable.rememberSaveable
+import androidx.compose.runtime.setValue
+import com.kert0n.medapp.presentation.course.CourseFormUiState
+import com.kert0n.medapp.presentation.course.CourseFormViewModel
+import com.kert0n.medapp.presentation.course.CourseListViewModel
+import com.kert0n.medapp.presentation.course.CoursePresentationDTO
+import com.kert0n.medapp.ui.course.CourseFormScreen
+import com.kert0n.medapp.ui.plan.PlanMode
+import com.kert0n.medapp.ui.plan.PlanScreen
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
@@ -208,7 +219,47 @@ private fun screens(stacks: TabStacks) = entryProvider<NavKey> {
             onBack = stacks::back
         )
     }
-    for (place in Place.entries - Place.MED_KITS) {
+    entry(Screen.Plan) {
+        val model: CourseListViewModel = hiltViewModel()
+        // Режим — состояние места: он переживает уход в другую комнату и возвращение, как и
+        // всё, что держит стопка (rememberSaveable под своим ключом маршрута).
+        var mode by rememberSaveable { mutableStateOf(PlanMode.COURSES) }
+        PlanScreen(
+            mode = mode,
+            onMode = { mode = it },
+            courses = model.state.collectAsStateWithLifecycle().value,
+            // Черновик открывается редактором, идущее и законченное лечение — карточкой.
+            onOpenCourse = { course ->
+                stacks.go(
+                    if (course.kind == CoursePresentationDTO.Kind.DRAFT) Screen.CourseForm(course.id)
+                    else Screen.CourseCard(course.id)
+                )
+            },
+            onAddCourse = { stacks.go(Screen.CourseForm()) }
+        )
+    }
+    entry<Screen.CourseForm> { key ->
+        val model = hiltViewModel<CourseFormViewModel, CourseFormViewModel.Factory>(
+            key = key.toString(),
+            creationCallback = { factory -> factory.create(key.courseId) }
+        )
+        val state = model.state.collectAsStateWithLifecycle().value
+        // Записанное или удалённое — повод уйти: человек заводил лечение, а не форму.
+        LaunchedEffect(state) {
+            if (state is CourseFormUiState.Editing && (state.isSaved || state.isDiscarded)) stacks.back()
+        }
+        CourseFormScreen(
+            state = state,
+            onEdit = model::edit,
+            onSave = model::save,
+            onAskToDiscard = model::askToDiscard,
+            onConfirmDiscard = model::discard,
+            onDismissDiscard = model::dismissDiscard,
+            onBack = stacks::back
+        )
+    }
+    entry<Screen.CourseCard> { NotReadyYet() }
+    for (place in Place.entries - Place.MED_KITS - Place.PLAN) {
         entry(place.key) { NotReadyYet() }
     }
 }

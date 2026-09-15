@@ -111,7 +111,7 @@ class ShellNavigationTest {
     fun aPlaceWithoutItsScreenSaysSo() {
         compose.setContent { MedAppTheme { MedAppShell() } }
 
-        place("План").performClick()
+        place("Сканер").performClick()
 
         compose.waitUntil {
             compose.onAllNodesWithText("Этот экран ещё не готов.").fetchSemanticsNodes().isNotEmpty()

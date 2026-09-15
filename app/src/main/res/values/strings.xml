@@ -261,4 +261,57 @@
     <string name="action_take">Принял</string>
     <string name="action_skip">Пропустить</string>
     <string name="action_snooze">Отложить</string>
+    <!-- Место «План» и курсы (H3 «Набор курсов») -->
+    <string name="plan_title">План</string>
+    <string name="plan_mode_day">День</string>
+    <string name="plan_mode_courses">Курсы</string>
+    <string name="plan_day_not_ready">План дня появится в следующем наборе экранов.</string>
+    <string name="courses_empty">Лечений пока нет.</string>
+    <string name="courses_empty_hint">Запишите назначение — даже одну заметку.</string>
+    <string name="courses_add">Записать лечение</string>
+    <string name="courses_running">Идут</string>
+    <string name="courses_drafts">Черновики</string>
+    <string name="courses_finished">Завершены</string>
+    <string name="course_completed_on">Завершён %1$s</string>
+    <string name="course_cancelled_on">Отменён %1$s</string>
+    <string name="course_draft">Черновик</string>
+    <string name="course_prescription_missing">Назначение не записано</string>
+    <plurals name="course_times_a_day">
+        <item quantity="one">%1$d раз в день</item>
+        <item quantity="few">%1$d раза в день</item>
+        <item quantity="many">%1$d раз в день</item>
+        <item quantity="other">%1$d раза в день</item>
+    </plurals>
+    <string name="course_days_daily">ежедневно</string>
+    <string name="course_days_range">%1$s–%2$s</string>
+    <plurals name="course_shortage">
+        <item quantity="one">Не хватает %1$d приёма</item>
+        <item quantity="few">Не хватает %1$d приёмов</item>
+        <item quantity="many">Не хватает %1$d приёмов</item>
+        <item quantity="other">Не хватает %1$d приёма</item>
+    </plurals>
+    <string name="course_shortage_from">%1$s с %2$s</string>
+    <string name="course_new">Новое лечение</string>
+    <string name="course_edit">Черновик лечения</string>
+    <string name="course_title">Название</string>
+    <string name="course_note">Заметка (необязательно)</string>
+    <string name="course_title_empty">Название нужно: без него лечение не отличить от других.</string>
+    <plurals name="course_title_too_long">
+        <item quantity="one">Название длиннее %1$d символа.</item>
+        <item quantity="few">Название длиннее %1$d символов.</item>
+        <item quantity="many">Название длиннее %1$d символов.</item>
+        <item quantity="other">Название длиннее %1$d символа.</item>
+    </plurals>
+    <plurals name="course_note_too_long">
+        <item quantity="one">Заметка длиннее %1$d символа.</item>
+        <item quantity="few">Заметка длиннее %1$d символов.</item>
+        <item quantity="many">Заметка длиннее %1$d символов.</item>
+        <item quantity="other">Заметка длиннее %1$d символа.</item>
+    </plurals>
+    <string name="course_stale">Черновик изменили с другого экрана — откройте его заново.</string>
+    <string name="course_gone">Этого черновика больше нет.</string>
+    <string name="course_discard">Удалить черновик</string>
+    <string name="course_discard_title">Удалить черновик?</string>
+    <string name="course_discard_explained">Записанное назначение и заметка пропадут. Пачки он не занимал.</string>
+    <string name="action_more">Ещё</string>
 </resources>
