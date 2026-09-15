@@ -76,6 +76,8 @@
 
     <!-- Упаковка: форма заведения и правки -->
     <string name="pack_new">Новая упаковка</string>
+    <string name="pack_edit">Правка упаковки</string>
+    <string name="pack_change_amount">Изменить</string>
     <string name="pack_med_kit">Аптечка</string>
     <string name="pack_no_med_kits">Сначала заведите аптечку — упаковка лежит в каком-то одном месте.</string>
     <string name="pack_name">Название</string>
@@ -139,6 +141,7 @@
     <string name="pack_too_long">Поле «%1$s» длиннее %2$d символов.</string>
     <string name="pack_amount_is_zero">Пустую упаковку заводить незачем — укажите, сколько в ней есть.</string>
     <string name="pack_hint_is_zero">Нулевой дозы не бывает.</string>
+    <string name="pack_form_clear_unsupported">У общей упаковки форму выпуска нельзя стереть — только заменить другой.</string>
     <string name="pack_unknown_in_vocabulary">Этого значения нет в справочнике — выберите другое.</string>
 
     <!-- Разбор количества, срока и цены -->

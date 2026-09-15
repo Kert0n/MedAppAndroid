@@ -13,12 +13,14 @@ import com.kert0n.medapp.domain.pack.PackageAvailability
 import com.kert0n.medapp.domain.pack.PackageEnding
 import com.kert0n.medapp.domain.pack.PackageFacts
 import com.kert0n.medapp.domain.pack.PackageProjection
+import com.kert0n.medapp.domain.pack.PackageRef
 import com.kert0n.medapp.domain.pack.PackageStatus
 import com.kert0n.medapp.domain.value.DosageForm
 import com.kert0n.medapp.domain.value.QuantityUnit
 import com.kert0n.medapp.domain.value.Vocabulary
 import com.kert0n.medapp.network.pack.PackageSnapshot
 import com.kert0n.medapp.network.pack.PackageSyncState
+import com.kert0n.medapp.domain.course.PackageFollowing
 import com.kert0n.medapp.domain.medkit.MedKitRef
 import com.kert0n.medapp.queue.QueuedCommand
 import com.kert0n.medapp.queue.QueueStorage
@@ -125,6 +127,12 @@ class FakePackages(vararg packs: Package) : PackageStorageRepository {
             is PackageAfter.Ended -> forget(pkg.id)
         }
         return true
+    }
+
+    /** Коробка, лежавшая до прихода человека: подготовка теста, а не действие сценария. */
+    fun lying(vararg packs: Package): FakePackages {
+        packs.forEach { write(it) }
+        return this
     }
 
     /** «Коробку убрали, пока экран был открыт» — та же дверь, что у сценария, но без него. */
@@ -295,4 +303,23 @@ class FakeQueue : QueueStorage {
 object DirectTransactions : Transactions {
 
     override suspend fun <T> run(block: suspend () -> T): T = block()
+}
+
+/**
+ * Лечение, следующее за коробкой, — заглушкой. Экраны локального учёта его не касаются: что курс
+ * делает, когда коробка изменилась, проверяется на нём самом (`CourseFollowingTest`). Здесь
+ * записано только то, за какими коробками следили: если экран забудет позвать сценарий, это
+ * видно.
+ */
+class FakeFollowing : PackageFollowing {
+
+    val followed = mutableListOf<Uuid>()
+
+    override suspend fun follow(packageId: Uuid, at: Instant) {
+        followed += packageId
+    }
+
+    override suspend fun lost(pkg: PackageRef, at: Instant) {
+        followed += pkg.id
+    }
 }

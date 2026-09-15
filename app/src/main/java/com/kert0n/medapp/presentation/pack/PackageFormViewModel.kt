@@ -4,6 +4,7 @@ import androidx.lifecycle.SavedStateHandle
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.kert0n.medapp.feature.packages.PackageAdding
+import com.kert0n.medapp.feature.packages.PackageDescribing
 import com.kert0n.medapp.presentation.ParsedInput
 import com.kert0n.medapp.presentation.RouteArguments
 import com.kert0n.medapp.presentation.Today
@@ -13,6 +14,7 @@ import com.kert0n.medapp.presentation.value.FormPresentationDTO
 import com.kert0n.medapp.presentation.value.UnitPresentationDTO
 import com.kert0n.medapp.presentation.value.toPresentationDTO
 import com.kert0n.medapp.storage.medkit.MedKitStorageRepository
+import com.kert0n.medapp.storage.pack.PackageStorageRepository
 import com.kert0n.medapp.storage.value.VocabularyStorageRepository
 import dagger.hilt.android.lifecycle.HiltViewModel
 import javax.inject.Inject
@@ -22,12 +24,18 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.flatMapLatest
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 
 /**
- * Заведение упаковки (PLAN H3 №7).
+ * Заведение (PLAN H3 №7) и правка (№8) упаковки. Экран один: поля те же и разбор тот же, а
+ * различает их то, есть ли уже коробка.
+ *
+ * **В правке количество и аптечка показаны, но не правятся.** Количество двигают пересчёт и
+ * утилизация, место — перенос; у обоих есть свой след, а у правки описания его нет и быть не
+ * должно (PLAN D3, D7).
  *
  * Аптечка, единица и форма выбираются из того, что есть: списки приходят из базы и словаря, а
  * напечатать несуществующее нельзя по устройству формы. Аптечка подставлена та, из которой
@@ -42,7 +50,9 @@ import kotlinx.coroutines.launch
 @HiltViewModel
 class PackageFormViewModel @Inject constructor(
     private val adding: PackageAdding,
+    private val describing: PackageDescribing,
     private val vocabulary: VocabularyStorageRepository,
+    private val packages: PackageStorageRepository,
     medKits: MedKitStorageRepository,
     today: Today,
     savedState: SavedStateHandle
@@ -51,19 +61,33 @@ class PackageFormViewModel @Inject constructor(
     private val medKitId: Uuid? =
         savedState.get<String>(RouteArguments.MED_KIT_ID)?.takeIf { it != "null" }?.let(Uuid::parse)
 
+    private val packageId: Uuid? =
+        savedState.get<String>(RouteArguments.PACKAGE_ID)?.takeIf { it != "null" }?.let(Uuid::parse)
+
     private val form = MutableStateFlow(PackageFormPresentationDTO(medKitId = medKitId))
+
+    /** Что записано у коробки, которую правят: количество и аптечку экран показывает отсюда. */
+    private val stored = MutableStateFlow<PackagePresentationDTO?>(null)
 
     private val progress = MutableStateFlow(Progress())
 
+    init {
+        // Записанное дочитывается **один раз**, при открытии: подписка перетирала бы набранное
+        // каждым изменением в базе (наследство разбора #16).
+        if (packageId != null) viewModelScope.launch { open(packageId) }
+    }
+
     val state: StateFlow<PackageFormUiState> = combine(
-        form,
+        combine(form, stored) { form, stored -> form to stored },
         progress,
         today.observe().flatMapLatest { medKits.observeAll(it) },
         vocabulary.observeUnits(),
         vocabulary.observeForms()
-    ) { form, progress, medKits, units, forms ->
+    ) { (form, stored), progress, medKits, units, forms ->
         PackageFormUiState(
             form = form,
+            stored = stored,
+            isEditing = packageId != null,
             medKits = medKits.map { it.toPresentationDTO() },
             units = units.map { it.toPresentationDTO() },
             forms = forms.map { it.toPresentationDTO() },
@@ -95,7 +119,18 @@ class PackageFormViewModel @Inject constructor(
         viewModelScope.launch { write() }
     }
 
+    private suspend fun open(packageId: Uuid) {
+        val found = packages.observe(packageId).first()
+        if (found == null) {
+            progress.value = Progress(error = PackageFormError.PackageGone)
+            return
+        }
+        stored.value = found.toPresentationDTO()
+        form.value = found.toFormPresentationDTO()
+    }
+
     private suspend fun write() {
+        if (packageId != null) return rewrite(packageId)
         val typed = form.value
         val medKitId = typed.medKitId ?: return reject(PackageFormError.MedKitMissing)
         val known = vocabulary.snapshot()
@@ -113,6 +148,21 @@ class PackageFormViewModel @Inject constructor(
             is PackageAdding.Outcome.Added -> Progress(saved = outcome.packageId)
             PackageAdding.Outcome.MedKitGone -> Progress(error = PackageFormError.MedKitGone)
             PackageAdding.Outcome.MedKitBusy -> Progress(error = PackageFormError.MedKitBusy)
+        }
+    }
+
+    /** Правка: количество и место не трогаются — сценарий принимает одни сведения (PLAN D3). */
+    private suspend fun rewrite(packageId: Uuid) {
+        val facts = when (val parsed = form.value.parsedFacts(vocabulary.snapshot())) {
+            is ParsedInput.Rejected -> return reject(parsed.error)
+            is ParsedInput.Parsed -> parsed.value
+        }
+        progress.value = when (describing.describe(packageId, facts)) {
+            PackageDescribing.Outcome.SAVED -> Progress(saved = packageId)
+            PackageDescribing.Outcome.GONE -> Progress(error = PackageFormError.PackageGone)
+            PackageDescribing.Outcome.UNUSABLE -> Progress(error = PackageFormError.PackageBusy)
+            PackageDescribing.Outcome.FORM_CLEAR_UNSUPPORTED ->
+                Progress(error = PackageFormError.FormClearUnsupported)
         }
     }
 
@@ -134,6 +184,10 @@ class PackageFormViewModel @Inject constructor(
  */
 data class PackageFormUiState(
     val form: PackageFormPresentationDTO,
+    /** Правят записанную коробку или заводят новую: у полей об этом не спрашивают. */
+    val isEditing: Boolean = false,
+    /** Что записано у правимой коробки: количество и аптечку экран показывает, но не правит. */
+    val stored: PackagePresentationDTO? = null,
     val medKits: List<MedKitPresentationDTO> = emptyList(),
     val units: List<UnitPresentationDTO> = emptyList(),
     val forms: List<FormPresentationDTO> = emptyList(),

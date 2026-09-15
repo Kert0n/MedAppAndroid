@@ -28,6 +28,7 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
@@ -59,6 +60,7 @@ fun PackageFormRoute(
     onSaved: (Uuid) -> Unit,
     onCancel: () -> Unit,
     modifier: Modifier = Modifier,
+    onChangeAmount: (Uuid) -> Unit = {},
     viewModel: PackageFormViewModel = hiltViewModel()
 ) {
     val state by viewModel.state.collectAsStateWithLifecycle()
@@ -68,6 +70,7 @@ fun PackageFormRoute(
         onEdit = viewModel::edit,
         onSave = viewModel::save,
         onCancel = onCancel,
+        onChangeAmount = { state.stored?.id?.let(onChangeAmount) },
         modifier = modifier
     )
 }
@@ -88,7 +91,8 @@ fun PackageFormScreen(
     onEdit: (PackageFormPresentationDTO) -> Unit,
     onSave: () -> Unit,
     onCancel: () -> Unit,
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier,
+    onChangeAmount: () -> Unit = {}
 ) {
     val form = state.form
     // Раскрыт ли раздел — дело самого экрана, а не состояния: за ним не стоит ни записи, ни
@@ -102,7 +106,9 @@ fun PackageFormScreen(
         modifier = modifier.fillMaxSize(),
         topBar = {
             TopAppBar(
-                title = { Text(stringResource(R.string.pack_new)) },
+                title = {
+                    Text(stringResource(if (state.isEditing) R.string.pack_edit else R.string.pack_new))
+                },
                 navigationIcon = {
                     IconButton(onClick = onCancel) {
                         Icon(
@@ -122,15 +128,33 @@ fun PackageFormScreen(
                 .padding(16.dp),
             verticalArrangement = Arrangement.spacedBy(16.dp)
         ) {
-            PickerField(
-                label = stringResource(R.string.pack_med_kit),
-                selected = state.medKits.firstOrNull { it.id == form.medKitId },
-                options = state.medKits,
-                optionText = { it.name },
-                onPick = { onEdit(form.copy(medKitId = it.id)) },
-                isError = state.error?.field == PackageFormError.Field.MED_KIT,
-                emptyText = stringResource(R.string.pack_no_med_kits)
-            )
+            if (state.isEditing) {
+                // Показано, но не правится: у переноса и пересчёта свой след, и ведут туда свои
+                // экраны — сказать об этом здесь дешевле, чем заставить искать (PLAN D3).
+                Stored(
+                    label = stringResource(R.string.pack_med_kit),
+                    value = state.medKits.firstOrNull { it.id == form.medKitId }?.name
+                        ?: stringResource(R.string.pack_med_kit_unknown)
+                )
+                Stored(
+                    label = stringResource(R.string.pack_amount),
+                    value = state.stored?.let {
+                        stringResource(R.string.pack_left, it.quantity.amount, it.quantity.unit.name)
+                    } ?: stringResource(R.string.state_loading),
+                    action = stringResource(R.string.pack_change_amount),
+                    onAction = onChangeAmount
+                )
+            } else {
+                PickerField(
+                    label = stringResource(R.string.pack_med_kit),
+                    selected = state.medKits.firstOrNull { it.id == form.medKitId },
+                    options = state.medKits,
+                    optionText = { it.name },
+                    onPick = { onEdit(form.copy(medKitId = it.id)) },
+                    isError = state.error?.field == PackageFormError.Field.MED_KIT,
+                    emptyText = stringResource(R.string.pack_no_med_kits)
+                )
+            }
             OutlinedTextField(
                 value = form.name,
                 onValueChange = { onEdit(form.copy(name = it)) },
@@ -139,7 +163,7 @@ fun PackageFormScreen(
                 singleLine = true,
                 modifier = Modifier.fillMaxWidth()
             )
-            Row(horizontalArrangement = Arrangement.spacedBy(16.dp)) {
+            if (!state.isEditing) Row(horizontalArrangement = Arrangement.spacedBy(16.dp)) {
                 OutlinedTextField(
                     value = form.amount,
                     onValueChange = { onEdit(form.copy(amount = it)) },
@@ -267,6 +291,30 @@ private fun Optional(state: PackageFormUiState, onEdit: (PackageFormPresentation
     }
 }
 
+/**
+ * Сведение, которое форма показывает, но не правит: его меняют другим действием и с другим
+ * следом. Куда идти за этим действием, сказано тут же — иначе человек ищет его по экранам.
+ */
+@Composable
+private fun Stored(
+    label: String,
+    value: String,
+    action: String? = null,
+    onAction: (() -> Unit)? = null
+) {
+    Column(Modifier.fillMaxWidth()) {
+        Text(label, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            Text(value, style = MaterialTheme.typography.bodyLarge, modifier = Modifier.weight(1f))
+            if (action != null && onAction != null) {
+                TextButton(onClick = onAction, modifier = Modifier.defaultMinSize(minHeight = 48.dp)) {
+                    Text(action)
+                }
+            }
+        }
+    }
+}
+
 /** Обычное текстовое поле формы: десять таких подряд, и каждое повторяло бы одно и то же. */
 @Composable
 private fun FormField(
@@ -305,6 +353,9 @@ private fun PackageFormError.message(): String = when (this) {
     PackageFormError.MedKitMissing -> stringResource(R.string.pack_med_kit_missing)
     PackageFormError.MedKitGone -> stringResource(R.string.pack_med_kit_gone)
     PackageFormError.MedKitBusy -> stringResource(R.string.pack_med_kit_busy)
+    PackageFormError.PackageGone -> stringResource(R.string.pack_gone)
+    PackageFormError.PackageBusy -> stringResource(R.string.pack_busy)
+    PackageFormError.FormClearUnsupported -> stringResource(R.string.pack_form_clear_unsupported)
     PackageFormError.UnitMissing -> stringResource(R.string.pack_unit_missing)
     PackageFormError.NameEmpty -> stringResource(R.string.pack_name_empty)
     is PackageFormError.TooLong ->

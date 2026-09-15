@@ -8,10 +8,16 @@ import androidx.compose.ui.test.performScrollTo
 import androidx.compose.ui.test.performTextInput
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import com.kert0n.medapp.fixture.HOME_KIT
+import com.kert0n.medapp.fixture.PACK
 import com.kert0n.medapp.fixture.TABLETS
 import com.kert0n.medapp.fixture.medKit
+import com.kert0n.medapp.fixture.pack
+import com.kert0n.medapp.fixture.projected
+import com.kert0n.medapp.fixture.tablets
 import com.kert0n.medapp.presentation.medkit.toPresentationDTO
 import com.kert0n.medapp.presentation.pack.PackageFormError
+import com.kert0n.medapp.presentation.pack.PackagePresentationDTO
+import com.kert0n.medapp.presentation.pack.toPresentationDTO
 import com.kert0n.medapp.presentation.pack.PackageFormPresentationDTO
 import com.kert0n.medapp.presentation.pack.PackageFormUiState
 import com.kert0n.medapp.presentation.value.toPresentationDTO
@@ -38,10 +44,13 @@ class PackageFormScreenTest {
 
     private fun show(
         form: PackageFormPresentationDTO = PackageFormPresentationDTO(medKitId = HOME_KIT),
-        error: PackageFormError? = null
+        error: PackageFormError? = null,
+        editing: PackagePresentationDTO? = null
     ) {
         val state = PackageFormUiState(
             form = form,
+            isEditing = editing != null,
+            stored = editing,
             medKits = listOf(medKit(id = HOME_KIT, name = "Домашняя").projection(MedKitContents.EMPTY).toPresentationDTO()),
             units = listOf(TABLETS.toPresentationDTO()),
             error = error
@@ -136,5 +145,36 @@ class PackageFormScreenTest {
 
         assertEquals(1, cancelled)
         assertEquals(0, saved)
+    }
+
+    /**
+     * В правке количество показано, но не правится: его двигают пересчёт и утилизация, у которых
+     * свой след. Куда за ними идти, сказано тут же.
+     *
+     * Красная проверка: оставить поле количества правимым — появится поле ввода, и человек
+     * изменит число там, где следа не остаётся.
+     */
+    @Test
+    fun editingShowsTheAmountButDoesNotLetItBeChanged() {
+        val stored = pack(id = PACK, name = "Нурофен", quantity = tablets("20")).projected().toPresentationDTO()
+        show(
+            form = PackageFormPresentationDTO(medKitId = HOME_KIT, name = "Нурофен"),
+            editing = stored
+        )
+
+        compose.onNodeWithText("Правка упаковки").assertIsDisplayed()
+        compose.onNodeWithText("20 таблетка").assertIsDisplayed()
+        compose.onNodeWithText("Изменить").assertIsDisplayed()
+        compose.onNodeWithText("Единица").assertDoesNotExist()
+    }
+
+    /** Форму общей коробки не стереть, и экран объясняет это, а не молчит (PLAN D3). */
+    @Test
+    fun clearingTheFormOfASharedBoxIsExplained() {
+        show(error = PackageFormError.FormClearUnsupported)
+
+        compose.onNodeWithText("У общей упаковки форму выпуска нельзя стереть — только заменить другой.")
+            .performScrollTo()
+            .assertIsDisplayed()
     }
 }

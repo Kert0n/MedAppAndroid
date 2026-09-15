@@ -3,17 +3,22 @@ package com.kert0n.medapp.presentation.pack
 import androidx.lifecycle.SavedStateHandle
 import com.kert0n.medapp.domain.medkit.MedKit
 import com.kert0n.medapp.feature.packages.PackageAdding
+import com.kert0n.medapp.feature.packages.PackageDescribing
 import com.kert0n.medapp.fixture.DirectTransactions
+import com.kert0n.medapp.fixture.FakeFollowing
 import com.kert0n.medapp.fixture.FakeMedKits
 import com.kert0n.medapp.fixture.FakePackages
 import com.kert0n.medapp.fixture.FakeQueue
 import com.kert0n.medapp.fixture.FakeVocabulary
 import com.kert0n.medapp.fixture.HOME_KIT
+import com.kert0n.medapp.fixture.PACK
 import com.kert0n.medapp.fixture.MainDispatcherRule
 import com.kert0n.medapp.fixture.SHARED_KIT
 import com.kert0n.medapp.fixture.TABLETS
 import com.kert0n.medapp.fixture.awaiting
 import com.kert0n.medapp.fixture.medKit
+import com.kert0n.medapp.fixture.pack
+import com.kert0n.medapp.fixture.tablets
 import com.kert0n.medapp.fixture.watching
 import com.kert0n.medapp.presentation.RouteArguments
 import com.kert0n.medapp.presentation.Today
@@ -52,14 +57,27 @@ class PackageFormViewModelTest {
         clock = clock
     )
 
-    private fun viewModel(medKitId: Uuid? = HOME_KIT) = PackageFormViewModel(
+    private fun viewModel(medKitId: Uuid? = HOME_KIT, packageId: Uuid? = null) = PackageFormViewModel(
         adding = adding,
+        describing = describing,
         vocabulary = FakeVocabulary(),
+        packages = packages,
         medKits = medKits,
         today = Today(clock),
         savedState = SavedStateHandle(
-            medKitId?.let { mapOf(RouteArguments.MED_KIT_ID to it.toString()) } ?: emptyMap()
+            buildMap {
+                medKitId?.let { put(RouteArguments.MED_KIT_ID, it.toString()) }
+                packageId?.let { put(RouteArguments.PACKAGE_ID, it.toString()) }
+            }
         )
+    )
+
+    private val describing = PackageDescribing(
+        packages = packages,
+        following = FakeFollowing(),
+        queue = QueueService(DirectTransactions, FakeQueue()),
+        transactions = DirectTransactions,
+        clock = clock
     )
 
     private fun PackageFormUiState.filled() = form.copy(
@@ -182,7 +200,9 @@ class PackageFormViewModelTest {
         val busy = FakeMedKits(medKit(id = HOME_KIT, publication = MedKit.Publication.LOCAL).markRemoving())
         val model = PackageFormViewModel(
             adding = PackageAdding(packages, busy, QueueService(DirectTransactions, FakeQueue()), DirectTransactions, clock),
+            describing = describing,
             vocabulary = FakeVocabulary(),
+            packages = packages,
             medKits = busy,
             today = Today(clock),
             savedState = SavedStateHandle(mapOf(RouteArguments.MED_KIT_ID to HOME_KIT.toString()))
@@ -196,5 +216,57 @@ class PackageFormViewModelTest {
 
         assertEquals(PackageFormError.MedKitBusy, state.error)
         assertEquals(emptyList<Any>(), packages.packages)
+    }
+
+    /** Открытая на правку форма показывает записанное, а не пустые поля. */
+    @Test
+    fun aFormOpenedForEditingShowsWhatIsStored() {
+        packages.lying(pack(id = PACK, name = "Нурофен", quantity = tablets("20")))
+
+        val state = watching(viewModel(packageId = PACK).state) { it.awaiting { s -> s.isEditing && s.stored != null } }
+
+        assertEquals("Нурофен", state.form.name)
+        assertEquals("20", state.stored?.quantity?.amount)
+    }
+
+    /**
+     * Правка не трогает количество и место: их двигают пересчёт и перенос, у которых свой след
+     * (PLAN D3, D7).
+     *
+     * Красная проверка: отдать сценарию правки ещё и количество — эта проверка краснеет числом.
+     */
+    @Test
+    fun editingLeavesTheAmountAndTheShelfAlone() {
+        packages.lying(pack(id = PACK, name = "Нурофен", quantity = tablets("20")))
+        val model = viewModel(packageId = PACK)
+
+        watching(model.state) { state ->
+            val opened = state.awaiting { it.stored != null }.form
+            model.edit(opened.copy(name = "Нурофен форте", amount = "1", manufacturer = "Reckitt"))
+            model.save()
+            state.awaiting { it.saved != null }
+        }
+
+        val stored = packages.packages.single()
+        assertEquals("Нурофен форте", stored.name)
+        assertEquals("Reckitt", stored.facts.manufacturer)
+        assertEquals(tablets("20"), stored.quantity)
+        assertEquals(HOME_KIT, stored.medKit.id)
+    }
+
+    /** Коробки не стало, пока форму держали открытой: писать некуда, и это сказано. */
+    @Test
+    fun aBoxThatIsGoneRefusesTheEdit() {
+        packages.lying(pack(id = PACK, name = "Нурофен"))
+        val model = viewModel(packageId = PACK)
+
+        val state = watching(model.state) { state ->
+            state.awaiting { it.stored != null }
+            packages.forget(PACK)
+            model.save()
+            state.awaiting { it.error != null }
+        }
+
+        assertEquals(PackageFormError.PackageGone, state.error)
     }
 }

@@ -90,4 +90,22 @@ sealed interface PackageFormError {
     data object MedKitBusy : PackageFormError {
         override val field: Field get() = Field.MED_KIT
     }
+
+    /** Коробки, которую правят, больше нет: писать некуда. */
+    data object PackageGone : PackageFormError {
+        override val field: Field get() = Field.NAME
+    }
+
+    /** Коробка ждёт ответа сервера на решение о себе: править её до ответа нельзя (PLAN E1). */
+    data object PackageBusy : PackageFormError {
+        override val field: Field get() = Field.NAME
+    }
+
+    /**
+     * У общей коробки форму выпуска не стереть: на проводе «не трогать» и «очистить» — одно и то
+     * же значение, и очистка выдалась бы за «оставить как было» (PLAN D3).
+     */
+    data object FormClearUnsupported : PackageFormError {
+        override val field: Field get() = Field.FORM
+    }
 }

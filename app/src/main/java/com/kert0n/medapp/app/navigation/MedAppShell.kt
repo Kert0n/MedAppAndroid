@@ -103,12 +103,15 @@ private fun MedAppNavHost(navController: NavHostController, modifier: Modifier =
             PackageFormRoute(
                 // Записанная коробка открывается карточкой, а форма со стека уходит: человек
                 // заводил её, чтобы на неё посмотреть, а не чтобы завести вторую такую же.
+                // Заведённая коробка открывается карточкой, а правленая на неё возвращается:
+                // в обоих случаях человек попадает туда, где видно, что получилось.
                 onSaved = { packageId ->
                     navController.navigate(Route.Package(packageId)) {
                         popUpTo<Route.PackageForm> { inclusive = true }
                     }
                 },
-                onCancel = { navController.popBackStack() }
+                onCancel = { navController.popBackStack() },
+                onChangeAmount = { navController.navigate(Route.PackageAmount(it)) }
             )
         }
         composable<Route.Package>(typeMap = mapOf(typeOf<Uuid>() to UuidNavType)) {
