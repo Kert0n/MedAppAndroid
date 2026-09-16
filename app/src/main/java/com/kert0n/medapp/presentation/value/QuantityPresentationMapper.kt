@@ -64,3 +64,7 @@ private fun reject(text: String): QuantityPresentationError? {
     }
     return null
 }
+
+/** Величина обратно на экран. Строки нормализованы: 1 и 1.000000 дают одинаковое состояние экрана. */
+fun Quantity.toPresentationDTO(): QuantityPresentationDTO =
+    QuantityPresentationDTO(amount.stripTrailingZeros().toPlainString(), unit.toPresentationDTO())

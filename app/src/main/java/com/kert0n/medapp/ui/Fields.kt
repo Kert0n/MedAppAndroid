@@ -43,7 +43,6 @@ import com.kert0n.medapp.presentation.value.QuantityPresentationError
 import java.time.Instant
 import java.time.LocalDate
 import java.time.ZoneOffset
-import java.time.format.DateTimeFormatter
 
 /**
  * Строка поиска, которая сама ничего не ищет: она ведёт туда, где ищут. Нужна там, где результат
@@ -209,7 +208,6 @@ fun DateField(
 }
 
 /** Как дата выглядит в поле: так же, как её печатают от руки. */
-private val DAY: DateTimeFormatter = DateTimeFormatter.ofPattern("dd.MM.uuuu")
 
 /**
  * Чем плох напечатанный ввод — словами. Один текст на все поля, где человек печатает количество,

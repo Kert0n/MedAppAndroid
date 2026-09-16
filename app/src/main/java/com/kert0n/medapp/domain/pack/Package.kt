@@ -67,6 +67,7 @@ class Package(
     ): PackageProjection =
         PackageProjection(
             id = id,
+            ref = ref,
             medKit = medKit,
             facts = facts,
             quantity = quantity,
