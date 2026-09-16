@@ -1,6 +1,6 @@
 package com.kert0n.medapp.platform.time
 
-import com.kert0n.medapp.di.NetworkModule
+import com.kert0n.medapp.di.ClockModule
 import java.time.ZoneId
 import java.util.TimeZone
 import org.junit.After
@@ -29,7 +29,7 @@ class DeviceClockTest {
     @Test
     fun theZoneFollowsTheDevice() {
         TimeZone.setDefault(TimeZone.getTimeZone("Europe/Moscow"))
-        val clock = NetworkModule.clock()
+        val clock = ClockModule.clock()
         assertEquals(ZoneId.of("Europe/Moscow"), clock.zone)
 
         TimeZone.setDefault(TimeZone.getTimeZone("Asia/Vladivostok"))

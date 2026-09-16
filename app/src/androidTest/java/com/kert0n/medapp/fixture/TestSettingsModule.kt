@@ -75,7 +75,13 @@ object TestPermissions : DevicePermissions {
     var exactAlarms: Boolean = true
 
     override fun current(): PermissionStates =
-        PermissionStates(notifications = notifications, exactAlarms = exactAlarms, camera = CameraAccess.GRANTED)
+        // Точность будильников у истории одна — у её постановок: спросить второй ответ значило бы
+        // завести в проверке то расхождение, которое приложение как раз не допускает.
+        PermissionStates(
+            notifications = notifications,
+            exactAlarms = StoryWorld.current?.alarms?.canBeExact ?: exactAlarms,
+            camera = CameraAccess.GRANTED
+        )
 
     fun reset() {
         notifications = true
