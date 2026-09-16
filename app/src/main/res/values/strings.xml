@@ -282,6 +282,7 @@
     <string name="intake_history_of_package">Приёмы из этой коробки</string>
     <string name="intake_history_of_course">Вся история</string>
     <string name="course_off_plan_action">Приёмы вне расписания</string>
+    <string name="course_off_plan_beyond">Больше, чем лечению осталось: можно засчитать %1$s.</string>
     <string name="course_off_plan_explained">Эти приёмы засчитываются лечению, но коробку не трогают и в историю не попадают.</string>
     <string name="course_off_plan_less">На один меньше</string>
     <string name="course_off_plan_more">На один больше</string>

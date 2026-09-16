@@ -80,9 +80,13 @@ class UnplannedIntakeSheetTest {
         assertEquals(1, acknowledged)
     }
 
-    /** Доза стоит в поле подсказкой, а рядом сказано, сколько в коробке моего: по нему и решают. */
+    /**
+     * Доза стоит в поле подсказкой, а рядом — **то же число, по которому судит сценарий**:
+     * свободное из всего, что в коробке. Покажи «доступно мне» — человек прочтёт число, с которого
+     * вопрос «заденет занятое» уже начался, и удивится вопросу (замечание владельца 2026-09-16).
+     */
     @Test
-    fun theHintAndWhatIsMineAreBothOnTheSheet() {
+    fun theHintAndWhatIsFreeOfTheWholeBoxAreBothOnTheSheet() {
         show(taking())
 
         compose.onNodeWithText("2").assertIsDisplayed()

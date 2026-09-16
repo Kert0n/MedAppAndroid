@@ -121,6 +121,8 @@ fun CourseCardScreen(
     if (state.asksOffPlan) {
         OffPlanDialog(
             current = state.offPlanDoses ?: 0,
+            // Больше, чем лечению осталось, набрать нельзя: столько доз ему не назначено (D5).
+            limit = state.offPlanLimit ?: (state.offPlanDoses ?: 0),
             onConfirm = onCountOffPlan,
             onDismiss = onDismissOffPlan
         )
@@ -334,12 +336,15 @@ private fun RunningMenu(onEdit: () -> Unit, onAskToCancel: () -> Unit) {
 
 /** Чем кончилась отмена — словами. Цвет один ничего не сообщает (H3 «Дизайн»). */
 @Composable
-private fun CourseCardMessage.words(): String = stringResource(
-    when (this) {
-        CourseCardMessage.AlreadyFinished -> R.string.course_cancel_already_finished
-        CourseCardMessage.Stale -> R.string.course_stale
-    }
-)
+private fun CourseCardMessage.words(): String = when (this) {
+    CourseCardMessage.AlreadyFinished -> stringResource(R.string.course_cancel_already_finished)
+    CourseCardMessage.Stale -> stringResource(R.string.course_stale)
+    // Предел называется числом: «столько нельзя» без «а сколько можно» человеку ничего не даёт.
+    is CourseCardMessage.BeyondPlan -> stringResource(
+        R.string.course_off_plan_beyond,
+        pluralStringResource(R.plurals.course_off_plan_count, limit, limit)
+    )
+}
 
 /**
  * Сколько приёмов сделано вне расписания. Считается **шагами**, а не свободным вводом: число
@@ -350,7 +355,7 @@ private fun CourseCardMessage.words(): String = stringResource(
  * трогают и в историю не попадают (PLAN D5).
  */
 @Composable
-private fun OffPlanDialog(current: Int, onConfirm: (Int) -> Unit, onDismiss: () -> Unit) {
+private fun OffPlanDialog(current: Int, limit: Int, onConfirm: (Int) -> Unit, onDismiss: () -> Unit) {
     var count by remember { mutableIntStateOf(current) }
     AlertDialog(
         onDismissRequest = onDismiss,
@@ -373,7 +378,7 @@ private fun OffPlanDialog(current: Int, onConfirm: (Int) -> Unit, onDismiss: () 
                         pluralStringResource(R.plurals.course_off_plan_count, count, count),
                         style = MaterialTheme.typography.titleLarge
                     )
-                    IconButton(onClick = { count += 1 }) {
+                    IconButton(onClick = { count += 1 }, enabled = count < limit) {
                         Icon(
                             painterResource(R.drawable.ic_add),
                             contentDescription = stringResource(R.string.course_off_plan_more)

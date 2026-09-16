@@ -1,6 +1,8 @@
 package com.kert0n.medapp.ui.course
 
 import androidx.compose.ui.test.assertIsDisplayed
+import androidx.compose.ui.test.assertIsNotEnabled
+import androidx.compose.ui.test.assertIsEnabled
 import androidx.compose.ui.test.junit4.v2.createComposeRule
 import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithText
@@ -207,5 +209,25 @@ class CourseCardScreenTest {
         compose.onNodeWithText("Приёмы вне расписания").performClick()
 
         assertEquals(1, askedOffPlan)
+    }
+
+    /**
+     * Больше, чем лечению осталось, набрать нельзя: «+» гаснет на пределе. Столько доз лечению не
+     * назначено, и счёт сверх этого — не поправка, а другое число (замечание владельца).
+     */
+    @Test
+    fun theOffPlanCountStopsAtWhatTheTreatmentHasLeft() {
+        show(
+            CourseCardUiState(
+                course = course(),
+                isRunning = true,
+                offPlanDoses = 2,
+                offPlanLimit = 2,
+                asksOffPlan = true
+            )
+        )
+
+        compose.onNodeWithContentDescription("На один больше").assertIsNotEnabled()
+        compose.onNodeWithContentDescription("На один меньше").assertIsEnabled()
     }
 }

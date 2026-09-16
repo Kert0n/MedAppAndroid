@@ -9,6 +9,7 @@ import com.kert0n.medapp.domain.course.CourseProjection
 import com.kert0n.medapp.domain.course.CoverageReduction
 import com.kert0n.medapp.domain.course.CourseRecordProjection
 import com.kert0n.medapp.domain.intake.IntakeProjection
+import com.kert0n.medapp.domain.intake.IntakeStatus
 import com.kert0n.medapp.feature.course.CourseCancellation
 import com.kert0n.medapp.feature.course.CourseOffPlanCounting
 import com.kert0n.medapp.storage.course.CourseStorageRepository
@@ -176,6 +177,11 @@ class CourseCardViewModel @AssistedInject constructor(
             asksToCancel = cancelling.asking,
             isCancelling = cancelling.working,
             offPlanDoses = plan?.takenOffPlan?.count,
+            // Сколько ещё можно засчитать мимо плана: больше лечению просто не назначено (D5).
+            offPlanLimit = plan?.let {
+                (prescription.totalDoses.count - intakes.count { taken -> taken.status == IntakeStatus.TAKEN })
+                    .coerceAtLeast(0)
+            },
             asksOffPlan = counting.asking,
             isCounting = counting.working,
             message = cancelling.message ?: counting.message
@@ -198,6 +204,8 @@ class CourseCardViewModel @AssistedInject constructor(
         CourseOffPlanCounting.Outcome.Finished -> Counting()
         CourseOffPlanCounting.Outcome.AlreadyFinished -> Counting(message = CourseCardMessage.AlreadyFinished)
         CourseOffPlanCounting.Outcome.Stale -> Counting(message = CourseCardMessage.Stale)
+        // Экран этого не даёт набрать, но он мог отстать от чтения: предел называется словами.
+        is CourseOffPlanCounting.Outcome.BeyondPlan -> Counting(message = CourseCardMessage.BeyondPlan(outcome.limit.count))
     }
 
     private data class Counting(
@@ -231,6 +239,8 @@ data class CourseCardUiState(
     val isCancelling: Boolean = false,
     /** Сколько доз принято мимо расписания: поправка к счёту, а не приёмы (PLAN D5). */
     val offPlanDoses: Int? = null,
+    /** Предел счёта: больше, чем лечению осталось, мимо плана не принимают (PLAN D5). */
+    val offPlanLimit: Int? = null,
     val asksOffPlan: Boolean = false,
     val isCounting: Boolean = false,
     /** Чем кончилось действие человека, если по самой карточке этого не видно. */
@@ -249,4 +259,7 @@ sealed interface CourseCardMessage {
 
     /** Лечение правили с другого экрана: карточка перечитает, а решение человек повторит. */
     data object Stale : CourseCardMessage
+
+    /** Мимо плана принято больше, чем лечению осталось: назван предел. */
+    data class BeyondPlan(val limit: Int) : CourseCardMessage
 }

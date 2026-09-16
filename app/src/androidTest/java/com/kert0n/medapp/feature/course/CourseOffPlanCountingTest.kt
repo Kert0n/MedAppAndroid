@@ -162,4 +162,20 @@ class CourseOffPlanCountingTest {
         assertEquals(CourseOffPlanCounting.Outcome.Stale, scenarios.courseOffPlanCounting.set(id, revision, Doses(3)))
         assertEquals(CourseOffPlanCounting.Outcome.Gone, scenarios.courseOffPlanCounting.set(Uuid.random(), revision, Doses(3)))
     }
+
+    /**
+     * Мимо плана нельзя принять больше, чем лечению осталось: столько доз ему не назначено, и
+     * счёт сверх этого — не поправка, а другое число (PLAN D5). Отказ называет предел; без него
+     * лечение закрывалось бы числом, которого в нём никогда не было.
+     */
+    @Test
+    fun moreThanTheTreatmentHasLeftIsRefusedWithItsLimit() = runTest {
+        val id = treated()
+
+        // Назначено шесть, принято по плану ноль: седьмой дозы у лечения нет.
+        val refused = scenarios.courseOffPlanCounting.set(id, revisionOf(id), Doses(7))
+
+        assertEquals(CourseOffPlanCounting.Outcome.BeyondPlan(Doses(6)), refused)
+        assertEquals(Doses(0), requireNotNull(database.courseRepository().findPlan(id)).takenOffPlan)
+    }
 }
