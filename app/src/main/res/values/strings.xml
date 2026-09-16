@@ -602,4 +602,6 @@
     <string name="scanner_camera_absent">На этом устройстве нет камеры. Коробки заводятся вручную.</string>
     <string name="scanner_unsupported">Этот код не поддерживается: на упаковках лекарств стоит DataMatrix.</string>
     <string name="scanner_invitation">Это приглашение в аптечку.</string>
+    <string name="med_kit_joining_scan">Отсканировать код</string>
+    <string name="med_kit_joining_aim">Наведите на QR приглашения</string>
 </resources>

@@ -259,11 +259,17 @@ private fun screens(stacks: TabStacks, planMode: MutableState<PlanMode>) = entry
                 stacks.go(Screen.MedKitContents(it))
             }
         }
+        // Разрешённая камера открывается сразу, неразрешённая сперва спрашивает: просьба стоит
+        // там, где человек нажал «Отсканировать», и объяснять её не нужно.
+        val askForCamera = rememberCameraPermissionRequest { granted -> if (granted) model.scan() }
         MedKitJoiningScreen(
             state = state,
             onType = model::type,
             onJoin = model::join,
-            onBack = stacks::back
+            onBack = stacks::back,
+            onScan = askForCamera,
+            onStopScanning = model::stopScanning,
+            onCode = model::seen
         )
     }
     entry<Screen.MedKitSharing> { key ->
@@ -286,7 +292,9 @@ private fun screens(stacks: TabStacks, planMode: MutableState<PlanMode>) = entry
         val model = hiltViewModel<PackageFormViewModel, PackageFormViewModel.Factory>(
             key = key.toString(),
             creationCallback = { factory ->
-                factory.create(PackageFormViewModel.Opened(key.medKitId, key.packageId))
+                factory.create(
+                    PackageFormViewModel.Opened(key.medKitId, key.packageId, key.scannedCode)
+                )
             }
         )
         val state = model.state.collectAsStateWithLifecycle().value
@@ -584,7 +592,7 @@ private fun screens(stacks: TabStacks, planMode: MutableState<PlanMode>) = entry
             model.resumed()
             onPauseOrDispose { }
         }
-        val askForCamera = rememberCameraPermissionRequest(onAnswered = model::asked)
+        val askForCamera = rememberCameraPermissionRequest { model.asked() }
         // Просьба — в тот миг, когда она объяснима: человек открыл сканер, камера нужна сейчас.
         // Один раз: спрошенное состояние — уже другое (`REFUSED`), и второй просьбы не будет.
         LaunchedEffect(state.camera) {
@@ -592,9 +600,9 @@ private fun screens(stacks: TabStacks, planMode: MutableState<PlanMode>) = entry
         }
         // Код с коробки ведёт в форму: спрашивает о нём реестр она сама (PLAN C1).
         LaunchedEffect(state.opening) {
-            if (state.opening == null) return@LaunchedEffect
+            val code = state.opening ?: return@LaunchedEffect
             model.opened()
-            stacks.go(Screen.PackageForm())
+            stacks.go(Screen.PackageForm(scannedCode = code))
         }
         val context = LocalContext.current
         ScannerScreen(

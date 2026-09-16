@@ -2,8 +2,11 @@ package com.kert0n.medapp.presentation.pack
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.kert0n.medapp.domain.scan.CodeFormat
+import com.kert0n.medapp.domain.scan.ScannedCode
 import com.kert0n.medapp.feature.packages.PackageAdding
 import com.kert0n.medapp.feature.packages.PackageDescribing
+import com.kert0n.medapp.feature.scan.PackageScanning
 import com.kert0n.medapp.feature.template.TemplateSearching
 import com.kert0n.medapp.feature.time.Today
 import com.kert0n.medapp.domain.Unavailability
@@ -53,6 +56,12 @@ import kotlinx.coroutines.launch
  * остановился на [SUGGESTION_PAUSE], а не на каждую букву; новая буква отменяет прежний запрос
  * вместе с его ответом, поэтому под нынешним текстом нет списка к старому — оба правила держит
  * одно `flatMapLatest`. Ответ справочника в форму не пишет ничего: пишет только выбор строки.
+ *
+ * **Форма, открытая сканером, спрашивает реестр сама и ровно один раз** (PLAN C1 «Результат
+ * сканирования — заполненная форма»): сканер ничего не показывает от себя, он предзаполняет этот
+ * экран. Предложение — не идентификатор и в маршрут не едет; едет код коробки, а спрашивает о нём
+ * тот, кто заполняет поля. Ответ ложится в **пустые** поля: пока он шёл по сети, человек уже мог
+ * начать печатать.
  */
 @OptIn(ExperimentalCoroutinesApi::class)
 @HiltViewModel(assistedFactory = PackageFormViewModel.Factory::class)
@@ -60,6 +69,7 @@ class PackageFormViewModel @AssistedInject constructor(
     private val adding: PackageAdding,
     private val describing: PackageDescribing,
     private val searching: TemplateSearching,
+    private val scanning: PackageScanning,
     private val packages: PackageStorageRepository,
     private val vocabulary: VocabularyStorageRepository,
     medKits: MedKitStorageRepository,
@@ -67,8 +77,15 @@ class PackageFormViewModel @AssistedInject constructor(
     @Assisted private val opened: Opened
 ) : ViewModel() {
 
-    /** Откуда экран открыт: с полки (тогда она подставлена) или у названной коробки. */
-    data class Opened(val medKitId: Uuid? = null, val packageId: Uuid? = null)
+    /**
+     * Откуда экран открыт: с полки (тогда она подставлена), у названной коробки или из сканера — и
+     * тогда [scannedCode] несёт код с упаковки, о котором форма спросит реестр.
+     */
+    data class Opened(
+        val medKitId: Uuid? = null,
+        val packageId: Uuid? = null,
+        val scannedCode: String? = null
+    )
 
     @AssistedFactory
     interface Factory {
@@ -140,6 +157,21 @@ class PackageFormViewModel @AssistedInject constructor(
 
     init {
         opened.packageId?.let { packageId -> viewModelScope.launch { open(packageId) } }
+        opened.scannedCode?.takeIf { it.isNotEmpty() }
+            ?.let { code -> viewModelScope.launch { ask(code) } }
+    }
+
+    /**
+     * Спросить реестр о коде с упаковки и заполнить **пустые** поля тем, что он знает. Ничего не
+     * знает или не отвечает — форма остаётся обычной пустой формой: сканер это короткий путь, и
+     * когда он не сработал, человек печатает сам (PLAN H5). Правка коробки сюда не заходит — кода
+     * у неё нет.
+     */
+    private suspend fun ask(code: String) {
+        val outcome = scanning.lookup(ScannedCode(CodeFormat.DATA_MATRIX, code))
+        if (outcome is PackageScanning.Outcome.Suggested) {
+            form.value = outcome.suggestion.filling(form.value)
+        }
     }
 
     fun edit(edited: PackageFormPresentationDTO) {

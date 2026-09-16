@@ -1,6 +1,5 @@
 package com.kert0n.medapp.ui.scan
 
-import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -15,7 +14,6 @@ import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
-import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
@@ -23,9 +21,6 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
-import androidx.compose.ui.semantics.contentDescription
-import androidx.compose.ui.semantics.semantics
-import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import com.kert0n.medapp.R
 import com.kert0n.medapp.domain.scan.ScannedCode
@@ -61,7 +56,7 @@ fun ScannerScreen(
         Column(Modifier.padding(padding).fillMaxSize()) {
             Box(Modifier.weight(1f).fillMaxWidth()) {
                 when (state.camera) {
-                    ScannerCamera.READY -> Viewfinder(onCode)
+                    ScannerCamera.READY -> CodeViewfinder(onCode)
                     ScannerCamera.UNASKED -> EmptyState(
                         text = stringResource(R.string.scanner_camera_denied),
                         icon = R.drawable.ic_photo_camera,
@@ -96,44 +91,6 @@ fun ScannerScreen(
                 onClick = onManual,
                 supporting = stringResource(R.string.scanner_manual_explained)
             )
-        }
-    }
-}
-
-/**
- * Картинка камеры и рамка, куда наводить. Рамка не обрезает разбор — распознаватель смотрит весь
- * кадр, — она говорит человеку, где держать коробку, и на неё же он наводит по привычке.
- */
-@Composable
-private fun Viewfinder(onCode: (ScannedCode) -> Unit) {
-    val description = stringResource(R.string.scanner_preview)
-    Box(
-        modifier = Modifier.fillMaxSize().semantics { contentDescription = description },
-        contentAlignment = Alignment.Center
-    ) {
-        CodeScannerView(onCode, Modifier.fillMaxSize())
-        Column(
-            horizontalAlignment = Alignment.CenterHorizontally,
-            verticalArrangement = Arrangement.spacedBy(20.dp)
-        ) {
-            Box(
-                Modifier
-                    .size(220.dp)
-                    .border(3.dp, MaterialTheme.colorScheme.primaryContainer, MaterialTheme.shapes.large)
-            )
-            // Подпись лежит на подложке: поверх живой картинки любой цвет текста то читается, то
-            // нет — это зависит от того, что человек навёл.
-            Surface(
-                color = MaterialTheme.colorScheme.surface,
-                shape = MaterialTheme.shapes.large
-            ) {
-                Text(
-                    stringResource(R.string.scanner_aim),
-                    style = MaterialTheme.typography.bodyLarge,
-                    textAlign = TextAlign.Center,
-                    modifier = Modifier.padding(horizontal = 16.dp, vertical = 10.dp)
-                )
-            }
         }
     }
 }

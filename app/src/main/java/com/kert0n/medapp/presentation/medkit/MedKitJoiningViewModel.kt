@@ -4,6 +4,8 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.kert0n.medapp.domain.Unavailability
 import com.kert0n.medapp.domain.medkit.InvitationKey
+import com.kert0n.medapp.domain.scan.CodeFormat
+import com.kert0n.medapp.domain.scan.ScannedCode
 import com.kert0n.medapp.feature.medkits.MedKitJoining
 import com.kert0n.medapp.presentation.ParsedInput
 import dagger.hilt.android.lifecycle.HiltViewModel
@@ -19,6 +21,10 @@ import kotlinx.coroutines.launch
  * не существует, и в очередь его не поставить (PLAN C3).
  *
  * Своей полки экран не показывает и списка не ведёт: он про **один** код и один ответ на него.
+ *
+ * **Камера здесь же, а не отдельным экраном** (U9): узнанный QR кладёт ключ в поле и зовёт
+ * вступление — человек наводил телефон ради этого. Ключ при этом не выходит за пределы состояния
+ * экрана: в маршрут он не едет ни при каких условиях (PLAN G3).
  */
 @HiltViewModel
 class MedKitJoiningViewModel @Inject constructor(
@@ -32,6 +38,25 @@ class MedKitJoiningViewModel @Inject constructor(
     /** Ввод снимает отказ: человек уже правит то, на что ему указали. */
     fun type(code: String) {
         _state.value = _state.value.copy(code = code, refusal = null)
+    }
+
+    /** Открыть камеру: код приглашения чаще показывают с экрана, чем переписывают. */
+    fun scan() {
+        _state.value = _state.value.copy(isScanning = true)
+    }
+
+    fun stopScanning() {
+        _state.value = _state.value.copy(isScanning = false)
+    }
+
+    /**
+     * Камера увидела код. Приглашение — это QR, и только он: код с упаковки лекарства сюда не
+     * годится, и приложение молча ждёт другого кадра, а не шлёт на сервер заведомо чужую строку.
+     */
+    fun seen(code: ScannedCode) {
+        if (code.format != CodeFormat.QR || code.text.isEmpty()) return
+        _state.value = _state.value.copy(code = code.text, refusal = null, isScanning = false)
+        join()
     }
 
     /**
@@ -75,7 +100,9 @@ data class MedKitJoiningUiState(
     val code: String = "",
     val isWorking: Boolean = false,
     val refusal: MedKitJoiningRefusal? = null,
-    val joined: Uuid? = null
+    val joined: Uuid? = null,
+    /** Открыта ли камера. Ключ живёт в [code], а не в маршруте: он секрет (PLAN G3). */
+    val isScanning: Boolean = false
 ) {
 
     /**

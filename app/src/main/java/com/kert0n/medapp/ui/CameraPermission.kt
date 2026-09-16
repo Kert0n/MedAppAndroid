@@ -12,15 +12,17 @@ import androidx.compose.runtime.rememberUpdatedState
  * камера нужна ему прямо сейчас (PLAN H3 «Набор сканера»).
  *
  * Ответ системы приходит в [onAnswered] **любой**: и согласие, и отказ меняют то, что человек
- * видит, — отказ ведёт к ручному вводу, а не в тупик. Своего мнения о разрешении приложение не
- * держит: состояние спрашивается у системы заново.
+ * видит, — отказ ведёт к ручному вводу, а не в тупик. Уже разрешённая камера отвечает сразу и без
+ * диалога, поэтому просьба годится и как «открыть камеру, если можно».
  *
  * Камера, в отличие от уведомлений, существует на всех поддерживаемых версиях, поэтому молчаливой
  * ветки «такого разрешения нет» здесь не бывает.
  */
 @Composable
-fun rememberCameraPermissionRequest(onAnswered: () -> Unit): () -> Unit {
+fun rememberCameraPermissionRequest(onAnswered: (Boolean) -> Unit): () -> Unit {
     val answered = rememberUpdatedState(onAnswered)
-    val ask = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) { answered.value() }
+    val ask = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) { granted ->
+        answered.value(granted)
+    }
     return remember(ask) { { ask.launch(Manifest.permission.CAMERA) } }
 }

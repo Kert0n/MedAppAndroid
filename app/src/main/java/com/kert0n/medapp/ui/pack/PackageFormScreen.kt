@@ -312,3 +312,4 @@ private fun SuggestionList(suggestions: Suggestions, onPick: (TemplatePresentati
 private fun Note(text: String) {
     Text(text, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
 }
+

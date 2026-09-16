@@ -2,6 +2,8 @@ package com.kert0n.medapp.presentation.medkit
 
 import com.kert0n.medapp.domain.Unavailability
 import com.kert0n.medapp.domain.medkit.InvitationKey
+import com.kert0n.medapp.domain.scan.CodeFormat
+import com.kert0n.medapp.domain.scan.ScannedCode
 import com.kert0n.medapp.feature.medkits.MedKitJoining
 import com.kert0n.medapp.fixture.MainDispatcherRule
 import com.kert0n.medapp.fixture.SHARED_KIT
@@ -112,6 +114,45 @@ class MedKitJoiningViewModelTest {
         }
 
         assertEquals(MedKitJoiningRefusal.Empty, state.refusal)
+        assertEquals(0, server.asked)
+    }
+
+    /**
+     * Узнанный QR кладёт ключ в поле и сразу зовёт вступление: человек наводил телефон ради этого,
+     * и второе нажатие было бы просьбой подтвердить то, что он уже сделал.
+     */
+    @Test
+    fun aScannedInvitationJoinsRightAway() {
+        val server = Server(HttpStatusCode.Created, shelfJson(SHARED_KIT))
+        val model = viewModel(server)
+
+        val state = watching(model.state) { state ->
+            model.scan()
+            model.seen(ScannedCode(CodeFormat.QR, "K7F-2M9-QX4"))
+            state.awaiting { it.joined != null }
+        }
+
+        assertEquals("K7F-2M9-QX4", state.code)
+        assertEquals(1, server.asked)
+        assertEquals(false, state.isScanning)
+    }
+
+    /**
+     * Код с упаковки лекарства приглашением не станет: камера ждёт другого кадра, а на сервер
+     * заведомо чужая строка не уходит.
+     */
+    @Test
+    fun aPackageCodeIsNotAnInvitation() {
+        val server = Server(HttpStatusCode.Created, shelfJson(SHARED_KIT))
+        val model = viewModel(server)
+
+        watching(model.state) { state ->
+            model.scan()
+            model.seen(ScannedCode(CodeFormat.DATA_MATRIX, "010460123456789021512345"))
+            state.awaiting { it.isScanning }
+        }
+
+        assertEquals("", model.state.value.code)
         assertEquals(0, server.asked)
     }
 

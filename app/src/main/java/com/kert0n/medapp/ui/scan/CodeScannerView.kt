@@ -7,13 +7,29 @@ import androidx.camera.core.ImageProxy
 import androidx.camera.view.CameraController
 import androidx.camera.view.LifecycleCameraController
 import androidx.camera.view.PreviewView
+import androidx.compose.foundation.border
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Surface
+import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.State
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberUpdatedState
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.unit.dp
 import androidx.compose.ui.viewinterop.AndroidView
 import androidx.core.content.ContextCompat
 import androidx.lifecycle.compose.LocalLifecycleOwner
@@ -21,6 +37,7 @@ import com.google.mlkit.vision.barcode.BarcodeScanner
 import com.google.mlkit.vision.barcode.BarcodeScanning
 import com.google.mlkit.vision.barcode.common.Barcode
 import com.google.mlkit.vision.common.InputImage
+import com.kert0n.medapp.R
 import com.kert0n.medapp.domain.scan.CodeFormat
 import com.kert0n.medapp.domain.scan.ScannedCode
 
@@ -99,4 +116,50 @@ internal fun codeFormat(format: Int): CodeFormat = when (format) {
     Barcode.FORMAT_DATA_MATRIX -> CodeFormat.DATA_MATRIX
     Barcode.FORMAT_QR_CODE -> CodeFormat.QR
     else -> CodeFormat.OTHER
+}
+
+/**
+ * Картинка камеры и рамка, куда наводить. Одна на всех, кто читает коды: сканер и вступление
+ * в аптечку показывают одно и то же — расходиться рамке и подсказке незачем.
+ *
+ * Рамка не обрезает разбор — распознаватель смотрит весь
+ * кадр, — она говорит человеку, куда наводить, и на неё же он целится по привычке. [hint] называет
+ * **что** искать: на сканере это код с упаковки, на вступлении в аптечку — QR приглашения.
+ */
+@Composable
+fun CodeViewfinder(
+    onCode: (ScannedCode) -> Unit,
+    modifier: Modifier = Modifier,
+    hint: String = stringResource(R.string.scanner_aim)
+) {
+    val description = stringResource(R.string.scanner_preview)
+    Box(
+        modifier = modifier.fillMaxSize().semantics { contentDescription = description },
+        contentAlignment = Alignment.Center
+    ) {
+        CodeScannerView(onCode, Modifier.fillMaxSize())
+        Column(
+            horizontalAlignment = Alignment.CenterHorizontally,
+            verticalArrangement = Arrangement.spacedBy(20.dp)
+        ) {
+            Box(
+                Modifier
+                    .size(220.dp)
+                    .border(3.dp, MaterialTheme.colorScheme.primaryContainer, MaterialTheme.shapes.large)
+            )
+            // Подпись лежит на подложке: поверх живой картинки любой цвет текста то читается, то
+            // нет — это зависит от того, что человек навёл.
+            Surface(
+                color = MaterialTheme.colorScheme.surface,
+                shape = MaterialTheme.shapes.large
+            ) {
+                Text(
+                    hint,
+                    style = MaterialTheme.typography.bodyLarge,
+                    textAlign = TextAlign.Center,
+                    modifier = Modifier.padding(horizontal = 16.dp, vertical = 10.dp)
+                )
+            }
+        }
+    }
 }
