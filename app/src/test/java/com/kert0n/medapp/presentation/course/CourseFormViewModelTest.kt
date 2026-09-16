@@ -45,6 +45,7 @@ import java.time.Instant
 import java.time.ZoneId
 import kotlin.uuid.Uuid
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Rule
@@ -227,6 +228,28 @@ class CourseFormViewModelTest {
 
         assertNull(state.error)
         assertEquals("Нурофен, неделя", courses.drafts.getValue(COURSE).title)
+    }
+
+    /**
+     * Отказ на пути «Начать» снимает занятость целиком. Без этого правила гаснет только признак
+     * записи, `isBusy` остаётся истинным навсегда — и форма заперта с ошибкой, которую нечем
+     * снять: ни сохранить, ни начать, ни уйти (C1 «Занятость формы снимается состоянием»).
+     */
+    @Test
+    fun aRefusedStartLeavesTheFormAlive() {
+        courses.holding(course(id = COURSE, title = "Нурофен"))
+        val model = viewModel(courseId = COURSE)
+
+        val state = watching(model.state) { state ->
+            state.awaiting { it is CourseFormUiState.Editing }
+            courses.holding(course(id = COURSE, title = "Нурофен детский", revision = 3))
+            model.edit(CourseFormPresentationDTO(title = "Нурофен, неделя"))
+            model.start()
+            state.awaiting { it is CourseFormUiState.Editing && it.error != null }
+        } as CourseFormUiState.Editing
+
+        assertEquals(CourseFormError.Stale, state.error)
+        assertFalse(state.isBusy)
     }
 
     /** Черновик, правленный с другого экрана, не затирается: сказано перечитать (PLAN F5). */

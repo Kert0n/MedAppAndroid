@@ -297,6 +297,7 @@ private fun screens(stacks: TabStacks) = entryProvider<NavKey> {
             onAskToCancel = model::askToCancel,
             onConfirmCancel = model::cancel,
             onDismissCancel = model::dismissCancel,
+            onDismissMessage = model::dismissMessage,
             onBack = stacks::back
         )
     }

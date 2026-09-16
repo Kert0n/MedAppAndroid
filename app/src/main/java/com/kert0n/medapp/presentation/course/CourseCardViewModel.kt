@@ -80,9 +80,28 @@ class CourseCardViewModel @AssistedInject constructor(
         if (!now.asking || now.working) return
         cancelling.value = now.copy(asking = false, working = true)
         viewModelScope.launch {
-            cancellation.cancel(courseId)
-            cancelling.value = Cancelling()
+            cancelling.value = told(cancellation.cancel(courseId))
         }
+    }
+
+    /** Прочитанное сообщение человек уносит сам: до ответа оно остаётся на экране. */
+    fun dismissMessage() {
+        cancelling.value = cancelling.value.copy(message = null)
+    }
+
+    /**
+     * Чем кончилась отмена. Два исхода говорит сама карточка, и своих слов им не нужно:
+     * отменённое приходит чтением плашкой «Отменён …» и пустым списком источников, а пропавшее —
+     * тем же чтением, из которого сценарий и узнал о пропаже: `record == null` делает карточку
+     * экраном «Этого лечения больше нет».
+     *
+     * Своих слов просит только третий: лечение кончилось само, пока человек шёл сюда. Карточка на
+     * нём не меняется ничем — она и так показывала «Завершён», — и молчание читалось бы как
+     * «ничего не произошло» (H3 §14).
+     */
+    private fun told(outcome: CourseCancellation.Outcome): Cancelling = when (outcome) {
+        CourseCancellation.Outcome.CANCELLED, CourseCancellation.Outcome.GONE -> Cancelling()
+        CourseCancellation.Outcome.ALREADY_FINISHED -> Cancelling(message = CourseCardMessage.AlreadyFinished)
     }
 
     private fun CourseRecordProjection.toCardUiState(
@@ -109,7 +128,8 @@ class CourseCardViewModel @AssistedInject constructor(
             items = intakes.filterIsInstance<IntakeProjection.Scheduled>().map { it.toPresentationDTO(zone) },
             isRunning = isOpen,
             asksToCancel = cancelling.asking,
-            isCancelling = cancelling.working
+            isCancelling = cancelling.working,
+            message = cancelling.message
         )
     }
 
@@ -122,7 +142,11 @@ class CourseCardViewModel @AssistedInject constructor(
         }
     }
 
-    private data class Cancelling(val asking: Boolean = false, val working: Boolean = false)
+    private data class Cancelling(
+        val asking: Boolean = false,
+        val working: Boolean = false,
+        val message: CourseCardMessage? = null
+    )
 }
 
 /**
@@ -140,5 +164,18 @@ data class CourseCardUiState(
     val isLoading: Boolean = false,
     val isGone: Boolean = false,
     val asksToCancel: Boolean = false,
-    val isCancelling: Boolean = false
+    val isCancelling: Boolean = false,
+    /** Чем кончилось действие человека, если по самой карточке этого не видно. */
+    val message: CourseCardMessage? = null
 )
+
+/**
+ * Что карточка отвечает на «Отменить лечение», когда отменить не вышло. Отменённое лечение своего
+ * случая здесь не имеет: о нём говорит сама карточка — плашкой «Отменён …» и пустым списком
+ * источников (PLAN H3 №14).
+ */
+sealed interface CourseCardMessage {
+
+    /** Лечение кончилось само, пока человек шёл сюда: отменять уже нечего. */
+    data object AlreadyFinished : CourseCardMessage
+}

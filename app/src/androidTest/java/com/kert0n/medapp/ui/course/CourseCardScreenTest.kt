@@ -51,6 +51,7 @@ class CourseCardScreenTest {
                     onAskToCancel = { asked++ },
                     onConfirmCancel = { confirmed++ },
                     onDismissCancel = {},
+                    onDismissMessage = {},
                     onBack = {}
                 )
             }

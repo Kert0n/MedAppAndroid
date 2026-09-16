@@ -3,6 +3,7 @@ package com.kert0n.medapp.ui.course
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
+import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.defaultMinSize
@@ -39,6 +40,7 @@ import androidx.compose.ui.unit.dp
 import com.kert0n.medapp.R
 import com.kert0n.medapp.ui.DAY
 import com.kert0n.medapp.domain.intake.IntakeStatus
+import com.kert0n.medapp.presentation.course.CourseCardMessage
 import com.kert0n.medapp.presentation.course.CourseCardUiState
 import com.kert0n.medapp.presentation.course.CourseItemPresentationDTO
 import com.kert0n.medapp.presentation.course.CoverageReductionPresentationDTO
@@ -62,6 +64,7 @@ fun CourseCardScreen(
     onAskToCancel: () -> Unit,
     onConfirmCancel: () -> Unit,
     onDismissCancel: () -> Unit,
+    onDismissMessage: () -> Unit,
     onBack: () -> Unit,
     modifier: Modifier = Modifier
 ) {
@@ -83,13 +86,23 @@ fun CourseCardScreen(
         }
     ) { padding ->
         val course = state.course
-        when {
-            state.isGone -> ErrorMessage(
-                text = stringResource(R.string.course_missing),
-                modifier = Modifier.padding(padding)
-            )
-            course == null -> LoadingState(Modifier.padding(padding))
-            else -> Card(state, course, onSources, Modifier.padding(padding))
+        Column(Modifier.padding(padding).fillMaxSize()) {
+            // Чем кончилась отмена, если по самой карточке этого не видно: закрытый диалог
+            // человеку ничего не сказал бы (PLAN H3 №14).
+            state.message?.let { message ->
+                Row(
+                    Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 8.dp),
+                    horizontalArrangement = Arrangement.SpaceBetween
+                ) {
+                    Text(message.words(), color = MaterialTheme.colorScheme.error, modifier = Modifier.weight(1f))
+                    TextButton(onClick = onDismissMessage) { Text(stringResource(R.string.action_got_it)) }
+                }
+            }
+            when {
+                state.isGone -> ErrorMessage(text = stringResource(R.string.course_missing))
+                course == null -> LoadingState()
+                else -> Card(state, course, onSources)
+            }
         }
     }
     if (state.asksToCancel) {
@@ -102,7 +115,7 @@ private fun Card(
     state: CourseCardUiState,
     course: CoursePresentationDTO,
     onSources: () -> Unit,
-    modifier: Modifier
+    modifier: Modifier = Modifier
 ) {
     LazyColumn(modifier.fillMaxSize(), contentPadding = PaddingValues(bottom = 16.dp)) {
         item("head") {
@@ -278,6 +291,14 @@ private fun RunningMenu(onEdit: () -> Unit, onAskToCancel: () -> Unit) {
         )
     }
 }
+
+/** Чем кончилась отмена — словами. Цвет один ничего не сообщает (H3 «Дизайн»). */
+@Composable
+private fun CourseCardMessage.words(): String = stringResource(
+    when (this) {
+        CourseCardMessage.AlreadyFinished -> R.string.course_cancel_already_finished
+    }
+)
 
 @Composable
 private fun CancelDialog(onConfirm: () -> Unit, onDismiss: () -> Unit) {

@@ -156,15 +156,18 @@ class SourcePickingViewModel @AssistedInject constructor(
 
     private fun told(outcome: CourseDrafting.Outcome): Attaching = when (outcome) {
         is CourseDrafting.Outcome.Saved -> Attaching(attached = true)
-        // Черновика нет или он устарел: показывать нечего — экран уходит, а список перечитается.
-        CourseDrafting.Outcome.Gone, CourseDrafting.Outcome.Stale -> Attaching(attached = true)
+        // Черновика нет: показывать нечего — экран уходит.
+        CourseDrafting.Outcome.Gone -> Attaching(attached = true)
+        // Состав правили с соседнего экрана: коробка не подключена, и уйти отсюда значило бы
+        // сказать «подключил» о том, чего не было (H3 №17).
+        CourseDrafting.Outcome.Stale -> Attaching(message = CourseSourcesMessage.Stale)
         is CourseDrafting.Outcome.Rejected -> Attaching(message = CourseSourcesMessage.Refused(outcome.reason))
         CourseDrafting.Outcome.PackageUnusable -> Attaching(message = CourseSourcesMessage.Unusable(null))
     }
 
     private fun told(outcome: SourceEditing.Outcome): Attaching = when (outcome) {
-        is SourceEditing.Outcome.Saved, SourceEditing.Outcome.Gone, SourceEditing.Outcome.Stale ->
-            Attaching(attached = true)
+        is SourceEditing.Outcome.Saved, SourceEditing.Outcome.Gone -> Attaching(attached = true)
+        SourceEditing.Outcome.Stale -> Attaching(message = CourseSourcesMessage.Stale)
         SourceEditing.Outcome.AlreadyFinished -> Attaching(message = CourseSourcesMessage.Finished)
         is SourceEditing.Outcome.Rejected -> Attaching(message = CourseSourcesMessage.Refused(outcome.reason))
         is SourceEditing.Outcome.PackageTaken -> Attaching(message = CourseSourcesMessage.Taken(null))

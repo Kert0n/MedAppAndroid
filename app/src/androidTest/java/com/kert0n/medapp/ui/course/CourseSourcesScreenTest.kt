@@ -5,6 +5,9 @@ import androidx.compose.ui.semantics.SemanticsActions
 import androidx.compose.ui.test.SemanticsMatcher
 import androidx.compose.ui.test.assertCountEquals
 import androidx.compose.ui.test.assertIsDisplayed
+import androidx.compose.ui.test.hasAnyAncestor
+import androidx.compose.ui.test.hasText
+import androidx.compose.ui.test.isDialog
 import androidx.compose.ui.test.performTouchInput
 import androidx.compose.ui.test.junit4.v2.createComposeRule
 import androidx.compose.ui.test.onNodeWithContentDescription
@@ -17,6 +20,7 @@ import com.kert0n.medapp.fixture.PACK
 import com.kert0n.medapp.fixture.TABLETS
 import com.kert0n.medapp.presentation.course.CourseEstimatePresentationDTO
 import com.kert0n.medapp.presentation.course.CourseSourcePresentationDTO
+import com.kert0n.medapp.presentation.course.CourseSourcesMessage
 import com.kert0n.medapp.presentation.course.CourseSourcesUiState
 import com.kert0n.medapp.presentation.value.QuantityPresentationDTO
 import com.kert0n.medapp.presentation.value.toPresentationDTO
@@ -122,6 +126,33 @@ class CourseSourcesScreenTest {
         compose.onNodeWithText("Отвязать пачку?").assertIsDisplayed()
         compose.onNodeWithText("Лечение останется, но эта коробка перестанет его обеспечивать, а её бронь снимется.")
             .assertIsDisplayed()
+    }
+
+    /**
+     * Ответ «Отвязать» доходит до сценария. Без этой проверки отключённый обработчик диалога
+     * незаметен: тексты на месте, а нажатие не делает ничего. Кнопка берётся из диалога — тем же
+     * словом названо и действие в строке источника.
+     */
+    @Test
+    fun theAnswerReachesTheScenario() {
+        show(CourseSourcesUiState(sources = listOf(source()), asksToDetach = PACK))
+
+        compose.onNode(hasText("Отвязать") and hasAnyAncestor(isDialog())).performClick()
+
+        assertEquals(1, confirmed)
+    }
+
+    /**
+     * Исход «Сохранить» виден и тогда, когда список опустел: отвязав последний источник, человек
+     * иначе остаётся с пустым экраном, а отказ записи пропадает вместе со списком — вместе с
+     * «Понятно», которым его снимают (C1 «Исход сценария доходит при любом состоянии экрана»).
+     */
+    @Test
+    fun theOutcomeIsSeenOnAnEmptiedScreen() {
+        show(CourseSourcesUiState(sources = emptyList(), message = CourseSourcesMessage.Stale))
+
+        compose.onNodeWithText("Источники правили с другого экрана — список перечитан, повторите.").assertIsDisplayed()
+        compose.onNodeWithText("Понятно").assertIsDisplayed()
     }
 
     /** Ручка перестановки названа экранному чтецу: жест ему недоступен, а порядок менять нужно. */

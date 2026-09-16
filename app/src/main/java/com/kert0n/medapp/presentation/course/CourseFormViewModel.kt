@@ -266,12 +266,11 @@ class CourseFormViewModel @AssistedInject constructor(
     /** Чем кончилось изменение лечения: изменили; лечение этим закончилось; отказ по месту. */
     private fun CourseFormUiState.Editing.told(outcome: CourseAmendment.Outcome): CourseFormUiState = when (outcome) {
         // Закончилось — запись эпизода расскажет об этом карточкой; править больше нечего.
-        is CourseAmendment.Outcome.Amended, CourseAmendment.Outcome.Finished ->
-            copy(isSaving = false, isSaved = true)
-        CourseAmendment.Outcome.AlreadyFinished -> copy(isSaving = false, error = CourseFormError.Finished)
+        is CourseAmendment.Outcome.Amended, CourseAmendment.Outcome.Finished -> idle().copy(isSaved = true)
+        CourseAmendment.Outcome.AlreadyFinished -> idle().copy(error = CourseFormError.Finished)
         CourseAmendment.Outcome.Gone -> CourseFormUiState.Gone
-        CourseAmendment.Outcome.Stale -> copy(isSaving = false, error = CourseFormError.Stale)
-        is CourseAmendment.Outcome.Rejected -> copy(isSaving = false, error = CourseFormError.Rejected(outcome.reason))
+        CourseAmendment.Outcome.Stale -> idle().copy(error = CourseFormError.Stale)
+        is CourseAmendment.Outcome.Rejected -> idle().copy(error = CourseFormError.Rejected(outcome.reason))
     }
 
     /**
@@ -326,16 +325,16 @@ class CourseFormViewModel @AssistedInject constructor(
 
     /** Чем кончилось начало лечения — человеку: пошло; уже идёт; отказ по месту; занятая пачка. */
     private fun CourseFormUiState.Editing.began(outcome: CourseActivation.Outcome): CourseFormUiState = when (outcome) {
-        is CourseActivation.Outcome.Started -> copy(isStarting = false, startedId = outcome.course.id)
+        is CourseActivation.Outcome.Started -> idle().copy(startedId = outcome.course.id)
         // Уже идёт — повтор ничего не менял, и человеку нужна та же карточка.
-        CourseActivation.Outcome.AlreadyStarted -> copy(isStarting = false, startedId = stored?.id ?: courseId)
+        CourseActivation.Outcome.AlreadyStarted -> idle().copy(startedId = stored?.id ?: courseId)
         CourseActivation.Outcome.Gone -> CourseFormUiState.Gone
-        CourseActivation.Outcome.Stale -> copy(isStarting = false, error = CourseFormError.Stale)
-        is CourseActivation.Outcome.Rejected -> copy(isStarting = false, error = CourseFormError.Rejected(outcome.reason))
+        CourseActivation.Outcome.Stale -> idle().copy(error = CourseFormError.Stale)
+        is CourseActivation.Outcome.Rejected -> idle().copy(error = CourseFormError.Rejected(outcome.reason))
         is CourseActivation.Outcome.PackageTaken ->
-            copy(isStarting = false, error = CourseFormError.PackageTaken(nameOf(outcome.packageId)))
+            idle().copy(error = CourseFormError.PackageTaken(nameOf(outcome.packageId)))
         is CourseActivation.Outcome.PackageUnusable ->
-            copy(isStarting = false, error = CourseFormError.PackageUnusable(nameOf(outcome.packageId)))
+            idle().copy(error = CourseFormError.PackageUnusable(nameOf(outcome.packageId)))
     }
 
     /** Имя коробки — из состава черновика: отказ называет коробку так, как человек её знает. */
@@ -353,10 +352,10 @@ class CourseFormViewModel @AssistedInject constructor(
 
     /** Чем кончилась запись — человеку: записано; черновика нет; устарел; отказ по месту. */
     private fun CourseFormUiState.Editing.told(outcome: CourseDrafting.Outcome): CourseFormUiState = when (outcome) {
-        is CourseDrafting.Outcome.Saved -> copy(isSaving = false, isSaved = true)
+        is CourseDrafting.Outcome.Saved -> idle().copy(isSaved = true)
         CourseDrafting.Outcome.Gone -> CourseFormUiState.Gone
-        CourseDrafting.Outcome.Stale -> copy(isSaving = false, error = CourseFormError.Stale)
-        is CourseDrafting.Outcome.Rejected -> copy(isSaving = false, error = CourseFormError.Rejected(outcome.reason))
+        CourseDrafting.Outcome.Stale -> idle().copy(error = CourseFormError.Stale)
+        is CourseDrafting.Outcome.Rejected -> idle().copy(error = CourseFormError.Rejected(outcome.reason))
         // Пачки редактор не трогает: до этого исхода его правки не доходят.
         CourseDrafting.Outcome.PackageUnusable -> error("редактор назначения пачек не подключает: $outcome")
     }
@@ -402,6 +401,14 @@ sealed interface CourseFormUiState {
         val isDiscarded: Boolean = false
     ) : CourseFormUiState {
         val isBusy: Boolean get() = isSaving || isDiscarding || isStarting
+
+        /**
+         * Занятость кончилась — вся, а не тот признак, чьё имя вспомнили. Признаков три, а выход
+         * из работы один, и исход у него общий на все входы: «Сохранить», «Источники», «Начать»
+         * и «Удалить» приходят к одним и тем же `told(…)`. Погашенный по имени признак запирает
+         * форму у того входа, который забыли (C1 «Занятость формы снимается состоянием»).
+         */
+        fun idle(): Editing = copy(isSaving = false, isStarting = false, isDiscarding = false)
     }
 
     /**

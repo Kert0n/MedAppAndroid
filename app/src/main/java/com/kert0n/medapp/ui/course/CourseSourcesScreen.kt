@@ -110,19 +110,30 @@ fun CourseSourcesScreen(
             )
         }
     ) { padding ->
-        when {
-            state.isLoading -> LoadingState(Modifier.padding(padding))
-            state.isGone -> ErrorMessage(
-                text = stringResource(R.string.course_missing),
-                modifier = Modifier.padding(padding)
-            )
-            state.sources.isEmpty() -> EmptyState(
-                text = stringResource(R.string.course_sources_empty),
-                modifier = Modifier.padding(padding),
-                actionText = stringResource(R.string.course_sources_add).takeUnless { state.isFinished },
-                onAction = onAdd.takeUnless { state.isFinished }
-            )
-            else -> Sources(state, onMove, onAllocate, onDetach, onDismissMessage, onAdd, onSave, Modifier.padding(padding))
+        Column(Modifier.padding(padding).fillMaxSize()) {
+            // Исход записи — выше ветвления: отвязав последний источник, человек остаётся с
+            // пустым списком, и сообщение пропало бы вместе с ним (PLAN H3 №16).
+            state.message?.let { message ->
+                Row(
+                    Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 8.dp),
+                    horizontalArrangement = Arrangement.SpaceBetween
+                ) {
+                    // Слова переносятся, а «Понятно» остаётся на экране: строка исхода длинная,
+                    // и на 360 dp кнопку вытолкнуло бы за край.
+                    Text(message.words(), color = MaterialTheme.colorScheme.error, modifier = Modifier.weight(1f))
+                    TextButton(onClick = onDismissMessage) { Text(stringResource(R.string.action_got_it)) }
+                }
+            }
+            when {
+                state.isLoading -> LoadingState()
+                state.isGone -> ErrorMessage(text = stringResource(R.string.course_missing))
+                state.sources.isEmpty() -> EmptyState(
+                    text = stringResource(R.string.course_sources_empty),
+                    actionText = stringResource(R.string.course_sources_add).takeUnless { state.isFinished },
+                    onAction = onAdd.takeUnless { state.isFinished }
+                )
+                else -> Sources(state, onMove, onAllocate, onDetach, onAdd, onSave)
+            }
         }
     }
     state.asksToDetach?.let {
@@ -136,25 +147,15 @@ private fun Sources(
     onMove: (Int, Int) -> Unit,
     onAllocate: (Uuid, Int) -> Unit,
     onDetach: (Uuid) -> Unit,
-    onDismissMessage: () -> Unit,
     onAdd: () -> Unit,
     onSave: () -> Unit,
-    modifier: Modifier
+    modifier: Modifier = Modifier
 ) {
     var dragging by remember { mutableStateOf<Int?>(null) }
     var shift by remember { mutableFloatStateOf(0f) }
     var rowHeight by remember { mutableIntStateOf(0) }
     val count = state.sources.size
     Column(modifier.fillMaxSize()) {
-        state.message?.let { message ->
-            Row(
-                Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 8.dp),
-                horizontalArrangement = Arrangement.SpaceBetween
-            ) {
-                Text(message.words(), color = MaterialTheme.colorScheme.error)
-                TextButton(onClick = onDismissMessage) { Text(stringResource(R.string.action_got_it)) }
-            }
-        }
         LazyColumn(Modifier.weight(1f), contentPadding = PaddingValues(bottom = 8.dp)) {
             itemsIndexed(state.sources, key = { _, source -> source.packageId }) { index, source ->
                 val held = dragging == index
