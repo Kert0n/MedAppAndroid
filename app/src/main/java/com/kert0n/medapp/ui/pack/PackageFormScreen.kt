@@ -9,8 +9,6 @@ import androidx.compose.foundation.layout.defaultMinSize
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Button
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
@@ -33,11 +31,14 @@ import androidx.compose.ui.unit.dp
 import com.kert0n.medapp.R
 import com.kert0n.medapp.presentation.pack.PackageFormError
 import com.kert0n.medapp.presentation.pack.PackageFormPresentationDTO
+import com.kert0n.medapp.presentation.pack.withForm
 import com.kert0n.medapp.presentation.pack.PackageFormUiState
 import com.kert0n.medapp.presentation.pack.Suggestions
 import com.kert0n.medapp.presentation.pack.TemplatePresentationDTO
 import com.kert0n.medapp.ui.DateField
+import com.kert0n.medapp.ui.Form
 import com.kert0n.medapp.ui.PickerField
+import com.kert0n.medapp.ui.QuantityField
 import com.kert0n.medapp.ui.text
 
 /**
@@ -81,13 +82,19 @@ fun PackageFormScreen(
             )
         }
     ) { padding ->
-        Column(
-            Modifier
-                .padding(padding)
-                .fillMaxSize()
-                .verticalScroll(rememberScrollState())
-                .padding(16.dp),
-            verticalArrangement = Arrangement.spacedBy(16.dp)
+        Form(
+            modifier = Modifier.padding(padding),
+            actions = {
+                state.error?.let { Text(it.message(), color = MaterialTheme.colorScheme.error) }
+                Button(
+                    onClick = onSave,
+                    modifier = Modifier.fillMaxWidth().defaultMinSize(minHeight = 48.dp)
+                ) { Text(stringResource(R.string.action_save)) }
+                TextButton(
+                    onClick = onCancel,
+                    modifier = Modifier.fillMaxWidth().defaultMinSize(minHeight = 48.dp)
+                ) { Text(stringResource(R.string.action_cancel)) }
+            }
         ) {
             if (state.isEditing) {
                 // Аптечка и количество показаны, но не правятся: их меняют перенос и пересчёт.
@@ -126,38 +133,33 @@ fun PackageFormScreen(
 
             SuggestionList(state.suggestions, onPick)
 
-            if (!state.isEditing) {
-                OutlinedTextField(
-                    value = form.amount,
-                    onValueChange = { onEdit(form.copy(amount = it)) },
-                    label = { Text(stringResource(R.string.pack_amount)) },
-                    singleLine = true,
-                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
-                    isError = state.error?.field == PackageFormError.Field.AMOUNT,
-                    supportingText = { if (form.amount.isBlank()) Text(stringResource(R.string.field_required)) },
-                    modifier = Modifier.fillMaxWidth()
-                )
-                PickerField(
-                    label = stringResource(R.string.pack_unit),
-                    selected = state.units.firstOrNull { it.id == form.unit?.id },
-                    options = state.units,
-                    optionText = { it.name },
-                    onPick = { onEdit(form.copy(unit = it)) },
-                    isError = state.error?.field == PackageFormError.Field.UNIT,
-                    emptyText = stringResource(R.string.pack_no_units),
-                    supporting = stringResource(R.string.field_required).takeIf { form.unit == null }
-                )
-            }
-
+            // Форма выпуска — перед количеством: она подсказывает единицу, которой это меряют.
             PickerField(
                 label = stringResource(R.string.pack_form),
                 selected = state.forms.firstOrNull { it.id == form.form?.id },
                 options = state.forms,
                 optionText = { it.name },
-                onPick = { onEdit(form.copy(form = it)) },
+                onPick = { onEdit(form.withForm(it, state.units)) },
                 isError = state.error?.field == PackageFormError.Field.FORM,
                 emptyText = stringResource(R.string.pack_no_forms)
             )
+
+            if (!state.isEditing) {
+                QuantityField(
+                    amount = form.amount,
+                    unit = form.unit,
+                    units = state.units,
+                    onAmount = { onEdit(form.copy(amount = it)) },
+                    onUnit = { onEdit(form.copy(unit = it)) },
+                    amountLabel = stringResource(R.string.pack_amount),
+                    unitLabel = stringResource(R.string.pack_unit),
+                    amountError = state.error?.field == PackageFormError.Field.AMOUNT,
+                    unitError = state.error?.field == PackageFormError.Field.UNIT,
+                    amountSupporting = stringResource(R.string.field_required).takeIf { form.amount.isBlank() },
+                    unitSupporting = stringResource(R.string.field_required).takeIf { form.unit == null },
+                    emptyUnits = stringResource(R.string.pack_no_units)
+                )
+            }
             OutlinedTextField(
                 value = form.expiresOn,
                 onValueChange = { onEdit(form.copy(expiresOn = it)) },
@@ -230,15 +232,6 @@ fun PackageFormScreen(
                 onPick = { onEdit(form.copy(openedOn = it)) }
             )
 
-            state.error?.let { Text(it.message(), color = MaterialTheme.colorScheme.error) }
-            Button(
-                onClick = onSave,
-                modifier = Modifier.fillMaxWidth().defaultMinSize(minHeight = 48.dp)
-            ) { Text(stringResource(R.string.action_save)) }
-            TextButton(
-                onClick = onCancel,
-                modifier = Modifier.fillMaxWidth().defaultMinSize(minHeight = 48.dp)
-            ) { Text(stringResource(R.string.action_cancel)) }
         }
     }
 }

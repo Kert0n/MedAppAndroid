@@ -42,7 +42,9 @@ reviews:
         scenario so a second tap never starts a second job. Before the first read the state is
         loading, never empty or gone. Every scenario outcome is shown, never swallowed. Colour is
         never the only carrier of meaning: icon and words accompany it. Strings live in R.string,
-        Russian counts use plurals.
+        and Russian counts use plurals in the app's own text. Names of units and dosage forms are
+        not the app's text: they come from the server vocabulary, are shown verbatim and are never
+        declined — an expectation like "20 таблетка" is a fixture's dictionary name, not a formatting bug.
     - path: "app/src/main/java/com/kert0n/medapp/storage/**"
       instructions: >-
         Room repositories live entirely in storage and are unknown to the domain. Flows expose

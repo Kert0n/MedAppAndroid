@@ -138,11 +138,8 @@ class CourseRoomRepository @Inject constructor(
      * `CourseRecord.rename`, и SQL это правило не повторяет. Записывается только то, что переход
      * и меняет, — законченное лечение обратно не открывается.
      */
-    override suspend fun rename(id: Uuid, title: String, note: String?): Boolean = database.withTransaction {
-        val record = courses.findRecord(id)?.toDomain(vocabulary.snapshot()) ?: return@withTransaction false
-        val renamed = record.rename(title, note)
-        courses.rename(renamed.id, renamed.title, renamed.note) > 0
-    }
+    override suspend fun rename(id: Uuid, title: String, note: String?): Boolean =
+        courses.rename(id, title, note) > 0
 
     override suspend fun courseHolding(packageId: Uuid): Uuid? = courses.courseHolding(packageId)
 

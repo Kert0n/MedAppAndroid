@@ -25,6 +25,12 @@ import androidx.compose.material3.rememberDatePickerState
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
+import androidx.compose.foundation.interaction.MutableInteractionSource
+import androidx.compose.foundation.interaction.PressInteraction
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.foundation.text.KeyboardOptions
+import androidx.compose.ui.text.input.KeyboardType
+import com.kert0n.medapp.presentation.value.UnitPresentationDTO
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -43,7 +49,6 @@ import com.kert0n.medapp.presentation.value.QuantityPresentationError
 import java.time.Instant
 import java.time.LocalDate
 import java.time.ZoneOffset
-import java.time.format.DateTimeFormatter
 
 /**
  * Строка поиска, которая сама ничего не ищет: она ведёт туда, где ищут. Нужна там, где результат
@@ -149,9 +154,67 @@ private val MENU_MAX_HEIGHT = 320.dp
 private val MENU_ITEM_HEIGHT = 48.dp
 
 /**
+ * Количество: число и единица — **одно поле в одной строке**. Величина одна (PLAN D1), и разнесённые
+ * по разным строкам половины читаются как два независимых вопроса; рядом же видно и то, что набрано,
+ * и чем это меряют.
+ *
+ * Спрашивают это всюду, где человек называет количество, — заводя коробку, пересчитывая её, задавая
+ * дозу лечения, — поэтому поле одно на всех: расходиться отступам, ширинам и порядку половин здесь
+ * незачем (просьба владельца 2026-09-16). Единицу подсказывает форма выпуска, и делает это не поле,
+ * а тот, кто держит форму (`suggestingUnit`): поле не знает, из чего набрана величина.
+ */
+@Composable
+fun QuantityField(
+    amount: String,
+    unit: UnitPresentationDTO?,
+    units: List<UnitPresentationDTO>,
+    onAmount: (String) -> Unit,
+    onUnit: (UnitPresentationDTO) -> Unit,
+    amountLabel: String,
+    unitLabel: String,
+    modifier: Modifier = Modifier,
+    amountError: Boolean = false,
+    unitError: Boolean = false,
+    amountSupporting: String? = null,
+    unitSupporting: String? = null,
+    emptyUnits: String? = null
+) {
+    Row(modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+        OutlinedTextField(
+            value = amount,
+            onValueChange = onAmount,
+            label = { Text(amountLabel) },
+            singleLine = true,
+            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
+            isError = amountError,
+            supportingText = amountSupporting?.let { { Text(it) } },
+            modifier = Modifier.weight(1f).defaultMinSize(minHeight = 48.dp)
+        )
+        PickerField(
+            label = unitLabel,
+            selected = units.firstOrNull { it.id == unit?.id },
+            options = units,
+            optionText = { it.name },
+            onPick = onUnit,
+            isError = unitError,
+            emptyText = emptyUnits,
+            supporting = unitSupporting,
+            modifier = Modifier.weight(1f)
+        )
+    }
+}
+
+/**
  * Дата, которую называет календарь. Печатать её строкой незачем: выбранная дата уже дата, и
  * состояния «13.20» у неё не бывает — потому у дат покупки и вскрытия нет своего разбора ввода,
  * в отличие от срока годности, который перепечатывают с упаковки как есть.
+ *
+ * Календарь открывает **всё поле**, а не один значок: «зоны нажатия от 48 dp» (PLAN H3 «Дизайн»)
+ * — про зону, а не про высоту рамки, и в поле во всю ширину живого было 24 dp. Открытие ловится
+ * нажатием на само поле ([PressInteraction.Release]), потому что поле остаётся `readOnly` —
+ * печатать дату по-прежнему нечем, и клавиатура не всплывает. Значок при этом остаётся: он
+ * называет действие экранному чтецу и виден глазу; крестик очистки — своя кнопка, и своё нажатие
+ * она тратит на себя.
  */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -162,6 +225,10 @@ fun DateField(
     modifier: Modifier = Modifier
 ) {
     var open by remember { mutableStateOf(false) }
+    val presses = remember { MutableInteractionSource() }
+    LaunchedEffect(presses) {
+        presses.interactions.collect { if (it is PressInteraction.Release) open = true }
+    }
     OutlinedTextField(
         value = value?.format(DAY).orEmpty(),
         onValueChange = {},
@@ -186,6 +253,7 @@ fun DateField(
                 }
             }
         },
+        interactionSource = presses,
         modifier = modifier.fillMaxWidth().defaultMinSize(minHeight = 48.dp)
     )
     if (!open) return
@@ -209,7 +277,6 @@ fun DateField(
 }
 
 /** Как дата выглядит в поле: так же, как её печатают от руки. */
-private val DAY: DateTimeFormatter = DateTimeFormatter.ofPattern("dd.MM.uuuu")
 
 /**
  * Чем плох напечатанный ввод — словами. Один текст на все поля, где человек печатает количество,
@@ -244,3 +311,35 @@ internal val MoneyPresentationError.text: Int
         MoneyPresentationError.UNKNOWN_CURRENCY -> R.string.price_unknown_currency
         MoneyPresentationError.OUT_OF_CURRENCY_RANGE -> R.string.price_too_big
     }
+
+/**
+ * Поиск по списку: строка с крестиком, который её очищает. Один и тот же на полке и в выборе
+ * источника — искать человек привык одинаково, и двум копиям этого поля незачем расходиться.
+ *
+ * Отбор поле не делает: оно отдаёт набранное тому, кто спрашивает хранение (PLAN H4).
+ */
+@Composable
+fun SearchField(
+    value: String,
+    onValueChange: (String) -> Unit,
+    label: String,
+    modifier: Modifier = Modifier
+) {
+    OutlinedTextField(
+        value = value,
+        onValueChange = onValueChange,
+        singleLine = true,
+        label = { Text(label) },
+        trailingIcon = {
+            if (value.isNotEmpty()) {
+                IconButton(onClick = { onValueChange("") }) {
+                    Icon(
+                        painterResource(R.drawable.ic_close),
+                        contentDescription = stringResource(R.string.action_clear_search)
+                    )
+                }
+            }
+        },
+        modifier = modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 8.dp)
+    )
+}

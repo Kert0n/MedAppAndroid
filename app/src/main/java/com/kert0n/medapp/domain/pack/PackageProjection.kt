@@ -21,6 +21,8 @@ import kotlin.uuid.Uuid
  */
 data class PackageProjection(
     val id: Uuid,
+    /** Чем коробка входит в чужой агрегат: имя, единица и форма — то, о чём его спрашивают. */
+    val ref: PackageRef,
     val medKit: MedKitRef,
     val facts: PackageFacts,
     val quantity: Quantity,
@@ -35,6 +37,7 @@ data class PackageProjection(
 ) {
     init {
         require(availability.packageId == id) { "доступность принадлежит своей пачке" }
+        require(ref.id == id) { "ссылка принадлежит своей пачке" }
     }
 
     val name: String get() = facts.name

@@ -41,6 +41,7 @@ import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import com.kert0n.medapp.R
+import com.kert0n.medapp.ui.SearchField
 import com.kert0n.medapp.presentation.medkit.MedKitPresentationDTO
 import com.kert0n.medapp.presentation.pack.MedKitContentsUiState
 import com.kert0n.medapp.presentation.pack.Narrowing
@@ -152,29 +153,13 @@ private fun Found(
     onOpen: (Uuid) -> Unit
 ) {
     Column(Modifier.fillMaxSize()) {
-        OutlinedTextField(
+        SearchField(
             value = state.text,
             onValueChange = onSearch,
-            singleLine = true,
-            label = {
-                Text(
-                    stringResource(
-                        if (state.isEverywhere) R.string.contents_search_everywhere
-                        else R.string.contents_search_here
-                    )
-                )
-            },
-            trailingIcon = {
-                if (state.text.isNotEmpty()) {
-                    IconButton(onClick = { onSearch("") }) {
-                        Icon(
-                            painterResource(R.drawable.ic_close),
-                            contentDescription = stringResource(R.string.contents_search_clear)
-                        )
-                    }
-                }
-            },
-            modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 8.dp)
+            label = stringResource(
+                if (state.isEverywhere) R.string.contents_search_everywhere
+                else R.string.contents_search_here
+            )
         )
 
         Narrowings(state, onNarrow, onOrder)

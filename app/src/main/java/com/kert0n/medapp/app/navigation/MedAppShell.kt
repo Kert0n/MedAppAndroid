@@ -12,6 +12,23 @@ import androidx.compose.material3.NavigationBarItem
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.saveable.rememberSaveable
+import androidx.compose.runtime.setValue
+import com.kert0n.medapp.presentation.course.CourseFormUiState
+import com.kert0n.medapp.presentation.course.CourseFormViewModel
+import com.kert0n.medapp.presentation.course.CourseCardViewModel
+import com.kert0n.medapp.presentation.course.CourseListViewModel
+import com.kert0n.medapp.presentation.course.CoursePresentationDTO
+import com.kert0n.medapp.presentation.course.CourseSourcesViewModel
+import com.kert0n.medapp.presentation.course.SourcePickingViewModel
+import com.kert0n.medapp.ui.course.CourseCardScreen
+import com.kert0n.medapp.ui.course.CourseFormScreen
+import com.kert0n.medapp.ui.course.CourseSourcesScreen
+import com.kert0n.medapp.ui.course.SourcePickingScreen
+import com.kert0n.medapp.ui.plan.PlanMode
+import com.kert0n.medapp.ui.plan.PlanScreen
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
@@ -208,7 +225,116 @@ private fun screens(stacks: TabStacks) = entryProvider<NavKey> {
             onBack = stacks::back
         )
     }
-    for (place in Place.entries - Place.MED_KITS) {
+    entry(Screen.Plan) {
+        val model: CourseListViewModel = hiltViewModel()
+        // Режим — состояние места: он переживает уход в другую комнату и возвращение, как и
+        // всё, что держит стопка (rememberSaveable под своим ключом маршрута).
+        var mode by rememberSaveable { mutableStateOf(PlanMode.COURSES) }
+        PlanScreen(
+            mode = mode,
+            onMode = { mode = it },
+            courses = model.state.collectAsStateWithLifecycle().value,
+            // Черновик открывается редактором, идущее и законченное лечение — карточкой.
+            onOpenCourse = { course ->
+                stacks.go(
+                    if (course.kind == CoursePresentationDTO.Kind.DRAFT) Screen.CourseForm(course.id)
+                    else Screen.CourseCard(course.id)
+                )
+            },
+            onAddCourse = { stacks.go(Screen.CourseForm()) }
+        )
+    }
+    entry<Screen.CourseForm> { key ->
+        val model = hiltViewModel<CourseFormViewModel, CourseFormViewModel.Factory>(
+            key = key.toString(),
+            creationCallback = { factory -> factory.create(key.courseId) }
+        )
+        val state = model.state.collectAsStateWithLifecycle().value
+        // Записанное или удалённое — повод уйти: человек заводил лечение, а не форму. Начатое
+        // ведёт дальше, к карточке: с этого мига у лечения есть что показывать. За источниками
+        // ведёт записанный черновик — до записи подключать коробки не к чему.
+        LaunchedEffect(state) {
+            if (state !is CourseFormUiState.Editing) return@LaunchedEffect
+            val started = state.startedId
+            val sources = state.sourcesOf
+            when {
+                started != null -> {
+                    stacks.back()
+                    stacks.go(Screen.CourseCard(started))
+                }
+                sources != null -> {
+                    model.sourcesOpened()
+                    stacks.go(Screen.CourseSources(sources))
+                }
+                state.isSaved || state.isDiscarded || state.isLeft -> stacks.back()
+            }
+        }
+        CourseFormScreen(
+            state = state,
+            onEdit = model::edit,
+            onSave = model::save,
+            onAskToDiscard = model::askToDiscard,
+            onConfirmDiscard = model::discard,
+            onDismissDiscard = model::dismissDiscard,
+            onKeep = model::keep,
+            onDismissLeaving = model::dismissLeaving,
+            // Источники есть у любого лечения: новый черновик по этой кнопке сначала запишется.
+            onSources = model::openSources,
+            onStart = model::start.takeIf { state !is CourseFormUiState.Editing || state.mode != CourseFormUiState.Mode.RUNNING },
+            // Уходит с формы не оболочка, а редактор: записанный ради источников черновик спросит.
+            onBack = model::leave
+        )
+    }
+    entry<Screen.CourseCard> { key ->
+        val model = hiltViewModel<CourseCardViewModel, CourseCardViewModel.Factory>(
+            key = key.toString(),
+            creationCallback = { factory -> factory.create(key.courseId) }
+        )
+        CourseCardScreen(
+            state = model.state.collectAsStateWithLifecycle().value,
+            onEdit = { stacks.go(Screen.CourseForm(key.courseId)) },
+            onSources = { stacks.go(Screen.CourseSources(key.courseId)) },
+            onAskToCancel = model::askToCancel,
+            onConfirmCancel = model::cancel,
+            onDismissCancel = model::dismissCancel,
+            onDismissMessage = model::dismissMessage,
+            onBack = stacks::back
+        )
+    }
+    entry<Screen.CourseSources> { key ->
+        val model = hiltViewModel<CourseSourcesViewModel, CourseSourcesViewModel.Factory>(
+            key = key.toString(),
+            creationCallback = { factory -> factory.create(key.courseId) }
+        )
+        CourseSourcesScreen(
+            state = model.state.collectAsStateWithLifecycle().value,
+            onMove = model::move,
+            onAllocate = model::allocate,
+            onDetach = model::askToDetach,
+            onConfirmDetach = model::detach,
+            onDismissDetach = model::dismissDetach,
+            onDismissMessage = model::dismissMessage,
+            onAdd = { stacks.go(Screen.SourcePicking(key.courseId)) },
+            onSave = model::save,
+            onBack = stacks::back
+        )
+    }
+    entry<Screen.SourcePicking> { key ->
+        val model = hiltViewModel<SourcePickingViewModel, SourcePickingViewModel.Factory>(
+            key = key.toString(),
+            creationCallback = { factory -> factory.create(key.courseId) }
+        )
+        val state = model.state.collectAsStateWithLifecycle().value
+        // Подключённая коробка ждёт человека в стеке: там он и решит, сколько из неё брать.
+        LaunchedEffect(state.isAttached) { if (state.isAttached) stacks.back() }
+        SourcePickingScreen(
+            state = state,
+            onAttach = model::attach,
+            onSearch = model::search,
+            onBack = stacks::back
+        )
+    }
+    for (place in Place.entries - Place.MED_KITS - Place.PLAN) {
         entry(place.key) { NotReadyYet() }
     }
 }

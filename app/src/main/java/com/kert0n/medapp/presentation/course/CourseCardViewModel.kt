@@ -1,0 +1,181 @@
+package com.kert0n.medapp.presentation.course
+
+import androidx.lifecycle.ViewModel
+import androidx.lifecycle.viewModelScope
+import com.kert0n.medapp.domain.course.CourseCoverage
+import com.kert0n.medapp.domain.course.CourseProjection
+import com.kert0n.medapp.domain.course.CoverageReduction
+import com.kert0n.medapp.domain.course.CourseRecordProjection
+import com.kert0n.medapp.domain.intake.IntakeProjection
+import com.kert0n.medapp.feature.course.CourseCancellation
+import com.kert0n.medapp.storage.course.CourseStorageRepository
+import com.kert0n.medapp.storage.intake.IntakeStorageRepository
+import dagger.assisted.Assisted
+import dagger.assisted.AssistedFactory
+import dagger.assisted.AssistedInject
+import dagger.hilt.android.lifecycle.HiltViewModel
+import kotlin.uuid.Uuid
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.SharingStarted
+import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.stateIn
+import kotlinx.coroutines.launch
+
+/**
+ * Карточка лечения (PLAN H3 №14). Первым — **обеспечение**: человек открывает её, чтобы узнать,
+ * хватит ли лекарства; назначение и пункты он читает вторым взглядом.
+ *
+ * Идущее и законченное лечение — одна карточка: у записи эпизода одна форма, и разными их делает
+ * исход, а не экран (D5). У закрытого плана нет — ни обеспечения, ни источников, ни действий.
+ */
+@HiltViewModel(assistedFactory = CourseCardViewModel.Factory::class)
+class CourseCardViewModel @AssistedInject constructor(
+    private val cancellation: CourseCancellation,
+    courses: CourseStorageRepository,
+    intakes: IntakeStorageRepository,
+    @Assisted private val courseId: Uuid
+) : ViewModel() {
+
+    @AssistedFactory
+    interface Factory {
+        fun create(courseId: Uuid): CourseCardViewModel
+    }
+
+    private val cancelling = MutableStateFlow(Cancelling())
+
+    /** Эпизод — запись и план вместе: имя живёт у записи, состав пачек — у плана (PLAN D5). */
+    private val episode = combine(courses.observeRecord(courseId), courses.observePlan(courseId)) { record, plan ->
+        record to plan
+    }
+
+    val state: StateFlow<CourseCardUiState> = combine(
+        episode,
+        courses.observeCoverage(courseId),
+        courses.observeReductions(courseId),
+        intakes.observeOfCourse(courseId),
+        cancelling
+    ) { (record, plan), coverage, reductions, intakes, cancelling ->
+        if (record == null) CourseCardUiState(isGone = true)
+        else record.toCardUiState(plan, coverage, reductions, intakes, cancelling)
+    }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), CourseCardUiState(isLoading = true))
+
+    /** Отмена спрашивается: будущие приёмы уйдут, а пачки освободятся (H3, список подтверждений). */
+    fun askToCancel() {
+        if (cancelling.value.working) return
+        cancelling.value = Cancelling(asking = true)
+    }
+
+    fun dismissCancel() {
+        if (cancelling.value.working) return
+        cancelling.value = Cancelling()
+    }
+
+    /**
+     * Отменить лечение. Зовётся после ответа человека; второе нажатие ничего не начинает.
+     * Уже законченного отменять нечего — карточка просто показывает исход, который у него есть.
+     */
+    fun cancel() {
+        val now = cancelling.value
+        if (!now.asking || now.working) return
+        cancelling.value = now.copy(asking = false, working = true)
+        viewModelScope.launch {
+            cancelling.value = told(cancellation.cancel(courseId))
+        }
+    }
+
+    /** Прочитанное сообщение человек уносит сам: до ответа оно остаётся на экране. */
+    fun dismissMessage() {
+        cancelling.value = cancelling.value.copy(message = null)
+    }
+
+    /**
+     * Чем кончилась отмена. Два исхода говорит сама карточка, и своих слов им не нужно:
+     * отменённое приходит чтением плашкой «Отменён …» и пустым списком источников, а пропавшее —
+     * тем же чтением, из которого сценарий и узнал о пропаже: `record == null` делает карточку
+     * экраном «Этого лечения больше нет».
+     *
+     * Своих слов просит только третий: лечение кончилось само, пока человек шёл сюда. Карточка на
+     * нём не меняется ничем — она и так показывала «Завершён», — и молчание читалось бы как
+     * «ничего не произошло» (H3 §14).
+     */
+    private fun told(outcome: CourseCancellation.Outcome): Cancelling = when (outcome) {
+        CourseCancellation.Outcome.CANCELLED, CourseCancellation.Outcome.GONE -> Cancelling()
+        CourseCancellation.Outcome.ALREADY_FINISHED -> Cancelling(message = CourseCardMessage.AlreadyFinished)
+    }
+
+    private fun CourseRecordProjection.toCardUiState(
+        plan: CourseProjection?,
+        coverage: CourseCoverage?,
+        reductions: List<CoverageReduction>,
+        intakes: List<IntakeProjection>,
+        cancelling: Cancelling
+    ): CourseCardUiState {
+        val zone = prescription.schedule.zone
+        return CourseCardUiState(
+            course = toPresentationDTO(coverage),
+            coverage = coverage?.takeIf { isOpen }?.toPresentationDTO(),
+            reductions = reductions.map { it.toPresentationDTO(zone, intakes.packageNames()) },
+            // Источники — коротко: чем лечение обеспечивают и сколько из каждой коробки взято.
+            sources = plan?.sources.orEmpty().map { source ->
+                source.toPresentationDTO(
+                    dose = prescription.dose,
+                    pack = null,
+                    medKitName = null,
+                    covered = coverage?.perSource?.firstOrNull { it.pkg == source.pkg }
+                )
+            },
+            items = intakes.filterIsInstance<IntakeProjection.Scheduled>().map { it.toPresentationDTO(zone) },
+            isRunning = isOpen,
+            asksToCancel = cancelling.asking,
+            isCancelling = cancelling.working,
+            message = cancelling.message
+        )
+    }
+
+    /** Имена коробок берутся у приёмов: сокращение помнит номер, а имя — та ссылка, что рядом. */
+    private fun List<IntakeProjection>.packageNames(): Map<Uuid, String> = buildMap {
+        for (intake in this@packageNames) {
+            val scheduled = intake as? IntakeProjection.Scheduled
+            scheduled?.plannedPackage?.let { put(it.id, it.name) }
+            intake.taken?.pkg?.let { put(it.id, it.name) }
+        }
+    }
+
+    private data class Cancelling(
+        val asking: Boolean = false,
+        val working: Boolean = false,
+        val message: CourseCardMessage? = null
+    )
+}
+
+/**
+ * Что показывает карточка. [isGone] — эпизода нет вовсе; [isRunning] отличает идущее лечение от
+ * законченного: у второго нет ни обеспечения, ни действий, а история остаётся.
+ */
+data class CourseCardUiState(
+    val course: CoursePresentationDTO? = null,
+    val coverage: CourseCoveragePresentationDTO? = null,
+    val reductions: List<CoverageReductionPresentationDTO> = emptyList(),
+    /** Чем лечение обеспечивают — коротко; весь стек человек правит на своём экране (H3 №16). */
+    val sources: List<CourseSourcePresentationDTO> = emptyList(),
+    val items: List<CourseItemPresentationDTO> = emptyList(),
+    val isRunning: Boolean = false,
+    val isLoading: Boolean = false,
+    val isGone: Boolean = false,
+    val asksToCancel: Boolean = false,
+    val isCancelling: Boolean = false,
+    /** Чем кончилось действие человека, если по самой карточке этого не видно. */
+    val message: CourseCardMessage? = null
+)
+
+/**
+ * Что карточка отвечает на «Отменить лечение», когда отменить не вышло. Отменённое лечение своего
+ * случая здесь не имеет: о нём говорит сама карточка — плашкой «Отменён …» и пустым списком
+ * источников (PLAN H3 №14).
+ */
+sealed interface CourseCardMessage {
+
+    /** Лечение кончилось само, пока человек шёл сюда: отменять уже нечего. */
+    data object AlreadyFinished : CourseCardMessage
+}

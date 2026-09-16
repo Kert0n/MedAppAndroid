@@ -10,7 +10,10 @@ import com.kert0n.medapp.domain.value.Vocabulary
 import com.kert0n.medapp.presentation.ParsedInput
 import com.kert0n.medapp.presentation.value.ExpiryDatePresentationDTO
 import com.kert0n.medapp.presentation.value.MoneyPresentationDTO
+import com.kert0n.medapp.presentation.value.FormPresentationDTO
 import com.kert0n.medapp.presentation.value.QuantityPresentationDTO
+import com.kert0n.medapp.presentation.value.UnitPresentationDTO
+import com.kert0n.medapp.presentation.value.usualUnit
 import com.kert0n.medapp.presentation.value.toDomain
 import com.kert0n.medapp.presentation.value.toPresentationDTO
 import kotlin.uuid.Uuid
@@ -135,3 +138,12 @@ data class PackageDescription(
 
 private fun rejected(error: PackageFormError): ParsedInput<PackageDescription, PackageFormError> =
     ParsedInput.Rejected(error)
+
+/**
+ * Форма выпуска подставляет единицу в пустое поле — ту, которой эту форму обычно меряют. Уже
+ * названную человеком единицу форма не трогает (решение владельца 2026-09-16).
+ */
+fun PackageFormPresentationDTO.withForm(
+    chosen: FormPresentationDTO,
+    units: List<UnitPresentationDTO>
+): PackageFormPresentationDTO = copy(form = chosen, unit = unit ?: chosen.usualUnit(units))
