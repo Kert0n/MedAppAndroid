@@ -30,10 +30,11 @@ class FormTest {
 
     private var saved = 0
 
-    private fun showLongForm() {
+    private fun showLongForm(typing: Boolean = false) {
         compose.setContent {
             MedAppTheme {
                 Form(
+                    typing = typing,
                     actions = {
                         Text("Записать не вышло")
                         Button(onClick = { saved++ }, modifier = Modifier.fillMaxWidth()) { Text("Сохранить") }
@@ -73,6 +74,29 @@ class FormTest {
         showLongForm()
 
         compose.onNodeWithText("Записать не вышло").assertIsDisplayed()
+    }
+
+    /**
+     * Пока человек набирает, подвала нет: клавиатура занимает половину экрана, и три кнопки над
+     * ней съедают то немногое, что осталось от формы, — у нижнего поля прячут и его соседей
+     * (находка владельца 2026-09-16).
+     */
+    @Test
+    fun theActionsStepAsideWhileTyping() {
+        showLongForm(typing = true)
+
+        compose.onNodeWithText("Сохранить").assertDoesNotExist()
+        compose.onNodeWithText("Отмена").assertDoesNotExist()
+        // Форма при этом цела: человек набирает то, ради чего клавиатуру и открыл.
+        compose.onNodeWithText("Поле 1").assertIsDisplayed()
+    }
+
+    /** Клавиатура убрана — действия вернулись: нажимать «Сохранить» человек идёт именно туда. */
+    @Test
+    fun theActionsComeBackWhenTypingIsOver() {
+        showLongForm(typing = false)
+
+        compose.onNodeWithText("Сохранить").assertIsDisplayed()
     }
 
     /** Прокручиваются при этом поля: до последнего долистывают, и он остаётся на экране. */
