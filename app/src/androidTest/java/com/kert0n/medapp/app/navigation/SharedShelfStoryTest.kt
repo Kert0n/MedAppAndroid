@@ -181,8 +181,10 @@ class SharedShelfStoryTest {
         val sergey = requireNotNull(ProbeAccounts.boris)
         val joined = sergey.joinMedKit(MembershipPostNetworkDTO(code))
         check(joined is ApiResult.Success) { "Сергей не вошёл по коду: $joined" }
+        // Читает перед тем, как писать: запрос готовится по прочитанному состоянию (PLAN E1).
+        val seen = success(sergey.packageSnapshot(box))
         val taken = sergey.synchronise(
-            box, Uuid.random(), PackageSyncNetworkDTO(consumed = "2", packageVersion = ResourceVersion(1))
+            box, Uuid.random(), PackageSyncNetworkDTO(consumed = "2", packageVersion = seen.pack.version)
         )
         check(taken is ApiResult.Success) { "Сергей не смог взять из коробки: $taken" }
     }
@@ -190,7 +192,9 @@ class SharedShelfStoryTest {
     private fun marinaSeesTheNewNumber() {
         refreshFromOptions()
         openTheShelf()
-        compose.waitUntil(WAIT) { shown("8") }
+        // Число стало другим: сколько именно, зависит от единицы боевого словаря, поэтому
+        // сверяется само число, а не вся строка.
+        compose.waitUntil(WAIT) { shownPart("8") }
     }
 
     /** К местам — возвратами: панели мест в глубине нет, она у мест (PLAN H3 «Оболочка»). */
@@ -228,6 +232,9 @@ class SharedShelfStoryTest {
     }
 
     private fun shown(text: String) = compose.onAllNodesWithText(text).fetchSemanticsNodes().isNotEmpty()
+
+    private fun shownPart(text: String) =
+        compose.onAllNodes(hasText(text, substring = true)).fetchSemanticsNodes().isNotEmpty()
 
     private fun described(text: String) =
         compose.onAllNodesWithContentDescription(text).fetchSemanticsNodes().isNotEmpty()
