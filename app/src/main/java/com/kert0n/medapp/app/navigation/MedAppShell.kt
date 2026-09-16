@@ -61,6 +61,7 @@ import androidx.navigation3.ui.NavDisplay
 import com.kert0n.medapp.R
 import com.kert0n.medapp.presentation.medkit.MedKitFormUiState
 import com.kert0n.medapp.presentation.medkit.MedKitFormViewModel
+import com.kert0n.medapp.presentation.medkit.MedKitSharingViewModel
 import com.kert0n.medapp.presentation.medkit.MedKitListViewModel
 import com.kert0n.medapp.presentation.pack.MedKitContentsViewModel
 import com.kert0n.medapp.presentation.pack.PackageCardViewModel
@@ -70,6 +71,7 @@ import com.kert0n.medapp.presentation.pack.PackageTransferViewModel
 import com.kert0n.medapp.ui.EmptyState
 import com.kert0n.medapp.ui.medkit.MedKitContentsScreen
 import com.kert0n.medapp.ui.medkit.MedKitFormScreen
+import com.kert0n.medapp.ui.medkit.MedKitSharingScreen
 import com.kert0n.medapp.ui.medkit.MedKitListScreen
 import com.kert0n.medapp.ui.pack.PackageCardScreen
 import com.kert0n.medapp.ui.pack.PackageFormScreen
@@ -221,10 +223,27 @@ private fun screens(stacks: TabStacks, planMode: MutableState<PlanMode>) = entry
             onOpen = { stacks.go(Screen.PackageCard(it)) },
             onAdd = { stacks.go(Screen.PackageForm(medKitId = key.medKitId)) },
             onEdit = { stacks.go(Screen.MedKitForm(key.medKitId)) },
+            // Делиться можно только названной полкой: у «всех лекарств» её нет, и меню там не
+            // показывается вовсе.
+            onShare = { key.medKitId?.let { stacks.go(Screen.MedKitSharing(it)) } },
             onAskToRemove = model::askToRemove,
             onPickTarget = model::pickTarget,
             onDismissRemoval = model::dismissRemoval,
             onRemove = model::remove,
+            onBack = stacks::back
+        )
+    }
+    entry<Screen.MedKitSharing> { key ->
+        val model = hiltViewModel<MedKitSharingViewModel, MedKitSharingViewModel.Factory>(
+            key = key.toString(),
+            creationCallback = { factory -> factory.create(key.medKitId) }
+        )
+        MedKitSharingScreen(
+            state = model.state.collectAsStateWithLifecycle().value,
+            onAsk = model::ask,
+            onDismissAsking = model::dismissAsking,
+            onPublish = model::publish,
+            onInvite = model::invite,
             onBack = stacks::back
         )
     }

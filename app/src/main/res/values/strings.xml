@@ -167,6 +167,27 @@
     <string name="med_kit_removal_contents_busy">Одна из упаковок ждёт ответа сервера — дождитесь его и повторите.</string>
     <string name="med_kit_removal_not_shared">Эта аптечка только ваша — оставлять её некому.</string>
 
+    <!-- Поделиться аптечкой (экран 20) -->
+    <string name="med_kit_sharing">Поделиться</string>
+    <string name="med_kit_sharing_menu">Поделиться аптечкой</string>
+    <string name="med_kit_sharing_invite_menu">Пригласить</string>
+    <string name="med_kit_sharing_becomes_shared">Станет общим</string>
+    <string name="med_kit_sharing_becomes_shared_list">Название упаковки, количество и единица, форма, категория, производитель, страна, описание.</string>
+    <string name="med_kit_sharing_stays_yours">Останется у вас</string>
+    <string name="med_kit_sharing_stays_yours_list">Срок годности, разовая доза, заметка, цена, дата покупки и дата вскрытия. Название аптечки и место хранения — тоже только ваши.</string>
+    <string name="med_kit_sharing_irreversible">Это необратимо: переданный доступ нельзя отозвать. Любой участник сможет удалить аптечку у всех.</string>
+    <string name="med_kit_sharing_publish">Сделать общей</string>
+    <string name="med_kit_sharing_publish_title">Сделать «%1$s» общей?</string>
+    <string name="med_kit_sharing_on_its_way">Решение об аптечке уже едет серверу. Пригласить можно будет, когда оно доедет.</string>
+    <string name="med_kit_sharing_shared">«%1$s» — общая аптечка. Позовите тех, с кем делите лекарства.</string>
+    <string name="med_kit_sharing_invite">Пригласить</string>
+    <string name="med_kit_sharing_invite_again">Обновить код</string>
+    <string name="med_kit_sharing_invite_title">Позвать в «%1$s»?</string>
+    <string name="med_kit_sharing_invite_explained">Кто получит код, войдёт в аптечку и увидит все её лекарства. Прежний код перестанет работать.</string>
+    <string name="med_kit_sharing_expires_around">Примерно до %1$s</string>
+    <string name="med_kit_sharing_busy">Аптечка ждёт ответа сервера на другое решение — дождитесь его и повторите.</string>
+    <string name="med_kit_sharing_not_shared">Эта аптечка только ваша: сначала сделайте её общей.</string>
+
     <!-- Карточка упаковки -->
     <string name="pack_title">Упаковка</string>
     <string name="pack_how_much">Сколько есть</string>

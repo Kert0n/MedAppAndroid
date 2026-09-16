@@ -74,6 +74,7 @@ fun MedKitContentsScreen(
     onOpen: (Uuid) -> Unit,
     onAdd: () -> Unit,
     onEdit: () -> Unit,
+    onShare: () -> Unit,
     onAskToRemove: () -> Unit,
     onPickTarget: () -> Unit,
     onDismissRemoval: () -> Unit,
@@ -102,7 +103,11 @@ fun MedKitContentsScreen(
                     }
                 },
                 // Меню полки — только у названной: у «всех лекарств» править и убирать нечего.
-                actions = { state.medKit?.let { ShelfMenu(onEdit = onEdit, onRemove = onAskToRemove) } }
+                actions = {
+                    state.medKit?.let {
+                        ShelfMenu(isShared = it.isShared, onEdit = onEdit, onShare = onShare, onRemove = onAskToRemove)
+                    }
+                }
             )
         },
         floatingActionButton = {
@@ -300,9 +305,12 @@ private fun <T> Choice(
     }
 }
 
-/** Меню полки: править и убрать. Больше с полкой сделать нечего. */
+/**
+ * Меню полки: править, поделиться и убрать. У общей полки «поделиться» уже случилось — там зовут,
+ * и пункт называется тем, что человек сделает (PLAN H3 №20).
+ */
 @Composable
-private fun ShelfMenu(onEdit: () -> Unit, onRemove: () -> Unit) {
+private fun ShelfMenu(isShared: Boolean, onEdit: () -> Unit, onShare: () -> Unit, onRemove: () -> Unit) {
     var open by remember { mutableStateOf(false) }
     IconButton(onClick = { open = true }) {
         Icon(
@@ -316,6 +324,19 @@ private fun ShelfMenu(onEdit: () -> Unit, onRemove: () -> Unit) {
             onClick = {
                 open = false
                 onEdit()
+            }
+        )
+        DropdownMenuItem(
+            text = {
+                Text(
+                    stringResource(
+                        if (isShared) R.string.med_kit_sharing_invite_menu else R.string.med_kit_sharing_menu
+                    )
+                )
+            },
+            onClick = {
+                open = false
+                onShare()
             }
         )
         DropdownMenuItem(

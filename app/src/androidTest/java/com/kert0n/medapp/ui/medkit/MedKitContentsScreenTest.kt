@@ -73,6 +73,7 @@ class MedKitContentsScreenTest {
                     onOpen = { opened = it },
                     onAdd = { added++ },
                     onEdit = {},
+                    onShare = {},
                     onAskToRemove = {},
                     onPickTarget = {},
                     onDismissRemoval = {},

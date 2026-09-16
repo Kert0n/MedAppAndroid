@@ -68,6 +68,14 @@ sealed interface Screen : NavKey {
     data class PackageTransfer(val packageId: Uuid) : Screen
 
     /**
+     * Поделиться аптечкой (PLAN H3 №20): местную сделать общей, в общую позвать. Ключ приглашения
+     * сюда не едет и ехать не может — он секрет, а ключ маршрута ложится в сохранённую стопку
+     * (PLAN G3, C1 «Ключ приглашения не бывает маршрутом»).
+     */
+    @Serializable
+    data class MedKitSharing(val medKitId: Uuid) : Screen
+
+    /**
      * Редактор лечения (PLAN H3 №15): без [courseId] — новый черновик, с ним — записанный
      * черновик или идущее лечение; что из двух, экран узнаёт у базы.
      */
