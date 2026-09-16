@@ -65,7 +65,9 @@ class CourseFormScreenTest {
     fun theSaveButtonStaysAliveAndTheRefusalNamesItsField() {
         show(editing(error = CourseFormError.Input.TITLE_EMPTY))
 
-        compose.onNodeWithText("Название нужно: без него лечение не отличить от других.").assertIsDisplayed()
+        // На 360 dp и при крупном шрифте отказ лежит ниже сгиба: до него долистывают, как и до кнопки.
+        compose.onNodeWithText("Название нужно: без него лечение не отличить от других.")
+            .performScrollTo().assertIsDisplayed()
         compose.onNodeWithText("Сохранить").performScrollTo().performClick()
 
         assertEquals(1, saved)
