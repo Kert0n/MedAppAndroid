@@ -1,6 +1,7 @@
 package com.kert0n.medapp.presentation.value
 
 import com.kert0n.medapp.presentation.course.CourseFormPresentationDTO
+import com.kert0n.medapp.presentation.course.suggestingUnit
 import com.kert0n.medapp.presentation.course.withForm
 import kotlin.uuid.Uuid
 import org.junit.Assert.assertEquals
@@ -56,18 +57,39 @@ class UsualUnitsTest {
         assertEquals(pieces, form(" Таблетки ").usualUnit(units))
     }
 
-    /** Выбрал форму — единица встала сама: поле было пустым. */
+    /** Выбрал форму, когда число уже набрано, — единица встала сама: поле было пустым. */
     @Test
     fun choosingAFormFillsAnEmptyUnit() {
-        val filled = CourseFormPresentationDTO(title = "Нурофен").withForm(form("таблетки"), units)
+        val typed = CourseFormPresentationDTO(title = "Нурофен", doseAmount = "2")
 
-        assertEquals(pieces, filled.unit)
+        assertEquals(pieces, typed.withForm(form("таблетки"), units).unit)
+    }
+
+    /**
+     * Пока мерить нечего, подсказывать нечего: единица без числа — половина дозы, и черновик
+     * «название + форма» с ней перестал бы записываться (PLAN H3 §15, C1 «Доза — число вместе с
+     * единицей»).
+     */
+    @Test
+    fun aFormAloneSuggestsNothingWhileThereIsNothingToMeasure() {
+        val chosen = CourseFormPresentationDTO(title = "Нурофен").withForm(form("таблетки"), units)
+
+        assertNull(chosen.unit)
+        assertEquals("таблетки", chosen.form?.name)
+    }
+
+    /** Число набрано — подсказка приходит к нему: форму человек выбрал раньше. */
+    @Test
+    fun typingTheAmountBringsTheSuggestionOfTheChosenForm() {
+        val chosen = CourseFormPresentationDTO(title = "Нурофен").withForm(form("таблетки"), units)
+
+        assertEquals(pieces, chosen.copy(doseAmount = "2").suggestingUnit(units).unit)
     }
 
     /** Назвал единицу сам — форма её не трогает: обратный порядок ничего не меняет. */
     @Test
     fun aUnitChosenByThePersonIsLeftAlone() {
-        val chosen = CourseFormPresentationDTO(title = "Нурофен", unit = millilitres)
+        val chosen = CourseFormPresentationDTO(title = "Нурофен", doseAmount = "2", unit = millilitres)
 
         val filled = chosen.withForm(form("таблетки"), units)
 

@@ -52,6 +52,7 @@ import com.kert0n.medapp.domain.course.CourseRejected
 import com.kert0n.medapp.presentation.course.CourseFormError
 import com.kert0n.medapp.presentation.course.CourseFormPresentationDTO
 import com.kert0n.medapp.presentation.course.CourseFormUiState
+import com.kert0n.medapp.presentation.course.suggestingUnit
 import com.kert0n.medapp.presentation.course.withForm
 import com.kert0n.medapp.ui.DateField
 import com.kert0n.medapp.ui.ErrorMessage
@@ -163,7 +164,9 @@ private fun Fields(
             label = { Text(stringResource(R.string.course_title)) },
             singleLine = true,
             isError = field == CourseFormError.Field.TITLE,
-            supportingText = { Text(stringResource(R.string.field_required)) },
+            // «обязательно» — пока название пусто: у заполненного поля подпись читается как
+            // требование поправить, а поверх своего отказа — как неверная причина.
+            supportingText = { if (form.title.isBlank()) Text(stringResource(R.string.field_required)) },
             modifier = Modifier.fillMaxWidth()
         )
         OutlinedTextField(
@@ -187,7 +190,8 @@ private fun Fields(
         Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
             OutlinedTextField(
                 value = form.doseAmount,
-                onValueChange = { onEdit(form.copy(doseAmount = it)) },
+                // Набрал число — форма выпуска подсказывает, чем его мерить (H3 §15).
+                onValueChange = { onEdit(form.copy(doseAmount = it).suggestingUnit(state.units)) },
                 label = { Text(stringResource(R.string.course_dose)) },
                 singleLine = true,
                 keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
@@ -350,6 +354,7 @@ private fun CourseFormError.message(): String = when (this) {
     CourseFormError.Input.NOTE_TOO_LONG ->
         pluralStringResource(R.plurals.course_note_too_long, CourseRecord.NOTE_MAX_LENGTH, CourseRecord.NOTE_MAX_LENGTH)
     CourseFormError.Input.UNIT_MISSING -> stringResource(R.string.course_unit_missing)
+    CourseFormError.Input.DOSE_MISSING -> stringResource(R.string.course_dose_missing)
     CourseFormError.Input.DOSE_IS_ZERO -> stringResource(R.string.course_dose_is_zero)
     CourseFormError.Input.FORM_UNKNOWN -> stringResource(R.string.course_form_unknown)
     CourseFormError.Input.START_MISSING -> stringResource(R.string.course_start_missing)

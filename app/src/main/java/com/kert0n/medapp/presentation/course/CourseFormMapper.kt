@@ -29,8 +29,9 @@ import java.time.LocalDate
  * проверки экран не держит (D5 «Черновик»).
  *
  * Пробелы вокруг названия — не часть его. Пустая заметка — **отсутствие**. Пределы берутся у
- * записи эпизода ([CourseRecord.TITLE_MAX_LENGTH], [CourseRecord.NOTE_MAX_LENGTH]). Число дозы
- * разбирает тот же разбор, что количество коробки; доза в ноль — не доза. Расписание либо целиком,
+ * записи эпизода ([CourseRecord.TITLE_MAX_LENGTH], [CourseRecord.NOTE_MAX_LENGTH]). **Доза —
+ * число вместе с единицей**: нет ни того ни другого — дозы нет, названа половина — отказ у своего
+ * поля. Число разбирает тот же разбор, что количество коробки; доза в ноль — не доза. Расписание либо целиком,
  * либо никак: начало без дней — не половина расписания, а незаконченное поле. Времена — минуты
  * без секунд, без повторов, по порядку: этого требует само расписание (D5), и экран его не
  * переспрашивает — приводит.
@@ -42,7 +43,11 @@ fun CourseFormPresentationDTO.parsed(vocabulary: Vocabulary): ParsedInput<Course
     if (title.length > CourseRecord.TITLE_MAX_LENGTH) return rejected(CourseFormError.Input.TITLE_TOO_LONG)
     if ((note?.length ?: 0) > CourseRecord.NOTE_MAX_LENGTH) return rejected(CourseFormError.Input.NOTE_TOO_LONG)
 
-    val dose = doseAmount.trim().ifEmpty { null }?.let { typed ->
+    // Доза — одна вещь, и половины у неё не бывает: число без единицы нечем мерить, единица без
+    // числа не значит ничего и при записи пропала бы молча (C1 «Доза — число вместе с единицей»).
+    val typedAmount = doseAmount.trim().ifEmpty { null }
+    if (typedAmount == null && unit != null) return rejected(CourseFormError.Input.DOSE_MISSING)
+    val dose = typedAmount?.let { typed ->
         val unit = unit ?: return rejected(CourseFormError.Input.UNIT_MISSING)
         when (val parsed = QuantityPresentationDTO(typed, unit).toDomain(vocabulary)) {
             is ParsedInput.Rejected -> return rejected(CourseFormError.Dose(parsed.error))
@@ -169,11 +174,23 @@ fun CourseDescription.changesSince(prescription: Prescription): List<CourseAmend
 }
 
 /**
- * Человек выбрал форму выпуска. Единица подставляется **только в пустое поле**: названную
- * человеком форма не переписывает — он мог поставить её намеренно, и молча менять его решение
- * нельзя (решение владельца 2026-09-16). Незнакомой форме подставлять нечего.
+ * Человек выбрал форму выпуска: она встаёт в поле и приводит с собой единицу — если мерить уже
+ * есть что ([suggestingUnit]).
  */
 fun CourseFormPresentationDTO.withForm(
     chosen: FormPresentationDTO,
     units: List<UnitPresentationDTO>
-): CourseFormPresentationDTO = copy(form = chosen, unit = unit ?: chosen.usualUnit(units))
+): CourseFormPresentationDTO = copy(form = chosen).suggestingUnit(units)
+
+/**
+ * Единица, подсказанная формой выпуска. Подставляется **только в пустое поле**: названную
+ * человеком форма не переписывает — он мог поставить её намеренно, и молча менять его решение
+ * нельзя (решение владельца 2026-09-16). Незнакомой форме подставлять нечего.
+ *
+ * И **только когда есть что мерить**: единица без числа — половина дозы, и черновик «название и
+ * форма выпуска», который H3 §15 как раз разрешает, перестал бы записываться. Поэтому подсказка
+ * приходит вместе с числом — в тот момент, когда его набирают, или вместе с формой, если число
+ * уже набрано.
+ */
+fun CourseFormPresentationDTO.suggestingUnit(units: List<UnitPresentationDTO>): CourseFormPresentationDTO =
+    if (doseAmount.isBlank() || unit != null) this else copy(unit = form?.usualUnit(units))

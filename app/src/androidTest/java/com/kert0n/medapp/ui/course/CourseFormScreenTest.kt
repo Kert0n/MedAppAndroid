@@ -87,6 +87,26 @@ class CourseFormScreenTest {
         assertEquals(1, saved)
     }
 
+    /** Пустому названию сказано, что оно обязательно, — до всякого нажатия и отказа. */
+    @Test
+    fun anEmptyTitleIsToldThatItIsRequired() {
+        show(editing(form = CourseFormPresentationDTO(title = "")))
+
+        compose.onNodeWithText("обязательно").performScrollTo().assertIsDisplayed()
+    }
+
+    /**
+     * У набранного названия подписи нет: она читалась бы как требование поправить готовое поле, а
+     * поверх собственного отказа «слишком длинное» — как неверная причина. Поле говорит о том, что
+     * в нём сейчас.
+     */
+    @Test
+    fun aFilledTitleIsNotAskedToBeFilled() {
+        show(editing(form = CourseFormPresentationDTO(title = "Нурофен"), error = CourseFormError.Input.TITLE_TOO_LONG))
+
+        compose.onNodeWithText("обязательно").assertDoesNotExist()
+    }
+
     /** Дни — плашки по одной на день; нажатие отдаёт форму с этим днём, повторное — без него. */
     @Test
     fun daysOfTheWeekAreChipsThatToggle() {

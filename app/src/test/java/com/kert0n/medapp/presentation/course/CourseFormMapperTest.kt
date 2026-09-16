@@ -49,6 +49,27 @@ class CourseFormMapperTest {
         assertEquals(ParsedInput.Parsed(CourseDescription("Нурофен", null)), parsed)
     }
 
+    /**
+     * Единица без числа — незаконченное поле, а не «дозы нет»: доза это одна вещь (ТЗ 4.1.1.4.1),
+     * и записанная половина теряла единицу молча — у черновика для неё отдельного места нет.
+     */
+    @Test
+    fun aUnitWithoutAnAmountIsAnUnfinishedField() {
+        assertEquals(
+            ParsedInput.Rejected(CourseFormError.Input.DOSE_MISSING),
+            CourseFormPresentationDTO(title = "Нурофен", unit = TABLETS.toPresentationDTO()).parsed(VOCABULARY)
+        )
+    }
+
+    /** Черновик «название и форма выпуска» записывается: дозы у него нет вовсе, а не половина (H3 §15). */
+    @Test
+    fun aDraftWithATitleAndAFormIsWritten() {
+        val parsed = CourseFormPresentationDTO(title = "Нурофен", form = TABLET_FORM.toPresentationDTO())
+            .parsed(VOCABULARY)
+
+        assertEquals(ParsedInput.Parsed(CourseDescription("Нурофен", null, dose = null, form = TABLET_FORM)), parsed)
+    }
+
     @Test
     fun anEmptyTitleIsRefusedByName() {
         assertEquals(

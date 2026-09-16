@@ -329,6 +329,7 @@
     <string name="course_total_doses">Всего приёмов</string>
     <string name="course_expected_end">Последний приём — %1$s</string>
     <string name="course_unit_missing">У дозы нужна единица: выберите её из словаря.</string>
+    <string name="course_dose_missing">Укажите число: единица без него ничего не значит.</string>
     <string name="course_dose_is_zero">Доза в ноль — не доза: укажите, сколько принимать за раз.</string>
     <string name="course_form_unknown">Такой формы уже нет в словаре — выберите другую.</string>
     <string name="course_start_missing">Расписанию нужен первый день.</string>

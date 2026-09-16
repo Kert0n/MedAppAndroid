@@ -20,6 +20,7 @@ sealed interface CourseFormError {
         TITLE_TOO_LONG(Field.TITLE),
         NOTE_TOO_LONG(Field.NOTE),
         UNIT_MISSING(Field.UNIT),
+        DOSE_MISSING(Field.DOSE),
         DOSE_IS_ZERO(Field.DOSE),
         FORM_UNKNOWN(Field.FORM),
         START_MISSING(Field.START),
