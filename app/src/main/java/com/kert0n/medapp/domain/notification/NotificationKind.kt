@@ -34,11 +34,12 @@ enum class NotificationKind(val channel: NotificationChannel) {
     val exact: Boolean get() = this == INTAKE_DUE
 
     /**
-     * Системным уведомлением или баннером внутри приложения — свойство вида, а не решение
-     * вызывающего: баннер бывает только у последнего дня годности (PLAN D8).
+     * Системным уведомлением или внутри приложения — свойство вида, а не решение вызывающего.
+     * В приложении говорятся два: последний день годности и **пропуск** — неотвеченный пункт
+     * прошлого дня приходит попапом при входе, а не в шторку (PLAN C1 «Попап пропущенного»).
      */
     val delivery: NoticeDelivery
-        get() = if (this == EXPIRY_TODAY) NoticeDelivery.IN_APP_BANNER else NoticeDelivery.SYSTEM
+        get() = if (this == EXPIRY_TODAY || this == INTAKE_MISSED) NoticeDelivery.IN_APP_BANNER else NoticeDelivery.SYSTEM
 
     /**
      * Что можно сделать прямо с карточки: отвечают только напоминанию о приёме. Все три действия

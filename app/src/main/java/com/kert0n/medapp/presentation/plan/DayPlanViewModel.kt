@@ -4,20 +4,10 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.kert0n.medapp.domain.report.DayPlan
 import kotlinx.coroutines.flow.map
-import kotlinx.coroutines.flow.flatMapLatest
-import kotlinx.coroutines.flow.distinctUntilChanged
-import com.kert0n.medapp.storage.notification.ReminderStorageRepository
-import com.kert0n.medapp.storage.intake.IntakeStorageRepository
-import com.kert0n.medapp.storage.course.CourseStorageRepository
-import com.kert0n.medapp.domain.notification.NotificationTarget
-import com.kert0n.medapp.domain.notification.NoticeDelivery
 import com.kert0n.medapp.domain.notification.NotificationChannel
 import com.kert0n.medapp.domain.notification.NotificationReadiness
-import com.kert0n.medapp.domain.intake.IntakeProjection
 import com.kert0n.medapp.domain.value.Dose
-import com.kert0n.medapp.domain.intake.IntakeStatus
 import com.kert0n.medapp.feature.intake.IntakeConfirmation
-import com.kert0n.medapp.feature.notification.ReminderAnswering
 import com.kert0n.medapp.feature.intake.IntakeDeclining
 import com.kert0n.medapp.feature.plan.DayPlanning
 import com.kert0n.medapp.feature.time.Today
@@ -60,37 +50,8 @@ class DayPlanViewModel @Inject constructor(
     private val declining: IntakeDeclining,
     private val devicePermissions: DevicePermissions,
     private val readiness: NotificationReadiness,
-    private val reminderAnswering: ReminderAnswering,
-    private val clock: Clock,
-    reminders: ReminderStorageRepository,
-    intakes: IntakeStorageRepository,
-    courses: CourseStorageRepository
+    private val clock: Clock
 ) : ViewModel() {
-
-    /**
-     * О чём не смогли напомнить: обязательства, которые приложение не сказало, о пунктах **прошлых
-     * дней** (PLAN C1 «Полка»). Сегодняшнее уже стоит в самом дне с кнопками — второй строкой его
-     * человек читал бы как вторую дозу (разбор U5). Будущее сюда не попадает тем же правилом.
-     *
-     * Граница — день от [Today], а не `clock.instant()` при выдаче таблицы: полка меняется сменой дня,
-     * даже когда обязательства не менялись (разбор #51). Сами приёмы читаются **по номерам** —
-     * обязательство знает только его (PLAN D8), — а лечение им даёт запись эпизода.
-     */
-    private val unannounced: StateFlow<List<IntakeProjection.Scheduled>> = combine(
-        reminders.observeAwaiting(NoticeDelivery.SYSTEM)
-            .map { notices -> notices.mapNotNull { (it.target as? NotificationTarget.Intake)?.intakeId }.toSet() }
-            .distinctUntilChanged(),
-        today.observe()
-    ) { ids, day -> ids to day.date }
-        .distinctUntilChanged()
-        .flatMapLatest { (ids, date) ->
-            intakes.observeOfIds(ids).map { read ->
-                read.filterIsInstance<IntakeProjection.Scheduled>().filter { it.slot.localDate.isBefore(date) }
-            }
-        }
-        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
-
-    private val titles = courses.observeRecords().map { records -> records.associate { it.id to it.title } }
 
     private val readings = mutableMapOf<Int, StateFlow<Reading?>>()
 
@@ -139,24 +100,9 @@ class DayPlanViewModel @Inject constructor(
      * а «на этот день ничего не назначено» — это пришедшая пустая страница, а не ожидание.
      */
     fun page(daysAhead: Int): StateFlow<ScreenState<DayPagePresentationDTO>> = pages.getOrPut(daysAhead) {
-        combine(reading(daysAhead), answering, message, unannounced, titles) { reading, answering, message, notices, titles ->
+        combine(reading(daysAhead), answering, message) { reading, answering, message ->
             if (reading == null) ScreenState.Loading
-            else ScreenState.Ready(
-                reading.plan.toPresentationDTO(daysAhead, reading.zone, answering, message).copy(
-                    // Полка стоит на сегодняшней странице: это разговор о **сейчас**, а не о том,
-                    // что будет послезавтра.
-                    unannounced = if (daysAhead != 0) emptyList()
-                    else notices.mapNotNull { intake ->
-                        val title = titles[intake.courseId] ?: return@mapNotNull null
-                        intake.toDayRow(title, reading.zone, on = intake.slot.localDate).copy(
-                            isAnswering = intake.id in answering,
-                            // Пропуск неответом на полке признают: «Понятно» снимает строку, пункт
-                            // остаётся пропуском (PLAN C1 «Полка»).
-                            canAcknowledge = intake.status == IntakeStatus.MISSED
-                        )
-                    }
-                )
-            )
+            else ScreenState.Ready(reading.plan.toPresentationDTO(daysAhead, reading.zone, answering, message))
         }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), ScreenState.Loading)
     }
 
@@ -177,24 +123,6 @@ class DayPlanViewModel @Inject constructor(
             } finally {
                 // Сорвался сценарий или нет, строка должна снова принимать нажатие: иначе она
                 // останется погашенной до конца жизни экрана.
-                answering.value = answering.value - intakeId
-            }
-        }
-    }
-
-    /**
-     * «Понятно» у пропуска на полке: человек прочёл, что доза пропущена, и согласен. Снимается
-     * обещание сказать о пропуске, а сам пункт остаётся пропуском — отвечать за него «Принял»
-     * по-прежнему можно из истории лечения (PLAN C1 «Полка»). Без этого честная ошибка висела бы
-     * над каждым следующим днём до конца срока хранения.
-     */
-    fun acknowledge(intakeId: Uuid) {
-        if (intakeId in answering.value) return
-        answering.value = answering.value + intakeId
-        viewModelScope.launch {
-            try {
-                reminderAnswering.acknowledge(intakeId)
-            } finally {
                 answering.value = answering.value - intakeId
             }
         }
@@ -257,9 +185,7 @@ class DayPlanViewModel @Inject constructor(
             .flatMap { it.plan.items.asSequence() }
             .filterIsInstance<DayPlan.Item.Scheduled>()
             .map { it.intake }
-        // И среди того, о чём не смогли напомнить: эти пункты старше сегодняшней страницы, а
-        // отвечают на них там же.
-        val intake = (onPages + unannounced.value.asSequence()).firstOrNull { it.id == intakeId } ?: return null
+        val intake = onPages.firstOrNull { it.id == intakeId } ?: return null
         val pkg = intake.plannedPackage ?: return null
         return Planned(intake.courseId, intake.id, pkg.id, intake.plannedAmount)
     }

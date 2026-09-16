@@ -45,7 +45,6 @@ class DayPageScreenTest {
     private val opened = mutableListOf<DayItemPresentationDTO>()
     private val confirmed = mutableListOf<Uuid>()
     private val declined = mutableListOf<Uuid>()
-    private val acknowledged = mutableListOf<Uuid>()
     private var dismissed = 0
     private var fixedNotifications = 0
     private var fixedAlarms = 0
@@ -82,7 +81,6 @@ class DayPageScreenTest {
                     onOpen = { opened += it },
                     onConfirm = { confirmed += it },
                     onDecline = { declined += it },
-                    onAcknowledge = { acknowledged += it },
                     onDismissMessage = { dismissed++ },
                     modifier = Modifier.fillMaxSize()
                 )
@@ -94,14 +92,12 @@ class DayPageScreenTest {
         daysAhead: Int = 0,
         items: List<DayItemPresentationDTO> = emptyList(),
         alsoOnThisDay: List<DayItemPresentationDTO> = emptyList(),
-        unannounced: List<DayItemPresentationDTO> = emptyList(),
         message: DayMessage? = null
     ) = DayPagePresentationDTO(
         date = today.plusDays(daysAhead.toLong()),
         daysAhead = daysAhead,
         items = items,
         alsoOnThisDay = alsoOnThisDay,
-        unannounced = unannounced,
         message = message
     )
 
@@ -161,25 +157,6 @@ class DayPageScreenTest {
 
         compose.onNodeWithText("пропущен").assertIsDisplayed()
         compose.onNodeWithText("Принял").assertIsDisplayed()
-    }
-
-    /**
-     * **Пропуск на полке признают словом «Понятно»** (PLAN C1 «Полка»). Честно пропущенная доза
-     * иначе висела бы над каждым днём до конца срока хранения: «Принял» — неправда, а другой кнопки
-     * не было. «Принял» рядом остаётся — вдруг выпил.
-     */
-    @Test
-    fun aMissOnTheShelfIsAcknowledgedInAWord() {
-        val missed = row("Пропущен", state = DayItemPresentationDTO.State.MISSED).copy(
-            on = today.minusDays(1),
-            canAcknowledge = true
-        )
-        show(page(unannounced = listOf(missed)))
-
-        compose.onNodeWithText("Принял").assertIsDisplayed()
-        compose.onNodeWithText("Понятно").performClick()
-
-        assertEquals(listOf(missed.intakeId), acknowledged)
     }
 
     /**
@@ -350,21 +327,4 @@ class DayPageScreenTest {
         compose.onNodeWithText("Напоминания могут опаздывать").assertDoesNotExist()
     }
 
-    /**
-     * О чём не смогли напомнить — своей полкой и **первым**: человек пришёл сам, потому что телефон
-     * промолчал, и это ответ на его вопрос «что я пропустил». У вчерашнего обязательства в строке
-     * стоит его день: время без дня ничего не говорит.
-     */
-    @Test
-    fun whatCouldNotBeAnnouncedStandsFirstAndCarriesItsDay() {
-        show(
-            page(
-                items = listOf(row("Сегодняшний")),
-                unannounced = listOf(row("Вчерашний").copy(on = today.minusDays(1)))
-            )
-        )
-
-        compose.onNodeWithText("О чём не смогли напомнить").assertIsDisplayed()
-        compose.onNodeWithText("09.03.2027 · 09:00").assertIsDisplayed()
-    }
 }

@@ -4,6 +4,7 @@ import androidx.annotation.DrawableRes
 import androidx.annotation.StringRes
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
@@ -23,7 +24,6 @@ import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import com.kert0n.medapp.R
@@ -69,7 +69,6 @@ fun DayPages(
     onOpen: (DayItemPresentationDTO) -> Unit,
     onConfirm: (Uuid) -> Unit,
     onDecline: (Uuid) -> Unit,
-    onAcknowledge: (Uuid) -> Unit,
     onDismissMessage: () -> Unit,
     onFixNotifications: () -> Unit,
     onFixAlarms: () -> Unit,
@@ -78,7 +77,7 @@ fun DayPages(
     val pager = rememberPagerState(pageCount = { DAYS_AHEAD + 1 })
     HorizontalPager(state = pager, modifier = modifier.fillMaxSize()) { daysAhead ->
         val state = page(daysAhead)
-        DayPage(state, permissions, onOpen, onConfirm, onDecline, onAcknowledge, onFixNotifications, onFixAlarms)
+        DayPage(state, permissions, onOpen, onConfirm, onDecline, onFixNotifications, onFixAlarms)
         // Записать не вышло — сказано словами: молчание после нажатия человек читает как успех.
         (state as? ScreenState.Ready)?.value?.message?.let {
             AlertDialog(
@@ -94,7 +93,7 @@ fun DayPages(
 
 /** Слова беды подбирает экран: причина — значение, и текст к ней живёт в `R.string.*` (PLAN H1). */
 @Composable
-private fun DayMessage.words(): String = when (this) {
+internal fun DayMessage.words(): String = when (this) {
     is DayMessage.Refused -> stringResource(reason.text)
     DayMessage.AlreadyAnswered -> stringResource(R.string.intake_already_answered)
     DayMessage.EpisodeClosed -> stringResource(R.string.intake_episode_closed)
@@ -109,7 +108,6 @@ private fun DayPage(
     onOpen: (DayItemPresentationDTO) -> Unit,
     onConfirm: (Uuid) -> Unit,
     onDecline: (Uuid) -> Unit,
-    onAcknowledge: (Uuid) -> Unit,
     onFixNotifications: () -> Unit,
     onFixAlarms: () -> Unit
 ) {
@@ -162,22 +160,7 @@ private fun DayPage(
             contentPadding = PaddingValues(start = 16.dp, end = 16.dp, bottom = 88.dp),
             verticalArrangement = Arrangement.spacedBy(8.dp)
         ) {
-            // О чём не смогли напомнить — первым: человек пришёл сам, потому что телефон
-            // промолчал, и это ответ на его вопрос «что я пропустил» (PLAN H3 «Уведомления»).
-            if (day.unannounced.isNotEmpty()) {
-                item(key = "unannounced") {
-                    Text(
-                        stringResource(R.string.plan_unannounced),
-                        style = MaterialTheme.typography.titleSmall,
-                        color = MaterialTheme.colorScheme.primary,
-                        modifier = Modifier.padding(top = 8.dp)
-                    )
-                }
-                items(day.unannounced, key = { "unannounced-" + it.key }) { item ->
-                    DayCard(item, onOpen, onConfirm, onDecline, onAcknowledge)
-                }
-            }
-            items(day.items, key = { it.key }) { item -> DayCard(item, onOpen, onConfirm, onDecline, onAcknowledge = {}) }
+            items(day.items, key = { it.key }) { item -> DayCard(item, onOpen, onConfirm, onDecline) }
             shelf(R.string.plan_day_also, day.alsoOnThisDay, onOpen)
         }
     }
@@ -213,7 +196,7 @@ private fun LazyListScope.shelf(
             modifier = Modifier.padding(top = 8.dp)
         )
     }
-    items(items, key = { it.key }) { item -> DayCard(item, onOpen, onConfirm = {}, onDecline = {}, onAcknowledge = {}) }
+    items(items, key = { it.key }) { item -> DayCard(item, onOpen, onConfirm = {}, onDecline = {}) }
 }
 
 /**
@@ -232,12 +215,11 @@ private fun LazyListScope.shelf(
  * наспех.
  */
 @Composable
-private fun DayCard(
+internal fun DayCard(
     item: DayItemPresentationDTO,
     onOpen: (DayItemPresentationDTO) -> Unit,
     onConfirm: (Uuid) -> Unit,
-    onDecline: (Uuid) -> Unit,
-    onAcknowledge: (Uuid) -> Unit
+    onDecline: (Uuid) -> Unit
 ) {
     val intakeId = item.intakeId
     ElevatedCard(
@@ -253,7 +235,13 @@ private fun DayCard(
             // Текст забирает остаток ширины, действия меряются своими словами: вес на кнопке
             // уравнял бы их и порезал текст (замечание владельца 2026-09-16).
             Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(4.dp)) {
-                Row(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.CenterVertically) {
+                // Переносится, а не сжимается: в узком окне (попап пропущенного, Sm29, крупный шрифт)
+                // метка иначе получала нулевую ширину и вставала столбиком по букве (снимок BigLatest).
+                FlowRow(
+                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                    verticalArrangement = Arrangement.spacedBy(4.dp),
+                    itemVerticalAlignment = Alignment.CenterVertically
+                ) {
                     // День стоит у строки, только если он не сегодняшний: у вчерашнего
                     // обязательства время без дня ничего не говорит.
                     Text(
@@ -273,7 +261,7 @@ private fun DayCard(
             }
             // Действия — столбиком справа и по центру: одно действие не заводит под себя целую
             // новую строку и не растягивает карточку.
-            if (intakeId != null && (item.canDecline || item.canConfirm || item.canAcknowledge)) {
+            if (intakeId != null && (item.canDecline || item.canConfirm)) {
                 Column(
                     horizontalAlignment = Alignment.End,
                     verticalArrangement = Arrangement.spacedBy(4.dp)
@@ -286,11 +274,6 @@ private fun DayCard(
                     if (item.canDecline) {
                         TextButton(onClick = { onDecline(intakeId) }, enabled = !item.isAnswering) {
                             Text(stringResource(R.string.intake_decline))
-                        }
-                    }
-                    if (item.canAcknowledge) {
-                        TextButton(onClick = { onAcknowledge(intakeId) }, enabled = !item.isAnswering) {
-                            Text(stringResource(R.string.intake_acknowledge_miss))
                         }
                     }
                 }
@@ -335,5 +318,5 @@ private val DayItemPresentationDTO.State.icon: Int
  * Чем строка отличается от соседних в списке. У пункта за окном календаря записи ещё нет, и
  * своего номера тоже: его называют лечение и время, которых на день приходится не больше одного.
  */
-private val DayItemPresentationDTO.key: String
+internal val DayItemPresentationDTO.key: String
     get() = intakeId?.toString() ?: "$courseId-$at"

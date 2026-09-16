@@ -37,6 +37,8 @@ import com.kert0n.medapp.presentation.intake.IntakeHistoryViewModel
 import com.kert0n.medapp.domain.notification.NotificationTarget
 import com.kert0n.medapp.presentation.notification.ExpiringTodayViewModel
 import com.kert0n.medapp.presentation.plan.DayPlanViewModel
+import com.kert0n.medapp.presentation.plan.MissedIntakesViewModel
+import com.kert0n.medapp.ui.plan.MissedIntakesPopup
 import com.kert0n.medapp.ui.intake.IntakeCardScreen
 import com.kert0n.medapp.ui.openExactAlarmSettings
 import com.kert0n.medapp.ui.openNotificationSettings
@@ -140,12 +142,26 @@ fun MedAppShell(
         // живёт и в глубине: вернулся — попап на месте, с живым содержимым.
         val expiring: ExpiringTodayViewModel = hiltViewModel()
         val expiringState = expiring.state.collectAsStateWithLifecycle().value
+        // Попап пропущенного — последний шанс ответить за прошлые дни (PLAN C1): там же, на
+        // местах, и после новости о сроке — два окна разом человек не читает.
+        val missed: MissedIntakesViewModel = hiltViewModel()
+        val missedState = missed.state.collectAsStateWithLifecycle().value
         if (stacks.screen in PLACES) {
-            ExpiringTodayPopup(
-                state = expiringState,
-                onOpenPackage = { stacks.go(Screen.PackageCard(it)) },
-                onDismiss = expiring::dismiss
-            )
+            if (!expiringState.isEmpty) {
+                ExpiringTodayPopup(
+                    state = expiringState,
+                    onOpenPackage = { stacks.go(Screen.PackageCard(it)) },
+                    onDismiss = expiring::dismiss
+                )
+            } else {
+                MissedIntakesPopup(
+                    state = missedState,
+                    onOpen = { row -> row.intakeId?.let { stacks.go(Screen.IntakeCard(it)) } },
+                    onConfirm = missed::confirm,
+                    onDismiss = missed::dismiss,
+                    onDismissMessage = missed::dismissMessage
+                )
+            }
         }
     }
 }
@@ -339,7 +355,6 @@ private fun screens(stacks: TabStacks, planMode: MutableState<PlanMode>) = entry
             onOpenIntake = { item -> item.intakeId?.let { stacks.go(Screen.IntakeCard(it)) } },
             onConfirmIntake = days::confirm,
             onDeclineIntake = days::decline,
-            onAcknowledgeIntake = days::acknowledge,
             onDismissDayMessage = days::dismissMessage,
             onFixNotifications = context::openNotificationSettings,
             onFixAlarms = context::openExactAlarmSettings,

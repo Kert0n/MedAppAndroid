@@ -252,8 +252,8 @@ class ReminderOutboxTest {
 
     /**
      * **В шторку — только в свой день** (PLAN C1). Максим три дня жил с запретом и в среду его снял.
-     * Утренний приём и сегодняшняя сводка ещё о сегодня — их сказать стоит. Вчерашний пропуск — уже
-     * нет: в шторке он утонул бы среди сегодняшнего, а прочесть и ответить его можно на полке дня.
+     * Утренний приём ещё о сегодня — его сказать стоит. Вчерашняя сводка — уже нет: в шторке она
+     * утонула бы среди сегодняшнего и открыла бы день, которого нет.
      * Непоказанное за пределом остаётся ждать полку, а не снимается. Очередь, ждущая решения, —
      * без предела: решать её нужно и назавтра.
      *
@@ -262,11 +262,7 @@ class ReminderOutboxTest {
     @Test
     fun onlyTodaysNewsIsToldOnceSpeakingIsAllowedAgain() = runTest {
         val yesterday = now.minus(java.time.Duration.ofHours(14))
-        val missed = Reminder(
-            NotificationKey.intake(Uuid.random(), NotificationKind.INTAKE_MISSED),
-            NotificationTarget.Intake(Uuid.random()),
-            yesterday
-        )
+        val missed = digest(day = LocalDate.of(2027, 3, 9), at = yesterday)
         val morning = intake(at = now.minusSeconds(3600))
         val queue = Reminder(NotificationKey.sync(Uuid.random()), NotificationTarget.SyncStatus, yesterday)
         scenarios.reminderStore.saveAll(listOf(missed, morning, queue))
@@ -278,7 +274,7 @@ class ReminderOutboxTest {
 
         assertEquals(setOf(morning.key, queue.key), scenarios.notifier.shown.map { it.key }.toSet())
         assertEquals(
-            "вчерашнее не сказано, но ждёт полки дня",
+            "вчерашнее не сказано и не снято: его судьбу решает сверка",
             Reminder.State.DUE,
             requireNotNull(scenarios.reminderStore.find(missed.key)).state
         )

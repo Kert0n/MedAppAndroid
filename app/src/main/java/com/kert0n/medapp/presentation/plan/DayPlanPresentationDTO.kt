@@ -23,16 +23,10 @@ data class DayPagePresentationDTO(
     val daysAhead: Int,
     val items: List<DayItemPresentationDTO>,
     val alsoOnThisDay: List<DayItemPresentationDTO>,
-    /**
-     * О чём не смогли напомнить: обязательства, которые приложение не сказало вовремя — телефон
-     * молчал, а человек пришёл сам (PLAN D8, H3 «Уведомления на экране»). Отвечают на них теми же
-     * двумя кнопками: отдельного листа для этого не заводится.
-     */
-    val unannounced: List<DayItemPresentationDTO> = emptyList(),
     /** Чем кончился ответ, если по самой странице этого не видно (PLAN U1). */
     val message: DayMessage? = null
 ) {
-    val isEmpty: Boolean get() = items.isEmpty() && alsoOnThisDay.isEmpty() && unannounced.isEmpty()
+    val isEmpty: Boolean get() = items.isEmpty() && alsoOnThisDay.isEmpty()
 }
 
 /**
@@ -94,9 +88,7 @@ data class DayItemPresentationDTO(
     val answeredAt: LocalTime?,
     /** Есть ли у пункта плановая пачка: без неё быстрый ответ брать неоткуда (PLAN D5). */
     val hasPlannedPackage: Boolean = false,
-    val isAnswering: Boolean = false,
-    /** Пропуск неответом на полке: «Понятно» снимает строку, а пункт не трогает (PLAN C1 «Полка»). */
-    val canAcknowledge: Boolean = false
+    val isAnswering: Boolean = false
 ) {
 
     /**

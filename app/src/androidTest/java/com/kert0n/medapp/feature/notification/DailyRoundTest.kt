@@ -86,9 +86,14 @@ class DailyRoundTest {
             .filter { it.state == com.kert0n.medapp.domain.notification.Reminder.State.DUE }
             .map { Uuid.parse(it.key.subject) }.toSet()
         assertEquals(byDay.filterKeys { it != start }.values.map { it.id }.toSet(), owed)
-        // Сказано: пропуск и срок источника за день. Приёмы ещё впереди, сводка — к своему часу.
-        assertEquals(setOf(NotificationKind.INTAKE_MISSED, NotificationKind.EXPIRY_SOURCE_1D), nextMorning.notifier.shown.map { it.kind }.toSet())
-        assertEquals(2, delivered.shown)
+        // В шторку сказан срок источника за день. Пропуск ждёт попапа пропущенного при входе, а не
+        // шторки (C1 «Попап пропущенного»); приёмы ещё впереди, сводка — к своему часу.
+        assertEquals(setOf(NotificationKind.EXPIRY_SOURCE_1D), nextMorning.notifier.shown.map { it.kind }.toSet())
+        assertEquals(1, delivered.shown)
+        assertEquals(
+            listOf(NotificationKind.INTAKE_MISSED),
+            nextMorning.reminderStore.awaiting(com.kert0n.medapp.domain.notification.NoticeDelivery.IN_APP_BANNER).map { it.kind }
+        )
         assertEquals(1, nextMorning.reminderStore.ofKinds(listOf(NotificationKind.DAILY_DIGEST)).size)
         // Будильник один, и он на ближайший невыполненный срок — сегодняшний приём в 09:00 МСК.
         assertEquals(byDay.getValue(start.plusDays(1)).plannedAt, nextMorning.reminders.wakeAt)
@@ -98,7 +103,7 @@ class DailyRoundTest {
         val again = nextMorning.dailyRound.run()
         assertEquals(0, again.missed)
         assertEquals(0, nextMorning.reminderOutbox.pass().shown)
-        assertEquals(2, nextMorning.notifier.shown.size)
+        assertEquals(1, nextMorning.notifier.shown.size)
     }
 
     /** Без лечения и с годными коробками проход молчит, ничего не обещает и не будит — счастливый путь. */

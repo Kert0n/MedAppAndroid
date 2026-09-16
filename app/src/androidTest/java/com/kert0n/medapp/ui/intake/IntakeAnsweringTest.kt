@@ -89,11 +89,7 @@ class IntakeAnsweringTest {
         declining = scenarios.intakeDeclining,
         devicePermissions = AllAllowed,
         readiness = AllAllowed,
-        reminderAnswering = scenarios.reminderAnswering,
-        clock = clock,
-        reminders = scenarios.reminderStore,
-        intakes = database.intakeRepository(),
-        courses = database.courseRepository()
+        clock = clock
     ).also { opened += it }
 
     private fun cardModel(intakeId: Uuid) = IntakeCardViewModel(
@@ -310,34 +306,4 @@ class IntakeAnsweringTest {
         val PATIENTLY: Duration = 15.seconds
     }
 
-    /**
-     * Телефон промолчал — день говорит сам: вчерашний пункт, о котором не смогли напомнить, стоит
-     * полкой и отвечается там же. Без неё вчерашний приём человек не нашёл бы вовсе: страница дня
-     * листается только вперёд (PLAN D8, H3 «Уведомления на экране»).
-     *
-     * На полке — только **прошлые дни** (PLAN C1 «Полка»): сегодняшнее уже стоит в самом дне, а
-     * будущее ещё не наступило. Обязательство заводит календарь при начале лечения — проверка его
-     * руками не пишет, иначе проверяла бы состояние, которого приложение не создаёт (разбор U5).
-     */
-    @Test
-    fun theDayShowsWhatCouldNotBeAnnouncedAndTakesTheAnswerThere(): Unit = runBlocking {
-        val courseId = started()
-        val intakeId = firstIntake(courseId).id
-        val model = dayModel(Clock.fixed(now.plus(java.time.Duration.ofDays(1)), ZoneOffset.UTC))
-
-        watching(model.page(0)) { page ->
-            val shown = page.awaiting(PATIENTLY) { state ->
-                state.ready()?.unannounced.orEmpty().any { it.intakeId == intakeId }
-            }
-            // Сегодняшние и завтрашние пункты сюда не попадают: они в своих днях.
-            assertEquals(listOf(intakeId), shown.ready()?.unannounced.orEmpty().map { it.intakeId })
-            model.confirm(intakeId)
-            // Отвеченное уходит из полки: напоминать о нём больше нечего (PLAN D8).
-            page.awaiting(PATIENTLY) { state ->
-                state.ready()?.unannounced.orEmpty().none { it.intakeId == intakeId }
-            }
-        }
-
-        assertEquals(IntakeStatus.TAKEN, database.intakeRepository().find(intakeId)?.status)
-    }
 }

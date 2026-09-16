@@ -1,6 +1,5 @@
 package com.kert0n.medapp.app.navigation
 
-import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.junit4.v2.createAndroidComposeRule
 import androidx.compose.ui.test.onAllNodesWithText
 import androidx.compose.ui.test.onFirst
@@ -46,7 +45,6 @@ import kotlin.uuid.Uuid
 import kotlinx.coroutines.runBlocking
 import org.junit.After
 import org.junit.Assert.assertEquals
-import org.junit.Assert.assertTrue
 import org.junit.Before
 import org.junit.Rule
 import org.junit.Test
@@ -98,36 +96,6 @@ class SilentPhoneStoryTest {
     }
 
     /**
-     * **Максим** — «отмахнулся от разрешения» (`docs/истории.md`): он ждал сигнала три дня, а
-     * телефон молчал, и на третий открыл приложение сам.
-     *
-     * Стережёт: день говорит **почему** молчал и **что** пропущено, и отвечается это там же —
-     * страница листается только вперёд, и без полки прошлые приёмы недосягаемы.
-     */
-    @Test
-    fun maximForgotToAllowNotificationsAndMeetsThreeSilentDays() {
-        TestPermissions.notifications = false
-        val courseId = treatmentStartedThreeDaysAgo()
-        val overdue = overdueIntakes(courseId)
-        assertTrue("завязка без пропусков: проверять нечего", overdue.size >= 2)
-        promiseWeFailedToTell(overdue)
-        start()
-
-        // Первое, что он видит на дне, — почему телефон молчал.
-        openTheDay()
-        compose.onNodeWithText("Напоминания не приходят").assertIsDisplayed()
-
-        // И что именно пропустил: обязательства стоят полкой, каждое со своим днём.
-        compose.waitUntil(WAIT) {
-            compose.onAllNodesWithText("О чём не смогли напомнить").fetchSemanticsNodes().isNotEmpty()
-        }
-        compose.onAllNodesWithText("Принял").onFirst().performClick()
-
-        // Ответ записан по-настоящему: коробка похудела на дозу.
-        compose.waitUntil(WAIT) { runBlocking { spent() == tablets("18") } }
-    }
-
-    /**
      * **Ольга** — «попала пальцем не туда» (`docs/истории.md`): тянулась к «Принял», попала в
      * «Пропустил», а таблетку выпила.
      *
@@ -156,35 +124,6 @@ class SilentPhoneStoryTest {
                 .count { it.status == IntakeStatus.TAKEN }
             assertEquals("исправленный приём не записан", 1, taken)
         }
-    }
-
-    /**
-     * **Тимур** — «три дня без связи» (`docs/истории.md`): лекарства пил, а отмечать было негде.
-     *
-     * Стережёт две меры: на полке — только наступившее (о завтрашнем скажут завтра), и отвечается
-     * оно по одному — за каждой дозой стоит таблетка, и врать о них разом легче, чем по одной
-     * (PLAN D6).
-     */
-    @Test
-    fun timurReturnsFromATripToWhatHasPiledUp() {
-        val courseId = treatmentStartedThreeDaysAgo()
-        val overdue = overdueIntakes(courseId)
-        promiseWeFailedToTell(overdue)
-        start()
-        openTheDay()
-
-        compose.waitUntil(WAIT) {
-            compose.onAllNodesWithText("О чём не смогли напомнить").fetchSemanticsNodes().isNotEmpty()
-        }
-        val piled = compose.onAllNodesWithText("Принял").fetchSemanticsNodes().size
-        assertTrue("накопившегося не видно: $piled", piled >= 2)
-
-        // Отвечает он по одному, и записывается ровно один приём: накопившееся не сваливается
-        // в кучу «отметить всё» — за каждым стоит своя доза (PLAN D6).
-        compose.onAllNodesWithText("Принял").onFirst().performClick()
-        compose.waitUntil(WAIT) { runBlocking { takenCount(courseId) == 1 } }
-        // Остальное ждёт на той же полке: разговор не окончен.
-        compose.onNodeWithText("О чём не смогли напомнить").assertIsDisplayed()
     }
 
     /** Лечение, начатое три дня назад: пункты прошлых дней остались без ответа и стали пропусками. */

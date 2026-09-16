@@ -4,6 +4,7 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.kert0n.medapp.domain.notification.NoticeDelivery
 import com.kert0n.medapp.domain.notification.NotificationKey
+import com.kert0n.medapp.domain.notification.NotificationKind
 import com.kert0n.medapp.domain.notification.NotificationTarget
 import com.kert0n.medapp.feature.notification.ReminderOutbox
 import com.kert0n.medapp.presentation.pack.PackagePresentationDTO
@@ -19,6 +20,7 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.flatMapLatest
 import kotlinx.coroutines.flow.flowOf
+import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
@@ -55,7 +57,9 @@ class ExpiringTodayViewModel @Inject constructor(
      */
     private val shown = MutableStateFlow<Set<NotificationKey>>(emptySet())
 
+    /** Баннеры приложения — только свои: пропуски приходят своим попапом и этим крестиком не закрываются. */
     private val awaiting = reminders.observeAwaiting(NoticeDelivery.IN_APP_BANNER)
+        .map { notices -> notices.filter { it.key.kind == NotificationKind.EXPIRY_TODAY } }
 
     val state: StateFlow<ExpiringTodayUiState> = combine(awaiting, dismissed) { notices, dismissed ->
         notices.filter { it.key !in dismissed }
