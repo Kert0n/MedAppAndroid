@@ -62,6 +62,25 @@ class PackageIdentityTest {
         pack(quantity = Quantity.zero(TABLETS))
     }
 
+    /**
+     * У проекции два имени одного и того же — `id` и `ref.id`, — и разойтись им нельзя: собранная
+     * с чужой ссылкой, она даёт одну коробку на проверку годности и другую на запись. Правило
+     * стоит рядом с тем, о чём говорит, — в конструкторе величины, как и «доступность принадлежит
+     * своей пачке».
+     */
+    @Test(expected = IllegalArgumentException::class)
+    fun aProjectionCannotCarryAnotherBoxesReference() {
+        val box = pack(id = PACK, quantity = tablets("20"))
+        val projection = box.projection(
+            availability = PackageAvailability(box, effective = tablets("20")),
+            hasUnconfirmedChanges = false,
+            holdingCourseId = null,
+            lastUsedAt = null
+        )
+
+        projection.copy(ref = pack(id = Uuid.random(), quantity = tablets("5")).ref)
+    }
+
     @Test
     fun renamedKitIsTheSameKit() {
         val created = MedKit(HOME_KIT, "Домашняя", null, MedKit.Publication.LOCAL, 1, Instant.EPOCH)

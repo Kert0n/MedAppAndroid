@@ -1,6 +1,7 @@
 package com.kert0n.medapp.feature.course
 
 import com.kert0n.medapp.queue.Transactions
+import com.kert0n.medapp.queue.readThisTransaction
 import com.kert0n.medapp.storage.course.CourseStorageRepository
 import javax.inject.Inject
 import kotlin.uuid.Uuid
@@ -18,9 +19,20 @@ class CourseRenaming @Inject constructor(
     private val transactions: Transactions
 ) {
 
-    /** Длину названия и заметки держит сама запись; здесь — только дверь к ней. */
+    /**
+     * Длину названия и заметки держит сама запись. Переход применяется к записи, прочитанной
+     * **этой же** транзакцией (PLAN F5): ноль изменённых строк после такого чтения незаконен, о
+     * чём и говорит [readThisTransaction].
+     *
+     * Записью сущности целиком это не делается и порт остаётся узким: общая запись вернула бы
+     * законченному лечению открытое состояние, а прочитанному когда-то экраном — его прежнее
+     * назначение (F5). Хранение пишет ровно названное.
+     */
     suspend fun rename(id: Uuid, title: String, note: String?): Outcome = transactions.run {
-        if (courses.rename(id, title, note)) Outcome.RENAMED else Outcome.GONE
+        val record = courses.findRecord(id) ?: return@run Outcome.GONE
+        val renamed = record.rename(title, note)
+        courses.rename(renamed.id, renamed.title, renamed.note).readThisTransaction("запись эпизода")
+        Outcome.RENAMED
     }
 
     /** Чем кончилось: переименовали; эпизода нет — показывать и править уже нечего. */

@@ -37,6 +37,7 @@ data class PackageProjection(
 ) {
     init {
         require(availability.packageId == id) { "доступность принадлежит своей пачке" }
+        require(ref.id == id) { "ссылка принадлежит своей пачке" }
     }
 
     val name: String get() = facts.name

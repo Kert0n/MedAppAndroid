@@ -103,6 +103,8 @@ class FakeCourseStorage : CourseStorageRepository {
     override suspend fun findRecord(id: Uuid): CourseRecord? = records[id]
 
     override suspend fun rename(id: Uuid, title: String, note: String?): Boolean {
+        // Названные колонки — и только они: у подделки записать их можно лишь целой записью,
+        // остальное в ней остаётся прежним. Переход применяет сценарий (PLAN F5).
         val record = records[id] ?: return false
         records[id] = record.rename(title, note)
         changed()

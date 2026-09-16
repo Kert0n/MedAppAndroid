@@ -543,18 +543,6 @@ class TransactionBoundariesTest {
         assertEquals(activation.record.prescription, record.prescription)
     }
 
-    /** Название эпизода — правило записи, и оно стоит до SQL: пустое имя в базу не попадает. */
-    @Test
-    fun blankTitleIsRejectedBeforeItReachesTheRow() = runTest {
-        val activation = draft()
-        courses.activate(activation)
-
-        val refusal = runCatching { courses.rename(COURSE, "   ", note = null) }.exceptionOrNull()
-
-        assertEquals(IllegalArgumentException::class, refusal!!::class)
-        assertEquals(activation.record.title, requireNotNull(courses.findRecord(COURSE)).title)
-    }
-
     private fun confirmedOutcome() = IntakeOutcome(
         intake = plannedIntake().confirm(paracetamol.take(dose("2"), LATER).getOrThrow()),
         expected = setOf(IntakeStatus.PLANNED),
