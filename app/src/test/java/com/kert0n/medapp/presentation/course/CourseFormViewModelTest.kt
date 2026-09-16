@@ -2,7 +2,10 @@ package com.kert0n.medapp.presentation.course
 
 import com.kert0n.medapp.domain.course.Revision
 import com.kert0n.medapp.feature.course.CourseActivation
+import com.kert0n.medapp.feature.course.CourseAmendment
 import com.kert0n.medapp.feature.course.CourseCalendar
+import com.kert0n.medapp.feature.course.CourseClosing
+import com.kert0n.medapp.feature.course.CourseRenaming
 import com.kert0n.medapp.feature.course.CourseDrafting
 import com.kert0n.medapp.feature.course.CourseFollowing
 import com.kert0n.medapp.feature.notification.ReminderPromising
@@ -65,6 +68,8 @@ class CourseFormViewModelTest {
         CourseFormViewModel(
             drafting = CourseDrafting(courses, packages, transactions, clock),
             activation = activation(transactions),
+            amendment = amendment(transactions),
+            renaming = CourseRenaming(courses, transactions),
             courses = courses,
             vocabulary = FakeVocabulary(),
             courseId = courseId
@@ -76,21 +81,34 @@ class CourseFormViewModelTest {
      * `CourseFormActivationTest` над Room. Соседи сценария поэтому — подделки, которые падают,
      * если их всё-таки позвать.
      */
-    private fun activation(transactions: Transactions): CourseActivation {
-        val calendar = CourseCalendar(
+    /** Изменение идущего лечения проверяется над Room (`CourseAmendmentTest`): здесь оно не зовётся. */
+    private fun amendment(transactions: Transactions): CourseAmendment {
+        val calendar = calendar(transactions)
+        return CourseAmendment(
+            courses,
             UnaskedIntakes,
             packages,
-            ReminderPromising(UnaskedReminders, QuietNotificationSettings, transactions),
-            ReminderWithdrawal(UnaskedReminders, transactions)
-        )
-        return CourseActivation(
-            courses,
-            packages,
             calendar,
-            CourseFollowing(courses, packages, calendar, QueueService(transactions, FakeQueue()), transactions),
+            CourseClosing(courses, following(transactions, calendar), ReminderWithdrawal(UnaskedReminders, transactions)),
+            following(transactions, calendar),
             transactions,
             clock
         )
+    }
+
+    private fun calendar(transactions: Transactions) = CourseCalendar(
+        UnaskedIntakes,
+        packages,
+        ReminderPromising(UnaskedReminders, QuietNotificationSettings, transactions),
+        ReminderWithdrawal(UnaskedReminders, transactions)
+    )
+
+    private fun following(transactions: Transactions, calendar: CourseCalendar) =
+        CourseFollowing(courses, packages, calendar, QueueService(transactions, FakeQueue()), transactions)
+
+    private fun activation(transactions: Transactions): CourseActivation {
+        val calendar = calendar(transactions)
+        return CourseActivation(courses, packages, calendar, following(transactions, calendar), transactions, clock)
     }
 
     /** Черновик с одним названием и заметкой — законная запись: «записал у врача, куплю завтра» (D5). */

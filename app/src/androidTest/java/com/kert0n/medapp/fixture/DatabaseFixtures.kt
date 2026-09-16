@@ -180,6 +180,7 @@ class Scenarios(
         medKits, packages, packageRelocation, queue, transactions, clock
     )
     val courseDrafting = com.kert0n.medapp.feature.course.CourseDrafting(courses, packages, transactions, clock)
+    val courseRenaming = com.kert0n.medapp.feature.course.CourseRenaming(courses, transactions)
     val packageAdjusting = com.kert0n.medapp.feature.packages.PackageAdjusting(packages, courseFollowing, queue, transactions, clock)
     val unplannedIntakeRecording = com.kert0n.medapp.feature.intake.UnplannedIntakeRecording(
         database.intakeRepository(), courses, packages, courseFollowing, queue, transactions, clock

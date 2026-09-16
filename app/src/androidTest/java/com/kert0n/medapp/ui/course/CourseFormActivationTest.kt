@@ -72,6 +72,8 @@ class CourseFormActivationTest {
     private fun model(courseId: Uuid?) = CourseFormViewModel(
         drafting = scenarios.courseDrafting,
         activation = scenarios.courseActivation,
+        amendment = scenarios.courseAmendment,
+        renaming = scenarios.courseRenaming,
         courses = database.courseRepository(),
         vocabulary = FakeVocabulary(),
         courseId = courseId

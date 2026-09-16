@@ -272,7 +272,7 @@ private fun screens(stacks: TabStacks) = entryProvider<NavKey> {
             onDismissDiscard = model::dismissDiscard,
             // Источники записанного черновика: у нового их некуда подключать — он ещё не записан.
             onSources = key.courseId?.let { { stacks.go(Screen.CourseSources(it)) } },
-            onStart = model::start,
+            onStart = model::start.takeIf { state !is CourseFormUiState.Editing || state.mode != CourseFormUiState.Mode.RUNNING },
             onBack = stacks::back
         )
     }

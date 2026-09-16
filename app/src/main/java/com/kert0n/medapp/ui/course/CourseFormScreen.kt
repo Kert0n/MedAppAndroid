@@ -92,7 +92,11 @@ fun CourseFormScreen(
                 title = {
                     Text(
                         stringResource(
-                            if (editing?.mode == CourseFormUiState.Mode.DRAFT) R.string.course_edit else R.string.course_new
+                            when (editing?.mode) {
+                                CourseFormUiState.Mode.DRAFT -> R.string.course_edit
+                                CourseFormUiState.Mode.RUNNING -> R.string.course_change
+                                else -> R.string.course_new
+                            }
                         )
                     )
                 },
@@ -326,6 +330,7 @@ private fun CourseFormError.message(): String = when (this) {
         name?.let { stringResource(R.string.course_source_unusable_named, it) }
             ?: stringResource(R.string.course_source_unusable)
     is CourseFormError.Rejected -> stringResource(reason.text)
+    CourseFormError.Finished -> stringResource(R.string.course_finished)
     CourseFormError.Stale -> stringResource(R.string.course_stale)
 }
 

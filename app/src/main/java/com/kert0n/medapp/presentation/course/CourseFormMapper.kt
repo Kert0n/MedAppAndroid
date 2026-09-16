@@ -1,6 +1,10 @@
 package com.kert0n.medapp.presentation.course
 
 import com.kert0n.medapp.domain.course.CourseDraftProjection
+import com.kert0n.medapp.domain.course.CourseProjection
+import com.kert0n.medapp.domain.course.CourseRecordProjection
+import com.kert0n.medapp.domain.course.Prescription
+import com.kert0n.medapp.feature.course.CourseAmendment
 import com.kert0n.medapp.domain.course.CourseRecord
 import com.kert0n.medapp.domain.course.CourseSchedule
 import com.kert0n.medapp.domain.value.DosageForm
@@ -121,3 +125,35 @@ data class CourseDescription(
 )
 
 private fun rejected(error: CourseFormError): ParsedInput<CourseDescription, CourseFormError> = ParsedInput.Rejected(error)
+
+/**
+ * Идущее лечение — обратно в форму: название и заметку помнит запись эпизода, а назначение —
+ * план. Человек правит то, что видит (PLAN D5).
+ */
+fun CourseRecordProjection.toFormPresentationDTO(plan: CourseProjection): CourseFormPresentationDTO {
+    val prescription = plan.prescription
+    return CourseFormPresentationDTO(
+        title = title,
+        note = note.orEmpty(),
+        doseAmount = prescription.dose.quantity.toPresentationDTO().amount,
+        unit = prescription.dose.unit.toPresentationDTO(),
+        form = prescription.form.toPresentationDTO(),
+        start = prescription.schedule.start,
+        days = prescription.schedule.daysOfWeek,
+        times = prescription.schedule.times,
+        totalDoses = prescription.totalDoses.count.toString(),
+        zone = prescription.schedule.zone
+    )
+}
+
+/**
+ * Что человек изменил в назначении идущего лечения: **только тронутое**. Нетронутое поле
+ * сценарию не называют — иначе каждая правка выглядела бы сменой всего назначения, а прошлые
+ * пункты и брони пересчитывались бы без причины (PLAN D5, C1 «Изменение лечения»).
+ */
+fun CourseDescription.changesSince(prescription: Prescription): List<CourseAmendment.Change> = buildList {
+    dose?.takeIf { it != prescription.dose }?.let { add(CourseAmendment.Change.SetDose(it)) }
+    form?.takeIf { it != prescription.form }?.let { add(CourseAmendment.Change.SetForm(it)) }
+    schedule?.takeIf { it != prescription.schedule }?.let { add(CourseAmendment.Change.SetSchedule(it)) }
+    totalDoses?.takeIf { it != prescription.totalDoses }?.let { add(CourseAmendment.Change.SetTotalDoses(it)) }
+}

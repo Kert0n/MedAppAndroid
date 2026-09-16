@@ -56,6 +56,11 @@ sealed interface CourseFormError {
         override val field: Field get() = Field.NONE
     }
 
+    /** Лечение уже закончено: править назначение у него нечего — история остаётся как есть. */
+    data object Finished : CourseFormError {
+        override val field: Field get() = Field.NONE
+    }
+
     /** Черновик правили с другого экрана: то, что здесь, устарело, и писать поверх нельзя (PLAN F5). */
     data object Stale : CourseFormError {
         override val field: Field get() = Field.NONE

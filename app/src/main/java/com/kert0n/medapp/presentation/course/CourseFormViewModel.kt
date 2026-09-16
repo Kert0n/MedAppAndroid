@@ -3,8 +3,12 @@ package com.kert0n.medapp.presentation.course
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.kert0n.medapp.domain.course.CourseDraftProjection
+import com.kert0n.medapp.domain.course.CourseProjection
+import com.kert0n.medapp.domain.course.CourseRecordProjection
 import com.kert0n.medapp.feature.course.CourseActivation
+import com.kert0n.medapp.feature.course.CourseAmendment
 import com.kert0n.medapp.feature.course.CourseDrafting
+import com.kert0n.medapp.feature.course.CourseRenaming
 import com.kert0n.medapp.presentation.ParsedInput
 import com.kert0n.medapp.presentation.value.FormPresentationDTO
 import com.kert0n.medapp.presentation.value.UnitPresentationDTO
@@ -38,6 +42,8 @@ import kotlinx.coroutines.launch
 class CourseFormViewModel @AssistedInject constructor(
     private val drafting: CourseDrafting,
     private val activation: CourseActivation,
+    private val amendment: CourseAmendment,
+    private val renaming: CourseRenaming,
     private val courses: CourseStorageRepository,
     private val vocabulary: VocabularyStorageRepository,
     @Assisted private val courseId: Uuid?
@@ -114,19 +120,76 @@ class CourseFormViewModel @AssistedInject constructor(
         }
     }
 
+    /**
+     * Что открыто — черновик или идущее лечение, — экран узнаёт у базы: у ключа маршрута номер
+     * один на оба случая, потому что эпизод один (PLAN H3 №15).
+     */
     private suspend fun open(id: Uuid) {
         val draft = courses.observeDrafts().first().firstOrNull { it.id == id }
-        // Черновика нет — это отказ, а не пустая форма: заполненную человек сохранил бы и не
-        // понял, куда делась его правка.
-        editing.value = draft?.let {
-            val form = it.toFormPresentationDTO()
-            CourseFormUiState.Editing(form, CourseFormUiState.Mode.DRAFT, stored = it, expectedEnd = form.expectedEnd())
-        } ?: CourseFormUiState.Gone
+        if (draft != null) {
+            val form = draft.toFormPresentationDTO()
+            editing.value = CourseFormUiState.Editing(
+                form,
+                CourseFormUiState.Mode.DRAFT,
+                stored = draft,
+                expectedEnd = form.expectedEnd()
+            )
+            return
+        }
+        val plan = courses.observePlan(id).first()
+        val record = courses.observeRecord(id).first()
+        // Ни черновика, ни плана — это отказ, а не пустая форма: заполненную человек сохранил бы
+        // и не понял, куда делась его правка.
+        editing.value = if (plan != null && record != null) {
+            val form = record.toFormPresentationDTO(plan)
+            CourseFormUiState.Editing(
+                form,
+                CourseFormUiState.Mode.RUNNING,
+                plan = plan,
+                record = record,
+                expectedEnd = form.expectedEnd()
+            )
+        } else {
+            CourseFormUiState.Gone
+        }
     }
 
     private suspend fun write(saving: CourseFormUiState.Editing, described: CourseDescription) {
+        if (saving.mode == CourseFormUiState.Mode.RUNNING) {
+            editing.value = saving.amended(described)
+            return
+        }
         val written = written(saving, described) ?: return
         editing.value = saving.copy(isSaving = false, isSaved = true, stored = written)
+    }
+
+    /**
+     * Изменение идущего лечения — **тот же эпизод** (PLAN C1, D5). Название и заметка правятся у
+     * записи и назначения не касаются; из назначения уходит только тронутое. Ничего не тронуто —
+     * человеку всё равно «записано»: он нажал и ждёт ответа, а не разбора, что именно изменилось.
+     */
+    private suspend fun CourseFormUiState.Editing.amended(described: CourseDescription): CourseFormUiState {
+        val plan = checkNotNull(plan)
+        val record = checkNotNull(record)
+        if (described.title != record.title || described.note != record.note) {
+            if (renaming.rename(plan.id, described.title, described.note) == CourseRenaming.Outcome.GONE) {
+                return CourseFormUiState.Gone
+            }
+        }
+        val changes = described.changesSince(plan.prescription)
+        if (changes.isEmpty()) return copy(isSaving = false, isSaved = true)
+        return told(amendment.amend(plan.id, plan.revision, changes))
+    }
+
+    /** Чем кончилось изменение лечения: изменили; лечение этим закончилось; отказ по месту. */
+    private fun CourseFormUiState.Editing.told(outcome: CourseAmendment.Outcome): CourseFormUiState = when (outcome) {
+        // Закончилось — запись эпизода расскажет об этом карточкой; править больше нечего.
+        is CourseAmendment.Outcome.Amended, CourseAmendment.Outcome.Finished ->
+            copy(isSaving = false, isSaved = true)
+        CourseAmendment.Outcome.AlreadyFinished -> copy(isSaving = false, error = CourseFormError.Finished)
+        CourseAmendment.Outcome.Gone -> CourseFormUiState.Gone
+        CourseAmendment.Outcome.Stale -> copy(isSaving = false, error = CourseFormError.Stale)
+        is CourseAmendment.Outcome.Rejected -> copy(isSaving = false, error = CourseFormError.Rejected(outcome.reason))
     }
 
     /**
@@ -140,6 +203,8 @@ class CourseFormViewModel @AssistedInject constructor(
         val base = when (saving.mode) {
             CourseFormUiState.Mode.NEW_DRAFT -> drafting.create(described.title, described.note)
             CourseFormUiState.Mode.DRAFT -> checkNotNull(saving.stored)
+            // Идущее лечение правится изменением эпизода, а не записью черновика: сюда оно не доходит.
+            CourseFormUiState.Mode.RUNNING -> error("идущее лечение не записывается черновиком")
         }
         val edits = described.editsSince(base)
         if (edits.isEmpty()) return base
@@ -228,8 +293,11 @@ sealed interface CourseFormUiState {
     data class Editing(
         val form: CourseFormPresentationDTO,
         val mode: Mode,
-        /** Записанное, с которым сравнивают при записи: уходит только изменённое. */
+        /** Записанный черновик, с которым сравнивают при записи: уходит только изменённое. */
         val stored: CourseDraftProjection? = null,
+        /** Идущее лечение: назначение живёт в плане, название и заметка — в записи эпизода. */
+        val plan: CourseProjection? = null,
+        val record: CourseRecordProjection? = null,
         val units: List<UnitPresentationDTO> = emptyList(),
         val forms: List<FormPresentationDTO> = emptyList(),
         /** Когда ожидается последний приём по тому, что набрано; нечего считать — `null`. */
@@ -247,6 +315,10 @@ sealed interface CourseFormUiState {
         val isBusy: Boolean get() = isSaving || isDiscarding || isStarting
     }
 
-    /** Чем открыт редактор: новым черновиком, записанным черновиком. Идущее лечение — U3 №9. */
-    enum class Mode { NEW_DRAFT, DRAFT }
+    /**
+     * Чем открыт редактор: новым черновиком, записанным черновиком или идущим лечением. У
+     * идущего те же поля правят **тот же эпизод**, а не заводят новый (PLAN C1 «Изменение
+     * лечения»).
+     */
+    enum class Mode { NEW_DRAFT, DRAFT, RUNNING }
 }
