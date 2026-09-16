@@ -54,6 +54,7 @@ import java.util.Currency
 fun PackageCardScreen(
     state: PackageCardUiState,
     onEdit: () -> Unit,
+    onTake: () -> Unit,
     onRecount: () -> Unit,
     onTransfer: () -> Unit,
     onAskToRemove: () -> Unit,
@@ -106,7 +107,7 @@ fun PackageCardScreen(
                     .padding(16.dp),
                 verticalArrangement = Arrangement.spacedBy(12.dp)
             ) {
-                HowMuchIsThere(pack, state.holdingCourseTitle, state.isBusy, onRecount)
+                HowMuchIsThere(pack, state.holdingCourseTitle, state.isBusy, onTake, onRecount)
                 WhatItIs(pack)
                 DatesAndPrice(pack, state.today, state.lastUsedOn)
                 WhereItLies(pack, state.medKitName, onTransfer)
@@ -127,11 +128,15 @@ private fun HowMuchIsThere(
     pack: PackagePresentationDTO,
     holdingCourseTitle: String?,
     isBusy: Boolean,
+    onTake: () -> Unit,
     onRecount: () -> Unit
 ) {
     Section(title = stringResource(R.string.pack_how_much)) {
         Row(verticalAlignment = Alignment.CenterVertically) {
             Text(pack.effective.text(), style = MaterialTheme.typography.headlineMedium, modifier = Modifier.weight(1f))
+            // Приём и пересчёт — оба про число, и стоят у числа: одно уменьшает его по факту,
+            // другое исправляет по виду (H3 №6, «действия живут по местам»).
+            TextButton(onClick = onTake) { Text(stringResource(R.string.intake_record)) }
             TextButton(onClick = onRecount) { Text(stringResource(R.string.pack_recount)) }
         }
         if (pack.availableToMe != pack.effective) {

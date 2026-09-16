@@ -39,6 +39,7 @@ class PackageCardScreenTest {
     val compose = createComposeRule()
 
     private var edited = 0
+    private var taken = 0
     private var recounted = 0
     private var transferred = 0
     private var asked = 0
@@ -71,6 +72,7 @@ class PackageCardScreenTest {
             MedAppTheme {
                 PackageCardScreen(
                     state = state,
+                    onTake = { taken++ },
                     onEdit = { edited++ },
                     onRecount = { recounted++ },
                     onTransfer = { transferred++ },

@@ -351,6 +351,15 @@
     <string name="course_sources_add">Подключить ещё</string>
     <string name="course_sources_unsaved">Правка не записана: обеспечение пересчитается после «Сохранить».</string>
     <string name="course_cancel_already_finished">Лечение уже закончилось — отменять нечего.</string>
+    <string name="intake_unplanned_title">Принять разово</string>
+    <string name="intake_available_to_me">Доступно мне: %1$s %2$s</string>
+    <string name="intake_taken_amount">Сколько принял</string>
+    <string name="intake_record">Принять</string>
+    <string name="intake_not_enough">В коробке столько не наберётся.</string>
+    <string name="intake_package_unusable">Этой коробки больше нет.</string>
+    <string name="intake_unit_mismatch">Коробку считают в другой единице.</string>
+    <string name="intake_episode_closed">Лечение закончено: его план ответов больше не принимает.</string>
+    <string name="intake_not_a_source">Эта коробка не из источников лечения — запишите приём разовым.</string>
     <string name="course_sources_stale">Источники правили с другого экрана — список перечитан, повторите.</string>
     <string name="course_sources_empty">Пачек пока нет — подключите первую.</string>
     <string name="course_source_detach">Отвязать</string>

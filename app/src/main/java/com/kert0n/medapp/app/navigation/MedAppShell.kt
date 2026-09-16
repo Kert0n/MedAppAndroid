@@ -27,6 +27,8 @@ import com.kert0n.medapp.ui.course.CourseCardScreen
 import com.kert0n.medapp.ui.course.CourseFormScreen
 import com.kert0n.medapp.ui.course.CourseSourcesScreen
 import com.kert0n.medapp.ui.course.SourcePickingScreen
+import com.kert0n.medapp.presentation.intake.UnplannedIntakeViewModel
+import com.kert0n.medapp.ui.intake.UnplannedIntakeSheet
 import com.kert0n.medapp.ui.plan.PlanMode
 import com.kert0n.medapp.ui.plan.PlanScreen
 import androidx.compose.runtime.LaunchedEffect
@@ -184,9 +186,13 @@ private fun screens(stacks: TabStacks) = entryProvider<NavKey> {
         val state = model.state.collectAsStateWithLifecycle().value
         // Выброшенной коробке карточки нет: уходим туда, откуда пришли.
         LaunchedEffect(state.isRemoved) { if (state.isRemoved) stacks.back() }
+        // Разовый приём — лист над карточкой (H3 №10): своего места в стопке у него нет, и
+        // коробку из виду человек не теряет.
+        var taking by rememberSaveable { mutableStateOf(false) }
         PackageCardScreen(
             state = state,
             onEdit = { stacks.go(Screen.PackageForm(packageId = key.packageId)) },
+            onTake = { taking = true },
             onRecount = { stacks.go(Screen.PackageRecount(key.packageId)) },
             onTransfer = { stacks.go(Screen.PackageTransfer(key.packageId)) },
             onAskToRemove = model::askToRemove,
@@ -194,6 +200,21 @@ private fun screens(stacks: TabStacks) = entryProvider<NavKey> {
             onDismissRemoval = model::dismissRemoval,
             onBack = stacks::back
         )
+        if (taking) {
+            val intake = hiltViewModel<UnplannedIntakeViewModel, UnplannedIntakeViewModel.Factory>(
+                key = "intake-${key.packageId}",
+                creationCallback = { factory -> factory.create(key.packageId) }
+            )
+            val taken = intake.state.collectAsStateWithLifecycle().value
+            // Записано — лист закрывается: человек сказал, что хотел, а новое число покажет карточка.
+            LaunchedEffect(taken.isRecorded, taken.isGone) { if (taken.isRecorded || taken.isGone) taking = false }
+            UnplannedIntakeSheet(
+                state = taken,
+                onEdit = intake::edit,
+                onRecord = intake::record,
+                onDismiss = { taking = false }
+            )
+        }
     }
     entry<Screen.PackageRecount> { key ->
         val model = hiltViewModel<PackageRecountViewModel, PackageRecountViewModel.Factory>(
