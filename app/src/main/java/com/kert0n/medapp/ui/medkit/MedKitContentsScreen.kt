@@ -47,6 +47,7 @@ import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import com.kert0n.medapp.R
+import com.kert0n.medapp.domain.medkit.MedKit
 import com.kert0n.medapp.presentation.medkit.MedKitPresentationDTO
 import com.kert0n.medapp.presentation.pack.MedKitContentsUiState
 import com.kert0n.medapp.presentation.pack.Narrowing
@@ -113,7 +114,13 @@ fun MedKitContentsScreen(
                 // Меню полки — только у названной: у «всех лекарств» править и убирать нечего.
                 actions = {
                     state.medKit?.let {
-                        ShelfMenu(isShared = it.isShared, onEdit = onEdit, onShare = onShare, onRemove = onAskToRemove)
+                        // «Поделиться» или «Пригласить» — по тому же признаку, по которому решает
+                        // сам экран: уехала ли полка. Участники тут ни при чём — в опубликованную
+                        // полку зовут и тогда, когда в ней пока один человек.
+                        ShelfMenu(
+                            isShared = it.publication == MedKit.Publication.PUBLISHED,
+                            onEdit = onEdit, onShare = onShare, onRemove = onAskToRemove
+                        )
                     }
                 }
             )
