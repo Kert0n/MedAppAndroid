@@ -127,6 +127,13 @@ data class CourseDescription(
     val totalDoses: Doses? = null
 )
 
+/**
+ * Что из записанного черновика правит редактор: название, заметка и назначение. Состав сюда не
+ * входит — его правит соседний экран, и редактор его не пишет.
+ */
+fun CourseDraftProjection.described(): CourseDescription =
+    CourseDescription(title, note, dose, form, schedule, totalDoses)
+
 private fun rejected(error: CourseFormError): ParsedInput<CourseDescription, CourseFormError> = ParsedInput.Rejected(error)
 
 /**

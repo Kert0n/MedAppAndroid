@@ -313,6 +313,10 @@
     <string name="course_discard">Удалить черновик</string>
     <string name="course_discard_title">Удалить черновик?</string>
     <string name="course_discard_explained">Записанное назначение и заметка пропадут. Пачки он не занимал.</string>
+    <string name="course_leave_title">Оставить черновик?</string>
+    <string name="course_leave_explained">Чтобы подключить источники, лечение записалось в черновики. Назначение и заметку можно дописать позже.</string>
+    <string name="course_leave_keep">Оставить</string>
+    <string name="course_leave_discard">Удалить</string>
     <string name="action_more">Ещё</string>
     <string name="course_dose">Доза</string>
     <string name="course_unit">Единица дозы</string>

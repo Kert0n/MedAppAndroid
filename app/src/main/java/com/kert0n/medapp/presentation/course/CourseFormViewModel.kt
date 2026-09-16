@@ -33,8 +33,10 @@ import kotlinx.coroutines.launch
  * Редактор лечения (PLAN H3 №15). Без номера — новый черновик; с номером — записанный.
  *
  * Черновик записывается **с одним названием**: остальное человек дописывает, когда узнает
- * (D5). Записанное дочитывается один раз, до первого ввода: экран показывает то, что человек
- * видел, и не переписывает то, что он печатает (U1). При записи уходит только изменённое:
+ * (D5). Поля дочитываются один раз, до первого ввода: экран показывает то, что человек видел, и
+ * не переписывает то, что он печатает (U1). А **редакция** записанного остаётся живой: источники
+ * правят тот же черновик с соседнего экрана, и вернувшийся человек нажимает «Начать» с их
+ * правкой, а не с отказом «черновик изменили». При записи уходит только изменённое:
  * назначение черновика правится по частям, и нетронутое поле сценарию не называют. Аргумент
  * приходит значением из ключа маршрута, а не из `SavedStateHandle` (H3 «Оболочка»).
  */
@@ -72,6 +74,22 @@ class CourseFormViewModel @AssistedInject constructor(
 
     init {
         if (courseId != null) viewModelScope.launch { open(courseId) }
+        viewModelScope.launch { courses.observeDrafts().collect { drafts -> rebase(drafts) } }
+    }
+
+    /**
+     * Свежая редакция записанного — новое основание для сравнения, но **только** если чужая
+     * правка не тронула ничего из того, что пишет редактор: состав правит соседний экран, и
+     * спорить с набранным ему нечем. Тронули те же поля — основание остаётся прежним, и запись
+     * честно скажет «черновик изменили, откройте заново» (PLAN F5): вслепую поверх чужого не
+     * пишут. Набранное не трогается в обоих случаях (U1).
+     */
+    private fun rebase(drafts: List<CourseDraftProjection>) {
+        val current = editing.value as? CourseFormUiState.Editing ?: return
+        val stored = current.stored ?: return
+        val fresh = drafts.firstOrNull { it.id == stored.id } ?: return
+        if (fresh.revision == stored.revision) return
+        if (fresh.described() == stored.described()) editing.value = current.copy(stored = fresh)
     }
 
     fun edit(form: CourseFormPresentationDTO) {
@@ -114,7 +132,13 @@ class CourseFormViewModel @AssistedInject constructor(
                 is ParsedInput.Rejected -> editing.value = saving.copy(isSaving = false, error = parsed.error)
                 is ParsedInput.Parsed -> {
                     val written = written(saving, parsed.value) ?: return@launch
-                    editing.value = saving.copy(isSaving = false, stored = written, sourcesOf = written.id)
+                    // С этой минуты редактор правит записанное: второй раз заводить его нельзя.
+                    editing.value = saving.copy(
+                        mode = CourseFormUiState.Mode.UNASKED_DRAFT,
+                        isSaving = false,
+                        stored = written,
+                        sourcesOf = written.id
+                    )
                 }
             }
         }
@@ -124,6 +148,32 @@ class CourseFormViewModel @AssistedInject constructor(
     fun sourcesOpened() {
         val current = editing.value as? CourseFormUiState.Editing ?: return
         editing.value = current.copy(sourcesOf = null)
+    }
+
+    /**
+     * Уйти с формы. Записанное по просьбе человека остаётся молча, а черновик, записанный **ради
+     * источников**, спрашивает: сохранить его никто не просил, и молча оставленная строка в списке
+     * — такая же пропажа, как молча удалённая запись врача (PLAN H3 №15).
+     */
+    fun leave() {
+        val current = editing.value as? CourseFormUiState.Editing ?: return
+        if (current.isBusy) return
+        editing.value =
+            if (current.mode == CourseFormUiState.Mode.UNASKED_DRAFT) current.copy(asksToLeave = true)
+            else current.copy(isLeft = true)
+    }
+
+    /** Оставить записанное и уйти: черновик нужен — его допишут позже. */
+    fun keep() {
+        val current = editing.value as? CourseFormUiState.Editing ?: return
+        if (!current.asksToLeave) return
+        editing.value = current.copy(asksToLeave = false, isLeft = true)
+    }
+
+    /** Вопрос закрыт без ответа — человек остаётся на форме: ни уходить, ни удалять он не решил. */
+    fun dismissLeaving() {
+        val current = editing.value as? CourseFormUiState.Editing ?: return
+        editing.value = current.copy(asksToLeave = false)
     }
 
     /** Удаление спрашивается **до** сценария: в черновике может лежать единственная запись от врача (H3). */
@@ -139,13 +189,16 @@ class CourseFormViewModel @AssistedInject constructor(
 
     fun discard() {
         val current = editing.value as? CourseFormUiState.Editing ?: return
-        if (!current.asksToDiscard || current.isBusy) return
-        val id = courseId ?: return
-        editing.value = current.copy(asksToDiscard = false, isDiscarding = true)
+        if (!current.asksToDiscard && !current.asksToLeave) return
+        if (current.isBusy) return
+        // Номер берётся у записанного: у нового черновика ключа маршрута нет, а запись уже есть.
+        val id = current.stored?.id ?: courseId ?: return
+        editing.value = current.copy(asksToDiscard = false, asksToLeave = false, isDiscarding = true)
         viewModelScope.launch {
             // Удалять нечего — черновика уже нет: итог для человека тот же, экран уходит.
             drafting.discard(id)
-            editing.value = current.copy(asksToDiscard = false, isDiscarding = false, isDiscarded = true)
+            editing.value =
+                current.copy(asksToDiscard = false, asksToLeave = false, isDiscarding = false, isDiscarded = true)
         }
     }
 
@@ -231,7 +284,8 @@ class CourseFormViewModel @AssistedInject constructor(
     ): CourseDraftProjection? {
         val base = when (saving.mode) {
             CourseFormUiState.Mode.NEW_DRAFT -> drafting.create(described.title, described.note)
-            CourseFormUiState.Mode.DRAFT -> checkNotNull(saving.stored)
+            // Записанный ради источников — уже записан: «Сохранить» и «Начать» правят его.
+            CourseFormUiState.Mode.UNASKED_DRAFT, CourseFormUiState.Mode.DRAFT -> checkNotNull(saving.stored)
             // Идущее лечение правится изменением эпизода, а не записью черновика: сюда оно не доходит.
             CourseFormUiState.Mode.RUNNING -> error("идущее лечение не записывается черновиком")
         }
@@ -340,6 +394,10 @@ sealed interface CourseFormUiState {
         /** Лечение началось — этот эпизод и открывают карточкой; `null` — ещё черновик. */
         val startedId: Uuid? = null,
         val asksToDiscard: Boolean = false,
+        /** Уход спрашивает: черновик записан ради источников, а сохранить его никто не просил. */
+        val asksToLeave: Boolean = false,
+        /** Человек ушёл с формы — экран закрывается. */
+        val isLeft: Boolean = false,
         val isDiscarding: Boolean = false,
         val isDiscarded: Boolean = false
     ) : CourseFormUiState {
@@ -350,6 +408,10 @@ sealed interface CourseFormUiState {
      * Чем открыт редактор: новым черновиком, записанным черновиком или идущим лечением. У
      * идущего те же поля правят **тот же эпизод**, а не заводят новый (PLAN C1 «Изменение
      * лечения»).
+     *
+     * [UNASKED_DRAFT] — тот же новый черновик, но уже записанный: номер понадобился источникам, а
+     * сохранить его человек не просил. Поэтому записывается он правкой, а не вторым черновиком, и
+     * уход с формы спрашивает, оставить ли его.
      */
-    enum class Mode { NEW_DRAFT, DRAFT, RUNNING }
+    enum class Mode { NEW_DRAFT, UNASKED_DRAFT, DRAFT, RUNNING }
 }

@@ -7,6 +7,7 @@ import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performScrollTo
 import androidx.test.ext.junit.runners.AndroidJUnit4
+import com.kert0n.medapp.domain.course.CourseDraftProjection
 import com.kert0n.medapp.domain.course.CourseRejected
 import com.kert0n.medapp.presentation.course.CourseFormError
 import com.kert0n.medapp.presentation.course.CourseFormPresentationDTO
@@ -33,6 +34,8 @@ class CourseFormScreenTest {
     private var saved = 0
     private var asked = 0
     private var confirmed = 0
+    private var left = 0
+    private var kept = 0
 
     private fun show(state: CourseFormUiState) {
         compose.setContent {
@@ -44,7 +47,8 @@ class CourseFormScreenTest {
                     onAskToDiscard = { asked++ },
                     onConfirmDiscard = { confirmed++ },
                     onDismissDiscard = {},
-                    onBack = {}
+                    onBack = { left++ },
+                    onKeep = { kept++ }
                 )
             }
         }
@@ -56,9 +60,19 @@ class CourseFormScreenTest {
         mode: CourseFormUiState.Mode = CourseFormUiState.Mode.NEW_DRAFT,
         error: CourseFormError? = null,
         asksToDiscard: Boolean = false,
+        asksToLeave: Boolean = false,
         form: CourseFormPresentationDTO = CourseFormPresentationDTO(title = "Нурофен"),
-        expectedEnd: LocalDate? = null
-    ) = CourseFormUiState.Editing(form, mode, error = error, asksToDiscard = asksToDiscard, expectedEnd = expectedEnd)
+        expectedEnd: LocalDate? = null,
+        stored: CourseDraftProjection? = null
+    ) = CourseFormUiState.Editing(
+        form,
+        mode,
+        stored = stored,
+        error = error,
+        asksToDiscard = asksToDiscard,
+        asksToLeave = asksToLeave,
+        expectedEnd = expectedEnd
+    )
 
     /** Кнопка не гаснет: нажатие с пустым названием — названная причина, а не молчание. */
     @Test
@@ -159,5 +173,40 @@ class CourseFormScreenTest {
         compose.onNodeWithText("Удалить черновик").performClick()
 
         assertEquals(1, confirmed)
+    }
+
+    /**
+     * Черновик записан ради источников — уход спрашивает, и оба ответа названы словом, а не
+     * «да/нет»: человек выбирает судьбу записи, а не подтверждает действие.
+     */
+    @Test
+    fun leavingADraftWrittenForItsSourcesOffersToKeepOrDelete() {
+        show(editing(mode = CourseFormUiState.Mode.UNASKED_DRAFT, asksToLeave = true))
+
+        compose.onNodeWithText("Оставить черновик?").assertIsDisplayed()
+        compose.onNodeWithText("Удалить").performClick()
+
+        assertEquals(1, confirmed)
+    }
+
+    /** «Оставить» уносит с формы, ничего не удаляя. */
+    @Test
+    fun keepingTheDraftLeavesTheForm() {
+        show(editing(mode = CourseFormUiState.Mode.UNASKED_DRAFT, asksToLeave = true))
+
+        compose.onNodeWithText("Оставить").performClick()
+
+        assertEquals(1, kept)
+        assertEquals(0, confirmed)
+    }
+
+    /** «Отмена» — такой же выход, как стрелка: спрашивает о нём форма, а не оболочка. */
+    @Test
+    fun cancelLeavesThroughTheForm() {
+        show(editing(mode = CourseFormUiState.Mode.UNASKED_DRAFT))
+
+        compose.onNodeWithText("Отмена").performScrollTo().performClick()
+
+        assertEquals(1, left)
     }
 }

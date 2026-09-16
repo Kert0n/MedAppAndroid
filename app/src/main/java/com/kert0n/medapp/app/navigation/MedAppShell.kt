@@ -266,7 +266,7 @@ private fun screens(stacks: TabStacks) = entryProvider<NavKey> {
                     model.sourcesOpened()
                     stacks.go(Screen.CourseSources(sources))
                 }
-                state.isSaved || state.isDiscarded -> stacks.back()
+                state.isSaved || state.isDiscarded || state.isLeft -> stacks.back()
             }
         }
         CourseFormScreen(
@@ -276,10 +276,13 @@ private fun screens(stacks: TabStacks) = entryProvider<NavKey> {
             onAskToDiscard = model::askToDiscard,
             onConfirmDiscard = model::discard,
             onDismissDiscard = model::dismissDiscard,
+            onKeep = model::keep,
+            onDismissLeaving = model::dismissLeaving,
             // Источники есть у любого лечения: новый черновик по этой кнопке сначала запишется.
             onSources = model::openSources,
             onStart = model::start.takeIf { state !is CourseFormUiState.Editing || state.mode != CourseFormUiState.Mode.RUNNING },
-            onBack = stacks::back
+            // Уходит с формы не оболочка, а редактор: записанный ради источников черновик спросит.
+            onBack = model::leave
         )
     }
     entry<Screen.CourseCard> { key ->

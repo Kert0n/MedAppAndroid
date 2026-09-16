@@ -169,4 +169,28 @@ class CoursesJourneyTest {
 
         compose.waitUntil { compose.onAllNodesWithText("Лечений пока нет.", substring = true).fetchSemanticsNodes().isNotEmpty() }
     }
+
+    /**
+     * Чтобы подключить источники, новый черновик приходится записать — номер нужен коробкам.
+     * Сохранить его никто не просил, поэтому уход с формы спрашивает, и «Удалить» его уносит:
+     * человек заводил лечение, а не строку в списке (PLAN H3 №15).
+     */
+    @Test
+    fun aDraftWrittenOnlyForItsSourcesIsOfferedForDeletionOnTheWayOut() {
+        compose.onNodeWithText("Записать лечение").performClick()
+        compose.onNodeWithText("Название").performTextInput("Нурофен")
+        compose.onNodeWithText("Источники лечения").performScrollTo().performClick()
+
+        // Источники открылись — значит, черновик записан.
+        compose.waitUntil { compose.onAllNodesWithText("Подключить ещё").fetchSemanticsNodes().isNotEmpty() }
+        compose.onNodeWithContentDescription("Назад").performClick()
+
+        compose.onNodeWithText("Отмена").performScrollTo().performClick()
+        compose.onNodeWithText("Оставить черновик?").assertIsDisplayed()
+        compose.onNodeWithText("Удалить").performClick()
+
+        compose.waitUntil {
+            compose.onAllNodesWithText("Лечений пока нет.", substring = true).fetchSemanticsNodes().isNotEmpty()
+        }
+    }
 }

@@ -45,6 +45,7 @@ import java.time.Instant
 import java.time.ZoneId
 import kotlin.uuid.Uuid
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Rule
 import org.junit.Test
@@ -191,6 +192,41 @@ class CourseFormViewModelTest {
         }
 
         assertEquals(1, courses.drafts.size)
+    }
+
+    /**
+     * Чужая правка **состава** не спорит с набранным: источники подключает соседний экран, и
+     * полей, которые печатает человек, он не трогает. Редактор догоняет такую редакцию и
+     * записывает набранное — «черновик изменили» про подключённую коробку было бы отказом ни о
+     * чём. Чужую правку тех же полей он по-прежнему не затирает — соседняя проверка.
+     */
+    @Test
+    fun aForeignSourceEditIsCaughtUpAndDoesNotRefuseTheWrite() {
+        // Пачки подключаются к назначенным дозе и форме — назначение у черновика уже есть.
+        courses.holding(course(id = COURSE, title = "Нурофен", dose = dose("2"), form = TABLET_FORM))
+        val model = viewModel(courseId = COURSE)
+
+        val state = watching(model.state) { state ->
+            state.awaiting { it is CourseFormUiState.Editing }
+            courses.holding(
+                course(
+                    id = COURSE,
+                    title = "Нурофен",
+                    dose = dose("2"),
+                    form = TABLET_FORM,
+                    sources = listOf(source(PACK, 4)),
+                    revision = 3
+                )
+            )
+            // Редактор увидел коробку — значит, догнал редакцию, которой её подключили.
+            state.awaiting { it is CourseFormUiState.Editing && it.stored?.sources?.isNotEmpty() == true }
+            model.edit(CourseFormPresentationDTO(title = "Нурофен, неделя"))
+            model.save()
+            state.awaiting { it is CourseFormUiState.Editing && !it.isSaving }
+        } as CourseFormUiState.Editing
+
+        assertNull(state.error)
+        assertEquals("Нурофен, неделя", courses.drafts.getValue(COURSE).title)
     }
 
     /** Черновик, правленный с другого экрана, не затирается: сказано перечитать (PLAN F5). */

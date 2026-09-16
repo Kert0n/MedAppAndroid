@@ -1,5 +1,6 @@
 package com.kert0n.medapp.ui.course
 
+import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ExperimentalLayoutApi
@@ -69,6 +70,10 @@ import java.time.LocalTime
  * **Кнопка не гаснет.** Погашенная не объясняет, чего не хватает; нажал — форма называет поле и
  * причину, а ввод отказ снимает. Удаление черновика спрашивается до сценария: в нём может лежать
  * единственная запись назначения от врача (H3).
+ *
+ * Уход с формы тоже спрашивает — но только у черновика, записанного **ради источников**: номер
+ * понадобился коробкам, а сохранять его человек не просил. Спрашивают все три выхода — стрелка,
+ * «Отмена» и системное «назад», — иначе вопрос обходился бы стороной.
  */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -81,6 +86,10 @@ fun CourseFormScreen(
     onDismissDiscard: () -> Unit,
     onBack: () -> Unit,
     modifier: Modifier = Modifier,
+    /** Оставить черновик, записанный ради источников, и уйти. */
+    onKeep: () -> Unit = {},
+    /** Закрыть вопрос об уходе, оставшись на форме. */
+    onDismissLeaving: () -> Unit = {},
     /** Путь к источникам: у нового черновика он сперва записывает набранное (H3 №15). */
     onSources: (() -> Unit)? = null,
     /** Начать лечение; `null` — у идущего лечения начинать уже нечего. */
@@ -121,6 +130,11 @@ fun CourseFormScreen(
         }
     }
     if (editing?.asksToDiscard == true) DiscardDialog(onConfirm = onConfirmDiscard, onDismiss = onDismissDiscard)
+    if (editing?.asksToLeave == true) {
+        LeavingDialog(onKeep = onKeep, onDiscard = onConfirmDiscard, onDismiss = onDismissLeaving)
+    }
+    // Системное «назад» — такой же выход, как стрелка: вопрос задаёт форма, а не оболочка.
+    BackHandler(enabled = editing?.mode == CourseFormUiState.Mode.UNASKED_DRAFT, onBack = onBack)
 }
 
 @OptIn(ExperimentalLayoutApi::class)
@@ -299,6 +313,21 @@ private fun DraftMenu(onAskToDiscard: () -> Unit) {
             onClick = { open = false; onAskToDiscard() }
         )
     }
+}
+
+/**
+ * Уход с записанным черновиком: оставить или удалить. Третий ответ — закрыть вопрос и остаться на
+ * форме; удаление стоит вторым, потому что уносит запись врача, а «Оставить» ничего не теряет.
+ */
+@Composable
+private fun LeavingDialog(onKeep: () -> Unit, onDiscard: () -> Unit, onDismiss: () -> Unit) {
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text(stringResource(R.string.course_leave_title)) },
+        text = { Text(stringResource(R.string.course_leave_explained)) },
+        confirmButton = { TextButton(onClick = onKeep) { Text(stringResource(R.string.course_leave_keep)) } },
+        dismissButton = { TextButton(onClick = onDiscard) { Text(stringResource(R.string.course_leave_discard)) } }
+    )
 }
 
 @Composable
