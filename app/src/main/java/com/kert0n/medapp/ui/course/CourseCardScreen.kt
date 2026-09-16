@@ -11,6 +11,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material3.AlertDialog
@@ -23,6 +24,7 @@ import androidx.compose.material3.IconButton
 import androidx.compose.material3.ListItem
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
+import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
@@ -36,6 +38,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import com.kert0n.medapp.R
 import com.kert0n.medapp.ui.DAY
@@ -62,6 +65,9 @@ fun CourseCardScreen(
     onEdit: () -> Unit,
     onSources: () -> Unit,
     onHistory: () -> Unit,
+    onAskOffPlan: () -> Unit,
+    onCountOffPlan: (Int) -> Unit,
+    onDismissOffPlan: () -> Unit,
     onAskToCancel: () -> Unit,
     onConfirmCancel: () -> Unit,
     onDismissCancel: () -> Unit,
@@ -102,12 +108,19 @@ fun CourseCardScreen(
             when {
                 state.isGone -> ErrorMessage(text = stringResource(R.string.course_missing))
                 course == null -> LoadingState()
-                else -> Card(state, course, onSources, onHistory)
+                else -> Card(state, course, onSources, onHistory, onAskOffPlan)
             }
         }
     }
     if (state.asksToCancel) {
         CancelDialog(onConfirm = onConfirmCancel, onDismiss = onDismissCancel)
+    }
+    if (state.asksOffPlan) {
+        OffPlanDialog(
+            current = state.offPlanDoses ?: 0,
+            onConfirm = onCountOffPlan,
+            onDismiss = onDismissOffPlan
+        )
     }
 }
 
@@ -117,6 +130,7 @@ private fun Card(
     course: CoursePresentationDTO,
     onSources: () -> Unit,
     onHistory: () -> Unit,
+    onAskOffPlan: () -> Unit,
     modifier: Modifier = Modifier
 ) {
     LazyColumn(modifier.fillMaxSize(), contentPadding = PaddingValues(bottom = 16.dp)) {
@@ -182,6 +196,17 @@ private fun Card(
                         onClick = onHistory,
                         modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp).defaultMinSize(minHeight = 48.dp)
                     ) { Text(stringResource(R.string.intake_history_of_course)) }
+                    // Принято мимо плана — поправка к счёту, а не приём: расписание не трогается,
+                    // а лечение считает, что доз принято больше (PLAN D5).
+                    if (state.isRunning) {
+                        TextButton(
+                            onClick = onAskOffPlan,
+                            enabled = !state.isCounting,
+                            modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp).defaultMinSize(minHeight = 48.dp)
+                        ) {
+                            Text(stringResource(R.string.course_off_plan_action, state.offPlanDoses ?: 0))
+                        }
+                    }
                 }
             }
         }
@@ -304,8 +329,38 @@ private fun RunningMenu(onEdit: () -> Unit, onAskToCancel: () -> Unit) {
 private fun CourseCardMessage.words(): String = stringResource(
     when (this) {
         CourseCardMessage.AlreadyFinished -> R.string.course_cancel_already_finished
+        CourseCardMessage.Stale -> R.string.course_stale
     }
 )
+
+/**
+ * Сколько доз принято мимо расписания. Спрашивается подтверждением: число уедет в прогресс и может
+ * закончить лечение (PLAN D5).
+ */
+@Composable
+private fun OffPlanDialog(current: Int, onConfirm: (Int) -> Unit, onDismiss: () -> Unit) {
+    var typed by remember { mutableStateOf(current.toString()) }
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text(stringResource(R.string.course_off_plan_title)) },
+        text = {
+            OutlinedTextField(
+                value = typed,
+                onValueChange = { entered -> typed = entered.filter(Char::isDigit) },
+                label = { Text(stringResource(R.string.course_off_plan_field)) },
+                singleLine = true,
+                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number)
+            )
+        },
+        confirmButton = {
+            TextButton(
+                onClick = { onConfirm(typed.toIntOrNull() ?: current) },
+                enabled = typed.isNotEmpty()
+            ) { Text(stringResource(R.string.action_save)) }
+        },
+        dismissButton = { TextButton(onClick = onDismiss) { Text(stringResource(R.string.action_cancel)) } }
+    )
+}
 
 @Composable
 private fun CancelDialog(onConfirm: () -> Unit, onDismiss: () -> Unit) {

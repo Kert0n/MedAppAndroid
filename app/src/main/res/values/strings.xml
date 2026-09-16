@@ -281,6 +281,9 @@
     <string name="intake_history_no_amount">доза не записана</string>
     <string name="intake_history_of_package">Приёмы из этой коробки</string>
     <string name="intake_history_of_course">Вся история</string>
+    <string name="course_off_plan_action">Принято мимо плана: %1$d</string>
+    <string name="course_off_plan_title">Принято мимо плана</string>
+    <string name="course_off_plan_field">Сколько доз</string>
     <string name="intake_card_gone">Этого приёма больше нет</string>
     <string name="intake_planned">Назначено на %1$s в %2$s: %3$s</string>
     <string name="intake_from_package">Из коробки: %1$s</string>

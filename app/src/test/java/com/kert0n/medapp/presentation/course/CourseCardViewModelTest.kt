@@ -4,6 +4,7 @@ import com.kert0n.medapp.domain.course.CourseRecord
 import com.kert0n.medapp.domain.intake.IntakeProjection
 import com.kert0n.medapp.feature.course.CourseCalendar
 import com.kert0n.medapp.feature.course.CourseCancellation
+import com.kert0n.medapp.feature.course.CourseOffPlanCounting
 import com.kert0n.medapp.feature.course.CourseClosing
 import com.kert0n.medapp.feature.course.CourseFollowing
 import com.kert0n.medapp.feature.notification.ReminderPromising
@@ -58,6 +59,9 @@ class CourseCardViewModelTest {
 
     private fun viewModel(courseId: Uuid = COURSE) = CourseCardViewModel(
         cancellation = cancellation(),
+        // Счёт доз мимо плана над подделками не проверяется — о нём судят над Room; сосед здесь
+        // такой же, как остальные: позовут — упадёт с именем.
+        offPlanCounting = offPlanCounting(),
         courses = courses,
         intakes = NoIntakes,
         courseId = courseId
@@ -86,6 +90,32 @@ class CourseCardViewModelTest {
             courses,
             UnaskedIntakes,
             calendar,
+            CourseClosing(courses, following, ReminderWithdrawal(UnaskedReminders, DirectTransactions)),
+            DirectTransactions,
+            clock
+        )
+    }
+
+    private fun offPlanCounting(): CourseOffPlanCounting {
+        val calendar = CourseCalendar(
+            UnaskedIntakes,
+            packages,
+            ReminderPromising(UnaskedReminders, QuietNotificationSettings, DirectTransactions),
+            ReminderWithdrawal(UnaskedReminders, DirectTransactions)
+        )
+        val following = CourseFollowing(
+            courses,
+            packages,
+            calendar,
+            QueueService(DirectTransactions, FakeQueue()),
+            DirectTransactions
+        )
+        return CourseOffPlanCounting(
+            courses,
+            UnaskedIntakes,
+            packages,
+            calendar,
+            following,
             CourseClosing(courses, following, ReminderWithdrawal(UnaskedReminders, DirectTransactions)),
             DirectTransactions,
             clock

@@ -38,6 +38,7 @@ class CourseCardScreenTest {
     val compose = createComposeRule()
 
     private var asked = 0
+    private var askedOffPlan = 0
     private var confirmed = 0
     private var edited = 0
 
@@ -49,6 +50,9 @@ class CourseCardScreenTest {
                     onEdit = { edited++ },
                     onSources = {},
                     onHistory = {},
+                    onAskOffPlan = { askedOffPlan++ },
+                    onCountOffPlan = {},
+                    onDismissOffPlan = {},
                     onAskToCancel = { asked++ },
                     onConfirmCancel = { confirmed++ },
                     onDismissCancel = {},
@@ -188,5 +192,15 @@ class CourseCardScreenTest {
         show(CourseCardUiState(isGone = true))
 
         compose.onNodeWithText("Этого лечения больше нет.").assertIsDisplayed()
+    }
+
+    /** Поправка счёта спрашивается, а не пишется с нажатия: число уедет в прогресс (PLAN D5). */
+    @Test
+    fun theOffPlanCountIsAskedBeforeItIsWritten() {
+        show(CourseCardUiState(course = course(), isRunning = true, offPlanDoses = 1))
+
+        compose.onNodeWithText("Принято мимо плана: 1").performClick()
+
+        assertEquals(1, askedOffPlan)
     }
 }
