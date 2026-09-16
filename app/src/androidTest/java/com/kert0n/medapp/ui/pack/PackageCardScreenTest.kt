@@ -1,8 +1,10 @@
 package com.kert0n.medapp.ui.pack
 
 import androidx.compose.ui.test.assertIsDisplayed
+import androidx.compose.ui.test.getUnclippedBoundsInRoot
 import androidx.compose.ui.test.junit4.v2.createComposeRule
 import androidx.compose.ui.test.onNodeWithContentDescription
+import androidx.compose.ui.test.onAllNodesWithText
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performScrollTo
@@ -23,6 +25,7 @@ import com.kert0n.medapp.ui.theme.MedAppTheme
 import java.math.BigDecimal
 import java.time.LocalDate
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertTrue
 import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
@@ -50,9 +53,13 @@ class PackageCardScreenTest {
     private fun box(
         expiresOn: String? = null,
         manufacturer: String? = null,
+        description: String? = null,
         hasUnconfirmedChanges: Boolean = false
     ): PackagePresentationDTO =
-        pack(id = PACK, name = "Нурофен", expiresOn = expiresOn?.let(::expiry), manufacturer = manufacturer)
+        pack(
+            id = PACK, name = "Нурофен", expiresOn = expiresOn?.let(::expiry),
+            manufacturer = manufacturer, description = description
+        )
             .projected(hasUnconfirmedChanges = hasUnconfirmedChanges)
             .toPresentationDTO()
 
@@ -250,4 +257,24 @@ class PackageCardScreenTest {
 
         assertEquals(1, taken)
     }
+
+    /**
+     * Первым — сколько есть, потом срок, потом место, и лишь затем что это за лекарство. Описание
+     * из справочника занимает целый экран: стоя вторым, оно отодвигало срок и место за край, и
+     * человек листал инструкцию, чтобы узнать, куда идти (замечание владельца 2026-09-17).
+     */
+    @Test
+    fun theUrgentComesBeforeTheReference() {
+        show(card(box(manufacturer = "Реккитт")))
+
+        val howMuch = compose.onNodeWithText("Сколько есть").getUnclippedBoundsInRoot()
+        val dates = compose.onNodeWithText("Сроки и цена").getUnclippedBoundsInRoot()
+        val where = compose.onNodeWithText("Где лежит").getUnclippedBoundsInRoot()
+        val what = compose.onNodeWithText("Что это").getUnclippedBoundsInRoot()
+
+        assertTrue("сроки идут после остатка", dates.top > howMuch.top)
+        assertTrue("место идёт после сроков", where.top > dates.top)
+        assertTrue("описание идёт последним", what.top > where.top)
+    }
+
 }

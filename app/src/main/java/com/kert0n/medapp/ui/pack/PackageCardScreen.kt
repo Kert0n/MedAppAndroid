@@ -125,18 +125,25 @@ fun PackageCardScreen(
         when {
             state.isGone -> EmptyState(text = stringResource(R.string.pack_gone), modifier = Modifier.padding(padding))
             pack == null -> LoadingState(Modifier.padding(padding))
+            // Порядок — от срочного к справочному (решение владельца 2026-09-17): сколько есть,
+            // до каких пор годно, где лежит, и только потом что это за лекарство. Описание из
+            // справочника занимает целый экран, и стоя вторым, оно отодвигало срок и место за
+            // край — человек листал инструкцию, чтобы узнать, куда идти.
             else -> Column(
                 Modifier
                     .padding(padding)
                     .fillMaxSize()
                     .verticalScroll(rememberScrollState())
-                    .padding(16.dp),
+                    // Снизу больше: плавающая кнопка «Принять» висит над содержимым, и последнее,
+                    // что в нём есть, оказывается под ней. Порядок секций беду уже снял — действия
+                    // ушли из хвоста, — но отступ держит её снятой и для будущего хвоста.
+                    .padding(start = 16.dp, top = 16.dp, end = 16.dp, bottom = 88.dp),
                 verticalArrangement = Arrangement.spacedBy(12.dp)
             ) {
                 HowMuchIsThere(pack, state.holdingCourseTitle, state.isBusy, onTake, onRecount, onHistory)
-                WhatItIs(pack)
                 DatesAndPrice(pack, state.today, state.lastUsedOn)
                 WhereItLies(pack, state.medKitName, onTransfer)
+                WhatItIs(pack)
             }
         }
     }
