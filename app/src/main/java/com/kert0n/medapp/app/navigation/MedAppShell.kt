@@ -33,12 +33,14 @@ import com.kert0n.medapp.presentation.intake.UnplannedIntakeViewModel
 import com.kert0n.medapp.ui.intake.UnplannedIntakeSheet
 import com.kert0n.medapp.presentation.intake.IntakeCardViewModel
 import com.kert0n.medapp.presentation.intake.IntakeHistoryViewModel
+import com.kert0n.medapp.presentation.notification.ExpiringTodayViewModel
 import com.kert0n.medapp.presentation.plan.DayPlanViewModel
 import com.kert0n.medapp.ui.intake.IntakeCardScreen
 import com.kert0n.medapp.ui.openExactAlarmSettings
 import com.kert0n.medapp.ui.openNotificationSettings
 import com.kert0n.medapp.ui.rememberNotificationPermissionRequest
 import com.kert0n.medapp.ui.intake.IntakeHistoryScreen
+import com.kert0n.medapp.ui.notification.ExpiringTodayPopup
 import com.kert0n.medapp.ui.plan.PlanMode
 import com.kert0n.medapp.ui.plan.PlanScreen
 import androidx.compose.runtime.LaunchedEffect
@@ -99,6 +101,14 @@ fun MedAppShell(modifier: Modifier = Modifier, stacks: TabStacks = rememberTabSt
             transitionSpec = { SWITCH },
             popTransitionSpec = { SWITCH },
             predictivePopTransitionSpec = { SWITCH }
+        )
+        // Попап срока живёт **над** местами, а не в одном из них: уход на карточку коробки — это
+        // тот же разговор, и возврат его не обрывает (PLAN H3 «Уведомления на экране»).
+        val expiring: ExpiringTodayViewModel = hiltViewModel()
+        ExpiringTodayPopup(
+            state = expiring.state.collectAsStateWithLifecycle().value,
+            onOpenPackage = { stacks.go(Screen.PackageCard(it)) },
+            onDismiss = expiring::dismiss
         )
     }
 }

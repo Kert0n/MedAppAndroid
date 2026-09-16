@@ -1,0 +1,85 @@
+package com.kert0n.medapp.presentation.notification
+
+import androidx.lifecycle.ViewModel
+import androidx.lifecycle.viewModelScope
+import com.kert0n.medapp.domain.notification.NoticeDelivery
+import com.kert0n.medapp.domain.notification.NotificationKey
+import com.kert0n.medapp.domain.notification.NotificationTarget
+import com.kert0n.medapp.feature.notification.ReminderOutbox
+import com.kert0n.medapp.presentation.pack.PackagePresentationDTO
+import com.kert0n.medapp.presentation.pack.toPresentationDTO
+import com.kert0n.medapp.storage.notification.ReminderStorageRepository
+import com.kert0n.medapp.storage.pack.PackageStorageRepository
+import dagger.hilt.android.lifecycle.HiltViewModel
+import javax.inject.Inject
+import kotlinx.coroutines.ExperimentalCoroutinesApi
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.SharingStarted
+import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.flatMapLatest
+import kotlinx.coroutines.flow.flowOf
+import kotlinx.coroutines.flow.stateIn
+import kotlinx.coroutines.launch
+
+/**
+ * «Сегодня истекает срок годности» — попап при входе (PLAN D8, H3 «Уведомления на экране»).
+ *
+ * Это новость о **вещи**, а не о приёме: строкой в списке она теряется, и человек узнаёт о ней,
+ * когда коробка уже просрочена. Оттого попап, и оттого он закрывается **только крестиком**: уход на
+ * карточку коробки — продолжение того же разговора, и возврат его не обрывает (решение владельца
+ * 2026-09-16).
+ *
+ * Показанные обязательства отмечаются при закрытии, а не при показе: отметь их раньше — чтение
+ * опустело бы под руками, и попап закрылся бы сам, ничего не сказав.
+ */
+@OptIn(ExperimentalCoroutinesApi::class)
+@HiltViewModel
+class ExpiringTodayViewModel @Inject constructor(
+    private val outbox: ReminderOutbox,
+    private val reminders: ReminderStorageRepository,
+    private val packages: PackageStorageRepository
+) : ViewModel() {
+
+    /** Закрыл ли человек попап: до крестика он висит, что бы ни менялось под ним. */
+    private val closed = MutableStateFlow(false)
+
+    /**
+     * Какие обязательства показаны. Снимок берётся из чтения и **не** сужается, пока попап открыт:
+     * коробка может уйти из списка, а обязательство о ней остаётся сказанным.
+     */
+    private val shown = MutableStateFlow<Set<NotificationKey>>(emptySet())
+
+    private val awaiting = reminders.observeAwaiting(NoticeDelivery.IN_APP_BANNER)
+
+    val state: StateFlow<ExpiringTodayUiState> = combine(awaiting, closed) { notices, closed ->
+        if (closed) emptyList() else notices
+    }.flatMapLatest { notices ->
+        // Коробки читаются живыми: выброшенная уходит из попапа сама, пока человек на него смотрит.
+        val ids = notices.mapNotNull { (it.target as? NotificationTarget.PackageCard)?.packageId }
+        shown.value = notices.map { it.key }.toSet()
+        if (ids.isEmpty()) flowOf(ExpiringTodayUiState())
+        else combine(ids.map { packages.observe(it) }) { boxes ->
+            ExpiringTodayUiState(boxes = boxes.filterNotNull().map { it.toPresentationDTO() })
+        }
+    }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), ExpiringTodayUiState())
+
+    /**
+     * Закрыт крестиком: обязательства помечаются сказанными, и сегодня попап больше не придёт.
+     * Владелец доставки один и для системы, и для экрана (PLAN D8).
+     */
+    fun dismiss() {
+        val keys = shown.value
+        closed.value = true
+        viewModelScope.launch { outbox.bannerShown(keys) }
+    }
+
+}
+
+/**
+ * Что показывает попап: коробки, у которых срок кончается сегодня. Пустой попап не показывается —
+ * говорить не о чем.
+ */
+data class ExpiringTodayUiState(val boxes: List<PackagePresentationDTO> = emptyList()) {
+    val isEmpty: Boolean get() = boxes.isEmpty()
+}

@@ -269,6 +269,9 @@
     <string name="plan_day_today">сегодня</string>
     <string name="plan_day_tomorrow">завтра</string>
     <string name="plan_day_also">Ещё в этот день</string>
+    <string name="expiry_today_title">Сегодня истекает срок годности</string>
+    <string name="expiry_today_close">Закрыть</string>
+    <string name="expiry_today_until">годен до %1$s</string>
     <string name="plan_notifications_off">Напоминания не приходят</string>
     <string name="plan_notifications_off_hint">Уведомления выключены — включить в настройках</string>
     <string name="plan_alarms_inexact">Напоминания могут опаздывать</string>
