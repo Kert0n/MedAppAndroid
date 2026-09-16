@@ -255,11 +255,12 @@ class UnplannedIntakeRecordingTest {
     }
 
     /**
-     * Просрочено и заденет занятое — оба вопроса сразу, и одно подтверждение пишет приём
-     * (PLAN D6). Годен до сегодня — не вопрос.
+     * Просрочка — не вопрос (C1 «Просроченная пачка», поправка владельца 2026-09-16): спрашивается
+     * только то, что заденет чужое, — занятое. Годен до вчера и заденет занятое — один вопрос о
+     * занятом; просрочку человек видит на коробке, а решает сам.
      */
     @Test
-    fun expiryAndReservedAreAskedTogetherAndAnsweredOnce() = runTest {
+    fun onlyTheReservedIsAskedAndExpiryIsNot() = runTest {
         local()
         holdByACourse()
         val today = LATER.atZone(ZoneOffset.UTC).toLocalDate()
@@ -267,18 +268,18 @@ class UnplannedIntakeRecordingTest {
 
         val asked = recording.record(PACK, dose("12"), LATER)
 
-        assertEquals(
-            UnplannedIntakeRecording.Outcome.Warned(listOf(IntakeWarning.Expired(ExpiryDate(today.minusDays(1))), IntakeWarning.TouchesReserved(tablets("10")))),
-            asked
-        )
-        assertEquals(tablets("20"), requireNotNull(database.packageRepository().find(PACK)).quantity)
-
+        assertEquals(UnplannedIntakeRecording.Outcome.Warned(listOf(IntakeWarning.TouchesReserved(tablets("10")))), asked)
         assertTrue(recording.record(PACK, dose("12"), LATER, acknowledged = true) is UnplannedIntakeRecording.Outcome.Recorded)
         assertEquals(tablets("8"), requireNotNull(database.packageRepository().find(PACK)).quantity)
+    }
 
-        // Годен до сегодня — не просрочен: остаётся только вопрос о занятом (курс зажат под остаток).
-        assertTrue(database.packageRepository().describe(PACK, factsOf(pack(quantity = tablets("8"), form = TABLET_FORM)).copy(expiresOn = ExpiryDate(today))))
-        val onlyReserved = recording.record(PACK, dose("1"), LATER) as UnplannedIntakeRecording.Outcome.Warned
-        assertEquals(listOf(IntakeWarning.TouchesReserved(tablets("0"))), onlyReserved.warnings)
+    /** Разовый приём из просроченной коробки, не задевающий занятого, пишется сразу. */
+    @Test
+    fun anExpiredBoxIsTakenOnceWithoutAQuestion() = runTest {
+        local()
+        val today = LATER.atZone(ZoneOffset.UTC).toLocalDate()
+        assertTrue(database.packageRepository().describe(PACK, factsOf(pack(quantity = tablets("20"), form = TABLET_FORM)).copy(expiresOn = ExpiryDate(today.minusDays(1)))))
+
+        assertTrue(recording.record(PACK, dose("1"), LATER) is UnplannedIntakeRecording.Outcome.Recorded)
     }
 }

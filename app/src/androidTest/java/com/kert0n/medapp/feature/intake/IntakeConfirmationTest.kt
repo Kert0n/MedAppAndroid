@@ -387,28 +387,22 @@ class IntakeConfirmationTest {
     }
 
     /**
-     * Коробка просрочена на день приёма: без подтверждения — вопрос, и ничего не записано (красная
-     * проверка: убрать вопрос — приём записан молча); с подтверждением — записан. Годен до сегодня —
-     * не просрочен, вопроса нет (PLAN D6, C1 «Просроченная пачка»).
+     * **Просроченная коробка приём не переспрашивает** (C1 «Просроченная пачка», поправка владельца
+     * 2026-09-16). Ольга знает, что железо со вчера просрочено, и решила допить: приложение срок
+     * показало, а решать ей. Спроси сценарий «вы уверены?» — и «Принял» из шторки не смог бы
+     * записать приём без экрана, а человека учили бы жить.
      */
     @Test
-    fun anExpiredBoxAsksBeforeTheIntakeIsWritten() = runTest {
+    fun anExpiredBoxIsTakenWithoutAQuestion() = runTest {
         val today = FIRST_PLANNED_AT.atZone(ZoneOffset.UTC).toLocalDate()
         assertTrue(packages.describe(PACK, factsOf(pack(quantity = tablets("20"))).copy(expiresOn = ExpiryDate(today.minusDays(1)))))
         activate()
 
-        val asked = confirmation.confirm(INTAKE, PACK, dose("2"), FIRST_PLANNED_AT)
+        val outcome = confirmation.confirm(INTAKE, PACK, dose("2"), FIRST_PLANNED_AT)
 
-        assertEquals(IntakeConfirmation.Outcome.Warned(listOf(IntakeWarning.Expired(ExpiryDate(today.minusDays(1))))), asked)
-        assertEquals(IntakeStatus.PLANNED, requireNotNull(intakes.find(INTAKE)).status)
-        assertEquals(tablets("20"), requireNotNull(packages.find(PACK)).quantity)
-        assertTrue(commands().isEmpty())
-
-        val confirmed = confirmation.confirm(INTAKE, PACK, dose("2"), FIRST_PLANNED_AT, acknowledged = true).confirmed()
-        assertEquals(IntakeStatus.TAKEN, confirmed.intake.status)
+        assertTrue("просрочка спросила, а не записала: $outcome", outcome is IntakeConfirmation.Outcome.Confirmed)
+        assertEquals(IntakeStatus.TAKEN, requireNotNull(intakes.find(INTAKE)).status)
         assertEquals(tablets("18"), requireNotNull(packages.find(PACK)).quantity)
-        // Повтор по уже принятому вопросов не задаёт: отвечает записанным.
-        assertEquals(confirmed.intake.status, confirmation.confirm(INTAKE, PACK, dose("2"), FIRST_PLANNED_AT).confirmed().intake.status)
     }
 
     @Test

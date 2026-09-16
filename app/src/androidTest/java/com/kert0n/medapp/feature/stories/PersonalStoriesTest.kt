@@ -136,10 +136,10 @@ class PersonalStoriesTest {
 
     /**
      * **J2.5 Просрочка.** Пачка с прошедшей датой: первой в списке при любой сортировке, помечена,
-     * предупреждает при приёме, а сама не удаляется — назавтра она всё ещё на месте.
+     * принимается без вопроса, а сама не удаляется — назавтра она всё ещё на месте.
      */
     @Test
-    fun anExpiredPackageIsFirstMarkedAndWarnsButStays() = runTest {
+    fun anExpiredPackageIsFirstMarkedAndStaysWithoutAsking() = runTest {
         val scenarios = Scenarios(database, now)
         val fresh = added(scenarios, HOME_KIT, "Аспирин", "10")
         val expired = added(scenarios, HOME_KIT, "Цитрамон", "10", expiresOn = today.minusDays(1))
@@ -152,9 +152,8 @@ class PersonalStoriesTest {
         assertEquals(listOf(expired), marked.map { it.id })
         assertTrue(requireNotNull(database.packageRepository().observe(expired).first()).facts.expiresOn!!.isExpiredOn(today))
 
-        val warned = scenarios.unplannedIntakeRecording.record(expired, dose("1"), now)
-        assertEquals(UnplannedIntakeRecording.Outcome.Warned(listOf(IntakeWarning.Expired(ExpiryDate(today.minusDays(1))))), warned)
-        assertTrue(scenarios.unplannedIntakeRecording.record(expired, dose("1"), now, acknowledged = true) is UnplannedIntakeRecording.Outcome.Recorded)
+        // Принять из неё можно без вопроса: срок показан, решает человек (C1, поправка 2026-09-16).
+        assertTrue(scenarios.unplannedIntakeRecording.record(expired, dose("1"), now) is UnplannedIntakeRecording.Outcome.Recorded)
 
         val tomorrow = Scenarios(database, now.plusSeconds(86_400))
         tomorrow.dailyRound.run()
