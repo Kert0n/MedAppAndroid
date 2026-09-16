@@ -10,7 +10,6 @@ import androidx.core.app.NotificationCompat
 import androidx.core.app.NotificationManagerCompat
 import androidx.core.content.ContextCompat
 import com.kert0n.medapp.R
-import com.kert0n.medapp.domain.intake.IntakeProjection
 import com.kert0n.medapp.domain.notification.Delivery
 import com.kert0n.medapp.domain.notification.NotificationAction
 import com.kert0n.medapp.domain.notification.NotificationKey
@@ -24,7 +23,6 @@ import com.kert0n.medapp.storage.course.CourseStorageRepository
 import com.kert0n.medapp.storage.intake.IntakeStorageRepository
 import com.kert0n.medapp.storage.pack.PackageStorageRepository
 import dagger.hilt.android.qualifiers.ApplicationContext
-import java.time.ZoneId
 import java.time.format.DateTimeFormatter
 import java.time.format.FormatStyle
 import javax.inject.Inject
@@ -75,10 +73,9 @@ class SystemNotifier @Inject constructor(
             .setContentIntent(openIntent(reminder))
         for (action in reminder.actions) {
             val intake = (reminder.target as? NotificationTarget.Intake)?.intakeId ?: continue
-            // «Принял» открывает приложение — с целью и действием в extras, не через приёмник:
-            // запуск активности из приёмника платформа запрещает (trampoline, C1).
-            val intent = if (action.handledInBackground) actionIntent(intake, action, reminder.key) else openIntent(reminder, action)
-            builder.addAction(0, context.getString(action.label), intent)
+            // Все действия — без экрана, своим приёмником: «Принял» пишет в фоне, а не вышло —
+            // приходит «нужно ваше решение» (C1). Запускать окно из приёмника платформа не даёт.
+            builder.addAction(0, context.getString(action.label), actionIntent(intake, action, reminder.key))
         }
         NotificationManagerCompat.from(context).notify(reminder.key.subject, reminder.kind.ordinal, builder.build())
         return Delivery.SHOWN
@@ -98,6 +95,10 @@ class SystemNotifier @Inject constructor(
             val dose = "${intake.plannedAmount.quantity.amount.stripTrailingZeros().toPlainString()} ${intake.plannedAmount.unit.name}"
             val pkg = intake.plannedPackage?.name
             when (notification.kind) {
+                NotificationKind.INTAKE_DECISION -> Text(
+                    context.getString(R.string.notice_intake_decision_title, title),
+                    context.getString(R.string.notice_intake_decision_body)
+                )
                 NotificationKind.INTAKE_DUE -> Text(
                     context.getString(R.string.notice_intake_due_title, title),
                     if (pkg != null) context.getString(R.string.notice_intake_due_body, dose, pkg) else context.getString(R.string.notice_intake_due_unsupplied, dose)
@@ -147,11 +148,11 @@ class SystemNotifier @Inject constructor(
      * [NotificationTargetExtras], который их потом читает. Платформа не знает экранов и их
      * Activity (H1) — открывается то, что пакет объявил точкой входа.
      */
-    private fun openIntent(notification: Reminder, action: NotificationAction? = null): PendingIntent {
+    private fun openIntent(notification: Reminder): PendingIntent {
         val intent = requireNotNull(context.packageManager.getLaunchIntentForPackage(context.packageName)) { "у приложения есть точка входа" }
             .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_SINGLE_TOP)
-            .setIdentifier(identity(notification.key, action))
-        NotificationTargetExtras.put(intent, notification.target, action)
+            .setIdentifier(identity(notification.key, null))
+        NotificationTargetExtras.put(intent, notification.target)
         return PendingIntent.getActivity(context, notification.key.hashCode(), intent, PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE)
     }
 

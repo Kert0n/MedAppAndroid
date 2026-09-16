@@ -1,7 +1,5 @@
 package com.kert0n.medapp.platform.notifications
 
-import com.kert0n.medapp.domain.notification.NotificationOpening
-import com.kert0n.medapp.domain.notification.NotificationAction
 import com.kert0n.medapp.domain.notification.NotificationTarget
 import java.io.File
 import java.time.LocalDate
@@ -29,19 +27,8 @@ class NotificationTargetExtrasTest {
     @Test
     fun everyTargetSurvivesTheRoundTrip() {
         for (target in samples) {
-            assertEquals(NotificationOpening(target, null), NotificationTargetExtras.decode(NotificationTargetExtras.encode(target)))
+            assertEquals(target, NotificationTargetExtras.decode(NotificationTargetExtras.encode(target)))
         }
-    }
-
-    /** Кнопка «Принял» — то же намерение с действием: действие читается, а незнакомое не роняет цель. */
-    @Test
-    fun theActionTravelsWithTheTargetAndAStrangeOneIsIgnored() {
-        val intake = samples.first()
-        for (action in NotificationAction.entries) {
-            assertEquals(NotificationOpening(intake, action), NotificationTargetExtras.decode(NotificationTargetExtras.encode(intake, action)))
-        }
-        val strange = NotificationTargetExtras.encode(intake) + ("notification_action" to "DANCE")
-        assertEquals(NotificationOpening(intake, null), NotificationTargetExtras.decode(strange))
     }
 
     @Test
@@ -72,7 +59,7 @@ class NotificationTargetExtrasTest {
      */
     @Test
     fun aRestoredWindowCarriesNoOpening() {
-        val extras = NotificationTargetExtras.encode(samples.first(), NotificationAction.TAKE)
+        val extras = NotificationTargetExtras.encode(samples.first())
 
         assertNull(NotificationTargetExtras.launchOpening(extras, flags = 0, windowRestored = true))
     }
@@ -88,10 +75,10 @@ class NotificationTargetExtrasTest {
     /** Свежее окно и новое намерение цель несут: это и есть нажатие человека. */
     @Test
     fun aFreshLaunchCarriesItsOpening() {
-        val extras = NotificationTargetExtras.encode(samples.first(), NotificationAction.TAKE)
+        val extras = NotificationTargetExtras.encode(samples.first())
 
         assertEquals(
-            NotificationOpening(samples.first(), NotificationAction.TAKE),
+            samples.first(),
             NotificationTargetExtras.launchOpening(extras, flags = Intent.FLAG_ACTIVITY_NEW_TASK, windowRestored = false)
         )
     }

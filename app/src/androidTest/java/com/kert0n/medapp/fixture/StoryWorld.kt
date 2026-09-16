@@ -4,7 +4,7 @@ import androidx.compose.runtime.mutableStateOf
 import com.kert0n.medapp.domain.notification.NotificationAction
 import com.kert0n.medapp.domain.notification.NotificationKey
 import com.kert0n.medapp.domain.notification.NotificationKind
-import com.kert0n.medapp.domain.notification.NotificationOpening
+import com.kert0n.medapp.domain.notification.NotificationTarget
 import com.kert0n.medapp.domain.notification.Reminder
 import com.kert0n.medapp.feature.notification.DailyRound
 import com.kert0n.medapp.feature.notification.NotificationReconciliation
@@ -49,7 +49,7 @@ class StoryWorld private constructor(start: Instant, zone: ZoneId) {
     val daily = FakeDailySchedule()
 
     /** Нажатие на карточку уведомления: оболочка применяет его так же, как намерение окна. */
-    val opening = mutableStateOf<NotificationOpening?>(null)
+    val opening = mutableStateOf<NotificationTarget?>(null)
 
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
 
@@ -117,27 +117,25 @@ class StoryWorld private constructor(start: Instant, zone: ZoneId) {
     fun cardUp(intakeId: Uuid, kind: NotificationKind = NotificationKind.INTAKE_DUE): Boolean =
         NotificationKey.intake(intakeId, kind) in shade.cards
 
-    /**
-     * Нажатие на карточку или на «Принял»: карточка гаснет (`setAutoCancel`), а приложение
-     * открывается с её целью и действием.
-     */
-    suspend fun tap(reminder: Reminder, action: NotificationAction? = null) {
-        if (action == null) shade.dismiss(reminder.key)
-        opening.value = NotificationOpening(reminder.target, action)
+    /** Нажатие на карточку: она гаснет (`setAutoCancel`), а приложение открывается с её целью. */
+    suspend fun tap(reminder: Reminder) {
+        shade.dismiss(reminder.key)
+        opening.value = reminder.target
     }
 
     /**
-     * «Пропустить» и «Отложить» в шторке — то, что делает `NotificationActionReceiver`: ответ тем же
+     * Кнопка на карточке в шторке — то, что делает `NotificationActionReceiver`: ответ тем же
      * сценарием, затем карточка гаснет сразу. Системный приёмник вне системы не поднять: `goAsync`
      * у него есть только при настоящей доставке сигнала.
      */
-    suspend fun inShade(intakeId: Uuid, action: NotificationAction) {
-        when (action) {
+    suspend fun inShade(intakeId: Uuid, action: NotificationAction): ReminderAnswering.Response {
+        val response = when (action) {
+            NotificationAction.TAKE -> answering.take(intakeId)
             NotificationAction.SKIP -> answering.skip(intakeId)
             NotificationAction.SNOOZE -> answering.snooze(intakeId)
-            NotificationAction.TAKE -> error("«Принял» открывает приложение: tap(reminder, TAKE)")
         }
         shade.dismiss(NotificationKey.intake(intakeId, NotificationKind.INTAKE_DUE))
+        return response
     }
 
     fun end() {

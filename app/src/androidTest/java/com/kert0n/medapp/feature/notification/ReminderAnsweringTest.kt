@@ -8,7 +8,6 @@ import com.kert0n.medapp.domain.notification.NotificationAction
 import com.kert0n.medapp.domain.notification.NotificationKind
 import com.kert0n.medapp.domain.notification.NotificationTarget
 import com.kert0n.medapp.domain.notification.Reminder
-import com.kert0n.medapp.domain.pack.ExpiryDate
 import com.kert0n.medapp.domain.value.Doses
 import com.kert0n.medapp.feature.course.CourseDrafting
 import com.kert0n.medapp.fixture.OTHER_PACK
@@ -16,7 +15,6 @@ import com.kert0n.medapp.fixture.PACK
 import com.kert0n.medapp.fixture.Scenarios
 import com.kert0n.medapp.fixture.TABLET_FORM
 import com.kert0n.medapp.fixture.dose
-import com.kert0n.medapp.fixture.factsOf
 import com.kert0n.medapp.fixture.inMemoryDatabase
 import com.kert0n.medapp.fixture.intakeRepository
 import com.kert0n.medapp.fixture.pack
@@ -88,19 +86,70 @@ class ReminderAnsweringTest {
         Reminder(reminderKey(intake), com.kert0n.medapp.domain.notification.NotificationTarget.Intake(intake.id), intake.plannedAt)
 
     /**
-     * «Принял» требует экрана при просрочке, отменённом курсе и затронутых бронях, а запустить
-     * экран из приёмника уведомления платформа с Android 12 не даёт (C1). Поэтому без экрана
-     * обходятся только два действия — они и идут приёмнику; «Принял» открывает приложение.
+     * **Все три действия — без экрана** (C1, поправка владельца 2026-09-16): приложение из шторки
+     * не открывается. У остальных видов действий нет вовсе: отвечать там не на что.
      */
     @Test
-    fun onlySkipAndSnoozeNeedNoScreen() {
+    fun onlyTheIntakeReminderCarriesActions() {
         assertEquals(
             listOf(NotificationAction.TAKE, NotificationAction.SKIP, NotificationAction.SNOOZE),
             NotificationKind.INTAKE_DUE.actions
         )
-        assertEquals(listOf(NotificationAction.SKIP, NotificationAction.SNOOZE), NotificationAction.entries.filter { it.handledInBackground })
-        // И у остального действий нет вовсе: отвечать там не на что.
         assertTrue(NotificationKind.entries.filter { it != NotificationKind.INTAKE_DUE }.all { it.actions.isEmpty() })
+    }
+
+    /**
+     * **«Принял» пишет в фоне** (C1): плановая пачка и доза, в момент нажатия, без перехода в
+     * приложение. Открывай его — и человек, нажавший кнопку у плиты, видит мелькнувшее окно и
+     * «Аптечки», будто ничего не произошло (опыт владельца на Pixel).
+     */
+    @Test
+    fun takeWritesWithoutTheScreen() = runTest {
+        val id = treated()
+        val intake = first(id)
+        scenarios.reminderPromising.promise(listOf(reminderFor(intake)))
+
+        assertEquals(ReminderAnswering.Response.Done, scenarios.reminderAnswering.take(intake.id))
+
+        assertEquals(IntakeStatus.TAKEN, requireNotNull(database.intakeRepository().find(intake.id)).status)
+        assertEquals(tablets("18"), requireNotNull(database.packageRepository().find(PACK)).quantity)
+        assertEquals(Reminder.State.WITHDRAWN, requireNotNull(scenarios.reminderStore.find(reminderKey(intake))).state)
+    }
+
+    /**
+     * **Не записалось — «нужно ваше решение»**, а не тишина (C1). Коробку, из которой лечение
+     * берёт, убрали из аптечки: «Принял» ничего не пишет и заводит обязательство, нажатие на
+     * которое ведёт на карточку пункта. Промолчи — и человек уверен, что приём записан.
+     */
+    @Test
+    fun aTakeThatCannotBeWrittenAsksForADecision() = runTest {
+        val id = treated()
+        val intake = first(id)
+        scenarios.packageRemoval.remove(PACK)
+
+        assertEquals(ReminderAnswering.Response.NeedsDecision, scenarios.reminderAnswering.take(intake.id))
+
+        assertEquals(IntakeStatus.PLANNED, requireNotNull(database.intakeRepository().find(intake.id)).status)
+        val decision = requireNotNull(scenarios.reminderStore.find(NotificationKey.intake(intake.id, NotificationKind.INTAKE_DECISION)))
+        assertEquals(Reminder.State.DUE, decision.state)
+        assertEquals(com.kert0n.medapp.domain.notification.NotificationTarget.Intake(intake.id), decision.target)
+    }
+
+    /** Решение принято на карточке — «нужно ваше решение» снимается вместе с напоминанием. */
+    @Test
+    fun answeringTheIntakeWithdrawsTheDecisionNotice() = runTest {
+        val id = treated()
+        val intake = first(id)
+        scenarios.reminderPromising.promise(
+            listOf(Reminder(NotificationKey.intake(intake.id, NotificationKind.INTAKE_DECISION), com.kert0n.medapp.domain.notification.NotificationTarget.Intake(intake.id), now))
+        )
+
+        scenarios.intakeDeclining.decline(intake.id, now)
+
+        assertEquals(
+            Reminder.State.WITHDRAWN,
+            requireNotNull(scenarios.reminderStore.find(NotificationKey.intake(intake.id, NotificationKind.INTAKE_DECISION))).state
+        )
     }
 
     /** «Отложить» сдвигает будильник на snoozeMinutes; plannedAt и статус пункта прежние. */

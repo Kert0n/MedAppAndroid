@@ -4,9 +4,8 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
-import com.kert0n.medapp.domain.notification.NotificationOpening
+import com.kert0n.medapp.domain.notification.NotificationTarget
 import com.kert0n.medapp.app.navigation.MedAppShell
-import com.kert0n.medapp.platform.notifications.NotificationTargetExtras
 import com.kert0n.medapp.presentation.bootstrap.AppStartState
 import com.kert0n.medapp.presentation.bootstrap.AppStartViewModel
 import com.kert0n.medapp.ui.bootstrap.SetupScreen
@@ -20,7 +19,7 @@ import com.kert0n.medapp.ui.bootstrap.SetupScreen
  */
 @Composable
 fun MedAppApp(
-    opening: NotificationOpening? = null,
+    opening: NotificationTarget? = null,
     onOpened: () -> Unit = {},
     viewModel: AppStartViewModel = hiltViewModel()
 ) {

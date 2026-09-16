@@ -241,6 +241,8 @@
     <string name="notice_intake_due_title">Пора принять: %1$s</string>
     <string name="notice_intake_due_body">%1$s из коробки «%2$s»</string>
     <string name="notice_intake_due_unsupplied">%1$s — коробки для этого приёма нет</string>
+    <string name="notice_intake_decision_title">Не записано: %1$s</string>
+    <string name="notice_intake_decision_body">«Принял» не смог записать приём — откройте, чтобы решить, откуда взять дозу</string>
     <string name="notice_intake_missed_title">Пропущен приём: %1$s</string>
     <string name="notice_intake_missed_body">Вчерашний приём %1$s остался без ответа</string>
     <string name="notice_expiry_3d_title">Через три дня истекает срок: %1$s</string>

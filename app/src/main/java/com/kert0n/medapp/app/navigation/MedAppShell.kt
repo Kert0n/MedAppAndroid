@@ -34,8 +34,6 @@ import com.kert0n.medapp.presentation.intake.UnplannedIntakeViewModel
 import com.kert0n.medapp.ui.intake.UnplannedIntakeSheet
 import com.kert0n.medapp.presentation.intake.IntakeCardViewModel
 import com.kert0n.medapp.presentation.intake.IntakeHistoryViewModel
-import com.kert0n.medapp.domain.notification.NotificationAction
-import com.kert0n.medapp.domain.notification.NotificationOpening
 import com.kert0n.medapp.domain.notification.NotificationTarget
 import com.kert0n.medapp.presentation.notification.ExpiringTodayViewModel
 import com.kert0n.medapp.presentation.plan.DayPlanViewModel
@@ -94,7 +92,7 @@ import com.kert0n.medapp.ui.pack.PackageTransferScreen
 fun MedAppShell(
     modifier: Modifier = Modifier,
     stacks: TabStacks = rememberTabStacks(),
-    opening: NotificationOpening? = null,
+    opening: NotificationTarget? = null,
     onOpened: () -> Unit = {}
 ) {
     // Режим места «План» держит оболочка: уведомление о плане дня ведёт прямо на день, а не на
@@ -106,11 +104,8 @@ fun MedAppShell(
     // Цель применяется **один раз**: иначе поворот экрана возвращал бы человека туда, откуда он
     // уже ушёл. Намерение опустошает окно, а эта проверка бережёт от повторного применения.
     LaunchedEffect(opening) {
-        val asked = opening ?: return@LaunchedEffect
-        when (val target = asked.target) {
-            is NotificationTarget.Intake -> stacks.go(
-                Screen.IntakeCard(target.intakeId, answerAtOnce = asked.action == NotificationAction.TAKE)
-            )
+        when (val target = opening ?: return@LaunchedEffect) {
+            is NotificationTarget.Intake -> stacks.go(Screen.IntakeCard(target.intakeId))
             is NotificationTarget.PackageCard -> stacks.go(Screen.PackageCard(target.packageId))
             is NotificationTarget.CourseSources -> stacks.go(Screen.CourseSources(target.courseId))
             // Сводка ведёт на план дня: даты в маршруте нет — страница дня держит сдвиг, а не
@@ -367,14 +362,6 @@ private fun screens(stacks: TabStacks, planMode: MutableState<PlanMode>) = entry
         val state = model.state.collectAsStateWithLifecycle().value
         // Ответ дан — карточка уходит: человек отвечал на приём, а не заполнял форму.
         LaunchedEffect(state.isDone) { if (state.isDone) stacks.back() }
-        // «Принял» нажали в шторке: карточка отвечает сама — тем же вызовом, что и кнопка. Есть
-        // вопрос — он виден здесь же, и до ответа не записано ничего (PLAN D6, H3 №18).
-        var answeredAtOnce by rememberSaveable { mutableStateOf(false) }
-        LaunchedEffect(key.answerAtOnce, state.isLoading) {
-            if (!key.answerAtOnce || answeredAtOnce || state.isLoading || !state.canAnswer) return@LaunchedEffect
-            answeredAtOnce = true
-            model.confirm()
-        }
         IntakeCardScreen(
             state = state,
             onEdit = model::edit,

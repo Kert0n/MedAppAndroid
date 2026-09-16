@@ -4,7 +4,12 @@ import com.kert0n.medapp.domain.notification.NotificationKey
 import com.kert0n.medapp.domain.notification.NotificationKind
 import com.kert0n.medapp.domain.notification.NotificationSettingsSource
 import com.kert0n.medapp.domain.notification.Reminder
+import com.kert0n.medapp.domain.intake.CourseIntake
+import com.kert0n.medapp.domain.intake.IntakeRejected
+import com.kert0n.medapp.domain.notification.NotificationTarget
+import com.kert0n.medapp.feature.intake.IntakeConfirmation
 import com.kert0n.medapp.feature.intake.IntakeDeclining
+import com.kert0n.medapp.storage.intake.IntakeStorageRepository
 import com.kert0n.medapp.storage.notification.ReminderStorageRepository
 import java.time.Clock
 import java.time.Duration
@@ -13,22 +18,47 @@ import javax.inject.Inject
 import kotlin.uuid.Uuid
 
 /**
- * Ответ на напоминание из шторки — тем же путём, что с экрана (PLAN D8, C1): «Пропустить» —
- * `IntakeDeclining`, «Отложить» — сдвиг срока обязательства на `snoozeMinutes`.
- *
- * «Принял» здесь нет. Он требует экрана всякий раз, когда есть о чём предупредить — просрочка,
- * отменённый курс, затронутые брони, — а запустить экран из приёмника уведомления платформа с
- * Android 12 не даёт. Записывать молча, не показав предупреждения, нельзя: предупреждение
- * действием из шторки не обходится. Кнопка вернётся вместе с экраном в U5.
+ * Ответ на напоминание из шторки — тем же путём, что с экрана (PLAN D8, C1): «Принял» —
+ * `IntakeConfirmation` с тем, что записано в пункте; «Пропустить» — `IntakeDeclining`; «Отложить» —
+ * сдвиг срока обязательства на `snoozeMinutes`. Приложение не открывается ни в одном случае.
  */
 class ReminderAnswering @Inject constructor(
     private val declining: IntakeDeclining,
+    private val confirmation: IntakeConfirmation,
+    private val intakes: IntakeStorageRepository,
+    private val promising: ReminderPromising,
     private val reminders: ReminderStorageRepository,
     private val withdrawal: ReminderWithdrawal,
     private val settings: NotificationSettingsSource,
     private val transactions: com.kert0n.medapp.queue.Transactions,
     private val clock: Clock
 ) {
+
+    /**
+     * «Принял» из шторки — **без экрана** (PLAN C1, поправка владельца 2026-09-16): принято то, что
+     * записано в пункте, — плановая пачка и доза, — в момент нажатия, тем же сценарием, что быстрый
+     * ответ на «Дне». Открыть приложение, ответить за человека и закрыть его выглядело как «ничего
+     * не произошло».
+     *
+     * Не вышло — не пишется ничего, и молча это не проходит: заводится обязательство «нужно ваше
+     * решение», нажатие на него ведёт на карточку пункта. Курс закрыт или пункта нет — решать нечего.
+     */
+    suspend fun take(intakeId: Uuid): Response {
+        val intake = intakes.find(intakeId) as? CourseIntake ?: return Response.Done
+        val planned = intake.plannedPackage
+        val outcome = planned?.let { confirmation.confirm(intakeId, it.id, intake.plannedAmount, clock.instant()) }
+        return when {
+            outcome is IntakeConfirmation.Outcome.Confirmed || outcome == IntakeConfirmation.Outcome.Gone -> Response.Done
+            outcome is IntakeConfirmation.Outcome.Rejected && outcome.reason == IntakeRejected.Reason.EPISODE_CLOSED -> {
+                withdrawal.withdraw(intakeId)
+                Response.Done
+            }
+            else -> {
+                promising.promise(listOf(Reminder(NotificationKey.intake(intakeId, NotificationKind.INTAKE_DECISION), NotificationTarget.Intake(intakeId), clock.instant())))
+                Response.NeedsDecision
+            }
+        }
+    }
 
     /** Отказ человека: пункт становится пропуском, и напоминать о нём больше нечего. */
     suspend fun skip(intakeId: Uuid): Response = when (declining.decline(intakeId, clock.instant())) {
@@ -78,5 +108,8 @@ class ReminderAnswering @Inject constructor(
     sealed interface Response {
         data object Done : Response
         data class Snoozed(val at: Instant) : Response
+
+        /** «Принял» не записал: пришло «нужно ваше решение», и решает человек на карточке. */
+        data object NeedsDecision : Response
     }
 }

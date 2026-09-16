@@ -192,12 +192,12 @@ class SystemNotifierTest {
     }
 
     /**
-     * «Принял» — намерение **открыть приложение**, «Пропустить» и «Отложить» — широковещание
-     * приёмнику: первый требует экрана, вторым он не нужен. Из приёмника активность не открыть
-     * (trampoline), поэтому кнопка и едет активностью — с целью и действием в extras.
+     * **Все три кнопки едут приёмнику**, ни одна не открывает приложение (C1, поправка владельца
+     * 2026-09-16): «Принял» пишет в фоне, а не вышло — приходит «нужно ваше решение». Открой
+     * «Принял» окно — и человек снова видит мелькнувшее приложение вместо записанного приёма.
      */
     @Test
-    fun takeOpensTheAppWhileSkipAndSnoozeGoToTheReceiver() = runTest {
+    fun everyActionGoesToTheReceiver() = runTest {
         if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.TIRAMISU) {
             InstrumentationRegistry.getInstrumentation().uiAutomation
                 .grantRuntimePermission(context.packageName, Manifest.permission.POST_NOTIFICATIONS)
@@ -227,7 +227,7 @@ class SystemNotifierTest {
         val actions = shown.notification.actions.associateBy { it.title.toString() }
         assertEquals(setOf("Принял", "Пропустить", "Отложить"), actions.keys)
         if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.S) {
-            assertTrue("«Принял» не открывает приложение", actions.getValue("Принял").actionIntent.isActivity)
+            assertTrue("«Принял» открывает активность", actions.getValue("Принял").actionIntent.isBroadcast)
             assertTrue("«Пропустить» открывает активность — trampoline", actions.getValue("Пропустить").actionIntent.isBroadcast)
             assertTrue("«Отложить» открывает активность — trampoline", actions.getValue("Отложить").actionIntent.isBroadcast)
         }

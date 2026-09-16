@@ -6,7 +6,7 @@ import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.compose.runtime.mutableStateOf
-import com.kert0n.medapp.domain.notification.NotificationOpening
+import com.kert0n.medapp.domain.notification.NotificationTarget
 import com.kert0n.medapp.platform.notifications.NotificationTargetExtras
 import com.kert0n.medapp.ui.theme.MedAppTheme
 import dagger.hilt.android.AndroidEntryPoint
@@ -26,7 +26,7 @@ import dagger.hilt.android.AndroidEntryPoint
 class MainActivity : ComponentActivity() {
 
     /** Цель, которую оболочка ещё не применила; применила — `null`. */
-    private val opening = mutableStateOf<NotificationOpening?>(null)
+    private val opening = mutableStateOf<NotificationTarget?>(null)
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -56,12 +56,12 @@ class MainActivity : ComponentActivity() {
         outState.putBundle(
             PENDING,
             Bundle().apply {
-                for ((key, value) in NotificationTargetExtras.encode(pending.target, pending.action)) putString(key, value)
+                for ((key, value) in NotificationTargetExtras.encode(pending)) putString(key, value)
             }
         )
     }
 
-    private fun pendingOf(saved: Bundle): NotificationOpening? =
+    private fun pendingOf(saved: Bundle): NotificationTarget? =
         NotificationTargetExtras.decode(saved.keySet().mapNotNull { key -> saved.getString(key)?.let { key to it } }.toMap())
 
     private companion object {

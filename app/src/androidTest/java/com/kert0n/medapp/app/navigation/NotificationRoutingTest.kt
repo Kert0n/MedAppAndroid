@@ -7,8 +7,6 @@ import androidx.compose.ui.test.onNodeWithText
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import com.kert0n.medapp.HiltTestActivity
 import com.kert0n.medapp.domain.intake.CourseIntake
-import com.kert0n.medapp.domain.notification.NotificationOpening
-import com.kert0n.medapp.domain.notification.NotificationAction
 import com.kert0n.medapp.domain.notification.NotificationTarget
 import com.kert0n.medapp.domain.pack.ExpiryDate
 import com.kert0n.medapp.domain.value.Doses
@@ -79,10 +77,10 @@ class NotificationRoutingTest {
         }
     }
 
-    private fun open(target: NotificationTarget, action: NotificationAction? = null) {
+    private fun open(target: NotificationTarget) {
         compose.setContent {
             MedAppTheme {
-                MedAppShell(opening = NotificationOpening(target, action))
+                MedAppShell(opening = target)
             }
         }
     }
