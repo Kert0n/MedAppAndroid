@@ -107,12 +107,24 @@ private class CodeReader(
     }
 }
 
-/** Пустой код кодом не является: показывать о нём нечего и спрашивать о нём нечего. */
-private fun Barcode.scanned(): ScannedCode? =
-    rawValue?.takeIf { it.isNotEmpty() }?.let { ScannedCode(codeFormat(format), it) }
+/**
+ * Код, как его прочитал распознаватель. Пустой код кодом не является: показывать и спрашивать о
+ * нём нечего.
+ *
+ * **Ведущий разделитель снимается, внутренние остаются.** Первым знаком GS1-код несёт признак
+ * FNC1, и ML Kit отдаёт его обычным `U+001D` в начале строки (снимок настоящей коробки,
+ * 2026-09-17). Тот же признак сетевая граница дописывает текстом `{FNC1}` (PLAN H5), и оставь мы
+ * его здесь — в реестр уехал бы код с удвоенным началом. Разделители **между полями** это
+ * значащие знаки, и они остаются на месте: правило «код не разбирается» их и защищает.
+ */
+fun Barcode.scanned(): ScannedCode? =
+    rawValue?.removePrefix(FNC1)?.takeIf { it.isNotEmpty() }?.let { ScannedCode(codeFormat(format), it) }
+
+/** Признак GS1 в начале кода — каким его отдаёт распознаватель. */
+private const val FNC1 = "\u001D"
 
 /** Что за код перед камерой — словами домена. Всё, кроме двух знакомых форматов, — чужое. */
-internal fun codeFormat(format: Int): CodeFormat = when (format) {
+fun codeFormat(format: Int): CodeFormat = when (format) {
     Barcode.FORMAT_DATA_MATRIX -> CodeFormat.DATA_MATRIX
     Barcode.FORMAT_QR_CODE -> CodeFormat.QR
     else -> CodeFormat.OTHER
