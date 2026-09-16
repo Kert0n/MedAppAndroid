@@ -3,6 +3,7 @@ package com.kert0n.medapp.domain.notification
 import com.kert0n.medapp.fixture.INTAKE
 import java.time.Duration
 import java.time.Instant
+import java.time.ZoneOffset
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNotEquals
@@ -89,12 +90,12 @@ class ReminderTest {
         val reminder = reminder()
 
         reminder.failedAt(at)
-        val first = requireNotNull(reminder.wakeAt(at))
+        val first = requireNotNull(reminder.wakeAt(at, ZoneOffset.UTC))
         assertTrue(first.isAfter(at))
         assertFalse(reminder.isDue(at))
 
         reminder.failedAt(first)
-        val second = requireNotNull(reminder.wakeAt(first))
+        val second = requireNotNull(reminder.wakeAt(first, ZoneOffset.UTC))
         assertTrue("вторая задержка должна быть длиннее первой", Duration.between(first, second) > Duration.between(at, first))
     }
 
@@ -106,9 +107,51 @@ class ReminderTest {
     fun whatIsDueAndUnsaidAsksForNoAlarm() {
         val reminder = reminder()
 
-        assertEquals(at, reminder.wakeAt(at.minusSeconds(1)))
-        assertNull(reminder.wakeAt(at))
-        assertNull(reminder.wakeAt(at.plusSeconds(3600)))
+        assertEquals(at, reminder.wakeAt(at.minusSeconds(1), ZoneOffset.UTC))
+        assertNull(reminder.wakeAt(at, ZoneOffset.UTC))
+        assertNull(reminder.wakeAt(at.plusSeconds(3600), ZoneOffset.UTC))
+    }
+
+    /**
+     * **Говорится в свой день** (PLAN C1). До полуночи дня срока обязательство говорит, после —
+     * молчит, но остаётся невыполненным: его ждёт полка дня. Будильник за пределом дня не ставится —
+     * будить ради того, что не скажется, незачем.
+     */
+    @Test
+    fun anObligationSpeaksWithinItsDayAndThenWaitsForTheShelf() {
+        val reminder = reminder()
+        val midnight = Instant.parse("2027-03-11T00:00:00Z")
+
+        assertTrue(reminder.speaksAt(midnight.minusMillis(1), ZoneOffset.UTC))
+        assertFalse(reminder.speaksAt(midnight, ZoneOffset.UTC))
+        assertTrue("за пределом дня обязательство ждёт полку", reminder.isDue(midnight))
+    }
+
+    /** День считается в зоне устройства: в Новосибирске полночь наступает раньше, чем в Москве. */
+    @Test
+    fun theDayEndsAtTheDevicesMidnight() {
+        val reminder = reminder() // 06:00Z — 09:00 в Москве, 13:00 в Новосибирске
+        val moment = Instant.parse("2027-03-10T18:00:00Z") // 21:00 в Москве, 01:00 следующего дня в Новосибирске
+
+        assertTrue(reminder.speaksAt(moment, java.time.ZoneId.of("Europe/Moscow")))
+        assertFalse(reminder.speaksAt(moment, java.time.ZoneId.of("Asia/Novosibirsk")))
+    }
+
+    /** Очередь, ждущая решения, пределом дня не ограничена: решать её нужно и назавтра. */
+    @Test
+    fun theQueueAwaitingADecisionSpeaksOnAnyDay() {
+        val queue = Reminder(NotificationKey.sync(INTAKE), NotificationTarget.SyncStatus, at)
+
+        assertTrue(queue.speaksAt(at.plus(java.time.Duration.ofDays(3)), ZoneOffset.UTC))
+    }
+
+    /** Повтор после сбоя, назначенный на завтра, будильника не просит: завтра не скажется. */
+    @Test
+    fun aRetryPastItsDayAsksForNoAlarm() {
+        val reminder = reminder()
+        reminder.failedAt(Instant.parse("2027-03-10T23:59:30Z"))
+
+        assertNull(reminder.wakeAt(Instant.parse("2027-03-10T23:59:31Z"), ZoneOffset.UTC))
     }
 
     /** Отозванное и несказанное возвращается, когда повод вернулся; сказанное — уже нет. */

@@ -136,10 +136,10 @@ class PersonalStoriesTest {
 
     /**
      * **J2.5 Просрочка.** Пачка с прошедшей датой: первой в списке при любой сортировке, помечена,
-     * предупреждает при приёме, а сама не удаляется — назавтра она всё ещё на месте.
+     * принимается без вопроса, а сама не удаляется — назавтра она всё ещё на месте.
      */
     @Test
-    fun anExpiredPackageIsFirstMarkedAndWarnsButStays() = runTest {
+    fun anExpiredPackageIsFirstMarkedAndStaysWithoutAsking() = runTest {
         val scenarios = Scenarios(database, now)
         val fresh = added(scenarios, HOME_KIT, "Аспирин", "10")
         val expired = added(scenarios, HOME_KIT, "Цитрамон", "10", expiresOn = today.minusDays(1))
@@ -152,9 +152,8 @@ class PersonalStoriesTest {
         assertEquals(listOf(expired), marked.map { it.id })
         assertTrue(requireNotNull(database.packageRepository().observe(expired).first()).facts.expiresOn!!.isExpiredOn(today))
 
-        val warned = scenarios.unplannedIntakeRecording.record(expired, dose("1"), now)
-        assertEquals(UnplannedIntakeRecording.Outcome.Warned(listOf(IntakeWarning.Expired(ExpiryDate(today.minusDays(1))))), warned)
-        assertTrue(scenarios.unplannedIntakeRecording.record(expired, dose("1"), now, acknowledged = true) is UnplannedIntakeRecording.Outcome.Recorded)
+        // Принять из неё можно без вопроса: срок показан, решает человек (C1, поправка 2026-09-16).
+        assertTrue(scenarios.unplannedIntakeRecording.record(expired, dose("1"), now) is UnplannedIntakeRecording.Outcome.Recorded)
 
         val tomorrow = Scenarios(database, now.plusSeconds(86_400))
         tomorrow.dailyRound.run()
@@ -220,15 +219,16 @@ class PersonalStoriesTest {
 
         val last = on(lastDay)
         assertEquals(emptySet<Uuid>(), shownOn(last, NotificationKind.EXPIRY_SOURCE_1D))
-        val banners = last.reminderStore.observeAwaiting(NoticeDelivery.IN_APP_BANNER).first()
+        // Баннеры приложения — и срок, и пропуски лечения источника (C1 «Попап пропущенного»); здесь
+        // история о сроке, поэтому спрашиваются только его.
+        val banners = last.reminderStore.observeAwaiting(NoticeDelivery.IN_APP_BANNER).first().filter { it.kind == NotificationKind.EXPIRY_TODAY }
         assertEquals(setOf(source, plain), banners.map { Uuid.parse(it.key.subject.substringBefore('@')) }.toSet())
-        assertTrue(banners.all { it.kind == NotificationKind.EXPIRY_TODAY })
         last.reminderOutbox.bannerShown(banners.map { it.key })
-        assertTrue(last.reminderStore.observeAwaiting(NoticeDelivery.IN_APP_BANNER).first().isEmpty())
+        assertTrue(last.reminderStore.observeAwaiting(NoticeDelivery.IN_APP_BANNER).first().none { it.kind == NotificationKind.EXPIRY_TODAY })
 
         val after = on(lastDay.plusDays(1))
         after.dailyRound.run()
-        assertTrue(after.reminderStore.observeAwaiting(NoticeDelivery.IN_APP_BANNER).first().isEmpty())
+        assertTrue(after.reminderStore.observeAwaiting(NoticeDelivery.IN_APP_BANNER).first().none { it.kind == NotificationKind.EXPIRY_TODAY })
         val listed = database.packageRepository().list(PackageQuery(medKitId = HOME_KIT, filter = PackageQuery.Filter.Expired), lastDay.plusDays(1)).first()
         assertEquals(setOf(source, plain), listed.map { it.id }.toSet())
     }

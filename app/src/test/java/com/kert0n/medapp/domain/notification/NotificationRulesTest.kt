@@ -98,8 +98,12 @@ class NotificationRulesTest {
         assertFalse(planned.exact)
         assertEquals(NotificationChannel.DIGEST, planned.channel)
         assertEquals(NoticeDelivery.SYSTEM, planned.delivery)
-        // Баннер — свойство вида, а не решение вызывающего: только последний день годности (D8).
-        assertEquals(NoticeDelivery.IN_APP_BANNER, NotificationKind.EXPIRY_TODAY.delivery)
+        // Доставка внутри приложения — свойство вида, а не решение вызывающего: последний день
+        // годности и пропуск, который приходит попапом при входе (D8, C1 «Попап пропущенного»).
+        assertEquals(
+            setOf(NotificationKind.EXPIRY_TODAY, NotificationKind.INTAKE_MISSED),
+            NotificationKind.entries.filter { it.delivery == NoticeDelivery.IN_APP_BANNER }.toSet()
+        )
         assertEquals(NotificationChannel.Importance.HIGH, NotificationChannel.INTAKES.importance)
     }
 

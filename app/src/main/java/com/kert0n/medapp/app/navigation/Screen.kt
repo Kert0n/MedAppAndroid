@@ -87,11 +87,12 @@ sealed interface Screen : NavKey {
     data class SourcePicking(val courseId: Uuid) : Screen
 
     /**
-     * Карточка пункта плана. Названы оба: пункт читается среди пунктов своего лечения, а именем
-     * лечения карточка и подписана (PLAN H3 №18).
+     * Карточка пункта плана. Назван **только пункт**: столько же знает уведомление, которое сюда
+     * ведёт (`NotificationTarget.Intake`), а лечение карточка находит по самому приёму. Два входа
+     * в одно место с разными знаниями расходятся первыми (PLAN G3, H3 №18).
      */
     @Serializable
-    data class IntakeCard(val courseId: Uuid, val intakeId: Uuid) : Screen
+    data class IntakeCard(val intakeId: Uuid) : Screen
 
     /**
      * История приёмов. Спрашивается об **одном**: или о лечении, или о коробке — и это разные

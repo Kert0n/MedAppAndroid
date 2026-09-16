@@ -100,8 +100,11 @@ class DailyWorkerTest {
                 .filter { it.state == com.kert0n.medapp.domain.notification.Reminder.State.DUE }
                 .map { kotlin.uuid.Uuid.parse(it.key.subject) }.toSet()
         )
-        today.reminderOutbox.pass()
-        assertTrue(today.notifier.shown.any { it.kind == com.kert0n.medapp.domain.notification.NotificationKind.INTAKE_MISSED })
+        // О пропуске скажет попап при входе (C1 «Попап пропущенного»): обещание ждёт его.
+        assertTrue(
+            today.reminderStore.awaiting(com.kert0n.medapp.domain.notification.NoticeDelivery.IN_APP_BANNER)
+                .any { it.kind == com.kert0n.medapp.domain.notification.NotificationKind.INTAKE_MISSED }
+        )
     }
 
     /** Ежедневная задача одна: повторная постановка её не сдвигает; «сейчас» — отдельная разовая. */

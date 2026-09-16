@@ -3,11 +3,15 @@ package com.kert0n.medapp.presentation.plan
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.kert0n.medapp.domain.report.DayPlan
+import kotlinx.coroutines.flow.map
+import com.kert0n.medapp.domain.notification.NotificationChannel
+import com.kert0n.medapp.domain.notification.NotificationReadiness
 import com.kert0n.medapp.domain.value.Dose
 import com.kert0n.medapp.feature.intake.IntakeConfirmation
 import com.kert0n.medapp.feature.intake.IntakeDeclining
 import com.kert0n.medapp.feature.plan.DayPlanning
 import com.kert0n.medapp.feature.time.Today
+import com.kert0n.medapp.platform.settings.DevicePermissions
 import com.kert0n.medapp.presentation.ScreenState
 import dagger.hilt.android.lifecycle.HiltViewModel
 import java.time.Clock
@@ -37,12 +41,15 @@ import kotlinx.coroutines.launch
  * виду две страницы разом, и общее состояние показывало бы соседней чужие строки. Чтения хранятся
  * по сдвигу, потому что вернувшийся на вчерашнюю страницу ждёт её же, а не новой подписки.
  */
+@OptIn(kotlinx.coroutines.ExperimentalCoroutinesApi::class)
 @HiltViewModel
 class DayPlanViewModel @Inject constructor(
     private val today: Today,
     private val planning: DayPlanning,
     private val confirmation: IntakeConfirmation,
     private val declining: IntakeDeclining,
+    private val devicePermissions: DevicePermissions,
+    private val readiness: NotificationReadiness,
     private val clock: Clock
 ) : ViewModel() {
 
@@ -53,11 +60,37 @@ class DayPlanViewModel @Inject constructor(
     /** По каким пунктам прямо сейчас идёт запись: второе нажатие по ним ничего не начинает. */
     private val answering = MutableStateFlow(emptySet<Uuid>())
 
-    /** Пункт, о котором сценарий спросил: отвечать на вопрос человек идёт на карточку (H3 №12). */
-    val asksAbout = MutableStateFlow<DayQuestion?>(null)
-
     /** Чем кончился ответ, если по самой странице этого не видно. */
     private val message = MutableStateFlow<DayMessage?>(null)
+
+    /**
+     * Что мешает напомнить вовремя. Состояние спрашивается у системы, а меняет его человек в её
+     * настройках — поэтому перечитывается при каждом возвращении на экран ([refreshPermissions]),
+     * а не один раз при создании.
+     */
+    private val quiet = MutableStateFlow(permissionsNow())
+
+    val permissions: StateFlow<DayPermissionsPresentationDTO> = quiet
+
+    /**
+     * Что мешает напомнить — словами экрана. Можно ли сказать, отвечает тот же [NotificationReadiness],
+     * что и показ: заглушённый канал «Приёмы» иначе молчал бы, а день говорил, что всё хорошо (PLAN C1).
+     * Беды называются по одной и по порядку: без разрешения о канале и точности говорить нечего.
+     */
+    private fun permissionsNow(): DayPermissionsPresentationDTO {
+        val readiness = readiness.now()
+        val intakesMuted = readiness.allowed && NotificationChannel.INTAKES in readiness.muted
+        return DayPermissionsPresentationDTO(
+            notificationsOff = !readiness.allowed,
+            intakesMuted = intakesMuted,
+            alarmsInexact = readiness.canSay(NotificationChannel.INTAKES) && !devicePermissions.current().exactAlarms
+        )
+    }
+
+    /** Человек вернулся из системных настроек: спрашиваем заново — там он мог всё и починить. */
+    fun refreshPermissions() {
+        quiet.value = permissionsNow()
+    }
 
     /**
      * Страница дня, отстоящего от сегодняшнего на [daysAhead] дней. Спрашивается из вёрстки, то
@@ -77,9 +110,6 @@ class DayPlanViewModel @Inject constructor(
      * Быстрый ответ: принято то, что **уже записано в пункте**, — плановая пачка, плановая доза — и
      * в момент «сейчас». Человек нажал одну кнопку и ничего не называл, поэтому и берётся
      * назначенное, а не собранное экраном (H3 №12).
-     *
-     * Вопрос сценария быстрый путь не проглатывает: на него человек отвечает зная, и путь ведёт к
-     * карточке пункта, где вопросы показаны (D6 «вопрос — не отказ и не успех»).
      */
     fun confirm(intakeId: Uuid) {
         if (intakeId in answering.value) return
@@ -125,7 +155,6 @@ class DayPlanViewModel @Inject constructor(
     private fun told(planned: Planned, outcome: IntakeConfirmation.Outcome) {
         when (outcome) {
             is IntakeConfirmation.Outcome.Confirmed -> Unit
-            is IntakeConfirmation.Outcome.Warned -> asksAbout.value = DayQuestion(planned.courseId, planned.intakeId)
             is IntakeConfirmation.Outcome.Rejected -> message.value = DayMessage.Refused(outcome.reason)
             IntakeConfirmation.Outcome.Gone -> message.value = DayMessage.Gone
         }
@@ -146,25 +175,20 @@ class DayPlanViewModel @Inject constructor(
         message.value = null
     }
 
-    /** Вопрос показан — карточка открыта, и второй раз открывать её незачем. */
-    fun questionShown() {
-        asksAbout.value = null
-    }
-
     /**
      * Что записано в пункте: пачка, доза и лечение. Ищется среди страниц, на которые сейчас
      * смотрят, — номер приёма один на всё приложение, и гадать, с какой он страницы, незачем.
      */
-    private fun plannedOf(intakeId: Uuid): Planned? = readings.values
-        .asSequence()
-        .mapNotNull { it.value }
-        .flatMap { it.plan.items.asSequence() }
-        .filterIsInstance<DayPlan.Item.Scheduled>()
-        .firstOrNull { it.intake.id == intakeId }
-        ?.let { item ->
-            val pkg = item.intake.plannedPackage ?: return null
-            Planned(item.intake.courseId, item.intake.id, pkg.id, item.intake.plannedAmount)
-        }
+    private fun plannedOf(intakeId: Uuid): Planned? {
+        val onPages = readings.values.asSequence()
+            .mapNotNull { it.value }
+            .flatMap { it.plan.items.asSequence() }
+            .filterIsInstance<DayPlan.Item.Scheduled>()
+            .map { it.intake }
+        val intake = onPages.firstOrNull { it.id == intakeId } ?: return null
+        val pkg = intake.plannedPackage ?: return null
+        return Planned(intake.courseId, intake.id, pkg.id, intake.plannedAmount)
+    }
 
     private fun reading(daysAhead: Int): StateFlow<Reading?> = readings.getOrPut(daysAhead) {
         combine(today.observe(), planning.observe(daysAhead)) { day, plan -> Reading(plan, day.zone) }
@@ -183,5 +207,3 @@ class DayPlanViewModel @Inject constructor(
     )
 }
 
-/** Пункт, о котором сценарий спросил: карточка открывается по лечению и самому пункту. */
-data class DayQuestion(val courseId: Uuid, val intakeId: Uuid)

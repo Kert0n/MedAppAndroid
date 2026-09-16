@@ -137,6 +137,7 @@ class WriteContractTest {
         // Приём
         "IntakeStorageRepository.observeOfCourse" to (Shape.READ by "(Uuid): Flow<List<IntakeProjection>>"),
         "IntakeStorageRepository.observeOfPackage" to (Shape.READ by "(Uuid): Flow<List<IntakeProjection>>"),
+        "IntakeStorageRepository.observeOfIds" to (Shape.READ by "(Set<Uuid>): Flow<List<IntakeProjection>>"),
         "IntakeStorageRepository.ofCourse" to (Shape.READ by "(Uuid): List<? extends Intake>"),
         "IntakeStorageRepository.find" to (Shape.READ by "(Uuid): Intake"),
         "IntakeStorageRepository.syncStateOf" to (Shape.READ by "(Uuid): IntakeSyncState"),

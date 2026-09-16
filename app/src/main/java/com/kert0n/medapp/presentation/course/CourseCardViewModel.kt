@@ -51,9 +51,6 @@ class CourseCardViewModel @AssistedInject constructor(
 
     private val counting = MutableStateFlow(Counting())
 
-    /** Редакция плана, которую видел экран: по ней сценарий и узнаёт, что правят виденное (F5). */
-    private var revision: Revision? = null
-
     /** Эпизод — запись и план вместе: имя живёт у записи, состав пачек — у плана (PLAN D5). */
     private val episode = combine(courses.observeRecord(courseId), courses.observePlan(courseId)) { record, plan ->
         record to plan
@@ -66,7 +63,6 @@ class CourseCardViewModel @AssistedInject constructor(
         intakes.observeOfCourse(courseId),
         combine(cancelling, counting) { cancelling, counting -> cancelling to counting }
     ) { (record, plan), coverage, reductions, intakes, working ->
-        revision = plan?.revision
         if (record == null) CourseCardUiState(isGone = true)
         else record.toCardUiState(plan, coverage, reductions, intakes, working.first, working.second)
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), CourseCardUiState(isLoading = true))
@@ -110,13 +106,20 @@ class CourseCardViewModel @AssistedInject constructor(
         counting.value = Counting()
     }
 
-    /** Записать новый счёт доз мимо плана; второе нажатие ничего не начинает. */
-    fun countOffPlan(total: Int) {
+    /**
+     * Записать новый счёт доз мимо плана; второе нажатие ничего не начинает.
+     *
+     * Редакция приезжает **нажатием**, вместе с числом: по ней сценарий узнаёт, что правят
+     * виденное. Прочитай её здесь заново — и правка легла бы на расписание, изменившееся
+     * между взглядом и «Сохранить», а `Stale` из сценария так и не пришёл бы
+     * (F5, C1 «Действие — по показанному», CodeRabbit 4030390705).
+     */
+    fun countOffPlan(total: Int, revision: Revision?) {
         val now = counting.value
         if (!now.asking || now.working) return
         // Плана нет — правят не то, что видели: сказать об этом и закрыть вопрос, иначе кнопка
         // «Сохранить» отвечает молчанием.
-        val revision = revision ?: run {
+        if (revision == null) {
             counting.value = Counting(message = CourseCardMessage.Stale)
             return
         }
@@ -160,6 +163,7 @@ class CourseCardViewModel @AssistedInject constructor(
     ): CourseCardUiState {
         val zone = prescription.schedule.zone
         return CourseCardUiState(
+            revision = plan?.revision,
             course = toPresentationDTO(coverage),
             coverage = coverage?.takeIf { isOpen }?.toPresentationDTO(),
             reductions = reductions.map { it.toPresentationDTO(zone, intakes.packageNames()) },
@@ -226,6 +230,8 @@ class CourseCardViewModel @AssistedInject constructor(
  * законченного: у второго нет ни обеспечения, ни действий, а история остаётся.
  */
 data class CourseCardUiState(
+    /** Редакция плана, которую видел экран: не рисуется, по ней пишут поправку к счёту (F5). */
+    val revision: Revision? = null,
     val course: CoursePresentationDTO? = null,
     val coverage: CourseCoveragePresentationDTO? = null,
     val reductions: List<CoverageReductionPresentationDTO> = emptyList(),

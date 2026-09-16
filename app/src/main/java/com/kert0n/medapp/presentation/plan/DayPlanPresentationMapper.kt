@@ -1,8 +1,10 @@
 package com.kert0n.medapp.presentation.plan
 
+import com.kert0n.medapp.domain.intake.IntakeProjection
 import com.kert0n.medapp.domain.intake.IntakeStatus
 import com.kert0n.medapp.domain.report.DayPlan
 import com.kert0n.medapp.presentation.value.toPresentationDTO
+import java.time.LocalDate
 import java.time.ZoneId
 import kotlin.uuid.Uuid
 
@@ -45,22 +47,36 @@ private val DayPlan.Item.intakeId: Uuid?
         is DayPlan.Item.Expected -> null
     }
 
+/**
+ * Пункт лечения — строкой дня. Одно место на две полки: то, что назначено на сегодня, и то, о чём
+ * не смогли напомнить, человек читает одинаково и отвечает одинаково (PLAN H3 «Уведомления»).
+ *
+ * [on] — день пункта, когда он **не сегодняшний**: у вчерашнего обязательства время без дня
+ * ничего не говорит.
+ */
+fun IntakeProjection.Scheduled.toDayRow(
+    title: String,
+    zone: ZoneId,
+    on: LocalDate? = null
+): DayItemPresentationDTO {
+    val fact = taken
+    return DayItemPresentationDTO(
+        intakeId = id,
+        courseId = courseId,
+        title = title,
+        on = on,
+        at = slot.at.atZone(zone).toLocalTime(),
+        // Состоявшийся приём говорит о себе сам: сколько взяли и откуда, а не что назначали.
+        dose = (fact?.amount ?: plannedAmount).quantity.toPresentationDTO(),
+        packageName = (fact?.pkg ?: plannedPackage)?.name,
+        hasPlannedPackage = plannedPackage != null,
+        state = status.toState(),
+        answeredAt = answer?.at?.atZone(zone)?.toLocalTime()
+    )
+}
+
 private fun DayPlan.Item.toPresentationDTO(zone: ZoneId): DayItemPresentationDTO = when (this) {
-    is DayPlan.Item.Scheduled -> {
-        val taken = intake.taken
-        DayItemPresentationDTO(
-            intakeId = intake.id,
-            courseId = intake.courseId,
-            title = title,
-            at = at.atZone(zone).toLocalTime(),
-            // Состоявшийся приём говорит о себе сам: сколько взяли и откуда, а не что назначали.
-            dose = (taken?.amount ?: intake.plannedAmount).quantity.toPresentationDTO(),
-            packageName = (taken?.pkg ?: intake.plannedPackage)?.name,
-            hasPlannedPackage = intake.plannedPackage != null,
-            state = intake.status.toState(),
-            answeredAt = intake.answer?.at?.atZone(zone)?.toLocalTime()
-        )
-    }
+    is DayPlan.Item.Scheduled -> intake.toDayRow(title, zone)
     is DayPlan.Item.Expected -> DayItemPresentationDTO(
         intakeId = null,
         courseId = courseId,

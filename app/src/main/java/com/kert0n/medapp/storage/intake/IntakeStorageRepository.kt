@@ -26,6 +26,16 @@ interface IntakeStorageRepository {
      */
     fun observeOfPackage(packageId: Uuid): Flow<List<IntakeProjection>>
 
+    /**
+     * Приёмы, названные номерами. Обязательство знает только номер приёма
+     * (`NotificationTarget.Intake`), а показать его человеку нужно лечением, дозой и пачкой —
+     * оттого чтение и спрашивается номерами, а не курсом (PLAN D8, H3 «Уведомления на экране»).
+     *
+     * Пустой набор — пустой список, а не все приёмы: «ни о чём не спросили» и «спросили обо всём»
+     * различаются.
+     */
+    fun observeOfIds(ids: Set<Uuid>): Flow<List<IntakeProjection>>
+
     /** Пункты курса одним чтением — из них сценарий собирает прогресс внутри своей транзакции. */
     suspend fun ofCourse(courseId: Uuid): List<Intake>
 

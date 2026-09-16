@@ -92,7 +92,7 @@ class SourcePickingViewModel @AssistedInject constructor(
 
     private val boxes = combine(days, query) { date, text -> date to text }
         .distinctUntilChanged()
-        .flatMapLatest { (date, text) -> packages.list(PackageQuery(text = text), date) }
+        .flatMapLatest { (date, text) -> packages.list(PackageQuery(text = text), date).map { date to it } }
 
     /** Чем назван курс, держащий коробку: имя лечения живёт у записи эпизода, а не у плана (D5). */
     private val titles = courses.observeRecords()
@@ -104,15 +104,16 @@ class SourcePickingViewModel @AssistedInject constructor(
         shelves,
         titles,
         combine(attaching, query) { attaching, text -> attaching to text }
-    ) { reading, boxes, shelves, titles, (attaching, text) ->
+    ) { reading, (date, boxes), shelves, titles, (attaching, text) ->
         val stored = reading.stored
         if (stored == null) SourcePickingUiState(isGone = true, text = text)
         else SourcePickingUiState(
             packages = boxes.map {
-                it.toAttachmentPresentationDTO(shelves[it.medKit.id], stored.attachability(it, titles))
+                it.toAttachmentPresentationDTO(shelves[it.medKit.id], stored.attachability(it, titles), date)
             },
             text = text,
             isAttached = attaching.attached,
+            attachedExpired = attaching.expired,
             isAttaching = attaching.busy,
             message = attaching.message
         )
@@ -134,28 +135,37 @@ class SourcePickingViewModel @AssistedInject constructor(
     fun attach(packageId: Uuid) {
         val attaching = attaching.value
         if (attaching.busy || attaching.attached) return
+        // Просрочена ли она — по тому, что человек видел, нажимая: сказать об этом после подключения
+        // нужно ровно о той коробке, которую он выбрал.
+        val expired = state.value.packages.firstOrNull { it.packageId == packageId }
+            ?.let { pack -> pack.expiredOn?.let { ExpiredSourcePresentationDTO(pack.name, it) } }
         this.attaching.value = attaching.copy(busy = true)
         viewModelScope.launch {
             // Ждём чтение, а не проверяем его наличие: нажатие до первого чтения иначе пропало бы.
             val stored = latest.filterNotNull().first().stored
                 ?: return@launch run { this@SourcePickingViewModel.attaching.value = Attaching() }
             val outcome = if (stored.isDraft) {
-                told(drafting.edit(courseId, stored.revision, listOf(CourseDrafting.Edit.Attach(packageId, 0.doses))))
+                told(drafting.edit(courseId, stored.revision, listOf(CourseDrafting.Edit.Attach(packageId, 0.doses))), expired)
             } else {
                 val wanted = stored.sources.map { SourceEditing.Source(it.pkg.id, it.allocatedDoses) } +
                     SourceEditing.Source(packageId, 0.doses)
-                told(sources.save(courseId, stored.revision, wanted))
+                told(sources.save(courseId, stored.revision, wanted), expired)
             }
             this@SourcePickingViewModel.attaching.value = outcome
         }
+    }
+
+    /** Человек прочёл, что лечение берёт из просроченной коробки: сказано, экран может уходить. */
+    fun expiredSourceSeen() {
+        attaching.value = attaching.value.copy(expired = null)
     }
 
     fun dismissMessage() {
         attaching.value = attaching.value.copy(message = null)
     }
 
-    private fun told(outcome: CourseDrafting.Outcome): Attaching = when (outcome) {
-        is CourseDrafting.Outcome.Saved -> Attaching(attached = true)
+    private fun told(outcome: CourseDrafting.Outcome, expired: ExpiredSourcePresentationDTO?): Attaching = when (outcome) {
+        is CourseDrafting.Outcome.Saved -> Attaching(attached = true, expired = expired)
         // Черновика нет: показывать нечего — экран уходит.
         CourseDrafting.Outcome.Gone -> Attaching(attached = true)
         // Состав правили с соседнего экрана: коробка не подключена, и уйти отсюда значило бы
@@ -167,8 +177,9 @@ class SourcePickingViewModel @AssistedInject constructor(
         CourseDrafting.Outcome.PackageUnusable -> Attaching(message = CourseSourcesMessage.Unusable(null))
     }
 
-    private fun told(outcome: SourceEditing.Outcome): Attaching = when (outcome) {
-        is SourceEditing.Outcome.Saved, SourceEditing.Outcome.Gone -> Attaching(attached = true)
+    private fun told(outcome: SourceEditing.Outcome, expired: ExpiredSourcePresentationDTO?): Attaching = when (outcome) {
+        is SourceEditing.Outcome.Saved -> Attaching(attached = true, expired = expired)
+        SourceEditing.Outcome.Gone -> Attaching(attached = true)
         SourceEditing.Outcome.Stale -> Attaching(message = CourseSourcesMessage.Stale)
         SourceEditing.Outcome.AlreadyFinished -> Attaching(message = CourseSourcesMessage.Finished)
         is SourceEditing.Outcome.Rejected -> Attaching(message = CourseSourcesMessage.Refused(outcome.reason))
@@ -213,7 +224,9 @@ class SourcePickingViewModel @AssistedInject constructor(
     private data class Attaching(
         val busy: Boolean = false,
         val attached: Boolean = false,
-        val message: CourseSourcesMessage? = null
+        val message: CourseSourcesMessage? = null,
+        /** Подключена просроченная — сказать один раз, прежде чем уйти. */
+        val expired: ExpiredSourcePresentationDTO? = null
     )
 
     /** Чтение, которое уже случилось: [stored] `null` — лечения нет, а не «ещё не читали». */
@@ -232,5 +245,10 @@ data class SourcePickingUiState(
     val isGone: Boolean = false,
     val isAttaching: Boolean = false,
     val isAttached: Boolean = false,
+    /** Подключённая коробка просрочена: экран говорит об этом один раз и только потом уходит. */
+    val attachedExpired: ExpiredSourcePresentationDTO? = null,
     val message: CourseSourcesMessage? = null
-)
+) {
+    /** Уходить можно: подключено, и сказать больше нечего. */
+    val isDone: Boolean get() = isAttached && attachedExpired == null
+}

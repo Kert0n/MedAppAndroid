@@ -118,24 +118,22 @@ class CalendarRemindersTest {
     }
 
     /**
-     * Пропуск, о котором не удалось сказать, не теряется: обязательство остаётся невыполненным и
-     * доходит следующим проходом. Прежде повод жил ровно один проход и исчезал вместе с ним.
+     * **Пропуск ждёт попапа, а не шторки** (C1 «Попап пропущенного»). Обязательство сказать о
+     * пропуске остаётся невыполненным, пока человек не войдёт, — и разрешение на уведомления тут
+     * ни при чём: в шторку оно не идёт ни с ним, ни без него.
      */
     @Test
-    fun anUnsaidMissIsStillOwed() = runTest {
+    fun anUnsaidMissWaitsForThePopup() = runTest {
         treated()
         val nextMorning = Scenarios(database, Instant.parse("2027-03-11T05:00:00Z"), notifier = scenarios.notifier)
-        nextMorning.notifier.allowed = false
 
         nextMorning.dailyRound.run()
-        assertEquals(0, nextMorning.reminderOutbox.pass().shown)
+        nextMorning.reminderOutbox.pass()
+
         val owedMiss = nextMorning.reminderStore.ofKinds(listOf(NotificationKind.INTAKE_MISSED))
         assertTrue(owedMiss.isNotEmpty())
         assertTrue(owedMiss.all { it.state == Reminder.State.DUE })
-
-        nextMorning.notifier.allowed = true
-        nextMorning.reminderOutbox.pass()
-        assertEquals(owedMiss.size, nextMorning.notifier.shown.count { it.kind == NotificationKind.INTAKE_MISSED })
+        assertEquals(0, nextMorning.notifier.shown.count { it.kind == NotificationKind.INTAKE_MISSED })
     }
 
     /**

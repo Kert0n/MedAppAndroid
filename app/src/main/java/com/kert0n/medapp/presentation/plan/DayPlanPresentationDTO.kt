@@ -30,6 +30,22 @@ data class DayPagePresentationDTO(
 }
 
 /**
+ * Что мешает приложению напомнить вовремя (PLAN H3 «Уведомления на экране»).
+ *
+ * Оба случая разные, и говорят о них по-разному: без разрешения приложение немо вовсе, а с
+ * неточным будильником оно скажет — но позже. Молчать о втором нельзя: человек решит, что
+ * напоминание потерялось, хотя это система отложила его ради батареи.
+ */
+data class DayPermissionsPresentationDTO(
+    val notificationsOff: Boolean = false,
+    /** Приложению разрешено, а канал «Приёмы» человек заглушил сам — чинится там же, другими словами. */
+    val intakesMuted: Boolean = false,
+    val alarmsInexact: Boolean = false
+) {
+    val isQuiet: Boolean get() = !notificationsOff && !intakesMuted && !alarmsInexact
+}
+
+/**
  * Что страница отвечает на ответ, когда записать его не вышло. Записанное своего случая здесь не
  * имеет: о нём говорит сама строка, а молчание после «принял» человек и так читает как успех.
  */
@@ -63,6 +79,8 @@ data class DayItemPresentationDTO(
     val intakeId: Uuid?,
     val courseId: Uuid?,
     val title: String,
+    /** День пункта, когда он не сегодняшний: у вчерашнего обязательства время без дня немо. */
+    val on: LocalDate? = null,
     val at: LocalTime,
     val dose: QuantityPresentationDTO,
     val packageName: String?,

@@ -1,10 +1,10 @@
 package com.kert0n.medapp.platform.notifications
 
-import com.kert0n.medapp.domain.notification.NotificationAction
 import com.kert0n.medapp.domain.notification.NotificationTarget
 import java.io.File
 import java.time.LocalDate
 import kotlin.uuid.Uuid
+import android.content.Intent
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNull
 import org.junit.Test
@@ -27,19 +27,8 @@ class NotificationTargetExtrasTest {
     @Test
     fun everyTargetSurvivesTheRoundTrip() {
         for (target in samples) {
-            assertEquals(NotificationTargetExtras.Opening(target, null), NotificationTargetExtras.decode(NotificationTargetExtras.encode(target)))
+            assertEquals(target, NotificationTargetExtras.decode(NotificationTargetExtras.encode(target)))
         }
-    }
-
-    /** Кнопка «Принял» — то же намерение с действием: действие читается, а незнакомое не роняет цель. */
-    @Test
-    fun theActionTravelsWithTheTargetAndAStrangeOneIsIgnored() {
-        val intake = samples.first()
-        for (action in NotificationAction.entries) {
-            assertEquals(NotificationTargetExtras.Opening(intake, action), NotificationTargetExtras.decode(NotificationTargetExtras.encode(intake, action)))
-        }
-        val strange = NotificationTargetExtras.encode(intake) + ("notification_action" to "DANCE")
-        assertEquals(NotificationTargetExtras.Opening(intake, null), NotificationTargetExtras.decode(strange))
     }
 
     @Test
@@ -60,5 +49,37 @@ class NotificationTargetExtrasTest {
         assertNull(NotificationTargetExtras.decode(mapOf("notification_target" to "INTAKE")))
         assertNull(NotificationTargetExtras.decode(mapOf("notification_target" to "INTAKE", "notification_target_id" to "не uuid")))
         assertNull(NotificationTargetExtras.decode(mapOf("notification_target" to "SOMETHING_ELSE")))
+    }
+
+    /**
+     * **Открытие из шторки применяется один раз** (PLAN C1). Восстановленное окно получает от
+     * системы исходное намерение с теми же extras — после смерти процесса, поворота, запуска из
+     * недавних. Прочитай его снова — и Ольга, ушедшая с отвеченной карточки готовить ужин, по
+     * возвращении снова попадает на неё.
+     */
+    @Test
+    fun aRestoredWindowCarriesNoOpening() {
+        val extras = NotificationTargetExtras.encode(samples.first())
+
+        assertNull(NotificationTargetExtras.launchOpening(extras, flags = 0, windowRestored = true))
+    }
+
+    /** Запуск из недавних несёт исходное намерение задачи — тот же случай, что восстановление. */
+    @Test
+    fun aLaunchFromRecentsCarriesNoOpening() {
+        val extras = NotificationTargetExtras.encode(samples.first())
+
+        assertNull(NotificationTargetExtras.launchOpening(extras, flags = Intent.FLAG_ACTIVITY_LAUNCHED_FROM_HISTORY, windowRestored = false))
+    }
+
+    /** Свежее окно и новое намерение цель несут: это и есть нажатие человека. */
+    @Test
+    fun aFreshLaunchCarriesItsOpening() {
+        val extras = NotificationTargetExtras.encode(samples.first())
+
+        assertEquals(
+            samples.first(),
+            NotificationTargetExtras.launchOpening(extras, flags = Intent.FLAG_ACTIVITY_NEW_TASK, windowRestored = false)
+        )
     }
 }

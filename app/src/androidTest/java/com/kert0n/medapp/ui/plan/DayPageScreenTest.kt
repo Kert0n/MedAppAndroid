@@ -17,6 +17,7 @@ import com.kert0n.medapp.fixture.TABLETS
 import com.kert0n.medapp.presentation.ScreenState
 import com.kert0n.medapp.presentation.plan.DayItemPresentationDTO
 import com.kert0n.medapp.presentation.plan.DayMessage
+import com.kert0n.medapp.presentation.plan.DayPermissionsPresentationDTO
 import com.kert0n.medapp.presentation.plan.DayPagePresentationDTO
 import com.kert0n.medapp.presentation.value.QuantityPresentationDTO
 import com.kert0n.medapp.presentation.value.toPresentationDTO
@@ -45,6 +46,9 @@ class DayPageScreenTest {
     private val confirmed = mutableListOf<Uuid>()
     private val declined = mutableListOf<Uuid>()
     private var dismissed = 0
+    private var fixedNotifications = 0
+    private var fixedAlarms = 0
+    private var permissions = DayPermissionsPresentationDTO()
 
     private fun row(
         title: String,
@@ -68,6 +72,9 @@ class DayPageScreenTest {
         compose.setContent {
             MedAppTheme {
                 DayPages(
+                    permissions = permissions,
+                    onFixNotifications = { fixedNotifications++ },
+                    onFixAlarms = { fixedAlarms++ },
                     page = { daysAhead ->
                         pages.getOrNull(daysAhead)?.let { ScreenState.Ready(it) } ?: ScreenState.Loading
                     },
@@ -266,4 +273,58 @@ class DayPageScreenTest {
         compose.onNodeWithText("11.03.2027 · завтра").assertIsDisplayed()
         compose.onNodeWithText("Цетрин").assertIsDisplayed()
     }
+
+    /**
+     * Человек пришёл сам, потому что телефон промолчал, — и первое, что он должен узнать, почему.
+     * Без этой строки немота выглядит как «лечение кончилось»: приёмы есть, а напоминаний нет.
+     */
+    @Test
+    fun theDaySaysWhyItCouldNotRemind() {
+        permissions = DayPermissionsPresentationDTO(notificationsOff = true)
+        show(page(items = listOf(row("Нурофен"))))
+
+        compose.onNodeWithText("Напоминания не приходят").performClick()
+
+        assertEquals(1, fixedNotifications)
+    }
+
+    /**
+     * Неточный будильник — другая беда и другие слова: сказать приложение сможет, но позже.
+     * Промолчи о ней — человек решит, что напоминание потерялось.
+     */
+    @Test
+    fun anInexactAlarmIsToldApartFromSilence() {
+        permissions = DayPermissionsPresentationDTO(alarmsInexact = true)
+        show(page(items = listOf(row("Нурофен"))))
+
+        compose.onNodeWithText("Напоминания не приходят").assertDoesNotExist()
+        compose.onNodeWithText("Напоминания могут опаздывать").performClick()
+
+        assertEquals(1, fixedAlarms)
+    }
+
+    /**
+     * Заглушённый канал — третья беда и свои слова: разрешение есть, а напоминания о приёмах человек
+     * выключил сам. Чинится там же, в настройках уведомлений приложения.
+     */
+    @Test
+    fun aMutedIntakeChannelIsToldInItsOwnWords() {
+        permissions = DayPermissionsPresentationDTO(intakesMuted = true)
+        show(page(items = listOf(row("Нурофен"))))
+
+        compose.onNodeWithText("Напоминания не приходят").assertDoesNotExist()
+        compose.onNodeWithText("Напоминания о приёмах выключены").performClick()
+
+        assertEquals(1, fixedNotifications)
+    }
+
+    /** Всё разрешено — строк нет: приложению нечего сказать, и оно молчит. */
+    @Test
+    fun nothingIsSaidWhenEverythingIsAllowed() {
+        show(page(items = listOf(row("Нурофен"))))
+
+        compose.onNodeWithText("Напоминания не приходят").assertDoesNotExist()
+        compose.onNodeWithText("Напоминания могут опаздывать").assertDoesNotExist()
+    }
+
 }

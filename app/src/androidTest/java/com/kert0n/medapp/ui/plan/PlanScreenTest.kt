@@ -14,6 +14,7 @@ import com.kert0n.medapp.presentation.course.CourseListPresentationDTO
 import com.kert0n.medapp.presentation.course.CoursePresentationDTO
 import com.kert0n.medapp.presentation.course.SchedulePresentationDTO
 import com.kert0n.medapp.presentation.plan.DayPagePresentationDTO
+import com.kert0n.medapp.presentation.plan.DayPermissionsPresentationDTO
 import com.kert0n.medapp.presentation.course.ShortagePresentationDTO
 import com.kert0n.medapp.presentation.value.FormPresentationDTO
 import com.kert0n.medapp.presentation.value.QuantityPresentationDTO
@@ -84,6 +85,9 @@ class PlanScreenTest {
                     // Что на странице дня, проверяет `DayPageScreenTest`; здесь она нужна
                     // настолько, чтобы отличить одно состояние места от другого.
                     dayPage = { ScreenState.Ready(emptyDay) },
+                    dayPermissions = DayPermissionsPresentationDTO(),
+                    onFixNotifications = {},
+                    onFixAlarms = {},
                     onOpenIntake = {},
                     onConfirmIntake = {},
                     onDeclineIntake = {},

@@ -40,7 +40,12 @@ data class PackageAttachmentPresentationDTO(
     val name: String,
     val medKitName: String?,
     val availableToMe: QuantityPresentationDTO?,
-    val attachability: Attachability
+    val attachability: Attachability,
+    /**
+     * Последний годный день, когда коробка **уже просрочена**. Подключить её можно — это решение
+     * человека, — но видно это сразу, а не после первого приёма (PLAN C1 «Просрочка при планировании»).
+     */
+    val expiredOn: LocalDate? = null
 ) {
     val isAttachable: Boolean get() = attachability == Attachability.Attachable
 }
@@ -123,3 +128,10 @@ data class CourseEstimatePresentationDTO(
     val coveredDoses: Int,
     val missingDoses: Int
 )
+
+/**
+ * Только что подключённая коробка просрочена: об этом говорится **один раз**, сразу после
+ * подключения. Не запрет и не вопрос — лечение уже берёт из неё; человек должен это знать
+ * (PLAN C1 «Просрочка при планировании», решение владельца 2026-09-16).
+ */
+data class ExpiredSourcePresentationDTO(val name: String, val expiredOn: LocalDate)

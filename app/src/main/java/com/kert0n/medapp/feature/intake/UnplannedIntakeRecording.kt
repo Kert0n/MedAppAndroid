@@ -3,10 +3,8 @@ package com.kert0n.medapp.feature.intake
 import com.kert0n.medapp.domain.intake.IntakeProjection
 import com.kert0n.medapp.domain.intake.IntakeRejected
 import com.kert0n.medapp.domain.intake.UnplannedIntake
-import com.kert0n.medapp.domain.pack.PackageAvailability
 import com.kert0n.medapp.domain.value.Dose
 import com.kert0n.medapp.feature.course.CourseFollowing
-import com.kert0n.medapp.feature.course.openPlan
 import com.kert0n.medapp.queue.QueueService
 import com.kert0n.medapp.queue.QueuedCommand
 import com.kert0n.medapp.queue.Transactions
@@ -61,7 +59,6 @@ class UnplannedIntakeRecording @Inject constructor(
         val free = seen.freeForAnyone
         // Вопросы — после отказов и до записи, все разом: человек отвечает один раз (PLAN D6).
         val warnings = listOfNotNull(
-            pkg.facts.expiresOn?.takeIf { pkg.isExpiredOn(at.atZone(clock.zone).toLocalDate()) }?.let { IntakeWarning.Expired(it) },
             IntakeWarning.TouchesReserved(free).takeIf { !free.covers(amount) }
         )
         if (warnings.isNotEmpty() && !acknowledged) return@run Outcome.Warned(warnings)

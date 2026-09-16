@@ -1,6 +1,7 @@
 package com.kert0n.medapp.ui.intake
 
-import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.setValue
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -19,19 +20,15 @@ import androidx.compose.material3.TimePicker
 import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.rememberTimePickerState
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
-import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
-import androidx.compose.ui.unit.dp
 import com.kert0n.medapp.R
 import com.kert0n.medapp.presentation.intake.IntakeCardError
 import com.kert0n.medapp.presentation.intake.IntakeCardPresentationDTO
 import com.kert0n.medapp.presentation.intake.IntakeCardUiState
-import com.kert0n.medapp.presentation.intake.IntakeQuestionPresentationDTO
 import com.kert0n.medapp.ui.PickerField
 import com.kert0n.medapp.ui.DAY
 import com.kert0n.medapp.ui.DateField
@@ -58,8 +55,6 @@ fun IntakeCardScreen(
     onEdit: (IntakeCardPresentationDTO) -> Unit,
     onConfirm: () -> Unit,
     onDecline: () -> Unit,
-    onAcknowledge: () -> Unit,
-    onDismissQuestions: () -> Unit,
     onBack: () -> Unit,
     modifier: Modifier = Modifier
 ) {
@@ -85,9 +80,6 @@ fun IntakeCardScreen(
             }
         }
     }
-    if (state.questions.isNotEmpty()) {
-        IntakeQuestionsDialog(state.questions, onAcknowledge = onAcknowledge, onDismiss = onDismissQuestions)
-    }
 }
 
 @Composable
@@ -101,7 +93,7 @@ private fun Card(
     actions = {
         state.error?.let { Text(it.words(), color = MaterialTheme.colorScheme.error) }
         if (state.canAnswer) {
-            Button(onClick = onConfirm, enabled = !state.isWriting, modifier = Modifier.fillMaxWidth()) {
+            Button(onClick = onConfirm, enabled = state.canConfirm, modifier = Modifier.fillMaxWidth()) {
                 Text(stringResource(R.string.intake_confirm))
             }
             // Отказ — решение, а не молчание: лечение считает эту дозу пропущенной (PLAN D6).

@@ -4,6 +4,7 @@ import androidx.annotation.DrawableRes
 import androidx.annotation.StringRes
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
@@ -23,19 +24,20 @@ import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import com.kert0n.medapp.R
 import com.kert0n.medapp.presentation.ScreenState
 import com.kert0n.medapp.presentation.plan.DayItemPresentationDTO
 import com.kert0n.medapp.presentation.plan.DayMessage
+import com.kert0n.medapp.presentation.plan.DayPermissionsPresentationDTO
 import com.kert0n.medapp.presentation.plan.DayPagePresentationDTO
 import com.kert0n.medapp.ui.DAY
 import com.kert0n.medapp.ui.EmptyState
 import com.kert0n.medapp.ui.LoadingState
 import com.kert0n.medapp.ui.TIME
 import com.kert0n.medapp.ui.intake.text
+import com.kert0n.medapp.ui.NavigationRow
 import com.kert0n.medapp.ui.pack.Marker
 import com.kert0n.medapp.ui.words
 import java.time.LocalTime
@@ -63,16 +65,19 @@ private const val DAYS_AHEAD = 60
 @Composable
 fun DayPages(
     page: @Composable (daysAhead: Int) -> ScreenState<DayPagePresentationDTO>,
+    permissions: DayPermissionsPresentationDTO,
     onOpen: (DayItemPresentationDTO) -> Unit,
     onConfirm: (Uuid) -> Unit,
     onDecline: (Uuid) -> Unit,
     onDismissMessage: () -> Unit,
+    onFixNotifications: () -> Unit,
+    onFixAlarms: () -> Unit,
     modifier: Modifier = Modifier
 ) {
     val pager = rememberPagerState(pageCount = { DAYS_AHEAD + 1 })
     HorizontalPager(state = pager, modifier = modifier.fillMaxSize()) { daysAhead ->
         val state = page(daysAhead)
-        DayPage(state, onOpen, onConfirm, onDecline)
+        DayPage(state, permissions, onOpen, onConfirm, onDecline, onFixNotifications, onFixAlarms)
         // Записать не вышло — сказано словами: молчание после нажатия человек читает как успех.
         (state as? ScreenState.Ready)?.value?.message?.let {
             AlertDialog(
@@ -88,7 +93,7 @@ fun DayPages(
 
 /** Слова беды подбирает экран: причина — значение, и текст к ней живёт в `R.string.*` (PLAN H1). */
 @Composable
-private fun DayMessage.words(): String = when (this) {
+internal fun DayMessage.words(): String = when (this) {
     is DayMessage.Refused -> stringResource(reason.text)
     DayMessage.AlreadyAnswered -> stringResource(R.string.intake_already_answered)
     DayMessage.EpisodeClosed -> stringResource(R.string.intake_episode_closed)
@@ -99,9 +104,12 @@ private fun DayMessage.words(): String = when (this) {
 @Composable
 private fun DayPage(
     state: ScreenState<DayPagePresentationDTO>,
+    permissions: DayPermissionsPresentationDTO,
     onOpen: (DayItemPresentationDTO) -> Unit,
     onConfirm: (Uuid) -> Unit,
-    onDecline: (Uuid) -> Unit
+    onDecline: (Uuid) -> Unit,
+    onFixNotifications: () -> Unit,
+    onFixAlarms: () -> Unit
 ) {
     val day = (state as? ScreenState.Ready)?.value
     // Первое чтение базы ещё не пришло: говорить «ничего не назначено» рано — это была бы неправда.
@@ -115,6 +123,34 @@ private fun DayPage(
             style = MaterialTheme.typography.titleMedium,
             modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp)
         )
+        // Что мешает напомнить вовремя — над днём: человек пришёл сам, потому что телефон
+        // промолчал, и первое, что он должен узнать, — почему (PLAN H3 «Уведомления на экране»).
+        if (permissions.notificationsOff) {
+            NavigationRow(
+                icon = R.drawable.ic_warning,
+                text = stringResource(R.string.plan_notifications_off),
+                supporting = stringResource(R.string.plan_notifications_off_hint),
+                onClick = onFixNotifications,
+                color = MaterialTheme.colorScheme.error
+            )
+        }
+        if (permissions.intakesMuted) {
+            NavigationRow(
+                icon = R.drawable.ic_warning,
+                text = stringResource(R.string.plan_intakes_muted),
+                supporting = stringResource(R.string.plan_intakes_muted_hint),
+                onClick = onFixNotifications,
+                color = MaterialTheme.colorScheme.error
+            )
+        }
+        if (permissions.alarmsInexact) {
+            NavigationRow(
+                icon = R.drawable.ic_schedule,
+                text = stringResource(R.string.plan_alarms_inexact),
+                supporting = stringResource(R.string.plan_alarms_inexact_hint),
+                onClick = onFixAlarms
+            )
+        }
         if (day.isEmpty) {
             EmptyState(text = stringResource(R.string.plan_day_empty), modifier = Modifier.fillMaxSize())
             return
@@ -179,7 +215,7 @@ private fun LazyListScope.shelf(
  * наспех.
  */
 @Composable
-private fun DayCard(
+internal fun DayCard(
     item: DayItemPresentationDTO,
     onOpen: (DayItemPresentationDTO) -> Unit,
     onConfirm: (Uuid) -> Unit,
@@ -199,8 +235,19 @@ private fun DayCard(
             // Текст забирает остаток ширины, действия меряются своими словами: вес на кнопке
             // уравнял бы их и порезал текст (замечание владельца 2026-09-16).
             Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(4.dp)) {
-                Row(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.CenterVertically) {
-                    Text(TIME.format(item.at), style = MaterialTheme.typography.titleMedium)
+                // Переносится, а не сжимается: в узком окне (попап пропущенного, Sm29, крупный шрифт)
+                // метка иначе получала нулевую ширину и вставала столбиком по букве (снимок BigLatest).
+                FlowRow(
+                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                    verticalArrangement = Arrangement.spacedBy(4.dp),
+                    itemVerticalAlignment = Alignment.CenterVertically
+                ) {
+                    // День стоит у строки, только если он не сегодняшний: у вчерашнего
+                    // обязательства время без дня ничего не говорит.
+                    Text(
+                        listOfNotNull(item.on?.let { DAY.format(it) }, TIME.format(item.at)).joinToString(" · "),
+                        style = MaterialTheme.typography.titleMedium
+                    )
                     if (item.tellsItsState) {
                         Marker(item.state.icon, item.stateWords(), MaterialTheme.colorScheme.onSurfaceVariant)
                     }
@@ -271,5 +318,5 @@ private val DayItemPresentationDTO.State.icon: Int
  * Чем строка отличается от соседних в списке. У пункта за окном календаря записи ещё нет, и
  * своего номера тоже: его называют лечение и время, которых на день приходится не больше одного.
  */
-private val DayItemPresentationDTO.key: String
+internal val DayItemPresentationDTO.key: String
     get() = intakeId?.toString() ?: "$courseId-$at"

@@ -251,6 +251,37 @@ class ReminderOutboxTest {
     }
 
     /**
+     * **В шторку — только в свой день** (PLAN C1). Максим три дня жил с запретом и в среду его снял.
+     * Утренний приём ещё о сегодня — его сказать стоит. Вчерашняя сводка — уже нет: в шторке она
+     * утонула бы среди сегодняшнего и открыла бы день, которого нет.
+     * Непоказанное за пределом остаётся ждать полку, а не снимается. Очередь, ждущая решения, —
+     * без предела: решать её нужно и назавтра.
+     *
+     * Без предела снятый запрет вываливает в шторку все пропуски за месяц разом.
+     */
+    @Test
+    fun onlyTodaysNewsIsToldOnceSpeakingIsAllowedAgain() = runTest {
+        val yesterday = now.minus(java.time.Duration.ofHours(14))
+        val missed = digest(day = LocalDate.of(2027, 3, 9), at = yesterday)
+        val morning = intake(at = now.minusSeconds(3600))
+        val queue = Reminder(NotificationKey.sync(Uuid.random()), NotificationTarget.SyncStatus, yesterday)
+        scenarios.reminderStore.saveAll(listOf(missed, morning, queue))
+        scenarios.notifier.allowed = false
+        scenarios.reminderOutbox.pass()
+
+        scenarios.notifier.allowed = true
+        scenarios.reminderOutbox.pass()
+
+        assertEquals(setOf(morning.key, queue.key), scenarios.notifier.shown.map { it.key }.toSet())
+        assertEquals(
+            "вчерашнее не сказано и не снято: его судьбу решает сверка",
+            Reminder.State.DUE,
+            requireNotNull(scenarios.reminderStore.find(missed.key)).state
+        )
+        assertNull("будить ради вчерашнего незачем", scenarios.reminders.wakeAt)
+    }
+
+    /**
      * **Гонка «показ против отмены».** Владелец доставки читает обязательства, идёт за свежестью —
      * это до двух секунд, — и только потом показывает. За это время лечение могли отменить: отмена
      * снимает обязательство своей транзакцией.

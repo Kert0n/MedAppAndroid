@@ -11,6 +11,7 @@ import com.kert0n.medapp.feature.course.CourseDrafting
 import com.kert0n.medapp.feature.course.SourceEditing
 import com.kert0n.medapp.feature.plan.DayPlanning
 import com.kert0n.medapp.feature.time.Today
+import com.kert0n.medapp.fixture.AllAllowed
 import com.kert0n.medapp.fixture.OTHER_PACK
 import com.kert0n.medapp.fixture.PACK
 import com.kert0n.medapp.fixture.QuietClock
@@ -47,7 +48,6 @@ import org.junit.After
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNotNull
-import org.junit.Assert.assertTrue
 import org.junit.Before
 import org.junit.Test
 import org.junit.runner.RunWith
@@ -82,15 +82,17 @@ class IntakeAnsweringTest {
         database.close()
     }
 
-    private fun dayModel() = DayPlanViewModel(
+    private fun dayModel(clock: Clock = this.clock) = DayPlanViewModel(
         today = Today(clock, QuietClock),
         planning = DayPlanning(Today(clock, QuietClock), database.reportRepository()),
         confirmation = scenarios.intakeConfirmation,
         declining = scenarios.intakeDeclining,
+        devicePermissions = AllAllowed,
+        readiness = AllAllowed,
         clock = clock
     ).also { opened += it }
 
-    private fun cardModel(courseId: Uuid, intakeId: Uuid) = IntakeCardViewModel(
+    private fun cardModel(intakeId: Uuid) = IntakeCardViewModel(
         confirmation = scenarios.intakeConfirmation,
         declining = scenarios.intakeDeclining,
         vocabulary = VocabularyRoomRepository(database.vocabulary()),
@@ -98,7 +100,6 @@ class IntakeAnsweringTest {
         clock = clock,
         courses = database.courseRepository(),
         intakes = database.intakeRepository(),
-        courseId = courseId,
         intakeId = intakeId
     ).also { opened += it }
 
@@ -196,11 +197,12 @@ class IntakeAnsweringTest {
     }
 
     /**
-     * Вопрос быстрый путь не проглатывает: просроченная коробка ничего не записывает, а ведёт на
-     * карточку пункта — отвечать на вопрос человек должен зная (PLAN D6).
+     * Быстрый ответ по просроченной коробке **пишет сразу**: вопроса нет, срок человеку показан
+     * (PLAN C1 «Просроченная пачка», поправка 2026-09-16). Отправляй его на карточку — и одним
+     * нажатием приём было бы не записать.
      */
     @Test
-    fun aQuestionWritesNothingAndSendsThePersonToTheCard() = runBlocking {
+    fun anExpiredBoxIsTakenFromTheDayAtOnce(): Unit = runBlocking {
         val courseId = started(expiresOn = LocalDate.of(2027, 3, 1))
         val intakeId = firstIntake(courseId).id
         val model = dayModel()
@@ -208,13 +210,10 @@ class IntakeAnsweringTest {
         watching(model.page(0)) { page ->
             page.awaiting(PATIENTLY) { it.ready()?.items?.isNotEmpty() == true }
             model.confirm(intakeId)
-            watching(model.asksAbout) { asked -> asked.awaiting(PATIENTLY) { it != null } }
+            page.awaiting(PATIENTLY) { state -> state.ready()?.items.orEmpty().none { it.canConfirm } }
         }
 
-        assertNotNull(model.asksAbout.value)
-        assertEquals(intakeId, model.asksAbout.value?.intakeId)
-        assertEquals(IntakeStatus.PLANNED, database.intakeRepository().find(intakeId)?.status)
-        assertEquals(tablets("20"), database.packageRepository().find(PACK)?.quantity)
+        assertEquals(IntakeStatus.TAKEN, database.intakeRepository().find(intakeId)?.status)
     }
 
     /**
@@ -225,7 +224,7 @@ class IntakeAnsweringTest {
     fun theCardWritesTheAmountThePersonTyped() = runBlocking {
         val courseId = started()
         val intakeId = firstIntake(courseId).id
-        val model = cardModel(courseId, intakeId)
+        val model = cardModel(intakeId)
 
         watching(model.state) { state ->
             val shown = state.awaiting(PATIENTLY) { it.unit != null }
@@ -240,29 +239,6 @@ class IntakeAnsweringTest {
     }
 
     /**
-     * Вопрос виден на карточке списком, и до ответа не записано ничего; «всё равно принял» —
-     * тот же вызов с подтверждением, и он пишет (PLAN D6).
-     */
-    @Test
-    fun theQuestionIsAskedOnTheCardAndAnsweringItWrites() = runBlocking {
-        val courseId = started(expiresOn = LocalDate.of(2027, 3, 1))
-        val intakeId = firstIntake(courseId).id
-        val model = cardModel(courseId, intakeId)
-
-        watching(model.state) { state ->
-            state.awaiting(PATIENTLY) { it.unit != null }
-            model.confirm()
-            val asked = state.awaiting(PATIENTLY) { it.questions.isNotEmpty() }
-            assertEquals(IntakeStatus.PLANNED, database.intakeRepository().find(intakeId)?.status)
-            assertTrue(asked.canAnswer)
-            model.confirm(acknowledged = true)
-            state.awaiting(PATIENTLY) { it.isDone }
-        }
-
-        assertEquals(IntakeStatus.TAKEN, database.intakeRepository().find(intakeId)?.status)
-    }
-
-    /**
      * Принять можно из **другой коробки лечения**: «беру из этой пачки» решается в момент записи,
      * а не при постройке плана (PLAN D6). Расход идёт из выбранной, плановая остаётся целой.
      */
@@ -270,7 +246,7 @@ class IntakeAnsweringTest {
     fun theIntakeIsTakenFromTheChosenSourceOfTheCourse() = runBlocking {
         val courseId = startedWithTwoSources()
         val intakeId = firstIntake(courseId).id
-        val model = cardModel(courseId, intakeId)
+        val model = cardModel(intakeId)
 
         watching(model.state) { state ->
             val shown = state.awaiting(PATIENTLY) { it.sources.size == 2 }
@@ -282,6 +258,36 @@ class IntakeAnsweringTest {
 
         assertEquals(tablets("20"), database.packageRepository().find(PACK)?.quantity)
         assertEquals(tablets("8"), database.packageRepository().find(OTHER_PACK)?.quantity)
+    }
+
+    /**
+     * **Выбранную коробку не подменяют плановой** (CodeRabbit 4030083072). Человек выбрал
+     * «Ибупрофен», а пока он набирал время, коробку отключили от лечения на другом экране. Карточка
+     * молча вернула в выбор плановый «Нурофен», и «Принять» списало бы из коробки, которую человек не
+     * выбирал. Выбор пропадает словами поля — пустым, — и записывать нечего, пока не выберут заново.
+     */
+    @Test
+    fun aChosenBoxThatLeftTheCourseIsNotSwappedForThePlannedOne() = runBlocking {
+        val courseId = startedWithTwoSources()
+        val intakeId = firstIntake(courseId).id
+        val model = cardModel(intakeId)
+
+        watching(model.state) { state ->
+            val shown = state.awaiting(PATIENTLY) { it.sources.size == 2 }
+            model.edit(shown.form.copy(packageId = OTHER_PACK))
+            state.awaiting(PATIENTLY) { it.packageId == OTHER_PACK }
+
+            val plan = requireNotNull(database.courseRepository().findPlan(courseId))
+            scenarios.sourceEditing.save(courseId, plan.revision, listOf(SourceEditing.Source(PACK, Doses(4))))
+            state.awaiting(PATIENTLY) { it.sources.size == 1 }
+            model.confirm()
+            // Записи ждать нечего: даём сценарию время, за которое он записал бы.
+            kotlinx.coroutines.delay(1_000)
+            assertEquals("выбор подменён плановой коробкой", null, state.value.packageId)
+        }
+
+        assertEquals(tablets("20"), database.packageRepository().find(PACK)?.quantity)
+        assertEquals(IntakeStatus.PLANNED, database.intakeRepository().find(intakeId)?.status)
     }
 
     /**
@@ -313,7 +319,7 @@ class IntakeAnsweringTest {
         val courseId = started()
         val intakeId = firstIntake(courseId).id
         scenarios.intakeConfirmation.confirm(intakeId, PACK, dose("2"), now)
-        val model = cardModel(courseId, intakeId)
+        val model = cardModel(intakeId)
 
         val shown = watching(model.state) { it.awaiting(PATIENTLY) { state -> state.unit != null } }
 
@@ -329,4 +335,5 @@ class IntakeAnsweringTest {
         /** Столько ждём чтения: между действием и состоянием стоят сценарий и потоки Room. */
         val PATIENTLY: Duration = 15.seconds
     }
+
 }

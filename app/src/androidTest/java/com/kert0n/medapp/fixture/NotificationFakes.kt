@@ -19,6 +19,15 @@ class FakeNotifier(var allowed: Boolean = true) : Notifier {
     val shown = mutableListOf<Reminder>()
     val dismissed = mutableListOf<NotificationKey>()
 
+    /** Что висит в шторке сейчас: показанное и ещё не погашенное. */
+    val cards: Set<NotificationKey>
+        get() = synchronized(this) { upNow.toSet() }
+
+    private val upNow = LinkedHashSet<NotificationKey>()
+
+    /** Показ по спросу: разрешение истории задаётся её миром, а не флагом шторки. */
+    var allowedWhen: ((Reminder) -> Boolean)? = null
+
     /** Ключи, показ которых бросает: сбой хранения или системы посреди прохода. */
     val failing = mutableSetOf<NotificationKey>()
 
@@ -36,10 +45,11 @@ class FakeNotifier(var allowed: Boolean = true) : Notifier {
 
     override suspend fun show(reminder: Reminder): Delivery {
         if (reminder.key in failing) error("показ сорвался: ${reminder.key}")
-        if (!allowed) return Delivery.NOT_ALLOWED
+        if (!allowed || allowedWhen?.invoke(reminder) == false) return Delivery.NOT_ALLOWED
         if (reminder.key in vanished) return Delivery.SUBJECT_GONE
         onShow?.invoke(reminder)
         shown += reminder
+        synchronized(this) { upNow += reminder.key }
         return Delivery.SHOWN
     }
 
@@ -49,6 +59,7 @@ class FakeNotifier(var allowed: Boolean = true) : Notifier {
     override suspend fun dismiss(key: NotificationKey) {
         if (dismissFailingOnce.remove(key)) error("гашение сорвалось: $key")
         dismissed += key
+        synchronized(this) { upNow -= key }
         onDismiss?.invoke(key)
     }
 }
@@ -59,7 +70,7 @@ class FakeNotifier(var allowed: Boolean = true) : Notifier {
  * (PLAN D8). [wakeAt] — ближайшая из двух, то, к чему система разбудит первым; [exact] — её
  * точность.
  */
-class FakeReminders(override val canBeExact: Boolean = true) : ReminderAlarms {
+class FakeReminders(override var canBeExact: Boolean = true) : ReminderAlarms {
     var exactAt: Instant? = null
         private set
     var inexactAt: Instant? = null

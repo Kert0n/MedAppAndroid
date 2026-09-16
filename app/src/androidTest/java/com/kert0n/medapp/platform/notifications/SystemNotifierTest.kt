@@ -58,7 +58,7 @@ class SystemNotifierTest {
     fun setUp() = runTest {
         database = inMemoryDatabase()
         database.packageRepository().add(pack(quantity = tablets("20"), expiresOn = expiry))
-        notifier = SystemNotifier(context, database.intakeRepository(), database.courseRepository(), database.packageRepository())
+        notifier = SystemNotifier(context, database.intakeRepository(), database.courseRepository(), database.packageRepository(), NotificationChannels(context))
         NotificationChannels(context).ensure()
         manager.cancelAll()
     }
@@ -192,12 +192,12 @@ class SystemNotifierTest {
     }
 
     /**
-     * «Принял» — намерение **открыть приложение**, «Пропустить» и «Отложить» — широковещание
-     * приёмнику: первый требует экрана, вторым он не нужен. Из приёмника активность не открыть
-     * (trampoline), поэтому кнопка и едет активностью — с целью и действием в extras.
+     * **Все три кнопки едут приёмнику**, ни одна не открывает приложение (C1, поправка владельца
+     * 2026-09-16): «Принял» пишет в фоне, а не вышло — приходит «нужно ваше решение». Открой
+     * «Принял» окно — и человек снова видит мелькнувшее приложение вместо записанного приёма.
      */
     @Test
-    fun takeOpensTheAppWhileSkipAndSnoozeGoToTheReceiver() = runTest {
+    fun everyActionGoesToTheReceiver() = runTest {
         if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.TIRAMISU) {
             InstrumentationRegistry.getInstrumentation().uiAutomation
                 .grantRuntimePermission(context.packageName, Manifest.permission.POST_NOTIFICATIONS)
@@ -227,7 +227,7 @@ class SystemNotifierTest {
         val actions = shown.notification.actions.associateBy { it.title.toString() }
         assertEquals(setOf("Принял", "Пропустить", "Отложить"), actions.keys)
         if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.S) {
-            assertTrue("«Принял» не открывает приложение", actions.getValue("Принял").actionIntent.isActivity)
+            assertTrue("«Принял» открывает активность", actions.getValue("Принял").actionIntent.isBroadcast)
             assertTrue("«Пропустить» открывает активность — trampoline", actions.getValue("Пропустить").actionIntent.isBroadcast)
             assertTrue("«Отложить» открывает активность — trampoline", actions.getValue("Отложить").actionIntent.isBroadcast)
         }
@@ -271,12 +271,16 @@ class SystemNotifierTest {
     }
 
     /**
-     * Канал выключен, а приложение — нет. Каналов у нас четыре, и человек выключает их по
-     * отдельности (D8): он мог оставить сводку и запретить приёмы. `areNotificationsEnabled()`
-     * отвечает про приложение и об этом не знает — `notify()` молчит, а мы пишем «сказано».
+     * Канала нет — показывать некуда, и об этом отвечается значением, а не молчанием: `notify()`
+     * в несуществующий канал ничего не делает, а мы записали бы «сказано» (PLAN D8).
+     *
+     * Канал здесь **удаляется и возвращается**, а не глушится: выключенный канал не вернуть —
+     * система помнит его настройки и после удаления, поднять важность приложение не вправе, и
+     * проверка портила бы устройство до переустановки (найдено прогонами 2026-09-16). Про
+     * выключенный канал спрашивает `NotificationChannelsTest` — на своём, не нашем канале.
      */
     @Test
-    fun aBlockedChannelIsNotAllowed() = runTest {
+    fun aMissingChannelIsNotAllowed() = runTest {
         if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.TIRAMISU) {
             InstrumentationRegistry.getInstrumentation().uiAutomation
                 .grantRuntimePermission(context.packageName, Manifest.permission.POST_NOTIFICATIONS)
@@ -284,16 +288,13 @@ class SystemNotifierTest {
         val channel = NotificationChannel.EXPIRY.id
         try {
             manager.deleteNotificationChannel(channel)
-            manager.createNotificationChannel(
-                android.app.NotificationChannel(channel, "Сроки годности", android.app.NotificationManager.IMPORTANCE_NONE)
-            )
 
             assertEquals(
                 com.kert0n.medapp.domain.notification.Delivery.NOT_ALLOWED,
                 notifier.show(planned)
             )
         } finally {
-            manager.deleteNotificationChannel(channel)
+            // Возвращается с прежней важностью: её никто не понижал, и система отдаёт ту же.
             NotificationChannels(context).ensure()
         }
     }

@@ -181,4 +181,29 @@ class SourcePickingViewModelTest {
         assertEquals(listOf(PACK), stored.sources.map { it.pkg.id })
         assertEquals(Doses(0), stored.sources.single().allocatedDoses)
     }
+
+    /**
+     * **Просроченную подключают, и об этом говорят один раз** (PLAN C1 «Просрочка при
+     * планировании»). Карточка несёт срок, подключение проходит, а экран не уходит молча: сначала
+     * человек читает, что лечение берёт из просроченной, и только «Понятно» его отпускает.
+     */
+    @Test
+    fun anExpiredBoxAttachesAndIsToldOnce(): Unit = runBlocking {
+        val expired = Uuid.random()
+        database.packageRepository().add(
+            pack(id = expired, name = "Старый нурофен", quantity = tablets("20"), form = TABLET_FORM, expiresOn = com.kert0n.medapp.domain.pack.ExpiryDate(start.minusDays(1)))
+        )
+        val model = model(prescribed())
+
+        watching(model.state) { state ->
+            val shown = state.awaiting(kotlin.time.Duration.parse("15s")) { s -> s.packages.any { it.packageId == expired } }
+            assertEquals(start.minusDays(1), shown.packages.single { it.packageId == expired }.expiredOn)
+            model.attach(expired)
+            val told = state.awaiting(kotlin.time.Duration.parse("15s")) { it.isAttached }
+            assertEquals("Старый нурофен", told.attachedExpired?.name)
+            assertEquals(false, told.isDone)
+            model.expiredSourceSeen()
+            state.awaiting(kotlin.time.Duration.parse("15s")) { it.isDone }
+        }
+    }
 }

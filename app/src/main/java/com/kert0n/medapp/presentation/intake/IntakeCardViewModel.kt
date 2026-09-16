@@ -9,7 +9,6 @@ import com.kert0n.medapp.domain.intake.IntakeStatus
 import com.kert0n.medapp.domain.value.Dose
 import com.kert0n.medapp.feature.intake.IntakeConfirmation
 import com.kert0n.medapp.feature.intake.IntakeDeclining
-import com.kert0n.medapp.feature.intake.IntakeWarning
 import com.kert0n.medapp.feature.time.Today
 import com.kert0n.medapp.presentation.ParsedInput
 import com.kert0n.medapp.presentation.value.QuantityPresentationDTO
@@ -30,6 +29,9 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.flatMapLatest
+import kotlinx.coroutines.flow.flowOf
+import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
@@ -44,6 +46,7 @@ import kotlinx.coroutines.launch
  * Записывает [IntakeConfirmation] — тот же сценарий, что и быстрый ответ: одно человеческое
  * действие живёт в одном месте, сколькими бы дорогами к нему ни приходили (PLAN F5).
  */
+@OptIn(kotlinx.coroutines.ExperimentalCoroutinesApi::class)
 @HiltViewModel(assistedFactory = IntakeCardViewModel.Factory::class)
 class IntakeCardViewModel @AssistedInject constructor(
     private val confirmation: IntakeConfirmation,
@@ -53,16 +56,12 @@ class IntakeCardViewModel @AssistedInject constructor(
     private val clock: Clock,
     courses: CourseStorageRepository,
     intakes: IntakeStorageRepository,
-    @Assisted("courseId") private val courseId: Uuid,
-    @Assisted("intakeId") private val intakeId: Uuid
+    @Assisted private val intakeId: Uuid
 ) : ViewModel() {
 
     @AssistedFactory
     interface Factory {
-        fun create(
-            @Assisted("courseId") courseId: Uuid,
-            @Assisted("intakeId") intakeId: Uuid
-        ): IntakeCardViewModel
+        fun create(intakeId: Uuid): IntakeCardViewModel
     }
 
     /** Что человек набрал; `null` — он ещё не трогал карточку, и в ней стоит плановое. */
@@ -70,39 +69,41 @@ class IntakeCardViewModel @AssistedInject constructor(
 
     private val writing = MutableStateFlow(Writing())
 
-    private val episode = combine(courses.observeRecord(courseId), courses.observePlan(courseId)) { record, plan ->
-        record to plan
-    }
+    /**
+     * Карточка знает только **номер приёма**: столько же знает уведомление, которое сюда ведёт
+     * (`NotificationTarget.Intake`). Лечение находится по самому приёму, а не приходит маршрутом —
+     * иначе у одного места было бы два входа с разными знаниями (PLAN G3, H3 «Уведомления на экране»).
+     */
+    private val episode = intakes.observeOfIds(setOf(intakeId))
+        .map { it.filterIsInstance<IntakeProjection.Scheduled>().firstOrNull { intake -> intake.id == intakeId } }
+        .flatMapLatest { intake ->
+            if (intake == null) flowOf(null to null)
+            else combine(courses.observeRecord(intake.courseId), courses.observePlan(intake.courseId)) { record, plan ->
+                intake to (record?.title to plan?.sources.orEmpty())
+            }
+        }
 
     val state: StateFlow<IntakeCardUiState> = combine(
         episode,
-        intakes.observeOfCourse(courseId),
         today.observe(),
         typed,
         writing
-    ) { (record, plan), intakes, day, typed, writing ->
-        val intake = intakes.filterIsInstance<IntakeProjection.Scheduled>().firstOrNull { it.id == intakeId }
+    ) { (intake, episode), day, typed, writing ->
+        val title = episode?.first
         // Пункта нет — расписание перестроили, пока карточку держали открытой: показывать нечего.
-        if (record == null || intake == null) IntakeCardUiState(isGone = true)
-        else intake.card(record.title, plan?.sources.orEmpty(), day.zone, typed, writing)
+        if (intake == null || title == null) IntakeCardUiState(isGone = true)
+        else intake.card(title, episode.second.orEmpty(), day.zone, typed, writing)
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), IntakeCardUiState(isLoading = true))
 
     fun edit(form: IntakeCardPresentationDTO) {
         typed.value = form
     }
 
-    fun dismissQuestions() {
-        writing.value = writing.value.copy(questions = emptyList())
-    }
-
     /**
      * Записать приём. Второе нажатие, пока идёт первое, ничего не начинает: сторожем служит само
      * состояние, а не расторопность пальца.
-     *
-     * [acknowledged] — ответ на вопросы сценария: тот же вызов, повторённый с подтверждением
-     * (PLAN D6). Своего решения карточка не принимает — вопрос задаёт сценарий, отвечает человек.
      */
-    fun confirm(acknowledged: Boolean = false) {
+    fun confirm() {
         // Сторож — у самой записи, а не у её отражения: состояние собрано `stateIn` и отстаёт от
         // записи на оборот, и второе нажатие успевало бы начать второй приём.
         if (writing.value.busy) return
@@ -110,11 +111,11 @@ class IntakeCardViewModel @AssistedInject constructor(
         if (!shown.canAnswer) return
         val unit = shown.unit ?: return
         // Набранное берётся у самого набранного: между вводом и нажатием стоит поток, и палец
-        // человека его не ждёт. Пачка — выбранная, сверенная с источниками лечения.
+        // человека его не ждёт. Пачка — выбранная, сверенная с показанным: плановая или один из
+        // источников. Выбора, которого больше нет, плановой не подменяют — человек её не выбирал
+        // (C1 «Действие — по показанному»).
         val form = typed.value ?: shown.form
-        val pkg = form.packageId?.takeIf { id -> shown.sources.any { it.id == id } }
-            ?: shown.packageId
-            ?: return
+        val pkg = form.packageId?.takeIf { id -> id == shown.packageId || shown.sources.any { it.id == id } } ?: return
         writing.value = Writing(busy = true)
         viewModelScope.launch {
             val known = vocabulary.snapshot()
@@ -122,7 +123,7 @@ class IntakeCardViewModel @AssistedInject constructor(
                 is ParsedInput.Rejected -> writing.value = Writing(error = IntakeCardError.Amount(parsed.error))
                 is ParsedInput.Parsed -> {
                     val at = moment(form, today.observe().first().zone)
-                    writing.value = told(confirmation.confirm(intakeId, pkg, Dose(parsed.value), at, acknowledged))
+                    writing.value = told(confirmation.confirm(intakeId, pkg, Dose(parsed.value), at))
                 }
             }
         }
@@ -172,14 +173,12 @@ class IntakeCardViewModel @AssistedInject constructor(
         is IntakeConfirmation.Outcome.Confirmed -> Writing(done = true)
         // Пункта больше нет: показывать нечего, и чтение скажет то же самое.
         IntakeConfirmation.Outcome.Gone -> Writing(done = true)
-        is IntakeConfirmation.Outcome.Warned -> Writing(questions = outcome.warnings)
         is IntakeConfirmation.Outcome.Rejected -> Writing(error = IntakeCardError.Rejected(outcome.reason))
     }
 
-    /** Что идёт прямо сейчас: запись, вопрос к человеку или отказ, который он ещё не прочёл. */
+    /** Что идёт прямо сейчас: запись или отказ, который человек ещё не прочёл. */
     private data class Writing(
         val busy: Boolean = false,
-        val questions: List<IntakeWarning> = emptyList(),
         val error: IntakeCardError? = null,
         val done: Boolean = false
     )
@@ -202,7 +201,10 @@ class IntakeCardViewModel @AssistedInject constructor(
         // Принять можно из любого источника лечения: «беру из этой пачки» решается в момент
         // записи, а не при постройке плана (PLAN D6). Отключённый источник — не источник.
         val usable = sources.filter { it.fault == null }.map { IntakeSourcePresentationDTO(it.pkg.id, it.pkg.name) }
-        val chosen = typed?.packageId?.takeIf { id -> usable.any { it.id == id } } ?: plannedPackage?.id
+        // Выбранное человеком, которого больше нет среди источников, — пустой выбор, а не плановая
+        // коробка: подменённое молча списало бы не оттуда, откуда он брал.
+        val picked = typed?.packageId?.takeIf { it != plannedPackage?.id }
+        val chosen = if (picked != null) picked.takeIf { id -> usable.any { it.id == id } } else plannedPackage?.id
         return IntakeCardUiState(
             title = title,
             plannedOn = slot.localDate,
@@ -225,7 +227,6 @@ class IntakeCardViewModel @AssistedInject constructor(
                 IntakeStatus.CANCELLED -> IntakeCardUiState.Answer.CANCELLED
             },
             answeredAt = answer?.at?.atZone(zone)?.toLocalTime(),
-            questions = writing.questions.map { it.toPresentationDTO() },
             error = writing.error,
             isWriting = writing.busy,
             isDone = writing.done

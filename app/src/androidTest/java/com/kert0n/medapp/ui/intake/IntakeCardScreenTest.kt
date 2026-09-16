@@ -10,7 +10,6 @@ import androidx.test.ext.junit.runners.AndroidJUnit4
 import com.kert0n.medapp.fixture.TABLETS
 import com.kert0n.medapp.presentation.intake.IntakeCardPresentationDTO
 import com.kert0n.medapp.presentation.intake.IntakeCardUiState
-import com.kert0n.medapp.presentation.intake.IntakeQuestionPresentationDTO
 import com.kert0n.medapp.presentation.intake.IntakeSourcePresentationDTO
 import com.kert0n.medapp.presentation.value.QuantityPresentationDTO
 import com.kert0n.medapp.presentation.value.toPresentationDTO
@@ -38,8 +37,6 @@ class IntakeCardScreenTest {
 
     private var confirmed = 0
     private var declined = 0
-    private var acknowledged = 0
-    private var dismissed = 0
 
     private fun show(state: IntakeCardUiState) {
         compose.setContent {
@@ -49,8 +46,6 @@ class IntakeCardScreenTest {
                     onEdit = {},
                     onConfirm = { confirmed++ },
                     onDecline = { declined++ },
-                    onAcknowledge = { acknowledged++ },
-                    onDismissQuestions = { dismissed++ },
                     onBack = {}
                 )
             }
@@ -59,8 +54,7 @@ class IntakeCardScreenTest {
 
     private fun waiting(
         answer: IntakeCardUiState.Answer? = null,
-        answeredAt: LocalTime? = null,
-        questions: List<IntakeQuestionPresentationDTO> = emptyList()
+        answeredAt: LocalTime? = null
     ) = IntakeCardUiState(
         title = "Нурофен",
         plannedOn = LocalDate.of(2027, 3, 10),
@@ -75,8 +69,7 @@ class IntakeCardScreenTest {
         unit = TABLETS.toPresentationDTO(),
         form = IntakeCardPresentationDTO("2", LocalDate.of(2027, 3, 10), LocalTime.of(9, 12)),
         answer = answer,
-        answeredAt = answeredAt,
-        questions = questions
+        answeredAt = answeredAt
     )
 
     /** Назначенное видно: по нему человек и узнаёт пункт, к которому пришёл. */
@@ -91,30 +84,6 @@ class IntakeCardScreenTest {
         compose.onAllNodesWithText("Нурофен").assertCountEquals(2)
         compose.onNodeWithText("Принял").performClick()
         assertEquals(1, confirmed)
-    }
-
-    /**
-     * Вопросы — **одним** диалогом со списком: решение у человека одно, и спрашивать по разу за
-     * каждую беду значило бы спрашивать одно и то же (H3 №18). «Отмена» не пишет ничего.
-     */
-    @Test
-    fun theQuestionsAreAskedInOneDialog() {
-        show(
-            waiting(
-                questions = listOf(
-                    IntakeQuestionPresentationDTO.Expired(LocalDate.of(2027, 3, 1)),
-                    IntakeQuestionPresentationDTO.TouchesReserved(QuantityPresentationDTO("1", TABLETS.toPresentationDTO()))
-                )
-            )
-        )
-
-        compose.onNodeWithText("Прежде чем записать").assertIsDisplayed()
-        compose.onNodeWithText("• Коробка просрочена: годна до 01.03.2027").assertIsDisplayed()
-        compose.onNodeWithText("• Приём заденет занятое: свободно 1 таблетка").assertIsDisplayed()
-
-        compose.onNodeWithText("Всё равно принял").performClick()
-        assertEquals(1, acknowledged)
-        assertEquals(0, dismissed)
     }
 
     /** Отказ — такое же решение, как приём, и стоит он рядом (PLAN D6). */

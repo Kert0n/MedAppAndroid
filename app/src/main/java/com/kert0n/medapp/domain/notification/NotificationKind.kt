@@ -15,22 +15,35 @@ enum class NotificationKind(val channel: NotificationChannel) {
     COVERAGE_END(NotificationChannel.COVERAGE),
     DAILY_DIGEST(NotificationChannel.DIGEST),
     /** Очередь ждёт решения человека: отвергнутое или нечитаемое — одно обязательство на всю очередь. */
-    SYNC_ATTENTION(NotificationChannel.SYNC);
+    SYNC_ATTENTION(NotificationChannel.SYNC),
+
+    /**
+     * «Принял» из шторки записать не смог — нужно решение человека (PLAN C1 «Принял» из шторки):
+     * коробки больше нет, лечение сменило источник, пачки в пункте не было. Нажатие ведёт на
+     * карточку пункта, где он решает. Последним — чтобы номера прежних видов в шторке не сдвинулись.
+     */
+    INTAKE_DECISION(NotificationChannel.INTAKES);
+
+    /**
+     * Говорится ли только в свой день (PLAN C1 «В шторку — только в свой день»). Новость дня назавтра
+     * врёт или тонет; а решить очередь и узнать о чужом сокращении обеспечения нужно и через день.
+     */
+    val saysWithinItsDay: Boolean get() = this != SYNC_ATTENTION && this != COVERAGE_SHORT
 
     /** Точный будильник нужен только напоминанию о приёме: остальное — календарные события дня. */
     val exact: Boolean get() = this == INTAKE_DUE
 
     /**
-     * Системным уведомлением или баннером внутри приложения — свойство вида, а не решение
-     * вызывающего: баннер бывает только у последнего дня годности (PLAN D8).
+     * Системным уведомлением или внутри приложения — свойство вида, а не решение вызывающего.
+     * В приложении говорятся два: последний день годности и **пропуск** — неотвеченный пункт
+     * прошлого дня приходит попапом при входе, а не в шторку (PLAN C1 «Попап пропущенного»).
      */
     val delivery: NoticeDelivery
-        get() = if (this == EXPIRY_TODAY) NoticeDelivery.IN_APP_BANNER else NoticeDelivery.SYSTEM
+        get() = if (this == EXPIRY_TODAY || this == INTAKE_MISSED) NoticeDelivery.IN_APP_BANNER else NoticeDelivery.SYSTEM
 
     /**
-     * Что можно сделать прямо с карточки: отвечают только напоминанию о приёме. «Принял» требует
-     * экрана при просрочке и отменённом курсе, поэтому он — намерение открыть приложение с целью
-     * и действием, а не приёмник (C1); куда вести — решает оболочка (U5).
+     * Что можно сделать прямо с карточки: отвечают только напоминанию о приёме. Все три действия
+     * делаются без экрана; «Принял», которому записать не удалось, заводит [INTAKE_DECISION] (C1).
      */
     val actions: List<NotificationAction>
         get() = if (this == INTAKE_DUE) listOf(NotificationAction.TAKE, NotificationAction.SKIP, NotificationAction.SNOOZE) else emptyList()
@@ -55,15 +68,12 @@ enum class NotificationChannel(val importance: Importance) {
 enum class NoticeDelivery { SYSTEM, IN_APP_BANNER }
 
 /**
- * Что можно сделать прямо с уведомления. «Пропустить» и «Отложить» обходятся без экрана;
- * «Принял» открывает приложение — записать приём молча нельзя, когда есть о чём предупредить
- * (PLAN D8, C1).
+ * Что можно сделать прямо с уведомления — **без экрана**, приёмником (PLAN D8, C1). «Принял» пишет
+ * тем же сценарием, что экран: вопросов у планового приёма нет, а не вышло — приходит «нужно ваше
+ * решение», и уже оно открывает приложение (поправка владельца 2026-09-16).
  */
 enum class NotificationAction {
     TAKE,
     SKIP,
-    SNOOZE;
-
-    /** Без экрана: делается приёмником, не открывая приложение. */
-    val handledInBackground: Boolean get() = this != TAKE
+    SNOOZE
 }

@@ -19,7 +19,7 @@ import com.kert0n.medapp.storage.notification.ReminderStorageRepository
 import java.time.Instant
 import kotlin.uuid.Uuid
 import kotlinx.coroutines.flow.Flow
-import kotlinx.coroutines.flow.emptyFlow
+import kotlinx.coroutines.flow.flow
 
 /**
  * Порты, до которых проверке дела нет, — и которые она **обязана** не задеть.
@@ -27,13 +27,16 @@ import kotlinx.coroutines.flow.emptyFlow
  * Собрать сценарий можно только целиком: у начала лечения в соседях календарь пунктов и
  * обязательства уведомлений. Редактор черновика их не трогает, и подделка это утверждает: позвали
  * — значит, путь разъехался с моделью, и проверка падает с именем метода, а не тихо зеленеет на
- * выдуманном ответе.
+ * выдуманном ответе. Потоки падают так же — **при подписке**: пустой поток не отвечал бы
+ * ничего, и проверка ждала бы до таймаута, вместо того чтобы назвать метод (разбор #51).
  */
 object UnaskedIntakes : IntakeStorageRepository {
 
-    override fun observeOfCourse(courseId: Uuid): Flow<List<IntakeProjection>> = emptyFlow()
+    override fun observeOfCourse(courseId: Uuid): Flow<List<IntakeProjection>> = flow { unasked("observeOfCourse") }
 
-    override fun observeOfPackage(packageId: Uuid): Flow<List<IntakeProjection>> = emptyFlow()
+    override fun observeOfPackage(packageId: Uuid): Flow<List<IntakeProjection>> = flow { unasked("observeOfPackage") }
+
+    override fun observeOfIds(ids: Set<Uuid>): Flow<List<IntakeProjection>> = flow { unasked("observeOfIds") }
 
     override suspend fun ofCourse(courseId: Uuid): List<Intake> = unasked("ofCourse")
 
@@ -56,9 +59,9 @@ object UnaskedIntakes : IntakeStorageRepository {
 /** Обязательства уведомлений: те же правила, что у [UnaskedIntakes]. */
 object UnaskedReminders : ReminderStorageRepository {
 
-    override fun changes(): Flow<Unit> = emptyFlow()
+    override fun changes(): Flow<Unit> = flow { unasked("changes") }
 
-    override fun groundsChanged(): Flow<Unit> = emptyFlow()
+    override fun groundsChanged(): Flow<Unit> = flow { unasked("groundsChanged") }
 
     override suspend fun find(key: NotificationKey): Reminder? = unasked("find")
 
@@ -66,7 +69,7 @@ object UnaskedReminders : ReminderStorageRepository {
 
     override suspend fun awaiting(delivery: NoticeDelivery): List<Reminder> = unasked("awaiting")
 
-    override fun observeAwaiting(delivery: NoticeDelivery): Flow<List<PendingNotice>> = emptyFlow()
+    override fun observeAwaiting(delivery: NoticeDelivery): Flow<List<PendingNotice>> = flow { unasked("observeAwaiting") }
 
     override suspend fun groundless(): List<Reminder> = unasked("groundless")
 

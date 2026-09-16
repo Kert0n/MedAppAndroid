@@ -15,7 +15,6 @@ import com.kert0n.medapp.presentation.intake.UnplannedIntakeUiState
 import com.kert0n.medapp.presentation.value.QuantityPresentationDTO
 import com.kert0n.medapp.presentation.value.toPresentationDTO
 import com.kert0n.medapp.ui.theme.MedAppTheme
-import java.time.LocalDate
 import org.junit.Assert.assertEquals
 import org.junit.Rule
 import org.junit.Test
@@ -66,15 +65,15 @@ class UnplannedIntakeSheetTest {
     )
 
     /**
-     * Вопрос сценария лист задаёт **тем же диалогом**, что и карточка пункта: спрашивает не экран,
-     * а сценарий, и человек читает об этом одинаково, куда бы ни пришёл (PLAN D6, H3 №10).
+     * Вопрос сценария лист задаёт диалогом со списком: спрашивает не экран, а сценарий, и
+     * «всё равно принял» — тот же вызов с подтверждением (PLAN D6, H3 №10).
      */
     @Test
     fun theQuestionIsAskedByTheSameDialogAsOnTheCard() {
-        show(taking(questions = listOf(IntakeQuestionPresentationDTO.Expired(LocalDate.of(2027, 3, 1)))))
+        show(taking(questions = listOf(IntakeQuestionPresentationDTO.TouchesReserved(QuantityPresentationDTO("1", TABLETS.toPresentationDTO())))))
 
         compose.onNodeWithText("Прежде чем записать").assertIsDisplayed()
-        compose.onNodeWithText("• Коробка просрочена: годна до 01.03.2027").assertIsDisplayed()
+        compose.onNodeWithText("• Приём заденет занятое: свободно 1 таблетка").assertIsDisplayed()
         compose.onNodeWithText("Всё равно принял").performClick()
 
         assertEquals(1, acknowledged)

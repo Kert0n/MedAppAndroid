@@ -134,8 +134,8 @@ class ReminderOutbox @Inject constructor(
         // система вправе задержать, и точный приём за ней не ждёт (D8).
         val left = reminders.awaiting(NoticeDelivery.SYSTEM)
         val at = clock.instant()
-        val nextExact = left.filter { it.exact }.mapNotNull { it.wakeAt(at) }.minOrNull()
-        val nextInexact = left.filterNot { it.exact }.mapNotNull { it.wakeAt(at) }.minOrNull()
+        val nextExact = left.filter { it.exact }.mapNotNull { it.wakeAt(at, clock.zone) }.minOrNull()
+        val nextInexact = left.filterNot { it.exact }.mapNotNull { it.wakeAt(at, clock.zone) }.minOrNull()
         keep(nextExact, exact = true)
         keep(nextInexact, exact = false)
         val next = listOfNotNull(nextExact, nextInexact).minOrNull()
@@ -160,9 +160,12 @@ class ReminderOutbox @Inject constructor(
         }
     }
 
-    /** Наступившее и несказанное этим способом доставки — свежим чтением. */
+    /**
+     * Что сказать сейчас — свежим чтением: наступившее, несказанное и не пережившее свой день
+     * ([Reminder.speaksAt]). Вчерашнее остаётся ждать полку дня (PLAN C1).
+     */
     private suspend fun due(now: Instant): List<Reminder> =
-        reminders.awaiting(NoticeDelivery.SYSTEM).filter { it.isDue(now) }
+        reminders.awaiting(NoticeDelivery.SYSTEM).filter { it.speaksAt(now, clock.zone) }
 
     /**
      * Записать исход показа — **перечитав** обязательство своей транзакцией. Пока шла система,
