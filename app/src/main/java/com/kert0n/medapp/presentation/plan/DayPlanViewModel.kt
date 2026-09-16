@@ -11,6 +11,8 @@ import com.kert0n.medapp.storage.intake.IntakeStorageRepository
 import com.kert0n.medapp.storage.course.CourseStorageRepository
 import com.kert0n.medapp.domain.notification.NotificationTarget
 import com.kert0n.medapp.domain.notification.NoticeDelivery
+import com.kert0n.medapp.domain.notification.NotificationChannel
+import com.kert0n.medapp.domain.notification.NotificationReadiness
 import com.kert0n.medapp.domain.intake.IntakeProjection
 import com.kert0n.medapp.domain.value.Dose
 import com.kert0n.medapp.feature.intake.IntakeConfirmation
@@ -55,6 +57,7 @@ class DayPlanViewModel @Inject constructor(
     private val confirmation: IntakeConfirmation,
     private val declining: IntakeDeclining,
     private val devicePermissions: DevicePermissions,
+    private val readiness: NotificationReadiness,
     private val clock: Clock,
     reminders: ReminderStorageRepository,
     intakes: IntakeStorageRepository,
@@ -102,13 +105,28 @@ class DayPlanViewModel @Inject constructor(
      * настройках — поэтому перечитывается при каждом возвращении на экран ([refreshPermissions]),
      * а не один раз при создании.
      */
-    private val quiet = MutableStateFlow(devicePermissions.permissions())
+    private val quiet = MutableStateFlow(permissionsNow())
 
     val permissions: StateFlow<DayPermissionsPresentationDTO> = quiet
 
+    /**
+     * Что мешает напомнить — словами экрана. Можно ли сказать, отвечает тот же [NotificationReadiness],
+     * что и показ: заглушённый канал «Приёмы» иначе молчал бы, а день говорил, что всё хорошо (PLAN C1).
+     * Беды называются по одной и по порядку: без разрешения о канале и точности говорить нечего.
+     */
+    private fun permissionsNow(): DayPermissionsPresentationDTO {
+        val readiness = readiness.now()
+        val intakesMuted = readiness.allowed && NotificationChannel.INTAKES in readiness.muted
+        return DayPermissionsPresentationDTO(
+            notificationsOff = !readiness.allowed,
+            intakesMuted = intakesMuted,
+            alarmsInexact = readiness.canSay(NotificationChannel.INTAKES) && !devicePermissions.current().exactAlarms
+        )
+    }
+
     /** Человек вернулся из системных настроек: спрашиваем заново — там он мог всё и починить. */
     fun refreshPermissions() {
-        quiet.value = devicePermissions.permissions()
+        quiet.value = permissionsNow()
     }
 
     /**
@@ -248,16 +266,6 @@ class DayPlanViewModel @Inject constructor(
     )
 }
 
-/** Состояние разрешений — словами экрана: точности будильника без самих уведомлений не бывает. */
-private fun DevicePermissions.permissions(): DayPermissionsPresentationDTO {
-    val states = current()
-    return DayPermissionsPresentationDTO(
-        notificationsOff = !states.notifications,
-        // О неточности говорят, только когда сказать вообще есть чем: иначе две беды разом, а
-        // чинить их человеку по одной.
-        alarmsInexact = states.notifications && !states.exactAlarms
-    )
-}
 
 /** Пункт, о котором сценарий спросил: карточка открывается по нему одному. */
 data class DayQuestion(val intakeId: Uuid)

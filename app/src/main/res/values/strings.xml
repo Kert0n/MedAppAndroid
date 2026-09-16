@@ -275,6 +275,8 @@
     <string name="expiry_today_until">годен до %1$s</string>
     <string name="plan_notifications_off">Напоминания не приходят</string>
     <string name="plan_notifications_off_hint">Уведомления выключены — включить в настройках</string>
+    <string name="plan_intakes_muted">Напоминания о приёмах выключены</string>
+    <string name="plan_intakes_muted_hint">Канал «Приёмы» заглушён — включить в настройках</string>
     <string name="plan_alarms_inexact">Напоминания могут опаздывать</string>
     <string name="plan_alarms_inexact_hint">Точное время будильников выключено — разрешить в настройках</string>
     <string name="intake_state_planned">ждёт</string>

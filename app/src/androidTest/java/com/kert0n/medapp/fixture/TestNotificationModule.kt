@@ -4,6 +4,7 @@ import com.kert0n.medapp.di.ClockModule
 import com.kert0n.medapp.di.NotificationModule
 import com.kert0n.medapp.domain.notification.Freshness
 import com.kert0n.medapp.domain.notification.Notifier
+import com.kert0n.medapp.domain.notification.NotificationReadiness
 import com.kert0n.medapp.domain.notification.ReminderAlarms
 import com.kert0n.medapp.feature.notification.DailySchedule
 import com.kert0n.medapp.feature.time.ClockShifts
@@ -52,6 +53,14 @@ object TestNotificationModule {
     @Provides
     @Singleton
     fun dailySchedule(real: Provider<WorkManagerDailySchedule>): DailySchedule = StoryWorld.current?.daily ?: real.get()
+
+    /**
+     * Можно ли сказать — у проверок отвечает [TestPermissions]: настоящее разрешение отозвать нельзя,
+     * Android убивает процесс, а истории об отказе о нём и написаны.
+     */
+    @Provides
+    @Singleton
+    fun readiness(): NotificationReadiness = TestPermissions
 
     /** Весть о переводе часов — всегда настоящая: история шлёт её сама, когда двигает часы. */
     @Provides

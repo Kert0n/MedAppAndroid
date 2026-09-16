@@ -93,6 +93,7 @@ class IntakeAnsweringTest {
         confirmation = scenarios.intakeConfirmation,
         declining = scenarios.intakeDeclining,
         devicePermissions = AllAllowed,
+        readiness = AllAllowed,
         clock = clock,
         reminders = scenarios.reminderStore,
         intakes = database.intakeRepository(),

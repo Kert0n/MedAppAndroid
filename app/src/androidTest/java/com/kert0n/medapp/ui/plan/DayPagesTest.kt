@@ -26,6 +26,10 @@ import kotlin.time.Duration
 import kotlin.time.Duration.Companion.seconds
 import kotlinx.coroutines.cancel
 import kotlinx.coroutines.runBlocking
+import com.kert0n.medapp.domain.notification.NotificationChannel
+import com.kert0n.medapp.domain.notification.NotificationReadiness
+import com.kert0n.medapp.domain.notification.Readiness
+import com.kert0n.medapp.presentation.plan.DayPermissionsPresentationDTO
 import org.junit.After
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertSame
@@ -60,12 +64,13 @@ class DayPagesTest {
         database.close()
     }
 
-    private fun model() = DayPlanViewModel(
+    private fun model(readiness: NotificationReadiness = AllAllowed) = DayPlanViewModel(
         today = Today(clock, QuietClock),
         planning = DayPlanning(Today(clock, QuietClock), database.reportRepository()),
         confirmation = scenarios.intakeConfirmation,
         declining = scenarios.intakeDeclining,
         devicePermissions = AllAllowed,
+        readiness = readiness,
         clock = clock,
         reminders = scenarios.reminderStore,
         intakes = database.intakeRepository(),
@@ -101,6 +106,31 @@ class DayPagesTest {
         val model = model()
 
         assertSame(model.page(0), model.page(0))
+    }
+
+    /**
+     * **Заглушённый канал называется.** Приложению разрешено, а канал «Приёмы» человек заглушил
+     * долгим нажатием на карточку: показ отвечает «нельзя», полка растёт. Спроси «День» другой
+     * ответ, чем показ, — и он скажет, что всё в порядке, а человек так и не узнает, почему
+     * молчит телефон (разбор U5).
+     */
+    @Test
+    fun aMutedIntakeChannelIsNamedByTheDay() {
+        val muted = object : NotificationReadiness {
+            override fun now() = Readiness(allowed = true, muted = setOf(NotificationChannel.INTAKES))
+        }
+
+        assertEquals(DayPermissionsPresentationDTO(intakesMuted = true), model(muted).permissions.value)
+    }
+
+    /** Заглушён чужой канал — о приёмах сказать есть чем, и «День» молчит. */
+    @Test
+    fun aMutedChannelOfAnotherKindIsNotTheDaysBusiness() {
+        val muted = object : NotificationReadiness {
+            override fun now() = Readiness(allowed = true, muted = setOf(NotificationChannel.EXPIRY))
+        }
+
+        assertEquals(DayPermissionsPresentationDTO(), model(muted).permissions.value)
     }
 
     private companion object {

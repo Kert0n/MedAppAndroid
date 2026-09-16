@@ -1,10 +1,17 @@
 package com.kert0n.medapp.platform.notifications
 
 import android.app.NotificationChannel as SystemChannel
+import android.Manifest
 import android.app.NotificationManager
 import android.content.Context
+import android.content.pm.PackageManager
+import android.os.Build
+import androidx.core.app.NotificationManagerCompat
+import androidx.core.content.ContextCompat
 import com.kert0n.medapp.R
 import com.kert0n.medapp.domain.notification.NotificationChannel
+import com.kert0n.medapp.domain.notification.NotificationReadiness
+import com.kert0n.medapp.domain.notification.Readiness
 import dagger.hilt.android.qualifiers.ApplicationContext
 import javax.inject.Inject
 import javax.inject.Singleton
@@ -15,7 +22,19 @@ import javax.inject.Singleton
  * Заводить каналы повторно безопасно — система хранит выбор человека, а не наши умолчания.
  */
 @Singleton
-class NotificationChannels @Inject constructor(@ApplicationContext private val context: Context) {
+class NotificationChannels @Inject constructor(@ApplicationContext private val context: Context) : NotificationReadiness {
+
+    /**
+     * Можно ли сказать: разрешение `POST_NOTIFICATIONS` (с Android 13), уведомления приложения
+     * вообще и каналы, заглушённые человеком. Отвечает владелец каналов — показ и «День» спрашивают
+     * здесь одно и то же (PLAN C1 «Можно ли сказать — один ответ»).
+     */
+    override fun now(): Readiness {
+        val permitted = Build.VERSION.SDK_INT < Build.VERSION_CODES.TIRAMISU ||
+            ContextCompat.checkSelfPermission(context, Manifest.permission.POST_NOTIFICATIONS) == PackageManager.PERMISSION_GRANTED
+        val allowed = permitted && NotificationManagerCompat.from(context).areNotificationsEnabled()
+        return Readiness(allowed, NotificationChannel.entries.filterTo(HashSet()) { mutedOrMissing(it.id) })
+    }
 
     fun ensure() {
         val manager = context.getSystemService(NotificationManager::class.java)

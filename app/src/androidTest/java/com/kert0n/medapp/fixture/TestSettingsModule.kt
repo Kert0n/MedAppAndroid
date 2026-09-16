@@ -10,6 +10,9 @@ import com.kert0n.medapp.platform.settings.CameraAccess
 import com.kert0n.medapp.platform.settings.PermissionStates
 import com.kert0n.medapp.platform.settings.DataStoreSettings
 import com.kert0n.medapp.platform.settings.DevicePermissions
+import com.kert0n.medapp.domain.notification.NotificationChannel
+import com.kert0n.medapp.domain.notification.NotificationReadiness
+import com.kert0n.medapp.domain.notification.Readiness
 import com.kert0n.medapp.platform.settings.StoredNotificationSettings
 import androidx.datastore.preferences.core.PreferenceDataStoreFactory
 import dagger.Module
@@ -69,12 +72,20 @@ object TestSettingsModule {
  * о них и не говорят. Отказ называется явно, и после каждой истории состояние возвращается
  * ([reset]): граф заводится заново, а объект живёт весь прогон.
  */
-object TestPermissions : DevicePermissions {
+object TestPermissions : DevicePermissions, NotificationReadiness {
 
     var notifications: Boolean = true
     var exactAlarms: Boolean = true
 
-    override fun current(): PermissionStates =
+    /** Каналы, заглушённые человеком долгим нажатием на карточку. */
+    var muted: Set<NotificationChannel> = emptySet()
+
+    /** Тот же ответ, что читают показ и «День»: разрешение приложению и заглушённые каналы. */
+    override fun now(): Readiness = Readiness(notifications, muted)
+
+    override fun current(): PermissionStates = states()
+
+    private fun states(): PermissionStates =
         // Точность будильников у истории одна — у её постановок: спросить второй ответ значило бы
         // завести в проверке то расхождение, которое приложение как раз не допускает.
         PermissionStates(
@@ -86,5 +97,6 @@ object TestPermissions : DevicePermissions {
     fun reset() {
         notifications = true
         exactAlarms = true
+        muted = emptySet()
     }
 }

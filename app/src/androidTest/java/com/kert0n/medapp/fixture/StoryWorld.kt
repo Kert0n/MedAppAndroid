@@ -40,7 +40,7 @@ class StoryWorld private constructor(start: Instant, zone: ZoneId) {
     val clock = StoryClock(start, zone)
 
     /** Шторка: что показано и погашено, и какие карточки висят сейчас ([FakeNotifier.cards]). */
-    val shade = FakeNotifier().also { shade -> shade.allowedWhen = { TestPermissions.notifications } }
+    val shade = FakeNotifier().also { shade -> shade.allowedWhen = { TestPermissions.now().canSay(it.channel) } }
 
     val alarms = FakeReminders()
 

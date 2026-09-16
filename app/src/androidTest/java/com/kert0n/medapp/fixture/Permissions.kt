@@ -27,7 +27,10 @@ fun allowNotifications() {
  * Разрешения, о которых проверка не спрашивает: всё позволено. Отказ — предмет своих проверок, и
  * там он называется явно.
  */
-object AllAllowed : com.kert0n.medapp.platform.settings.DevicePermissions {
+object AllAllowed : com.kert0n.medapp.platform.settings.DevicePermissions, com.kert0n.medapp.domain.notification.NotificationReadiness {
+
+    override fun now() = com.kert0n.medapp.domain.notification.Readiness(allowed = true)
+
     override fun current() = com.kert0n.medapp.platform.settings.PermissionStates(
         notifications = true,
         exactAlarms = true,

@@ -15,6 +15,7 @@ import com.kert0n.medapp.domain.notification.Delivery
 import com.kert0n.medapp.domain.notification.NotificationAction
 import com.kert0n.medapp.domain.notification.NotificationKey
 import com.kert0n.medapp.domain.notification.NotificationKind
+import com.kert0n.medapp.domain.notification.NotificationReadiness
 import com.kert0n.medapp.domain.notification.NotificationTarget
 import com.kert0n.medapp.domain.notification.Notifier
 import com.kert0n.medapp.domain.notification.Reminder
@@ -49,7 +50,7 @@ class SystemNotifier @Inject constructor(
     private val intakes: IntakeStorageRepository,
     private val courses: CourseStorageRepository,
     private val packages: PackageStorageRepository,
-    private val channels: NotificationChannels
+    private val readiness: NotificationReadiness
 ) : Notifier {
 
     override suspend fun show(reminder: Reminder): Delivery {
@@ -58,11 +59,11 @@ class SystemNotifier @Inject constructor(
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU &&
             ContextCompat.checkSelfPermission(context, Manifest.permission.POST_NOTIFICATIONS) != PackageManager.PERMISSION_GRANTED
         ) return Delivery.NOT_ALLOWED
-        if (!NotificationManagerCompat.from(context).areNotificationsEnabled()) return Delivery.NOT_ALLOWED
         // Разрешение приложению — ещё не разрешение этому разговору: каналов пять, и человек
         // выключает их по отдельности (PLAN D8). Выключенный канал молчит, а `notify` об этом не
-        // скажет — спрашиваем **владельца каналов** о канале этого вида.
-        if (channels.mutedOrMissing(reminder.channel.id)) return Delivery.NOT_ALLOWED
+        // скажет. Спрашиваем тот же ответ, что читает «День»: иначе полка растёт, а день молчит
+        // о причине (PLAN C1 «Можно ли сказать — один ответ»).
+        if (!readiness.now().canSay(reminder.channel)) return Delivery.NOT_ALLOWED
         // Текст собирается из чтений по идентификаторам цели: не нашлось — повода больше нет.
         val text = textOf(reminder) ?: return Delivery.SUBJECT_GONE
         val builder = NotificationCompat.Builder(context, reminder.channel.id)

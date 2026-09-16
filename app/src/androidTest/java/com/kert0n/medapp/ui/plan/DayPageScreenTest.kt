@@ -305,6 +305,21 @@ class DayPageScreenTest {
         assertEquals(1, fixedAlarms)
     }
 
+    /**
+     * Заглушённый канал — третья беда и свои слова: разрешение есть, а напоминания о приёмах человек
+     * выключил сам. Чинится там же, в настройках уведомлений приложения.
+     */
+    @Test
+    fun aMutedIntakeChannelIsToldInItsOwnWords() {
+        permissions = DayPermissionsPresentationDTO(intakesMuted = true)
+        show(page(items = listOf(row("Нурофен"))))
+
+        compose.onNodeWithText("Напоминания не приходят").assertDoesNotExist()
+        compose.onNodeWithText("Напоминания о приёмах выключены").performClick()
+
+        assertEquals(1, fixedNotifications)
+    }
+
     /** Всё разрешено — строк нет: приложению нечего сказать, и оно молчит. */
     @Test
     fun nothingIsSaidWhenEverythingIsAllowed() {

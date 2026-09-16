@@ -134,6 +134,15 @@ private fun DayPage(
                 color = MaterialTheme.colorScheme.error
             )
         }
+        if (permissions.intakesMuted) {
+            NavigationRow(
+                icon = R.drawable.ic_warning,
+                text = stringResource(R.string.plan_intakes_muted),
+                supporting = stringResource(R.string.plan_intakes_muted_hint),
+                onClick = onFixNotifications,
+                color = MaterialTheme.colorScheme.error
+            )
+        }
         if (permissions.alarmsInexact) {
             NavigationRow(
                 icon = R.drawable.ic_schedule,

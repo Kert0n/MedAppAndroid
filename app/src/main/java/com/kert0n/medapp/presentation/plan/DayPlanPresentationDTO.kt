@@ -44,9 +44,11 @@ data class DayPagePresentationDTO(
  */
 data class DayPermissionsPresentationDTO(
     val notificationsOff: Boolean = false,
+    /** Приложению разрешено, а канал «Приёмы» человек заглушил сам — чинится там же, другими словами. */
+    val intakesMuted: Boolean = false,
     val alarmsInexact: Boolean = false
 ) {
-    val isQuiet: Boolean get() = !notificationsOff && !alarmsInexact
+    val isQuiet: Boolean get() = !notificationsOff && !intakesMuted && !alarmsInexact
 }
 
 /**

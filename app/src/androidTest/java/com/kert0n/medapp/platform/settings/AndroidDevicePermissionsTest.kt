@@ -8,6 +8,7 @@ import androidx.core.content.ContextCompat
 import androidx.test.platform.app.InstrumentationRegistry
 import com.kert0n.medapp.fixture.FakeReminders
 import org.junit.Assume.assumeTrue
+import com.kert0n.medapp.platform.notifications.NotificationChannels
 import org.junit.Assert.assertEquals
 import org.junit.Test
 
@@ -21,7 +22,7 @@ class AndroidDevicePermissionsTest {
 
     @Test
     fun statesComeFromTheSystem() {
-        val states = AndroidDevicePermissions(context, FakeReminders(canBeExact = true)).current()
+        val states = AndroidDevicePermissions(context, FakeReminders(canBeExact = true), NotificationChannels(context)).current()
 
         assertEquals(NotificationManagerCompat.from(context).areNotificationsEnabled(), states.notifications)
         val expectedCamera = when {
@@ -35,8 +36,8 @@ class AndroidDevicePermissionsTest {
     /** Точность — ответ владельца будильников, и только его: при отказе экран показывает «приблизительно». */
     @Test
     fun exactnessIsTheAlarmOwnersAnswer() {
-        assertEquals(true, AndroidDevicePermissions(context, FakeReminders(canBeExact = true)).current().exactAlarms)
-        assertEquals(false, AndroidDevicePermissions(context, FakeReminders(canBeExact = false)).current().exactAlarms)
+        assertEquals(true, AndroidDevicePermissions(context, FakeReminders(canBeExact = true), NotificationChannels(context)).current().exactAlarms)
+        assertEquals(false, AndroidDevicePermissions(context, FakeReminders(canBeExact = false), NotificationChannels(context)).current().exactAlarms)
     }
 
     /**
@@ -54,7 +55,7 @@ class AndroidDevicePermissionsTest {
                 if (permission == Manifest.permission.CAMERA) PackageManager.PERMISSION_DENIED else super.checkPermission(permission, pid, uid)
         }
 
-        assertEquals(CameraAccess.DENIED, AndroidDevicePermissions(denying, FakeReminders()).current().camera)
-        assertEquals(CameraAccess.GRANTED, AndroidDevicePermissions(context, FakeReminders()).current().camera)
+        assertEquals(CameraAccess.DENIED, AndroidDevicePermissions(denying, FakeReminders(), NotificationChannels(denying)).current().camera)
+        assertEquals(CameraAccess.GRANTED, AndroidDevicePermissions(context, FakeReminders(), NotificationChannels(context)).current().camera)
     }
 }
