@@ -210,8 +210,20 @@ private fun Fields(
             unitError = field == CourseFormError.Field.UNIT,
             emptyUnits = stringResource(R.string.pack_no_units)
         )
-        // Источники — сразу под формой и дозой: раньше них подключать нечего, а дальше в списке
-        // полей они бы потерялись (решение владельца 2026-09-16).
+        // Сколько всего приёмов — до источников: делить между коробками нечего, пока не сказано,
+        // сколько приёмов делить (просьба владельца 2026-09-16).
+        OutlinedTextField(
+            value = form.totalDoses,
+            onValueChange = { onEdit(form.copy(totalDoses = it)) },
+            label = { Text(stringResource(R.string.course_total_doses)) },
+            singleLine = true,
+            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+            isError = field == CourseFormError.Field.TOTAL_DOSES,
+            supportingText = state.expectedEnd?.let { { Text(stringResource(R.string.course_expected_end, it.format(DAY))) } },
+            modifier = Modifier.fillMaxWidth()
+        )
+        // Источники — сразу за дозой и числом приёмов: раньше них подключать нечего, а дальше в
+        // списке полей они бы потерялись (решение владельца 2026-09-16).
         onSources?.let {
             OutlinedButton(
                 onClick = it,
@@ -235,16 +247,6 @@ private fun Fields(
         }
         Text(stringResource(R.string.course_times), style = MaterialTheme.typography.labelLarge)
         TimesField(times = form.times, onTimes = { onEdit(form.copy(times = it)) })
-        OutlinedTextField(
-            value = form.totalDoses,
-            onValueChange = { onEdit(form.copy(totalDoses = it)) },
-            label = { Text(stringResource(R.string.course_total_doses)) },
-            singleLine = true,
-            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
-            isError = field == CourseFormError.Field.TOTAL_DOSES,
-            supportingText = state.expectedEnd?.let { { Text(stringResource(R.string.course_expected_end, it.format(DAY))) } },
-            modifier = Modifier.fillMaxWidth()
-        )
     }
 }
 
