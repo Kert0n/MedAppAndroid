@@ -73,6 +73,7 @@ class PackageCardScreenTest {
                 PackageCardScreen(
                     state = state,
                     onTake = { taken++ },
+                    onHistory = {},
                     onEdit = { edited++ },
                     onRecount = { recounted++ },
                     onTransfer = { transferred++ },

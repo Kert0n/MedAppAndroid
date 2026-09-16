@@ -61,6 +61,7 @@ fun CourseCardScreen(
     state: CourseCardUiState,
     onEdit: () -> Unit,
     onSources: () -> Unit,
+    onHistory: () -> Unit,
     onAskToCancel: () -> Unit,
     onConfirmCancel: () -> Unit,
     onDismissCancel: () -> Unit,
@@ -101,7 +102,7 @@ fun CourseCardScreen(
             when {
                 state.isGone -> ErrorMessage(text = stringResource(R.string.course_missing))
                 course == null -> LoadingState()
-                else -> Card(state, course, onSources)
+                else -> Card(state, course, onSources, onHistory)
             }
         }
     }
@@ -115,6 +116,7 @@ private fun Card(
     state: CourseCardUiState,
     course: CoursePresentationDTO,
     onSources: () -> Unit,
+    onHistory: () -> Unit,
     modifier: Modifier = Modifier
 ) {
     LazyColumn(modifier.fillMaxSize(), contentPadding = PaddingValues(bottom = 16.dp)) {
@@ -175,6 +177,11 @@ private fun Card(
                         Spacer(Modifier.width(8.dp))
                         Text(stringResource(R.string.course_sources_open))
                     }
+                    // Как шло лечение — тем же путём, что и источники: списком, а не в меню.
+                    TextButton(
+                        onClick = onHistory,
+                        modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp).defaultMinSize(minHeight = 48.dp)
+                    ) { Text(stringResource(R.string.intake_history_of_course)) }
                 }
             }
         }

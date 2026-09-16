@@ -91,4 +91,10 @@ sealed interface Screen : NavKey {
      * лечения карточка и подписана (PLAN H3 №18).
      */
     data class IntakeCard(val courseId: Uuid, val intakeId: Uuid) : Screen
+
+    /**
+     * История приёмов. Спрашивается об **одном**: или о лечении, или о коробке — и это разные
+     * вопросы с разными ответами (PLAN H3 №19).
+     */
+    data class IntakeHistory(val courseId: Uuid? = null, val packageId: Uuid? = null) : Screen
 }

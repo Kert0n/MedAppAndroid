@@ -48,6 +48,7 @@ class CourseCardScreenTest {
                     state = state,
                     onEdit = { edited++ },
                     onSources = {},
+                    onHistory = {},
                     onAskToCancel = { asked++ },
                     onConfirmCancel = { confirmed++ },
                     onDismissCancel = {},

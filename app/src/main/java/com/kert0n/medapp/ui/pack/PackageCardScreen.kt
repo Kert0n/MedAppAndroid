@@ -55,6 +55,7 @@ fun PackageCardScreen(
     state: PackageCardUiState,
     onEdit: () -> Unit,
     onTake: () -> Unit,
+    onHistory: () -> Unit,
     onRecount: () -> Unit,
     onTransfer: () -> Unit,
     onAskToRemove: () -> Unit,
@@ -107,7 +108,7 @@ fun PackageCardScreen(
                     .padding(16.dp),
                 verticalArrangement = Arrangement.spacedBy(12.dp)
             ) {
-                HowMuchIsThere(pack, state.holdingCourseTitle, state.isBusy, onTake, onRecount)
+                HowMuchIsThere(pack, state.holdingCourseTitle, state.isBusy, onTake, onRecount, onHistory)
                 WhatItIs(pack)
                 DatesAndPrice(pack, state.today, state.lastUsedOn)
                 WhereItLies(pack, state.medKitName, onTransfer)
@@ -129,7 +130,8 @@ private fun HowMuchIsThere(
     holdingCourseTitle: String?,
     isBusy: Boolean,
     onTake: () -> Unit,
-    onRecount: () -> Unit
+    onRecount: () -> Unit,
+    onHistory: () -> Unit
 ) {
     Section(title = stringResource(R.string.pack_how_much)) {
         Row(verticalAlignment = Alignment.CenterVertically) {
@@ -139,6 +141,9 @@ private fun HowMuchIsThere(
             TextButton(onClick = onTake) { Text(stringResource(R.string.intake_record)) }
             TextButton(onClick = onRecount) { Text(stringResource(R.string.pack_recount)) }
         }
+        // История переживает саму коробку: кончившаяся и выброшенная рассказывает о себе так же
+        // (PLAN D3, H3 №19).
+        TextButton(onClick = onHistory) { Text(stringResource(R.string.intake_history_of_package)) }
         if (pack.availableToMe != pack.effective) {
             Fact(stringResource(R.string.pack_available_to_me), pack.availableToMe.text())
         }

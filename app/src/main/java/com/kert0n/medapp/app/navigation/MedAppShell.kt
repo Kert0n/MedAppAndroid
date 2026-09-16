@@ -30,8 +30,10 @@ import com.kert0n.medapp.ui.course.SourcePickingScreen
 import com.kert0n.medapp.presentation.intake.UnplannedIntakeViewModel
 import com.kert0n.medapp.ui.intake.UnplannedIntakeSheet
 import com.kert0n.medapp.presentation.intake.IntakeCardViewModel
+import com.kert0n.medapp.presentation.intake.IntakeHistoryViewModel
 import com.kert0n.medapp.presentation.plan.DayPlanViewModel
 import com.kert0n.medapp.ui.intake.IntakeCardScreen
+import com.kert0n.medapp.ui.intake.IntakeHistoryScreen
 import com.kert0n.medapp.ui.plan.PlanMode
 import com.kert0n.medapp.ui.plan.PlanScreen
 import androidx.compose.runtime.LaunchedEffect
@@ -196,6 +198,7 @@ private fun screens(stacks: TabStacks) = entryProvider<NavKey> {
             state = state,
             onEdit = { stacks.go(Screen.PackageForm(packageId = key.packageId)) },
             onTake = { taking = true },
+            onHistory = { stacks.go(Screen.IntakeHistory(packageId = key.packageId)) },
             onRecount = { stacks.go(Screen.PackageRecount(key.packageId)) },
             onTransfer = { stacks.go(Screen.PackageTransfer(key.packageId)) },
             onAskToRemove = model::askToRemove,
@@ -309,6 +312,16 @@ private fun screens(stacks: TabStacks) = entryProvider<NavKey> {
             onBack = stacks::back
         )
     }
+    entry<Screen.IntakeHistory> { key ->
+        val model = hiltViewModel<IntakeHistoryViewModel, IntakeHistoryViewModel.Factory>(
+            key = key.toString(),
+            creationCallback = { factory -> factory.create(key.courseId, key.packageId) }
+        )
+        IntakeHistoryScreen(
+            state = model.state.collectAsStateWithLifecycle().value,
+            onBack = stacks::back
+        )
+    }
     entry<Screen.CourseForm> { key ->
         val model = hiltViewModel<CourseFormViewModel, CourseFormViewModel.Factory>(
             key = key.toString(),
@@ -359,6 +372,7 @@ private fun screens(stacks: TabStacks) = entryProvider<NavKey> {
             state = model.state.collectAsStateWithLifecycle().value,
             onEdit = { stacks.go(Screen.CourseForm(key.courseId)) },
             onSources = { stacks.go(Screen.CourseSources(key.courseId)) },
+            onHistory = { stacks.go(Screen.IntakeHistory(courseId = key.courseId)) },
             onAskToCancel = model::askToCancel,
             onConfirmCancel = model::cancel,
             onDismissCancel = model::dismissCancel,
