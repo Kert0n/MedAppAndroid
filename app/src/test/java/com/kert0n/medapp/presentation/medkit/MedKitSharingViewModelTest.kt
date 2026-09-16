@@ -217,4 +217,38 @@ class MedKitSharingViewModelTest {
 
         assertEquals(MedKitSharingUiState.Gone, state)
     }
+
+    /** Полного экрана без ключа не бывает: показывать там нечего. */
+    @Test
+    fun thereIsNoFullScreenWithoutACode() {
+        val model = viewModel(medKitId = SHARED_KIT)
+
+        val state = watching(model.state) { state ->
+            model.showFullScreen()
+            state.awaiting { it is MedKitSharingUiState.Shared }
+        }
+
+        assertTrue(!(state as MedKitSharingUiState.Shared).isFullScreen)
+    }
+
+    /**
+     * «Обновить код» с полного экрана оставляет человека там же: он нажал, не закрывая, и ждёт
+     * новый код на том же месте.
+     */
+    @Test
+    fun refreshingTheCodeKeepsTheFullScreenOpen() {
+        val model = viewModel(medKitId = SHARED_KIT)
+
+        val state = watching(model.state) { state ->
+            model.invite()
+            state.awaiting { it is MedKitSharingUiState.Shared && it.invitation != null }
+            model.showFullScreen()
+            state.awaiting { it is MedKitSharingUiState.Shared && it.isFullScreen }
+            issue = MedKitInvitations.Issue.Issued(InvitationKey("Z1A-4B7-QW2"))
+            model.invite()
+            state.awaiting { it is MedKitSharingUiState.Shared && it.invitation?.key == InvitationKey("Z1A-4B7-QW2") }
+        }
+
+        assertTrue((state as MedKitSharingUiState.Shared).isFullScreen)
+    }
 }

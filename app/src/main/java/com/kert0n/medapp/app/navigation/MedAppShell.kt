@@ -244,6 +244,8 @@ private fun screens(stacks: TabStacks, planMode: MutableState<PlanMode>) = entry
             onDismissAsking = model::dismissAsking,
             onPublish = model::publish,
             onInvite = model::invite,
+            onShowFullScreen = model::showFullScreen,
+            onHideFullScreen = model::hideFullScreen,
             onBack = stacks::back
         )
     }

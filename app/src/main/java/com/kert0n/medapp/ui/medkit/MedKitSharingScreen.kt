@@ -1,6 +1,9 @@
 package com.kert0n.medapp.ui.medkit
 
+import androidx.compose.foundation.Image
+import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.defaultMinSize
@@ -18,17 +21,22 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
+import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.FilterQuality
 import androidx.compose.foundation.layout.size
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.window.Dialog
+import androidx.compose.ui.window.DialogProperties
 import androidx.annotation.DrawableRes
 import com.kert0n.medapp.R
 import com.kert0n.medapp.presentation.medkit.InvitationPresentationDTO
@@ -37,6 +45,7 @@ import com.kert0n.medapp.presentation.medkit.MedKitSharingUiState
 import com.kert0n.medapp.ui.EmptyState
 import com.kert0n.medapp.ui.ErrorMessage
 import com.kert0n.medapp.ui.LoadingState
+import com.kert0n.medapp.ui.SecretOnScreen
 import com.kert0n.medapp.ui.TIME
 import com.kert0n.medapp.ui.text
 
@@ -56,6 +65,8 @@ fun MedKitSharingScreen(
     onDismissAsking: () -> Unit,
     onPublish: () -> Unit,
     onInvite: () -> Unit,
+    onShowFullScreen: () -> Unit,
+    onHideFullScreen: () -> Unit,
     onBack: () -> Unit,
     modifier: Modifier = Modifier
 ) {
@@ -81,7 +92,8 @@ fun MedKitSharingScreen(
             MedKitSharingUiState.Gone -> EmptyState(stringResource(R.string.med_kit_gone), inside)
             is MedKitSharingUiState.OnItsWay -> EmptyState(stringResource(R.string.med_kit_sharing_on_its_way), inside)
             is MedKitSharingUiState.Deciding -> Deciding(state, onAsk, onDismissAsking, onPublish, inside)
-            is MedKitSharingUiState.Shared -> Shared(state, onAsk, onDismissAsking, onInvite, inside)
+            is MedKitSharingUiState.Shared ->
+                Shared(state, onAsk, onDismissAsking, onInvite, onShowFullScreen, onHideFullScreen, inside)
         }
     }
 }
@@ -130,6 +142,8 @@ private fun Shared(
     onAsk: () -> Unit,
     onDismissAsking: () -> Unit,
     onInvite: () -> Unit,
+    onShowFullScreen: () -> Unit,
+    onHideFullScreen: () -> Unit,
     modifier: Modifier
 ) {
     Column(
@@ -140,7 +154,7 @@ private fun Shared(
             stringResource(R.string.med_kit_sharing_shared, state.name),
             style = MaterialTheme.typography.bodyLarge
         )
-        state.invitation?.let { Code(it) }
+        state.invitation?.let { Code(it, onShowFullScreen) }
         state.refusal?.let { Refusal(it) }
         Button(
             onClick = onAsk,
@@ -155,6 +169,9 @@ private fun Shared(
             )
         }
         if (state.isWorking) Waiting()
+    }
+    if (state.isFullScreen && state.invitation != null) {
+        FullScreenCode(state.invitation, onInvite = onAsk, onHide = onHideFullScreen)
     }
     if (state.isAsking) {
         Confirmation(
@@ -172,12 +189,19 @@ private fun Shared(
  * его кэша раньше (PLAN B6, C1 «Приглашение»).
  */
 @Composable
-private fun Code(invitation: InvitationPresentationDTO) {
+private fun Code(invitation: InvitationPresentationDTO, onShowFullScreen: () -> Unit) {
+    // Ключ на экране — секрет: пока он виден, снимок экрана и показ в недавних запрещены (G3).
+    SecretOnScreen()
     ElevatedCard(Modifier.fillMaxWidth()) {
         Column(
             modifier = Modifier.padding(16.dp),
+            horizontalAlignment = Alignment.CenterHorizontally,
             verticalArrangement = Arrangement.spacedBy(8.dp)
         ) {
+            Pattern(invitation.key.value, Modifier.size(180.dp))
+            TextButton(onClick = onShowFullScreen) {
+                Text(stringResource(R.string.med_kit_sharing_show_full_screen))
+            }
             Text(
                 invitation.key.value,
                 style = MaterialTheme.typography.titleMedium,
@@ -257,3 +281,51 @@ private fun Confirmation(
     confirmButton = { TextButton(onClick = onConfirm) { Text(action) } },
     dismissButton = { TextButton(onClick = onDismiss) { Text(stringResource(R.string.action_cancel)) } }
 )
+
+/**
+ * Узор ключа. Подложка белая при любой теме и не зависит от палитры: узор читает камера чужого
+ * телефона, а тёмный распознаватели теряют. Сглаживание выключено — размытая граница модуля
+ * читается хуже резкой.
+ */
+@Composable
+private fun Pattern(code: String, modifier: Modifier = Modifier) {
+    Image(
+        bitmap = rememberInvitationPattern(code),
+        contentDescription = stringResource(R.string.med_kit_sharing_qr),
+        filterQuality = FilterQuality.None,
+        modifier = modifier
+            .background(Color.White)
+            .padding(8.dp)
+    )
+}
+
+/**
+ * Экран 21 — код во весь экран. Это **состояние экрана 20**, а не маршрут: ключ секрет, а ключ
+ * маршрута ложится в сохранённую стопку (PLAN G3, C1 «Ключ приглашения не бывает маршрутом»).
+ * Оттого он и не переживает смерть процесса — человек видит «обновить код», и это честно.
+ */
+@Composable
+private fun FullScreenCode(
+    invitation: InvitationPresentationDTO,
+    onInvite: () -> Unit,
+    onHide: () -> Unit
+) = Dialog(onDismissRequest = onHide, properties = DialogProperties(usePlatformDefaultWidth = false)) {
+    SecretOnScreen()
+    Surface(modifier = Modifier.fillMaxSize()) {
+        Column(
+            modifier = Modifier.fillMaxSize().padding(24.dp),
+            horizontalAlignment = Alignment.CenterHorizontally,
+            verticalArrangement = Arrangement.spacedBy(16.dp, Alignment.CenterVertically)
+        ) {
+            Pattern(invitation.key.value, Modifier.fillMaxWidth(0.85f).aspectRatio(1f))
+            Text(invitation.key.value, style = MaterialTheme.typography.titleMedium)
+            Text(
+                stringResource(R.string.med_kit_sharing_expires_around, TIME.format(invitation.expiresAround)),
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
+            TextButton(onClick = onInvite) { Text(stringResource(R.string.med_kit_sharing_invite_again)) }
+            TextButton(onClick = onHide) { Text(stringResource(R.string.action_close)) }
+        }
+    }
+}

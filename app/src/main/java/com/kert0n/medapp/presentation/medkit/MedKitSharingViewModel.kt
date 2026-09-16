@@ -90,6 +90,15 @@ class MedKitSharingViewModel @AssistedInject constructor(
         }
     }
 
+    /** Показать код во весь экран (№21) и убрать его оттуда. */
+    fun showFullScreen() {
+        if (own.value.invitation != null) own.value = own.value.copy(isFullScreen = true)
+    }
+
+    fun hideFullScreen() {
+        own.value = own.value.copy(isFullScreen = false)
+    }
+
     /** Позвать: выдать ключ. Прежний ключ заменяется новым — сервер выдаёт по ключу на запрос. */
     fun invite() {
         if (own.value.isWorking) return
@@ -109,9 +118,12 @@ class MedKitSharingViewModel @AssistedInject constructor(
         val invitation: Invitation? = null,
         val isAsking: Boolean = false,
         val isWorking: Boolean = false,
+        val isFullScreen: Boolean = false,
         val refusal: MedKitSharingRefusal? = null
     ) {
 
+        // Новый ключ показывается там же, где человек смотрел прежний: он нажал «обновить
+        // код», не закрывая полный экран, и закрывать его за него незачем.
         fun settled(): Own = copy(isWorking = false, refusal = null)
 
         fun refused(refusal: MedKitSharingRefusal): Own = copy(isWorking = false, refusal = refusal)
@@ -123,7 +135,9 @@ class MedKitSharingViewModel @AssistedInject constructor(
             // (PLAN D2, E5). Ключа в этом состоянии нет и быть не может.
             !shelf.acceptsInvitations -> MedKitSharingUiState.OnItsWay(shelf.name)
             else -> MedKitSharingUiState.Shared(
-                shelf.name, invitation?.toPresentationDTO(zone), isAsking, isWorking, refusal
+                shelf.name, invitation?.toPresentationDTO(zone), isAsking, isWorking, refusal,
+                // Полного экрана без ключа не бывает: ключ мог уйти вместе с полкой.
+                isFullScreen = isFullScreen && invitation != null
             )
         }
     }
@@ -160,7 +174,9 @@ sealed interface MedKitSharingUiState {
         val invitation: InvitationPresentationDTO? = null,
         val isAsking: Boolean = false,
         val isWorking: Boolean = false,
-        val refusal: MedKitSharingRefusal? = null
+        val refusal: MedKitSharingRefusal? = null,
+        /** Код показан во весь экран (№21) — состояние этого же экрана, а не отдельный маршрут. */
+        val isFullScreen: Boolean = false
     ) : MedKitSharingUiState
 }
 
