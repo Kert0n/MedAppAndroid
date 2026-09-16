@@ -29,6 +29,7 @@ import com.kert0n.medapp.ui.course.CourseSourcesScreen
 import com.kert0n.medapp.ui.course.SourcePickingScreen
 import com.kert0n.medapp.presentation.intake.UnplannedIntakeViewModel
 import com.kert0n.medapp.ui.intake.UnplannedIntakeSheet
+import com.kert0n.medapp.presentation.plan.DayPlanViewModel
 import com.kert0n.medapp.ui.plan.PlanMode
 import com.kert0n.medapp.ui.plan.PlanScreen
 import androidx.compose.runtime.LaunchedEffect
@@ -248,6 +249,7 @@ private fun screens(stacks: TabStacks) = entryProvider<NavKey> {
     }
     entry(Screen.Plan) {
         val model: CourseListViewModel = hiltViewModel()
+        val days: DayPlanViewModel = hiltViewModel()
         // Режим — состояние места: он переживает уход в другую комнату и возвращение, как и
         // всё, что держит стопка (rememberSaveable под своим ключом маршрута).
         var mode by rememberSaveable { mutableStateOf(PlanMode.COURSES) }
@@ -255,6 +257,9 @@ private fun screens(stacks: TabStacks) = entryProvider<NavKey> {
             mode = mode,
             onMode = { mode = it },
             courses = model.state.collectAsStateWithLifecycle().value,
+            // Чтение спрашивается у той страницы, которой оно принадлежит: сдвиг называет вёрстка
+            // страницы, а не оболочка.
+            dayPage = { daysAhead -> days.page(daysAhead).collectAsStateWithLifecycle().value },
             // Черновик открывается редактором, идущее и законченное лечение — карточкой.
             onOpenCourse = { course ->
                 stacks.go(

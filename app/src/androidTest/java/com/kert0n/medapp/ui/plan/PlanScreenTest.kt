@@ -13,6 +13,7 @@ import com.kert0n.medapp.presentation.ScreenState
 import com.kert0n.medapp.presentation.course.CourseListPresentationDTO
 import com.kert0n.medapp.presentation.course.CoursePresentationDTO
 import com.kert0n.medapp.presentation.course.SchedulePresentationDTO
+import com.kert0n.medapp.presentation.plan.DayPagePresentationDTO
 import com.kert0n.medapp.presentation.course.ShortagePresentationDTO
 import com.kert0n.medapp.presentation.value.FormPresentationDTO
 import com.kert0n.medapp.presentation.value.QuantityPresentationDTO
@@ -40,6 +41,13 @@ class PlanScreenTest {
 
     private var opened: CoursePresentationDTO? = null
     private var added = 0
+
+    private val emptyDay = DayPagePresentationDTO(
+        date = LocalDate.of(2027, 3, 10),
+        daysAhead = 0,
+        items = emptyList(),
+        alsoOnThisDay = emptyList()
+    )
 
     private fun course(
         title: String,
@@ -73,6 +81,9 @@ class PlanScreenTest {
                     mode = current,
                     onMode = { current = it },
                     courses = courses,
+                    // Что на странице дня, проверяет `DayPageScreenTest`; здесь она нужна
+                    // настолько, чтобы отличить одно состояние места от другого.
+                    dayPage = { ScreenState.Ready(emptyDay) },
                     onOpenCourse = { opened = it },
                     onAddCourse = { added++ }
                 )
@@ -95,7 +106,7 @@ class PlanScreenTest {
 
         compose.onNodeWithText("Нурофен").assertIsDisplayed()
         compose.onNodeWithText("День").performClick()
-        compose.onNodeWithText("План дня появится в следующем наборе экранов.").assertIsDisplayed()
+        compose.onNodeWithText("На этот день ничего не назначено").assertIsDisplayed()
         compose.onNodeWithText("Нурофен").assertDoesNotExist()
         compose.onNodeWithText("Курсы").performClick()
         compose.onNodeWithText("Нурофен").assertIsDisplayed()

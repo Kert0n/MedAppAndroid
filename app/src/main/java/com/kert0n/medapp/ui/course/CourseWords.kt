@@ -6,7 +6,7 @@ import androidx.compose.ui.res.stringResource
 import com.kert0n.medapp.R
 import com.kert0n.medapp.presentation.course.CoursePresentationDTO
 import com.kert0n.medapp.presentation.course.SchedulePresentationDTO
-import com.kert0n.medapp.presentation.value.QuantityPresentationDTO
+import com.kert0n.medapp.ui.words
 import java.time.DayOfWeek
 import java.time.format.TextStyle
 import java.util.Locale
@@ -24,8 +24,6 @@ internal fun CoursePresentationDTO.prescriptionWords(): String {
     )
     return if (parts.isEmpty()) stringResource(R.string.course_prescription_missing) else parts.joinToString(" · ")
 }
-
-internal fun QuantityPresentationDTO.words(): String = "$amount ${unit.name}"
 
 /**
  * Дни недели словами: все семь — «ежедневно», подряд — «пн–пт», вразнобой — «пн, ср, пт».

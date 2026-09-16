@@ -265,7 +265,16 @@
     <string name="plan_title">План</string>
     <string name="plan_mode_day">День</string>
     <string name="plan_mode_courses">Курсы</string>
-    <string name="plan_day_not_ready">План дня появится в следующем наборе экранов.</string>
+    <string name="plan_day_empty">На этот день ничего не назначено</string>
+    <string name="plan_day_today">сегодня</string>
+    <string name="plan_day_tomorrow">завтра</string>
+    <string name="plan_day_also">Ещё в этот день</string>
+    <string name="intake_state_planned">ждёт</string>
+    <string name="intake_state_taken">принят в %1$s</string>
+    <string name="intake_state_missed">пропущен</string>
+    <string name="intake_state_cancelled">отменён</string>
+    <string name="intake_state_expected">ожидается</string>
+    <string name="intake_state_one_off">разово в %1$s</string>
     <string name="courses_empty">Лечений пока нет.</string>
     <string name="courses_empty_hint">Запишите назначение — даже одну заметку.</string>
     <string name="courses_add">Записать лечение</string>
