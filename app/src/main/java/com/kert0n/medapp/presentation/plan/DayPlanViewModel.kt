@@ -68,7 +68,15 @@ class DayPlanViewModel @Inject constructor(
      */
     private val unannounced: StateFlow<List<IntakeProjection.Scheduled>> = reminders
         .observeAwaiting(NoticeDelivery.SYSTEM)
-        .map { notices -> notices.mapNotNull { (it.target as? NotificationTarget.Intake)?.intakeId }.toSet() }
+        // Только **наступившее**: обязательство на послезавтра ещё не просрочено — о нём скажут
+        // вовремя, и на сегодняшней полке ему нечего делать (PLAN D8: «наступило ли, экран решает
+        // по `dueAt` и своим часам»). Без этого полка показывала бы всё будущее лечения.
+        .map { notices ->
+            val now = clock.instant()
+            notices.filter { !it.dueAt.isAfter(now) }
+                .mapNotNull { (it.target as? NotificationTarget.Intake)?.intakeId }
+                .toSet()
+        }
         .distinctUntilChanged()
         .flatMapLatest { ids -> intakes.observeOfIds(ids) }
         .map { read -> read.filterIsInstance<IntakeProjection.Scheduled>() }

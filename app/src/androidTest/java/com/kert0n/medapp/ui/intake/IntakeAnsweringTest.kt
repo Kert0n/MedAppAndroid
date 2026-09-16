@@ -342,6 +342,9 @@ class IntakeAnsweringTest {
      * Телефон промолчал — день говорит сам: обязательство, о котором не смогли напомнить, видно
      * полкой и отвечается там же. Без неё вчерашний пропущенный приём человек не нашёл бы вовсе:
      * страница дня листается только вперёд (PLAN D8, H3 «Уведомления на экране»).
+     *
+     * На полке — только **наступившее**: обязательство на послезавтра ещё не просрочено, и без
+     * этого правила полка показывала бы всё будущее лечения (найдено историей Максима).
      */
     @Test
     fun theDayShowsWhatCouldNotBeAnnouncedAndTakesTheAnswerThere() = runBlocking {
@@ -359,9 +362,11 @@ class IntakeAnsweringTest {
         val model = dayModel()
 
         watching(model.page(0)) { page ->
-            page.awaiting(PATIENTLY) { state ->
+            val shown = page.awaiting(PATIENTLY) { state ->
                 state.ready()?.unannounced.orEmpty().any { it.intakeId == intakeId }
             }
+            // Завтрашние обязательства сюда не попадают: о них скажут вовремя.
+            assertEquals(listOf(intakeId), shown.ready()?.unannounced.orEmpty().map { it.intakeId })
             model.confirm(intakeId)
             // Отвеченное уходит из полки: напоминать о нём больше нечего (PLAN D8).
             page.awaiting(PATIENTLY) { state ->
