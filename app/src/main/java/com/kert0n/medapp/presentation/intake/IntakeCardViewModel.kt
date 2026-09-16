@@ -30,6 +30,9 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.flatMapLatest
+import kotlinx.coroutines.flow.flowOf
+import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
@@ -44,6 +47,7 @@ import kotlinx.coroutines.launch
  * Записывает [IntakeConfirmation] — тот же сценарий, что и быстрый ответ: одно человеческое
  * действие живёт в одном месте, сколькими бы дорогами к нему ни приходили (PLAN F5).
  */
+@OptIn(kotlinx.coroutines.ExperimentalCoroutinesApi::class)
 @HiltViewModel(assistedFactory = IntakeCardViewModel.Factory::class)
 class IntakeCardViewModel @AssistedInject constructor(
     private val confirmation: IntakeConfirmation,
@@ -53,16 +57,12 @@ class IntakeCardViewModel @AssistedInject constructor(
     private val clock: Clock,
     courses: CourseStorageRepository,
     intakes: IntakeStorageRepository,
-    @Assisted("courseId") private val courseId: Uuid,
-    @Assisted("intakeId") private val intakeId: Uuid
+    @Assisted private val intakeId: Uuid
 ) : ViewModel() {
 
     @AssistedFactory
     interface Factory {
-        fun create(
-            @Assisted("courseId") courseId: Uuid,
-            @Assisted("intakeId") intakeId: Uuid
-        ): IntakeCardViewModel
+        fun create(intakeId: Uuid): IntakeCardViewModel
     }
 
     /** Что человек набрал; `null` — он ещё не трогал карточку, и в ней стоит плановое. */
@@ -70,21 +70,30 @@ class IntakeCardViewModel @AssistedInject constructor(
 
     private val writing = MutableStateFlow(Writing())
 
-    private val episode = combine(courses.observeRecord(courseId), courses.observePlan(courseId)) { record, plan ->
-        record to plan
-    }
+    /**
+     * Карточка знает только **номер приёма**: столько же знает уведомление, которое сюда ведёт
+     * (`NotificationTarget.Intake`). Лечение находится по самому приёму, а не приходит маршрутом —
+     * иначе у одного места было бы два входа с разными знаниями (PLAN G3, H3 «Уведомления на экране»).
+     */
+    private val episode = intakes.observeOfIds(setOf(intakeId))
+        .map { it.filterIsInstance<IntakeProjection.Scheduled>().firstOrNull { intake -> intake.id == intakeId } }
+        .flatMapLatest { intake ->
+            if (intake == null) flowOf(null to null)
+            else combine(courses.observeRecord(intake.courseId), courses.observePlan(intake.courseId)) { record, plan ->
+                intake to (record?.title to plan?.sources.orEmpty())
+            }
+        }
 
     val state: StateFlow<IntakeCardUiState> = combine(
         episode,
-        intakes.observeOfCourse(courseId),
         today.observe(),
         typed,
         writing
-    ) { (record, plan), intakes, day, typed, writing ->
-        val intake = intakes.filterIsInstance<IntakeProjection.Scheduled>().firstOrNull { it.id == intakeId }
+    ) { (intake, episode), day, typed, writing ->
+        val title = episode?.first
         // Пункта нет — расписание перестроили, пока карточку держали открытой: показывать нечего.
-        if (record == null || intake == null) IntakeCardUiState(isGone = true)
-        else intake.card(record.title, plan?.sources.orEmpty(), day.zone, typed, writing)
+        if (intake == null || title == null) IntakeCardUiState(isGone = true)
+        else intake.card(title, episode.second.orEmpty(), day.zone, typed, writing)
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), IntakeCardUiState(isLoading = true))
 
     fun edit(form: IntakeCardPresentationDTO) {

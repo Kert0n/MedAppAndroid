@@ -1,5 +1,6 @@
 package com.kert0n.medapp.platform.notifications
 
+import com.kert0n.medapp.domain.notification.NotificationOpening
 import com.kert0n.medapp.domain.notification.NotificationAction
 import com.kert0n.medapp.domain.notification.NotificationTarget
 import java.io.File
@@ -27,7 +28,7 @@ class NotificationTargetExtrasTest {
     @Test
     fun everyTargetSurvivesTheRoundTrip() {
         for (target in samples) {
-            assertEquals(NotificationTargetExtras.Opening(target, null), NotificationTargetExtras.decode(NotificationTargetExtras.encode(target)))
+            assertEquals(NotificationOpening(target, null), NotificationTargetExtras.decode(NotificationTargetExtras.encode(target)))
         }
     }
 
@@ -36,10 +37,10 @@ class NotificationTargetExtrasTest {
     fun theActionTravelsWithTheTargetAndAStrangeOneIsIgnored() {
         val intake = samples.first()
         for (action in NotificationAction.entries) {
-            assertEquals(NotificationTargetExtras.Opening(intake, action), NotificationTargetExtras.decode(NotificationTargetExtras.encode(intake, action)))
+            assertEquals(NotificationOpening(intake, action), NotificationTargetExtras.decode(NotificationTargetExtras.encode(intake, action)))
         }
         val strange = NotificationTargetExtras.encode(intake) + ("notification_action" to "DANCE")
-        assertEquals(NotificationTargetExtras.Opening(intake, null), NotificationTargetExtras.decode(strange))
+        assertEquals(NotificationOpening(intake, null), NotificationTargetExtras.decode(strange))
     }
 
     @Test

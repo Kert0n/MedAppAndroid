@@ -13,6 +13,7 @@ import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.MutableState
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.ui.platform.LocalContext
 import androidx.lifecycle.compose.LifecycleResumeEffect
@@ -33,6 +34,8 @@ import com.kert0n.medapp.presentation.intake.UnplannedIntakeViewModel
 import com.kert0n.medapp.ui.intake.UnplannedIntakeSheet
 import com.kert0n.medapp.presentation.intake.IntakeCardViewModel
 import com.kert0n.medapp.presentation.intake.IntakeHistoryViewModel
+import com.kert0n.medapp.domain.notification.NotificationOpening
+import com.kert0n.medapp.domain.notification.NotificationTarget
 import com.kert0n.medapp.presentation.notification.ExpiringTodayViewModel
 import com.kert0n.medapp.presentation.plan.DayPlanViewModel
 import com.kert0n.medapp.ui.intake.IntakeCardScreen
@@ -87,7 +90,37 @@ import com.kert0n.medapp.ui.pack.PackageTransferScreen
  * все экраны, поэтому и лечится она здесь.
  */
 @Composable
-fun MedAppShell(modifier: Modifier = Modifier, stacks: TabStacks = rememberTabStacks()) {
+fun MedAppShell(
+    modifier: Modifier = Modifier,
+    stacks: TabStacks = rememberTabStacks(),
+    opening: NotificationOpening? = null,
+    onOpened: () -> Unit = {}
+) {
+    // Режим места «План» держит оболочка: уведомление о плане дня ведёт прямо на день, а не на
+    // список курсов, и знать об этом должен тот, кто применяет цель (PLAN H3 «Уведомления»).
+    // Состояние, а не значение: читает его сам экран места, и подписка на изменение остаётся у
+    // него. Передай значением — список экранов пришлось бы собирать заново на каждую смену
+    // режима, и `NavDisplay` показал бы прежний.
+    val planMode = rememberSaveable { mutableStateOf(PlanMode.COURSES) }
+    // Цель применяется **один раз**: иначе поворот экрана возвращал бы человека туда, откуда он
+    // уже ушёл. Намерение опустошает окно, а эта проверка бережёт от повторного применения.
+    LaunchedEffect(opening) {
+        val asked = opening ?: return@LaunchedEffect
+        when (val target = asked.target) {
+            is NotificationTarget.Intake -> stacks.go(Screen.IntakeCard(target.intakeId))
+            is NotificationTarget.PackageCard -> stacks.go(Screen.PackageCard(target.packageId))
+            is NotificationTarget.CourseSources -> stacks.go(Screen.CourseSources(target.courseId))
+            // Сводка ведёт на план дня: даты в маршруте нет — страница дня держит сдвиг, а не
+            // число, и «сегодня» у неё своё (H3 №12).
+            is NotificationTarget.DayPlan -> {
+                planMode.value = PlanMode.DAY
+                stacks.go(Place.PLAN.key)
+            }
+            // Экрана состояния синхронизации ещё нет (U6): ведём в место, где он появится.
+            NotificationTarget.SyncStatus -> stacks.go(Place.OPTIONS.key)
+        }
+        onOpened()
+    }
     Scaffold(
         modifier = modifier.fillMaxSize(),
         // Панель мест — у мест: в глубине человек занят одним делом, и пять соседних комнат
@@ -95,7 +128,7 @@ fun MedAppShell(modifier: Modifier = Modifier, stacks: TabStacks = rememberTabSt
         bottomBar = { if (stacks.screen in PLACES) Places(stacks) }
     ) { padding ->
         NavDisplay(
-            entries = stacks.entries(remember(stacks) { screens(stacks) }),
+            entries = stacks.entries(remember(stacks, planMode) { screens(stacks, planMode) }),
             onBack = stacks::back,
             modifier = Modifier.padding(padding).consumeWindowInsets(padding),
             transitionSpec = { SWITCH },
@@ -120,7 +153,7 @@ fun MedAppShell(modifier: Modifier = Modifier, stacks: TabStacks = rememberTabSt
  * Состояние экрану даёт `hiltViewModel` здесь же, а аргумент приходит **значением из ключа**:
  * экран получает `state` и действия и больше ничего (PLAN H1).
  */
-private fun screens(stacks: TabStacks) = entryProvider<NavKey> {
+private fun screens(stacks: TabStacks, planMode: MutableState<PlanMode>) = entryProvider<NavKey> {
     entry(Screen.MedKits) {
         val model: MedKitListViewModel = hiltViewModel()
         MedKitListScreen(
@@ -283,7 +316,6 @@ private fun screens(stacks: TabStacks) = entryProvider<NavKey> {
         val days: DayPlanViewModel = hiltViewModel()
         // Режим — состояние места: он переживает уход в другую комнату и возвращение, как и
         // всё, что держит стопка (rememberSaveable под своим ключом маршрута).
-        var mode by rememberSaveable { mutableStateOf(PlanMode.COURSES) }
         val context = LocalContext.current
         // Разрешения человек меняет у системы: вернулся — спрашиваем заново, своего мнения о них
         // приложение не держит (PLAN H3 «Уведомления на экране»).
@@ -297,22 +329,18 @@ private fun screens(stacks: TabStacks) = entryProvider<NavKey> {
         LaunchedEffect(question) {
             val asked = question ?: return@LaunchedEffect
             days.questionShown()
-            stacks.go(Screen.IntakeCard(asked.courseId, asked.intakeId))
+            stacks.go(Screen.IntakeCard(asked.intakeId))
         }
         PlanScreen(
-            mode = mode,
-            onMode = { mode = it },
+            mode = planMode.value,
+            onMode = { planMode.value = it },
             courses = model.state.collectAsStateWithLifecycle().value,
             // Чтение спрашивается у той страницы, которой оно принадлежит: сдвиг называет вёрстка
             // страницы, а не оболочка.
             dayPage = { daysAhead -> days.page(daysAhead).collectAsStateWithLifecycle().value },
             // Нажатие на строку ведёт на карточку пункта; у дозы за окном календаря записи ещё
             // нет, и открывать по ней нечего.
-            onOpenIntake = { item ->
-                val intakeId = item.intakeId
-                val courseId = item.courseId
-                if (intakeId != null && courseId != null) stacks.go(Screen.IntakeCard(courseId, intakeId))
-            },
+            onOpenIntake = { item -> item.intakeId?.let { stacks.go(Screen.IntakeCard(it)) } },
             onConfirmIntake = days::confirm,
             onDeclineIntake = days::decline,
             onDismissDayMessage = days::dismissMessage,
@@ -332,7 +360,7 @@ private fun screens(stacks: TabStacks) = entryProvider<NavKey> {
     entry<Screen.IntakeCard> { key ->
         val model = hiltViewModel<IntakeCardViewModel, IntakeCardViewModel.Factory>(
             key = key.toString(),
-            creationCallback = { factory -> factory.create(key.courseId, key.intakeId) }
+            creationCallback = { factory -> factory.create(key.intakeId) }
         )
         val state = model.state.collectAsStateWithLifecycle().value
         // Ответ дан — карточка уходит: человек отвечал на приём, а не заполнял форму.

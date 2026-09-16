@@ -92,7 +92,7 @@ class IntakeAnsweringTest {
         clock = clock
     ).also { opened += it }
 
-    private fun cardModel(courseId: Uuid, intakeId: Uuid) = IntakeCardViewModel(
+    private fun cardModel(intakeId: Uuid) = IntakeCardViewModel(
         confirmation = scenarios.intakeConfirmation,
         declining = scenarios.intakeDeclining,
         vocabulary = VocabularyRoomRepository(database.vocabulary()),
@@ -100,7 +100,6 @@ class IntakeAnsweringTest {
         clock = clock,
         courses = database.courseRepository(),
         intakes = database.intakeRepository(),
-        courseId = courseId,
         intakeId = intakeId
     ).also { opened += it }
 
@@ -227,7 +226,7 @@ class IntakeAnsweringTest {
     fun theCardWritesTheAmountThePersonTyped() = runBlocking {
         val courseId = started()
         val intakeId = firstIntake(courseId).id
-        val model = cardModel(courseId, intakeId)
+        val model = cardModel(intakeId)
 
         watching(model.state) { state ->
             val shown = state.awaiting(PATIENTLY) { it.unit != null }
@@ -249,7 +248,7 @@ class IntakeAnsweringTest {
     fun theQuestionIsAskedOnTheCardAndAnsweringItWrites() = runBlocking {
         val courseId = started(expiresOn = LocalDate.of(2027, 3, 1))
         val intakeId = firstIntake(courseId).id
-        val model = cardModel(courseId, intakeId)
+        val model = cardModel(intakeId)
 
         watching(model.state) { state ->
             state.awaiting(PATIENTLY) { it.unit != null }
@@ -272,7 +271,7 @@ class IntakeAnsweringTest {
     fun theIntakeIsTakenFromTheChosenSourceOfTheCourse() = runBlocking {
         val courseId = startedWithTwoSources()
         val intakeId = firstIntake(courseId).id
-        val model = cardModel(courseId, intakeId)
+        val model = cardModel(intakeId)
 
         watching(model.state) { state ->
             val shown = state.awaiting(PATIENTLY) { it.sources.size == 2 }
@@ -315,7 +314,7 @@ class IntakeAnsweringTest {
         val courseId = started()
         val intakeId = firstIntake(courseId).id
         scenarios.intakeConfirmation.confirm(intakeId, PACK, dose("2"), now)
-        val model = cardModel(courseId, intakeId)
+        val model = cardModel(intakeId)
 
         val shown = watching(model.state) { it.awaiting(PATIENTLY) { state -> state.unit != null } }
 

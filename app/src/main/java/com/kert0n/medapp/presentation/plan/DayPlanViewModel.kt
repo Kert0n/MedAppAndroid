@@ -141,7 +141,7 @@ class DayPlanViewModel @Inject constructor(
     private fun told(planned: Planned, outcome: IntakeConfirmation.Outcome) {
         when (outcome) {
             is IntakeConfirmation.Outcome.Confirmed -> Unit
-            is IntakeConfirmation.Outcome.Warned -> asksAbout.value = DayQuestion(planned.courseId, planned.intakeId)
+            is IntakeConfirmation.Outcome.Warned -> asksAbout.value = DayQuestion(planned.intakeId)
             is IntakeConfirmation.Outcome.Rejected -> message.value = DayMessage.Refused(outcome.reason)
             IntakeConfirmation.Outcome.Gone -> message.value = DayMessage.Gone
         }
@@ -210,5 +210,5 @@ private fun DevicePermissions.permissions(): DayPermissionsPresentationDTO {
     )
 }
 
-/** Пункт, о котором сценарий спросил: карточка открывается по лечению и самому пункту. */
-data class DayQuestion(val courseId: Uuid, val intakeId: Uuid)
+/** Пункт, о котором сценарий спросил: карточка открывается по нему одному. */
+data class DayQuestion(val intakeId: Uuid)

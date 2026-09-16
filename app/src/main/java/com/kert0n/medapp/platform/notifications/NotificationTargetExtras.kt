@@ -3,6 +3,7 @@ package com.kert0n.medapp.platform.notifications
 import com.kert0n.medapp.domain.attempt
 import android.content.Intent
 import com.kert0n.medapp.domain.notification.NotificationAction
+import com.kert0n.medapp.domain.notification.NotificationOpening
 import com.kert0n.medapp.domain.notification.NotificationTarget
 import java.time.LocalDate
 import kotlin.uuid.Uuid
@@ -15,16 +16,13 @@ import kotlin.uuid.Uuid
  */
 object NotificationTargetExtras {
 
-    /** С чем открыли приложение: цель — всегда, действие — если нажали кнопку, а не карточку. */
-    data class Opening(val target: NotificationTarget, val action: NotificationAction?)
-
     fun put(intent: Intent, target: NotificationTarget, action: NotificationAction? = null): Intent {
         for ((key, value) in encode(target, action)) intent.putExtra(key, value)
         return intent
     }
 
     /** Цель и действие из намерения; намерение без цели или с незнакомой — `null`: открывается просто приложение. */
-    fun read(intent: Intent): Opening? = decode(
+    fun read(intent: Intent): NotificationOpening? = decode(
         listOf(KIND, ID, DATE, ACTION).mapNotNull { key -> intent.getStringExtra(key)?.let { key to it } }.toMap()
     )
 
@@ -39,7 +37,7 @@ object NotificationTargetExtras {
         return if (action == null) fields else fields + (ACTION to action.name)
     }
 
-    fun decode(extras: Map<String, String>): Opening? {
+    fun decode(extras: Map<String, String>): NotificationOpening? {
         val id = extras[ID]?.let { attempt { Uuid.parse(it) }.getOrNull() }
         val date = extras[DATE]?.let { attempt { LocalDate.parse(it) }.getOrNull() }
         val target = when (extras[KIND]) {
@@ -52,7 +50,7 @@ object NotificationTargetExtras {
         } ?: return null
         // Незнакомое действие — не повод терять цель: открывается карточка, как по нажатию на неё.
         val action = extras[ACTION]?.let { name -> NotificationAction.entries.firstOrNull { it.name == name } }
-        return Opening(target, action)
+        return NotificationOpening(target, action)
     }
 
     private const val KIND = "notification_target"
