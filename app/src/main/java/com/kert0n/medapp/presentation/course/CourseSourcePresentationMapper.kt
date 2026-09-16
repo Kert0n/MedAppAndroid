@@ -43,14 +43,17 @@ private fun PackageProjection.gives(dose: Dose, fault: CourseSource.Fault?): Dos
     return availability.availableToMe.dosesIn(dose)
 }
 
-/** Коробка в выборе источника: то, чем человек её узнаёт, и сколько в ней свободно ему. */
-fun PackageProjection.toAttachmentPresentationDTO(medKitName: String?): PackageAttachmentPresentationDTO =
-    PackageAttachmentPresentationDTO(
-        packageId = id,
-        name = facts.name,
-        medKitName = medKitName,
-        availableToMe = availability.availableToMe.toPresentationDTO()
-    )
+/** Коробка в выборе источника: чем человек её узнаёт, сколько в ней свободно и можно ли её взять. */
+fun PackageProjection.toAttachmentPresentationDTO(
+    medKitName: String?,
+    attachability: Attachability
+): PackageAttachmentPresentationDTO = PackageAttachmentPresentationDTO(
+    packageId = id,
+    name = facts.name,
+    medKitName = medKitName,
+    availableToMe = availability.availableToMe.toPresentationDTO(),
+    attachability = attachability
+)
 
 /** Обеспечение словами экрана: числа приёмов и дни в зоне курса (PLAN D5). */
 fun CourseCoverage.toPresentationDTO(): CourseCoveragePresentationDTO = CourseCoveragePresentationDTO(

@@ -17,10 +17,13 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import com.kert0n.medapp.R
+import com.kert0n.medapp.domain.course.CourseSource
+import com.kert0n.medapp.presentation.course.Attachability
 import com.kert0n.medapp.presentation.course.PackageAttachmentPresentationDTO
 import com.kert0n.medapp.presentation.course.SourcePickingUiState
 import com.kert0n.medapp.ui.EmptyState
@@ -84,18 +87,51 @@ fun SourcePickingScreen(
     }
 }
 
+/**
+ * Строка коробки: чем она названа, где лежит и сколько в ней свободно. Неподходящая не прячется,
+ * а выключается и второй строкой говорит **почему** — иначе человек ищет пропавшую коробку
+ * глазами и не находит (PLAN H3 №17).
+ */
 @Composable
 private fun PackageRow(pack: PackageAttachmentPresentationDTO, onAttach: () -> Unit, enabled: Boolean) {
+    val takeable = pack.isAttachable
     ListItem(
         headlineContent = { Text(pack.name) },
         supportingContent = {
-            Text(
-                listOfNotNull(
-                    pack.medKitName,
-                    pack.availableToMe?.let { stringResource(R.string.course_source_free, it.amount, it.unit.name) }
-                ).joinToString(" · ")
-            )
+            Column {
+                Text(
+                    listOfNotNull(
+                        pack.medKitName,
+                        pack.availableToMe?.let { stringResource(R.string.course_source_free, it.amount, it.unit.name) }
+                    ).joinToString(" · ")
+                )
+                if (!takeable) {
+                    Text(pack.attachability.words(), color = MaterialTheme.colorScheme.error)
+                }
+            }
         },
-        modifier = Modifier.fillMaxWidth().clickable(enabled = enabled, onClick = onAttach)
+        modifier = Modifier
+            .fillMaxWidth()
+            .alpha(if (takeable) 1f else 0.6f)
+            .clickable(enabled = enabled && takeable, onClick = onAttach)
     )
+}
+
+/** Почему коробку нельзя взять — словами, которые ведут к действию. */
+@Composable
+private fun Attachability.words(): String = when (this) {
+    Attachability.Attachable -> ""
+    Attachability.Attached -> stringResource(R.string.course_attach_already)
+    is Attachability.HeldByCourse ->
+        title?.let { stringResource(R.string.course_attach_held_named, it) }
+            ?: stringResource(R.string.course_attach_held)
+    Attachability.NeedsForm -> stringResource(R.string.course_attach_needs_form)
+    is Attachability.Mismatch -> stringResource(
+        when (fault) {
+            CourseSource.Fault.FORM_MISMATCH -> R.string.course_attach_other_form
+            CourseSource.Fault.UNIT_MISMATCH -> R.string.course_attach_other_unit
+        }
+    )
+    Attachability.Unusable -> stringResource(R.string.course_attach_unusable)
+    Attachability.PrescriptionIncomplete -> stringResource(R.string.course_attach_incomplete)
 }

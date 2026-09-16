@@ -31,15 +31,48 @@ data class CourseSourcePresentationDTO(
 )
 
 /**
- * Коробка, которую можно подключить (PLAN H3 №17): чем она названа, где лежит и сколько в ней
- * свободно.
+ * Коробка в выборе источника (PLAN H3 №17): чем она названа, где лежит, сколько в ней свободно
+ * и **можно ли её подключить**. Неподходящая не прячется: человек ищет именно её и должен
+ * прочитать, почему она не идёт.
  */
 data class PackageAttachmentPresentationDTO(
     val packageId: Uuid,
     val name: String,
     val medKitName: String?,
-    val availableToMe: QuantityPresentationDTO?
-)
+    val availableToMe: QuantityPresentationDTO?,
+    val attachability: Attachability
+) {
+    val isAttachable: Boolean get() = attachability == Attachability.Attachable
+}
+
+/**
+ * Можно ли подключить коробку к этому лечению, и если нет — почему. Случаи различаются тем, что
+ * человек делает дальше: у одной коробки он поправит форму, другую освободит другое лечение,
+ * третью не вернуть вовсе. Совместимость решает домен (`CourseSource.Fault.between`), занятость —
+ * проекция коробки, пригодность — её статус (PLAN D5).
+ */
+sealed interface Attachability {
+
+    data object Attachable : Attachability
+
+    /** Уже в составе этого лечения — второй раз её не подключают. */
+    data object Attached : Attachability
+
+    /** Держит другое идущее лечение: одна пачка — один активный курс (D5). */
+    data class HeldByCourse(val title: String?) : Attachability
+
+    /** У коробки не заполнена форма: сказать, тот ли это препарат, нечем. */
+    data object NeedsForm : Attachability
+
+    /** Форма или единица коробки не те, что назначены. */
+    data class Mismatch(val fault: CourseSource.Fault) : Attachability
+
+    /** Коробку выбрасывают или её полки больше нет. */
+    data object Unusable : Attachability
+
+    /** У лечения ещё не названы доза и форма — сверять коробку не с чем. */
+    data object PrescriptionIncomplete : Attachability
+}
 
 /**
  * Чем кончилась попытка записать состав — то, что человек прочтёт. Случаи различаются тем, что

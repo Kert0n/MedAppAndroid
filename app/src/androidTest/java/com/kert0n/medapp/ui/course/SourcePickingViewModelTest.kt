@@ -3,6 +3,7 @@ package com.kert0n.medapp.ui.course
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import androidx.test.ext.junit.runners.AndroidJUnit4
+import com.kert0n.medapp.domain.course.CourseSource
 import com.kert0n.medapp.domain.value.Doses
 import com.kert0n.medapp.feature.course.CourseDrafting
 import com.kert0n.medapp.feature.time.Today
@@ -22,6 +23,7 @@ import com.kert0n.medapp.fixture.packageRepository
 import com.kert0n.medapp.fixture.schedule
 import com.kert0n.medapp.fixture.tablets
 import com.kert0n.medapp.fixture.watching
+import com.kert0n.medapp.presentation.course.Attachability
 import com.kert0n.medapp.presentation.course.SourcePickingViewModel
 import com.kert0n.medapp.storage.database.MedAppDatabase
 import java.time.Clock
@@ -100,48 +102,67 @@ class SourcePickingViewModelTest {
     )
 
     /**
-     * Форму и единицу сверяет назначение: коробка в капсулах под лечение в таблетках не идёт.
-     * Порядок — тот, что отдаёт чтение: по названию («Ибупрофен» раньше «Нурофена»).
+     * Неподходящая коробка не прячется: человек ищет именно её и читает, почему она не идёт.
+     * Форму и единицу сверяет назначение — коробка в капсулах под лечение в таблетках не годится.
      */
     @Test
-    fun aBoxOfAnotherFormIsNotOffered() = runBlocking {
+    fun aBoxOfAnotherFormStaysInTheListWithItsReason() = runBlocking {
         val model = model(prescribed())
 
-        val state = watching(model.state) { it.awaiting { state -> state.packages.isNotEmpty() } }
+        val state = watching(model.state) { it.awaiting { s -> s.packages.isNotEmpty() } }
 
-        assertEquals(listOf(OTHER_PACK, PACK), state.packages.map { it.packageId })
+        assertEquals(
+            Attachability.Mismatch(CourseSource.Fault.FORM_MISMATCH),
+            state.packages.first { it.packageId == capsules }.attachability
+        )
+        assertEquals(Attachability.Attachable, state.packages.first { it.packageId == PACK }.attachability)
     }
 
-    /** Пока доза и форма не названы, сверять не с чем — подключать нечего. */
+    /** Пока доза и форма не названы, сверять не с чем — и это сказано у каждой строки. */
     @Test
-    fun aDraftWithoutADoseOffersNothing() = runBlocking {
+    fun aDraftWithoutADoseSaysWhatToFillFirst() = runBlocking {
         val model = model(draft())
 
-        val state = watching(model.state) { it.awaiting { state -> !state.isLoading } }
+        val state = watching(model.state) { it.awaiting { s -> s.packages.isNotEmpty() } }
 
-        assertTrue(state.packages.isEmpty())
+        assertTrue(state.packages.all { it.attachability == Attachability.PrescriptionIncomplete })
     }
 
-    /** Уже подключённая коробка второй раз не предлагается. */
+    /** Уже подключённая коробка второй раз не подключается, но видна с причиной. */
     @Test
-    fun anAttachedBoxIsNotOfferedAgain() = runBlocking {
+    fun anAttachedBoxSaysItIsAlreadyHere() = runBlocking {
         val model = model(prescribed(CourseDrafting.Edit.Attach(PACK, Doses(0))))
 
-        val state = watching(model.state) { it.awaiting { state -> state.packages.isNotEmpty() } }
+        val state = watching(model.state) { it.awaiting { s -> s.packages.isNotEmpty() } }
 
-        assertEquals(listOf(OTHER_PACK), state.packages.map { it.packageId })
+        assertEquals(Attachability.Attached, state.packages.first { it.packageId == PACK }.attachability)
     }
 
-    /** Коробку держит другое идущее лечение: одна пачка — один активный курс (PLAN D5). */
+    /** Коробку держит другое лечение — отказ называет то лечение (PLAN D5). */
     @Test
-    fun aBoxHeldByAnotherCourseIsNotOffered() = runBlocking {
+    fun aBoxHeldByAnotherCourseNamesThatCourse() = runBlocking {
         val held = prescribed(CourseDrafting.Edit.Attach(PACK, Doses(1)))
         scenarios.courseActivation.activate(held, requireNotNull(database.courseRepository().findDraft(held)).revision)
         val model = model(prescribed())
 
-        val state = watching(model.state) { it.awaiting { state -> state.packages.isNotEmpty() } }
+        val state = watching(model.state) { it.awaiting { s -> s.packages.isNotEmpty() } }
 
-        assertEquals(listOf(OTHER_PACK), state.packages.map { it.packageId })
+        assertEquals(
+            Attachability.HeldByCourse("Ибупрофен"),
+            state.packages.first { it.packageId == PACK }.attachability
+        )
+    }
+
+    /** У коробки не заполнена форма — сказать, тот ли это препарат, нечем; сначала форма. */
+    @Test
+    fun aBoxWithoutAFormAsksForItsForm() = runBlocking {
+        val formless = Uuid.random()
+        database.packageRepository().add(pack(id = formless, name = "Без формы", quantity = tablets("10")))
+        val model = model(prescribed())
+
+        val state = watching(model.state) { it.awaiting { s -> s.packages.any { p -> p.packageId == formless } } }
+
+        assertEquals(Attachability.NeedsForm, state.packages.first { it.packageId == formless }.attachability)
     }
 
     /** Подключается коробка с нулём приёмов: сколько из неё брать, человек решает в стеке. */

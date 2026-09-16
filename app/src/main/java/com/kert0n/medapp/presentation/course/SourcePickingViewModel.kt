@@ -66,8 +66,9 @@ class SourcePickingViewModel @AssistedInject constructor(
         courses.observePlan(courseId)
     ) { draft, plan ->
         when {
-            draft != null -> Stored(true, draft.revision, draft.dose, draft.form, draft.sources)
+            draft != null -> Stored(courseId, true, draft.revision, draft.dose, draft.form, draft.sources)
             plan != null -> Stored(
+                courseId = courseId,
                 isDraft = false,
                 revision = plan.revision,
                 dose = plan.prescription.dose,
@@ -88,17 +89,23 @@ class SourcePickingViewModel @AssistedInject constructor(
 
     private val boxes = days.flatMapLatest { date -> packages.list(PackageQuery(), date) }
 
+    /** Чем назван курс, держащий коробку: имя лечения живёт у записи эпизода, а не у плана (D5). */
+    private val titles = courses.observeRecords()
+        .map { records -> records.filter { it.isOpen }.associate { it.id to it.title } }
+
     val state: StateFlow<SourcePickingUiState> = combine(
         latest.filterNotNull(),
         boxes,
         shelves,
+        titles,
         attaching
-    ) { reading, boxes, shelves, attaching ->
+    ) { reading, boxes, shelves, titles, attaching ->
         val stored = reading.stored
         if (stored == null) SourcePickingUiState(isGone = true)
         else SourcePickingUiState(
-            packages = boxes.filter { stored.attachable(it) }
-                .map { it.toAttachmentPresentationDTO(shelves[it.medKit.id]) },
+            packages = boxes.map {
+                it.toAttachmentPresentationDTO(shelves[it.medKit.id], stored.attachability(it, titles))
+            },
             isAttached = attaching.attached,
             isAttaching = attaching.busy,
             message = attaching.message
@@ -156,6 +163,7 @@ class SourcePickingViewModel @AssistedInject constructor(
     }
 
     private data class Stored(
+        val courseId: Uuid,
         val isDraft: Boolean,
         val revision: Revision,
         val dose: Dose?,
@@ -164,17 +172,25 @@ class SourcePickingViewModel @AssistedInject constructor(
     ) {
 
         /**
-         * Годится ли коробка под это лечение. Пока доза или форма не названы, сверять не с чем —
-         * подключать нельзя ничего; совместимость считает домен, занятость и пригодность приносит
-         * сама коробка.
+         * Можно ли взять эту коробку, и если нет — почему. Порядок вопросов тот же, каким
+         * отвечает подключение: непригодную не берут вовсе, уже взятую не берут второй раз, без
+         * формы не с чем сверять, а дальше решает правило домена (PLAN D5).
+         *
+         * Случай «у коробки не указана форма» экран узнаёт сам: домен различает его внутри
+         * `attach` (`FORM_UNKNOWN`), а снаружи такого вопроса не задаёт.
          */
-        fun attachable(pack: PackageProjection): Boolean {
-            val dose = dose ?: return false
-            val form = form ?: return false
-            if (!pack.status.allowsUse) return false
-            if (pack.holdingCourseId != null) return false
-            if (sources.any { it.pkg.id == pack.id }) return false
-            return CourseSource.Fault.between(pack.ref, dose, form) == null
+        fun attachability(pack: PackageProjection, titles: Map<Uuid, String>): Attachability {
+            val dose = dose ?: return Attachability.PrescriptionIncomplete
+            val form = form ?: return Attachability.PrescriptionIncomplete
+            if (!pack.status.allowsUse) return Attachability.Unusable
+            if (sources.any { it.pkg.id == pack.id }) return Attachability.Attached
+            pack.holdingCourseId?.takeIf { it != courseId }?.let {
+                return Attachability.HeldByCourse(titles[it])
+            }
+            if (pack.ref.form == null) return Attachability.NeedsForm
+            return CourseSource.Fault.between(pack.ref, dose, form)
+                ?.let { Attachability.Mismatch(it) }
+                ?: Attachability.Attachable
         }
     }
 

@@ -114,8 +114,8 @@ class CoursesJourneyTest {
         // Стек пуст, и подключать пока нечего: доза и форма ещё не названы, сверять коробку не с чем.
         compose.onNodeWithText("Пачек пока нет — подключите первую.").assertIsDisplayed()
         compose.onNodeWithText("Подключить ещё").performClick()
-        compose.onNodeWithText("Подходящих пачек нет: заведите коробку на полке или укажите ей форму.")
-            .assertIsDisplayed()
+        // Коробка на полке есть, но подключать её не к чему: доза и форма лечения не названы.
+        compose.onNodeWithText("Сначала укажите дозу и форму лечения.").assertIsDisplayed()
 
         val held = runBlocking { database.packageRepository().projection(PACK)?.holdingCourseId }
         assertNull(held)

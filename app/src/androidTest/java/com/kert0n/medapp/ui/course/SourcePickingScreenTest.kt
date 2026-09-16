@@ -7,6 +7,7 @@ import androidx.compose.ui.test.performClick
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import com.kert0n.medapp.fixture.PACK
 import com.kert0n.medapp.fixture.TABLETS
+import com.kert0n.medapp.presentation.course.Attachability
 import com.kert0n.medapp.presentation.course.PackageAttachmentPresentationDTO
 import com.kert0n.medapp.presentation.course.SourcePickingUiState
 import com.kert0n.medapp.presentation.value.QuantityPresentationDTO
@@ -14,6 +15,7 @@ import com.kert0n.medapp.presentation.value.toPresentationDTO
 import com.kert0n.medapp.ui.theme.MedAppTheme
 import kotlin.uuid.Uuid
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertNull
 import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
@@ -35,11 +37,14 @@ class SourcePickingScreenTest {
         }
     }
 
-    private fun candidate() = PackageAttachmentPresentationDTO(
+    private fun candidate(
+        attachability: Attachability = Attachability.Attachable
+    ) = PackageAttachmentPresentationDTO(
         packageId = PACK,
         name = "Нурофен",
         medKitName = "Домашняя",
-        availableToMe = QuantityPresentationDTO("20", TABLETS.toPresentationDTO())
+        availableToMe = QuantityPresentationDTO("20", TABLETS.toPresentationDTO()),
+        attachability = attachability
     )
 
     /** Строка говорит, чем коробка названа, где лежит и сколько в ней моего. */
@@ -59,6 +64,27 @@ class SourcePickingScreenTest {
         compose.onNodeWithText("Нурофен").performClick()
 
         assertEquals(PACK, attached)
+    }
+
+    /** Неподходящая коробка остаётся на виду и говорит, почему её нельзя взять. */
+    @Test
+    fun anUnsuitableBoxStaysVisibleWithItsReason() {
+        show(SourcePickingUiState(packages = listOf(candidate(Attachability.HeldByCourse("Ибупрофен")))))
+
+        compose.onNodeWithText("Нурофен").assertIsDisplayed()
+        compose.onNodeWithText("Занята лечением «Ибупрофен».").assertIsDisplayed()
+    }
+
+    /** Нажатие по неподходящей ничего не подключает: причина названа, и решение за человеком. */
+    @Test
+    fun tappingAnUnsuitableBoxDoesNothing() {
+        show(SourcePickingUiState(packages = listOf(candidate(Attachability.NeedsForm))))
+
+        compose.onNodeWithText("Нурофен").performClick()
+
+        assertNull(attached)
+        compose.onNodeWithText("Укажите форму выпуска у этой пачки, чтобы подключить её к курсу.")
+            .assertIsDisplayed()
     }
 
     /** Подключать нечего — сказано, что с этим делать. */
