@@ -2,11 +2,12 @@ package com.kert0n.medapp.ui.plan
 
 import androidx.annotation.DrawableRes
 import androidx.annotation.StringRes
-import androidx.compose.foundation.clickable
+import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyListScope
@@ -14,8 +15,7 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.pager.HorizontalPager
 import androidx.compose.foundation.pager.rememberPagerState
 import androidx.compose.material3.FilledTonalButton
-import androidx.compose.material3.Icon
-import androidx.compose.material3.ListItem
+import androidx.compose.material3.ElevatedCard
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
@@ -33,6 +33,7 @@ import com.kert0n.medapp.ui.DAY
 import com.kert0n.medapp.ui.EmptyState
 import com.kert0n.medapp.ui.LoadingState
 import com.kert0n.medapp.ui.TIME
+import com.kert0n.medapp.ui.pack.Marker
 import com.kert0n.medapp.ui.words
 import java.time.LocalTime
 import kotlin.uuid.Uuid
@@ -94,8 +95,12 @@ private fun DayPage(
             EmptyState(text = stringResource(R.string.plan_day_empty), modifier = Modifier.fillMaxSize())
             return
         }
-        LazyColumn(Modifier.fillMaxSize(), contentPadding = PaddingValues(bottom = 88.dp)) {
-            items(day.items, key = { it.key }) { item -> DayRow(item, onOpen, onConfirm, onDecline) }
+        LazyColumn(
+            Modifier.fillMaxSize(),
+            contentPadding = PaddingValues(start = 16.dp, end = 16.dp, bottom = 88.dp),
+            verticalArrangement = Arrangement.spacedBy(8.dp)
+        ) {
+            items(day.items, key = { it.key }) { item -> DayCard(item, onOpen, onConfirm, onDecline) }
             shelf(R.string.plan_day_also, day.alsoOnThisDay, onOpen)
         }
     }
@@ -128,55 +133,75 @@ private fun LazyListScope.shelf(
             stringResource(title),
             style = MaterialTheme.typography.titleSmall,
             color = MaterialTheme.colorScheme.primary,
-            modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp)
+            modifier = Modifier.padding(top = 8.dp)
         )
     }
-    items(items, key = { it.key }) { item -> DayRow(item, onOpen, onConfirm = {}, onDecline = {}) }
+    items(items, key = { it.key }) { item -> DayCard(item, onOpen, onConfirm = {}, onDecline = {}) }
 }
 
 /**
- * Строка дня: время, лечение, доза и пачка, а справа — ответ. У неотвеченного пункта это кнопка:
- * в день приёмов несколько, и просить два нажатия на каждый — просить лишнего (H3 №12). У
- * отвеченного — слово о том, что записано; значок повторяет его глазу и потому экранному чтецу не
- * адресуется: он прочёл бы состояние дважды.
+ * Пункт дня — **карточка**, а не строка списка (замечание владельца 2026-09-16). У пункта есть свои
+ * действия, а действие внутри строки без границы читается как действие всего списка; Material 3
+ * отводит карточке ровно этот случай — содержимое и действия об одном предмете. Список аптечек
+ * устроен так же.
  *
- * Нажатие на саму строку ведёт на карточку пункта — туда, где приём меняют, а не отвечают наспех.
+ * Сверху вниз: время и состояние в одной строке, выровненные по её центру; лечение; доза и коробка;
+ * действия — внизу справа. Значок повторяет слово глазу и потому экранному чтецу не адресуется.
+ *
+ * Нажимается карточка целиком и ведёт на карточку пункта — туда, где приём меняют, а не отвечают
+ * наспех.
  */
 @Composable
-private fun DayRow(
+private fun DayCard(
     item: DayItemPresentationDTO,
     onOpen: (DayItemPresentationDTO) -> Unit,
     onConfirm: (Uuid) -> Unit,
     onDecline: (Uuid) -> Unit
 ) {
-    ListItem(
-        overlineContent = { Text(TIME.format(item.at)) },
-        headlineContent = { Text(item.title) },
-        supportingContent = { Text(item.details()) },
-        leadingContent = { Icon(painterResource(item.state.icon), contentDescription = null) },
-        trailingContent = {
-            val intakeId = item.intakeId
-            // Ответа два, и оба — решения: «принял» и «не принял» (PLAN D6). Записанное стоит
-            // рядом: пропущенный пункт и говорит о себе, и принимает подтверждение.
-            Row(verticalAlignment = Alignment.CenterVertically) {
+    val intakeId = item.intakeId
+    ElevatedCard(
+        onClick = { onOpen(item) },
+        enabled = intakeId != null,
+        modifier = Modifier.fillMaxWidth()
+    ) {
+        Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+            Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+                Text(
+                    TIME.format(item.at),
+                    style = MaterialTheme.typography.titleMedium,
+                    modifier = Modifier.weight(1f)
+                )
                 if (item.tellsItsState) {
-                    Text(item.stateWords(), style = MaterialTheme.typography.labelLarge)
+                    Marker(item.state.icon, item.stateWords(), MaterialTheme.colorScheme.onSurfaceVariant)
                 }
-                if (intakeId == null) return@Row
-                if (item.canDecline) {
-                    TextButton(onClick = { onDecline(intakeId) }, enabled = !item.isAnswering) {
-                        Text(stringResource(R.string.intake_decline))
+            }
+            Text(item.title, style = MaterialTheme.typography.bodyLarge)
+            Text(
+                item.details(),
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
+            if (intakeId != null && (item.canDecline || item.canConfirm)) {
+                // Кнопки карточки стоят в её нижнем конце, а не посреди содержимого (Material 3).
+                Row(
+                    Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp, Alignment.End),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    if (item.canDecline) {
+                        TextButton(onClick = { onDecline(intakeId) }, enabled = !item.isAnswering) {
+                            Text(stringResource(R.string.intake_decline))
+                        }
                     }
-                }
-                if (item.canConfirm) {
-                    FilledTonalButton(onClick = { onConfirm(intakeId) }, enabled = !item.isAnswering) {
-                        Text(stringResource(R.string.intake_confirm))
+                    if (item.canConfirm) {
+                        FilledTonalButton(onClick = { onConfirm(intakeId) }, enabled = !item.isAnswering) {
+                            Text(stringResource(R.string.intake_confirm))
+                        }
                     }
                 }
             }
-        },
-        modifier = Modifier.clickable(enabled = item.intakeId != null) { onOpen(item) }
-    )
+        }
+    }
 }
 
 /** Доза и, если она известна, пачка: «2 таблетка · Нурофен». */

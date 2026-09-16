@@ -47,9 +47,9 @@ class IntakeHistoryScreenTest {
             )
         )
 
-        compose.onNodeWithText("10.03.2027 · 09:12").assertIsDisplayed()
         compose.onNodeWithText("2 таблетка").assertIsDisplayed()
-        compose.onNodeWithText("Домашняя аптечка").assertIsDisplayed()
+        // Когда и откуда — одной строкой: три строки Material 3 прижимает боковое к верху.
+        compose.onNodeWithText("10.03.2027 · 09:12 · Домашняя аптечка").assertIsDisplayed()
         compose.onNodeWithText("принят в 09:12").assertIsDisplayed()
     }
 

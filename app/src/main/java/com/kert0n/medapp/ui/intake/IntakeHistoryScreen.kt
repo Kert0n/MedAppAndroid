@@ -5,8 +5,9 @@ import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.ListItem
@@ -60,23 +61,37 @@ fun IntakeHistoryScreen(
                 state.isLoading -> LoadingState(Modifier.fillMaxSize())
                 state.isEmpty -> EmptyState(stringResource(R.string.intake_history_empty), Modifier.fillMaxSize())
                 else -> LazyColumn(Modifier.fillMaxSize(), contentPadding = PaddingValues(bottom = 24.dp)) {
-                    items(state.rows, key = { it.id }) { row -> HistoryRow(row) }
+                    itemsIndexed(state.rows, key = { _, row -> row.id }) { index, row ->
+                        // Черта между фактами: у строки должна быть граница, иначе список читается
+                        // сплошняком (Material 3, замечание владельца 2026-09-16).
+                        if (index > 0) HorizontalDivider()
+                        HistoryRow(row)
+                    }
                 }
             }
         }
     }
 }
 
-/** Строка истории: когда, сколько, откуда — и чем кончилось, словом. */
+/**
+ * Строка истории: сколько приняли, когда и откуда — а справа то, чем это кончилось.
+ *
+ * Строк **две**, а не три: у трёхстрочной строки Material 3 прижимает боковые части к верху, и
+ * слово состояния уезжает от того, к чему относится. День и время стоят в той же второй строке, что
+ * и лечение, — читаются они вместе.
+ */
 @Composable
 private fun HistoryRow(row: IntakeHistoryRowPresentationDTO) {
     ListItem(
-        overlineContent = { Text("${DAY.format(row.on)} · ${TIME.format(row.at)}") },
         headlineContent = { Text(row.amount?.words() ?: stringResource(R.string.intake_history_no_amount)) },
-        supportingContent = row.subject?.let { { Text(it) } },
+        supportingContent = { Text(row.details()) },
         trailingContent = { Text(row.stateWords(), style = MaterialTheme.typography.labelLarge) }
     )
 }
+
+/** Когда и откуда: «10.03.2027 · 09:12 · Цетрин». Чего не знаем, того в строке нет. */
+private fun IntakeHistoryRowPresentationDTO.details(): String =
+    listOfNotNull("${DAY.format(on)} · ${TIME.format(at)}", subject).joinToString(" · ")
 
 @Composable
 private fun IntakeHistoryRowPresentationDTO.stateWords(): String = when (state) {
