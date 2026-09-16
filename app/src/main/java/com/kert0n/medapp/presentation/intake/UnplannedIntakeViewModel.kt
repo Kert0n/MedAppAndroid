@@ -2,6 +2,7 @@ package com.kert0n.medapp.presentation.intake
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.kert0n.medapp.feature.intake.IntakeWarning
 import com.kert0n.medapp.feature.intake.UnplannedIntakeRecording
 import com.kert0n.medapp.presentation.ParsedInput
 import com.kert0n.medapp.presentation.value.QuantityPresentationDTO
@@ -66,6 +67,7 @@ class UnplannedIntakeViewModel @AssistedInject constructor(
                 // подтвердить, а не набирать то же самое руками.
                 form = typed ?: UnplannedIntakePresentationDTO(hint?.amount.orEmpty()),
                 error = recorded.error,
+                questions = recorded.questions.map { it.toPresentationDTO() },
                 isBusy = recorded.busy,
                 isRecorded = recorded.recorded
             )
@@ -82,7 +84,7 @@ class UnplannedIntakeViewModel @AssistedInject constructor(
      * Записать приём. Признак работы ставится до обращения к сценарию, и второе нажатие ничего не
      * начинает: приём — факт о мире, и второго такого же человек не просил.
      */
-    fun record() {
+    fun record(acknowledged: Boolean = false) {
         val state = state.value
         val unit = state.unit ?: return
         if (recorded.value.busy || recorded.value.recorded) return
@@ -90,26 +92,32 @@ class UnplannedIntakeViewModel @AssistedInject constructor(
         viewModelScope.launch {
             when (val parsed = state.form.parsed(unit, vocabulary.snapshot())) {
                 is ParsedInput.Rejected -> recorded.value = Recording(error = parsed.error)
-                is ParsedInput.Parsed -> recorded.value = told(recording.record(packageId, parsed.value, clock.instant()))
+                is ParsedInput.Parsed ->
+                    recorded.value = told(recording.record(packageId, parsed.value, clock.instant(), acknowledged))
             }
         }
     }
 
+    /** Вопрос закрыт без ответа — не записано ничего: отмена и есть отказ записывать (PLAN D6). */
+    fun dismissQuestions() {
+        recorded.value = recorded.value.copy(questions = emptyList())
+    }
+
     /**
-     * Чем кончилась запись. Вопрос (`Warned`) сюда ещё не приходит: его задают на карточке пункта,
-     * и лист отдаст его туда же, когда карточка появится (PLAN U4, коммит «Приём просроченного и
-     * занятого спрашивает»).
+     * Чем кончилась запись. Вопрос — третий исход рядом с записью и отказом: не записано ничего,
+     * пока человек не ответит, и ответ — тот же вызов с подтверждением (PLAN D6).
      */
     private fun told(outcome: UnplannedIntakeRecording.Outcome): Recording = when (outcome) {
         is UnplannedIntakeRecording.Outcome.Recorded -> Recording(recorded = true)
         is UnplannedIntakeRecording.Outcome.Rejected -> Recording(error = UnplannedIntakeError.Rejected(outcome.reason))
-        is UnplannedIntakeRecording.Outcome.Warned -> Recording()
+        is UnplannedIntakeRecording.Outcome.Warned -> Recording(questions = outcome.warnings)
     }
 
     private data class Recording(
         val busy: Boolean = false,
         val recorded: Boolean = false,
-        val error: UnplannedIntakeError? = null
+        val error: UnplannedIntakeError? = null,
+        val questions: List<IntakeWarning> = emptyList()
     )
 }
 
@@ -124,6 +132,8 @@ data class UnplannedIntakeUiState(
     val availableToMe: QuantityPresentationDTO? = null,
     val form: UnplannedIntakePresentationDTO = UnplannedIntakePresentationDTO(),
     val error: UnplannedIntakeError? = null,
+    /** О чём сценарий спросил до записи: пока на это не ответили, не записано ничего (PLAN D6). */
+    val questions: List<IntakeQuestionPresentationDTO> = emptyList(),
     val isLoading: Boolean = false,
     val isGone: Boolean = false,
     val isBusy: Boolean = false,

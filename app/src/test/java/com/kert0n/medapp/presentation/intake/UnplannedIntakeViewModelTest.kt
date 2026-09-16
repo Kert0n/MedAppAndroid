@@ -1,6 +1,7 @@
 package com.kert0n.medapp.presentation.intake
 
 import com.kert0n.medapp.domain.intake.IntakeRejected
+import com.kert0n.medapp.domain.pack.ExpiryDate
 import com.kert0n.medapp.feature.intake.UnplannedIntakeRecording
 import com.kert0n.medapp.storage.intake.IntakeOutcome
 import com.kert0n.medapp.storage.intake.IntakeStorageRepository
@@ -28,6 +29,7 @@ import com.kert0n.medapp.presentation.value.QuantityPresentationError
 import com.kert0n.medapp.queue.QueueService
 import java.time.Clock
 import java.time.Instant
+import java.time.LocalDate
 import java.time.ZoneId
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNull
@@ -46,6 +48,16 @@ class UnplannedIntakeViewModelTest {
     private val clock: Clock = Clock.fixed(Instant.parse("2026-09-16T09:00:00Z"), ZoneId.of("Europe/Moscow"))
 
     private val packages = FakePackages(pack(id = PACK, quantity = tablets("20"), defaultIntakeAmount = dose("2")))
+
+    /** Та же коробка, но просроченная: годна была до вчера. */
+    private val expiredPackages = FakePackages(
+        pack(
+            id = PACK,
+            quantity = tablets("20"),
+            defaultIntakeAmount = dose("2"),
+            expiresOn = ExpiryDate(LocalDate.of(2026, 9, 15))
+        )
+    )
 
     private val courses = FakeCourseStorage()
 
@@ -80,7 +92,7 @@ class UnplannedIntakeViewModelTest {
         DirectTransactions
     )
 
-    private fun viewModel() = UnplannedIntakeViewModel(
+    private fun viewModel(packages: FakePackages = this.packages) = UnplannedIntakeViewModel(
         recording = UnplannedIntakeRecording(
             intakes = intakes,
             courses = courses,
@@ -95,6 +107,32 @@ class UnplannedIntakeViewModelTest {
         packages = packages,
         packageId = PACK
     )
+
+    /**
+     * Просроченная коробка **спрашивает**, а не отказывает: решение человека, но принимает он его
+     * зная (ТЗ 4.1.1.5.5, PLAN D6). Пока не ответил — не записано ничего; ответил «всё равно
+     * принял» — записано. Проглоти экран вопрос — и просроченное списалось бы молча.
+     */
+    @Test
+    fun anExpiredBoxAsksBeforeTheIntakeIsWritten() {
+        val model = viewModel(expiredPackages)
+
+        watching(model.state) { state ->
+            state.awaiting { !it.isLoading }
+            model.record()
+            val asked = state.awaiting { it.questions.isNotEmpty() }
+            assertEquals(
+                listOf(IntakeQuestionPresentationDTO.Expired(LocalDate.of(2026, 9, 15))),
+                asked.questions
+            )
+            assertEquals(emptyList<IntakeOutcome>(), intakes.written)
+
+            model.record(acknowledged = true)
+            state.awaiting { it.isRecorded }
+        }
+
+        assertEquals(1, intakes.written.size)
+    }
 
     /**
      * Доза-подсказка стоит в поле готовым ответом: чаще всего человек её и подтверждает, а набирать

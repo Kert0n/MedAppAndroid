@@ -86,7 +86,7 @@ fun IntakeCardScreen(
         }
     }
     if (state.questions.isNotEmpty()) {
-        Questions(state.questions, onAcknowledge = onAcknowledge, onDismiss = onDismissQuestions)
+        IntakeQuestionsDialog(state.questions, onAcknowledge = onAcknowledge, onDismiss = onDismissQuestions)
     }
 }
 
@@ -193,36 +193,6 @@ private fun TimeField(label: String, value: LocalTime?, onPick: (LocalTime) -> U
             dismissButton = { TextButton(onClick = { picking = false }) { Text(stringResource(R.string.action_cancel)) } }
         )
     }
-}
-
-/**
- * Вопросы — **одним** диалогом со списком: человек отвечает на всё разом, потому что решение у
- * него одно — принимать или нет (H3 №18). Отмена не пишет ничего.
- */
-@Composable
-private fun Questions(
-    questions: List<IntakeQuestionPresentationDTO>,
-    onAcknowledge: () -> Unit,
-    onDismiss: () -> Unit
-) {
-    AlertDialog(
-        onDismissRequest = onDismiss,
-        title = { Text(stringResource(R.string.intake_questions_title)) },
-        text = {
-            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                questions.forEach { Text("• " + it.words()) }
-            }
-        },
-        confirmButton = { TextButton(onClick = onAcknowledge) { Text(stringResource(R.string.intake_confirm_anyway)) } },
-        dismissButton = { TextButton(onClick = onDismiss) { Text(stringResource(R.string.action_cancel)) } }
-    )
-}
-
-@Composable
-private fun IntakeQuestionPresentationDTO.words(): String = when (this) {
-    is IntakeQuestionPresentationDTO.Expired -> stringResource(R.string.intake_question_expired, DAY.format(on))
-    is IntakeQuestionPresentationDTO.TouchesReserved ->
-        stringResource(R.string.intake_question_touches_reserved, free.words())
 }
 
 /** Что назначено на этот пункт: день, время и доза — одной строкой. */

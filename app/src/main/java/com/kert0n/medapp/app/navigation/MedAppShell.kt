@@ -214,7 +214,9 @@ private fun screens(stacks: TabStacks) = entryProvider<NavKey> {
             UnplannedIntakeSheet(
                 state = taken,
                 onEdit = intake::edit,
-                onRecord = intake::record,
+                onRecord = { intake.record() },
+                onAcknowledge = { intake.record(acknowledged = true) },
+                onDismissQuestions = intake::dismissQuestions,
                 onDismiss = { taking = false }
             )
         }

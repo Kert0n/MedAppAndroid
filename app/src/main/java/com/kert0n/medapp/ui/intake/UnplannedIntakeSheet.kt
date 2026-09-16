@@ -38,6 +38,8 @@ fun UnplannedIntakeSheet(
     state: UnplannedIntakeUiState,
     onEdit: (UnplannedIntakePresentationDTO) -> Unit,
     onRecord: () -> Unit,
+    onAcknowledge: () -> Unit,
+    onDismissQuestions: () -> Unit,
     onDismiss: () -> Unit
 ) {
     ModalBottomSheet(onDismissRequest = onDismiss, sheetState = rememberModalBottomSheetState()) {
@@ -70,6 +72,10 @@ fun UnplannedIntakeSheet(
                 modifier = Modifier.fillMaxWidth().defaultMinSize(minHeight = 48.dp)
             ) { Text(stringResource(R.string.intake_record)) }
         }
+    }
+    // Вопросы — тем же диалогом, что и на карточке пункта: спрашивает не экран, а сценарий.
+    if (state.questions.isNotEmpty()) {
+        IntakeQuestionsDialog(state.questions, onAcknowledge = onAcknowledge, onDismiss = onDismissQuestions)
     }
 }
 

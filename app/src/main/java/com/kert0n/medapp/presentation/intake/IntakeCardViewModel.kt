@@ -213,9 +213,3 @@ class IntakeCardViewModel @AssistedInject constructor(
         )
     }
 }
-
-/** Вопрос сценария — словами экрана: последний годный день коробки, свободное — величиной. */
-private fun IntakeWarning.toPresentationDTO(): IntakeQuestionPresentationDTO = when (this) {
-    is IntakeWarning.Expired -> IntakeQuestionPresentationDTO.Expired(expiresOn.lastDay)
-    is IntakeWarning.TouchesReserved -> IntakeQuestionPresentationDTO.TouchesReserved(free.toPresentationDTO())
-}
