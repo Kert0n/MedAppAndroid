@@ -1,6 +1,8 @@
 package com.kert0n.medapp.ui.course
 
-import androidx.compose.foundation.clickable
+import com.kert0n.medapp.ui.DAY
+import androidx.compose.material3.TextButton
+import androidx.compose.material3.AlertDialog
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
@@ -13,7 +15,6 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
-import androidx.compose.material3.ListItem
 import androidx.compose.material3.ElevatedCard
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
@@ -46,6 +47,7 @@ import kotlin.uuid.Uuid
 fun SourcePickingScreen(
     state: SourcePickingUiState,
     onAttach: (Uuid) -> Unit,
+    onExpiredSeen: () -> Unit,
     onSearch: (String) -> Unit,
     onBack: () -> Unit,
     modifier: Modifier = Modifier
@@ -109,6 +111,14 @@ fun SourcePickingScreen(
             }
         }
     }
+    state.attachedExpired?.let { expired ->
+        AlertDialog(
+            onDismissRequest = onExpiredSeen,
+            title = { Text(stringResource(R.string.course_source_expired_title)) },
+            text = { Text(stringResource(R.string.course_source_expired_body, expired.name, DAY.format(expired.expiredOn))) },
+            confirmButton = { TextButton(onClick = onExpiredSeen) { Text(stringResource(R.string.action_understood)) } }
+        )
+    }
 }
 
 /**
@@ -143,6 +153,15 @@ private fun PackageRow(pack: PackageAttachmentPresentationDTO, onAttach: () -> U
                     style = MaterialTheme.typography.bodyMedium,
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
+                pack.expiredOn?.let {
+                    // Просроченную не прячут и не запрещают: решает человек, но видит сразу
+                    // (PLAN C1 «Просрочка при планировании»). Цвет продублирован словом.
+                    Text(
+                        stringResource(R.string.course_source_expired, DAY.format(it)),
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.error
+                    )
+                }
                 if (!takeable) {
                     Text(
                         pack.attachability.words(),

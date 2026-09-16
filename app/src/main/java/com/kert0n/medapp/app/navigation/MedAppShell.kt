@@ -470,10 +470,12 @@ private fun screens(stacks: TabStacks, planMode: MutableState<PlanMode>) = entry
         )
         val state = model.state.collectAsStateWithLifecycle().value
         // Подключённая коробка ждёт человека в стеке: там он и решит, сколько из неё брать.
-        LaunchedEffect(state.isAttached) { if (state.isAttached) stacks.back() }
+        // Просроченную прежде называют — один раз (PLAN C1 «Просрочка при планировании»).
+        LaunchedEffect(state.isDone) { if (state.isDone) stacks.back() }
         SourcePickingScreen(
             state = state,
             onAttach = model::attach,
+            onExpiredSeen = model::expiredSourceSeen,
             onSearch = model::search,
             onBack = stacks::back
         )

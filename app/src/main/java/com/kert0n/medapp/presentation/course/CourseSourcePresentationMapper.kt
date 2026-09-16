@@ -1,5 +1,6 @@
 package com.kert0n.medapp.presentation.course
 
+import java.time.LocalDate
 import com.kert0n.medapp.domain.course.CourseCoverage
 import com.kert0n.medapp.domain.course.CourseSource
 import com.kert0n.medapp.domain.pack.PackageProjection
@@ -48,13 +49,15 @@ private fun PackageProjection.gives(dose: Dose, fault: CourseSource.Fault?): Dos
 /** Коробка в выборе источника: чем человек её узнаёт, сколько в ней свободно и можно ли её взять. */
 fun PackageProjection.toAttachmentPresentationDTO(
     medKitName: String?,
-    attachability: Attachability
+    attachability: Attachability,
+    today: LocalDate
 ): PackageAttachmentPresentationDTO = PackageAttachmentPresentationDTO(
     packageId = id,
     name = facts.name,
     medKitName = medKitName,
     availableToMe = availability.availableToMe.toPresentationDTO(),
-    attachability = attachability
+    attachability = attachability,
+    expiredOn = facts.expiresOn?.takeIf { facts.isExpiredOn(today) }?.lastDay
 )
 
 /** Обеспечение словами экрана: числа приёмов и дни в зоне курса (PLAN D5). */

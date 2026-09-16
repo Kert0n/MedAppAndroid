@@ -424,6 +424,10 @@
     <string name="course_source_handle">Переставить: %1$s</string>
     <string name="course_source_move_up">Выше</string>
     <string name="course_source_move_down">Ниже</string>
+    <string name="course_source_expired">Просрочена: годна до %1$s</string>
+    <string name="course_source_expired_title">Коробка просрочена</string>
+    <string name="course_source_expired_body">Лечение будет брать из «%1$s» — она годна до %2$s. Решать вам; мы лишь предупреждаем.</string>
+    <string name="action_understood">Понятно</string>
     <string name="course_source_free">свободно %1$s %2$s</string>
     <string name="course_source_expires">годен до %1$s</string>
     <plurals name="course_source_allocated">

@@ -30,6 +30,7 @@ class SourcePickingScreenTest {
 
     private var attached: Uuid? = null
     private var searched: String? = null
+    private var expiredSeen = 0
 
     private fun show(state: SourcePickingUiState) {
         compose.setContent {
@@ -37,6 +38,7 @@ class SourcePickingScreenTest {
                 SourcePickingScreen(
                     state = state,
                     onAttach = { attached = it },
+                    onExpiredSeen = { expiredSeen++ },
                     onSearch = { searched = it },
                     onBack = {}
                 )
@@ -119,5 +121,37 @@ class SourcePickingScreenTest {
 
         compose.onNodeWithText("Подходящих пачек нет: заведите коробку на полке или укажите ей форму.")
             .assertIsDisplayed()
+    }
+
+    /**
+     * **Просроченная коробка видна и подключается** (PLAN C1 «Просрочка при планировании»). Её не
+     * прячут и не запрещают — решать человеку, — но срок стоит на карточке словами. Спрячь его — и
+     * человек узнает о просрочке, когда уже лечится из неё.
+     */
+    @Test
+    fun anExpiredBoxSaysSoAndStillAttaches() {
+        show(SourcePickingUiState(packages = listOf(candidate().copy(expiredOn = java.time.LocalDate.of(2027, 3, 1)))))
+
+        compose.onNodeWithText("Просрочена: годна до 01.03.2027").assertIsDisplayed()
+        compose.onNodeWithText("Нурофен").performClick()
+
+        assertEquals(PACK, attached)
+    }
+
+    /** Подключили просроченную — это сказано **один раз**, и «Понятно» отпускает экран. */
+    @Test
+    fun anAttachedExpiredBoxIsToldOnce() {
+        show(
+            SourcePickingUiState(
+                packages = listOf(candidate()),
+                isAttached = true,
+                attachedExpired = com.kert0n.medapp.presentation.course.ExpiredSourcePresentationDTO("Нурофен", java.time.LocalDate.of(2027, 3, 1))
+            )
+        )
+
+        compose.onNodeWithText("Коробка просрочена").assertIsDisplayed()
+        compose.onNodeWithText("Понятно").performClick()
+
+        assertEquals(1, expiredSeen)
     }
 }
