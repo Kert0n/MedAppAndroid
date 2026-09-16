@@ -25,6 +25,9 @@ import androidx.compose.material3.rememberDatePickerState
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
+import androidx.compose.foundation.interaction.MutableInteractionSource
+import androidx.compose.foundation.interaction.PressInteraction
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -151,6 +154,13 @@ private val MENU_ITEM_HEIGHT = 48.dp
  * Дата, которую называет календарь. Печатать её строкой незачем: выбранная дата уже дата, и
  * состояния «13.20» у неё не бывает — потому у дат покупки и вскрытия нет своего разбора ввода,
  * в отличие от срока годности, который перепечатывают с упаковки как есть.
+ *
+ * Календарь открывает **всё поле**, а не один значок: «зоны нажатия от 48 dp» (PLAN H3 «Дизайн»)
+ * — про зону, а не про высоту рамки, и в поле во всю ширину живого было 24 dp. Открытие ловится
+ * нажатием на само поле ([PressInteraction.Release]), потому что поле остаётся `readOnly` —
+ * печатать дату по-прежнему нечем, и клавиатура не всплывает. Значок при этом остаётся: он
+ * называет действие экранному чтецу и виден глазу; крестик очистки — своя кнопка, и своё нажатие
+ * она тратит на себя.
  */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -161,6 +171,10 @@ fun DateField(
     modifier: Modifier = Modifier
 ) {
     var open by remember { mutableStateOf(false) }
+    val presses = remember { MutableInteractionSource() }
+    LaunchedEffect(presses) {
+        presses.interactions.collect { if (it is PressInteraction.Release) open = true }
+    }
     OutlinedTextField(
         value = value?.format(DAY).orEmpty(),
         onValueChange = {},
@@ -185,6 +199,7 @@ fun DateField(
                 }
             }
         },
+        interactionSource = presses,
         modifier = modifier.fillMaxWidth().defaultMinSize(minHeight = 48.dp)
     )
     if (!open) return
