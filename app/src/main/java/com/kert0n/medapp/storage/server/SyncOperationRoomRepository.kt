@@ -94,9 +94,12 @@ private fun StoredSyncOperation.asOutstanding(names: Map<Uuid, String>): Outstan
     val subjectId = command?.subjectId()
     return OutstandingOperation(
         id = id,
+        // Спрашивают у самой строки, а не у её статуса: предусловие перехода — у типа
+        // (C1 «Переходы операции — у типа»). Решения человека ждут ровно двое, и различает их
+        // то, читается ли строка.
         trouble = when {
             this is StoredSyncOperation.Unreadable -> OutstandingOperation.Trouble.UNREADABLE
-            state.status == SyncOperationStatus.REFUSED -> OutstandingOperation.Trouble.REFUSED
+            needsDecision -> OutstandingOperation.Trouble.REFUSED
             else -> OutstandingOperation.Trouble.WAITING
         },
         subject = subjectId?.let { names[it] },
