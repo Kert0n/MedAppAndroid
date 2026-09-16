@@ -68,7 +68,10 @@ class CourseFormViewModel @AssistedInject constructor(
         vocabulary.observeForms()
     ) { state, units, forms ->
         if (state is CourseFormUiState.Editing) {
-            state.copy(units = units.map { it.toPresentationDTO() }, forms = forms.map { it.toPresentationDTO() })
+            val known = units.map { it.toPresentationDTO() }
+            // Единицу подсказывает форма выпуска — и при выборе формы, и здесь: у записанного
+            // черновика её негде хранить, пока нет числа, а открывается он с готовой формой.
+            state.copy(form = state.form.suggestingUnit(known), units = known, forms = forms.map { it.toPresentationDTO() })
         } else state
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), editing.value)
 

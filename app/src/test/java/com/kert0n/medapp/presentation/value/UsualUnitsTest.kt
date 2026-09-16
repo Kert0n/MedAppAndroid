@@ -57,33 +57,24 @@ class UsualUnitsTest {
         assertEquals(pieces, form(" Таблетки ").usualUnit(units))
     }
 
-    /** Выбрал форму, когда число уже набрано, — единица встала сама: поле было пустым. */
+    /** Выбрал форму — единица встала сама: поле было пустым, и мерить этим будут в любом случае. */
     @Test
     fun choosingAFormFillsAnEmptyUnit() {
-        val typed = CourseFormPresentationDTO(title = "Нурофен", doseAmount = "2")
-
-        assertEquals(pieces, typed.withForm(form("таблетки"), units).unit)
-    }
-
-    /**
-     * Пока мерить нечего, подсказывать нечего: единица без числа — половина дозы, и черновик
-     * «название + форма» с ней перестал бы записываться (PLAN H3 §15, C1 «Доза — число вместе с
-     * единицей»).
-     */
-    @Test
-    fun aFormAloneSuggestsNothingWhileThereIsNothingToMeasure() {
         val chosen = CourseFormPresentationDTO(title = "Нурофен").withForm(form("таблетки"), units)
 
-        assertNull(chosen.unit)
+        assertEquals(pieces, chosen.unit)
         assertEquals("таблетки", chosen.form?.name)
     }
 
-    /** Число набрано — подсказка приходит к нему: форму человек выбрал раньше. */
+    /**
+     * Записанный черновик открыт заново: единицы у него нет — её негде хранить, пока нет числа, —
+     * и подсказку приносит его собственная форма выпуска, а не пустое поле (H3 §15).
+     */
     @Test
-    fun typingTheAmountBringsTheSuggestionOfTheChosenForm() {
-        val chosen = CourseFormPresentationDTO(title = "Нурофен").withForm(form("таблетки"), units)
+    fun aStoredFormBringsItsUnitBackWhenTheVocabularyArrives() {
+        val reopened = CourseFormPresentationDTO(title = "Нурофен", form = form("таблетки"))
 
-        assertEquals(pieces, chosen.copy(doseAmount = "2").suggestingUnit(units).unit)
+        assertEquals(pieces, reopened.suggestingUnit(units).unit)
     }
 
     /** Назвал единицу сам — форма её не трогает: обратный порядок ничего не меняет. */

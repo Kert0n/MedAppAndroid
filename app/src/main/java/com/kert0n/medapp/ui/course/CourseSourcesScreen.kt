@@ -63,6 +63,7 @@ import com.kert0n.medapp.presentation.course.CourseEstimatePresentationDTO
 import com.kert0n.medapp.presentation.course.CourseSourcePresentationDTO
 import com.kert0n.medapp.presentation.course.CourseSourcesMessage
 import com.kert0n.medapp.presentation.course.CourseSourcesUiState
+import com.kert0n.medapp.presentation.value.QuantityPresentationDTO
 import com.kert0n.medapp.presentation.course.ShortagePresentationDTO
 import com.kert0n.medapp.ui.EmptyState
 import com.kert0n.medapp.ui.ErrorMessage
@@ -161,6 +162,7 @@ private fun Sources(
                 val held = dragging == index
                 SourceRow(
                     source = source,
+                    dose = state.dose,
                     isFinished = state.isFinished,
                     onAllocate = onAllocate,
                     onDetach = { onDetach(source.packageId) },
@@ -228,6 +230,7 @@ private fun Sources(
 @Composable
 private fun SourceRow(
     source: CourseSourcePresentationDTO,
+    dose: QuantityPresentationDTO?,
     isFinished: Boolean,
     onAllocate: (Uuid, Int) -> Unit,
     onDetach: () -> Unit,
@@ -247,7 +250,7 @@ private fun SourceRow(
                 when (val fault = source.fault) {
                     null -> {
                         Text(source.allocation())
-                        Allocation(source, enabled = !isFinished, onAllocate = onAllocate)
+                        Allocation(source, dose = dose, enabled = !isFinished, onAllocate = onAllocate)
                     }
                     else -> Text(fault.words(), color = MaterialTheme.colorScheme.error)
                 }
@@ -373,13 +376,21 @@ internal fun Coverage(
 @Composable
 private fun Allocation(
     source: CourseSourcePresentationDTO,
+    dose: QuantityPresentationDTO?,
     enabled: Boolean,
     onAllocate: (Uuid, Int) -> Unit
 ) {
     val limit = source.maxDoses
     if (limit == null || limit == 0) {
         Text(
-            stringResource(if (limit == null) R.string.course_source_no_limit else R.string.course_source_gives_nothing),
+            when {
+                limit == null -> stringResource(R.string.course_source_no_limit)
+                // Доза берётся из одной коробки (C1), и здесь её не набрать: чтобы это не читалось
+                // как ошибка приложения, сказано, какой именно дозы не хватает.
+                dose != null ->
+                    stringResource(R.string.course_source_gives_nothing_for, dose.amount, dose.unit.name)
+                else -> stringResource(R.string.course_source_gives_nothing)
+            },
             style = MaterialTheme.typography.bodySmall,
             color = MaterialTheme.colorScheme.onSurfaceVariant
         )

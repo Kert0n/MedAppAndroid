@@ -329,7 +329,6 @@
     <string name="course_total_doses">Всего приёмов</string>
     <string name="course_expected_end">Последний приём — %1$s</string>
     <string name="course_unit_missing">У дозы нужна единица: выберите её из словаря.</string>
-    <string name="course_dose_missing">Укажите число: единица без него ничего не значит.</string>
     <string name="course_dose_is_zero">Доза в ноль — не доза: укажите, сколько принимать за раз.</string>
     <string name="course_form_unknown">Такой формы уже нет в словаре — выберите другую.</string>
     <string name="course_start_missing">Расписанию нужен первый день.</string>
@@ -401,6 +400,7 @@
     <string name="course_source_doses">Приёмов из %1$d</string>
     <string name="course_source_no_limit">Укажите дозу и число приёмов — тогда будет что выделять.</string>
     <string name="course_source_gives_nothing">Целой дозы здесь уже не наберётся.</string>
+    <string name="course_source_gives_nothing_for">Одной дозы (%1$s %2$s) здесь не наберётся: доза берётся из одной коробки.</string>
     <string name="course_source_fault_unit">Другая единица — снимите пачку или поправьте её сведения.</string>
     <string name="course_source_fault_form">Другая форма — снимите пачку или поправьте её сведения.</string>
     <string name="course_source_taken">Эта пачка занята другим лечением.</string>

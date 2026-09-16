@@ -57,6 +57,7 @@ import com.kert0n.medapp.ui.Form
 import com.kert0n.medapp.ui.ErrorMessage
 import com.kert0n.medapp.ui.LoadingState
 import com.kert0n.medapp.ui.PickerField
+import com.kert0n.medapp.ui.QuantityField
 import com.kert0n.medapp.ui.text
 import java.time.DayOfWeek
 import java.time.LocalTime
@@ -199,28 +200,18 @@ private fun Fields(
             isError = field == CourseFormError.Field.FORM,
             emptyText = stringResource(R.string.pack_no_forms)
         )
-        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-            OutlinedTextField(
-                value = form.doseAmount,
-                // Набрал число — форма выпуска подсказывает, чем его мерить (H3 §15).
-                onValueChange = { onEdit(form.copy(doseAmount = it).suggestingUnit(state.units)) },
-                label = { Text(stringResource(R.string.course_dose)) },
-                singleLine = true,
-                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
-                isError = field == CourseFormError.Field.DOSE,
-                modifier = Modifier.weight(1f)
-            )
-            PickerField(
-                label = stringResource(R.string.course_unit),
-                selected = state.units.firstOrNull { it.id == form.unit?.id },
-                options = state.units,
-                optionText = { it.name },
-                onPick = { onEdit(form.copy(unit = it)) },
-                isError = field == CourseFormError.Field.UNIT,
-                emptyText = stringResource(R.string.pack_no_units),
-                modifier = Modifier.weight(1f)
-            )
-        }
+        QuantityField(
+            amount = form.doseAmount,
+            unit = form.unit,
+            units = state.units,
+            onAmount = { onEdit(form.copy(doseAmount = it)) },
+            onUnit = { onEdit(form.copy(unit = it)) },
+            amountLabel = stringResource(R.string.course_dose),
+            unitLabel = stringResource(R.string.course_unit),
+            amountError = field == CourseFormError.Field.DOSE,
+            unitError = field == CourseFormError.Field.UNIT,
+            emptyUnits = stringResource(R.string.pack_no_units)
+        )
         // Источники — сразу под формой и дозой: раньше них подключать нечего, а дальше в списке
         // полей они бы потерялись (решение владельца 2026-09-16).
         onSources?.let {
@@ -351,7 +342,6 @@ private fun CourseFormError.message(): String = when (this) {
     CourseFormError.Input.NOTE_TOO_LONG ->
         pluralStringResource(R.plurals.course_note_too_long, CourseRecord.NOTE_MAX_LENGTH, CourseRecord.NOTE_MAX_LENGTH)
     CourseFormError.Input.UNIT_MISSING -> stringResource(R.string.course_unit_missing)
-    CourseFormError.Input.DOSE_MISSING -> stringResource(R.string.course_dose_missing)
     CourseFormError.Input.DOSE_IS_ZERO -> stringResource(R.string.course_dose_is_zero)
     CourseFormError.Input.FORM_UNKNOWN -> stringResource(R.string.course_form_unknown)
     CourseFormError.Input.START_MISSING -> stringResource(R.string.course_start_missing)

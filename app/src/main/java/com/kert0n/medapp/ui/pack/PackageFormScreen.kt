@@ -38,6 +38,7 @@ import com.kert0n.medapp.presentation.pack.TemplatePresentationDTO
 import com.kert0n.medapp.ui.DateField
 import com.kert0n.medapp.ui.Form
 import com.kert0n.medapp.ui.PickerField
+import com.kert0n.medapp.ui.QuantityField
 import com.kert0n.medapp.ui.text
 
 /**
@@ -144,25 +145,19 @@ fun PackageFormScreen(
             )
 
             if (!state.isEditing) {
-                OutlinedTextField(
-                    value = form.amount,
-                    onValueChange = { onEdit(form.copy(amount = it)) },
-                    label = { Text(stringResource(R.string.pack_amount)) },
-                    singleLine = true,
-                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
-                    isError = state.error?.field == PackageFormError.Field.AMOUNT,
-                    supportingText = { if (form.amount.isBlank()) Text(stringResource(R.string.field_required)) },
-                    modifier = Modifier.fillMaxWidth()
-                )
-                PickerField(
-                    label = stringResource(R.string.pack_unit),
-                    selected = state.units.firstOrNull { it.id == form.unit?.id },
-                    options = state.units,
-                    optionText = { it.name },
-                    onPick = { onEdit(form.copy(unit = it)) },
-                    isError = state.error?.field == PackageFormError.Field.UNIT,
-                    emptyText = stringResource(R.string.pack_no_units),
-                    supporting = stringResource(R.string.field_required).takeIf { form.unit == null }
+                QuantityField(
+                    amount = form.amount,
+                    unit = form.unit,
+                    units = state.units,
+                    onAmount = { onEdit(form.copy(amount = it)) },
+                    onUnit = { onEdit(form.copy(unit = it)) },
+                    amountLabel = stringResource(R.string.pack_amount),
+                    unitLabel = stringResource(R.string.pack_unit),
+                    amountError = state.error?.field == PackageFormError.Field.AMOUNT,
+                    unitError = state.error?.field == PackageFormError.Field.UNIT,
+                    amountSupporting = stringResource(R.string.field_required).takeIf { form.amount.isBlank() },
+                    unitSupporting = stringResource(R.string.field_required).takeIf { form.unit == null },
+                    emptyUnits = stringResource(R.string.pack_no_units)
                 )
             }
             OutlinedTextField(

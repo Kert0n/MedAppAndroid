@@ -28,6 +28,9 @@ import androidx.compose.material3.Text
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.interaction.PressInteraction
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.foundation.text.KeyboardOptions
+import androidx.compose.ui.text.input.KeyboardType
+import com.kert0n.medapp.presentation.value.UnitPresentationDTO
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -149,6 +152,57 @@ private val MENU_MAX_HEIGHT = 320.dp
 
 /** Высота пункта меню Material: по ней рамка считает свою высоту, не меряя пункты. */
 private val MENU_ITEM_HEIGHT = 48.dp
+
+/**
+ * Количество: число и единица — **одно поле в одной строке**. Величина одна (PLAN D1), и разнесённые
+ * по разным строкам половины читаются как два независимых вопроса; рядом же видно и то, что набрано,
+ * и чем это меряют.
+ *
+ * Спрашивают это всюду, где человек называет количество, — заводя коробку, пересчитывая её, задавая
+ * дозу лечения, — поэтому поле одно на всех: расходиться отступам, ширинам и порядку половин здесь
+ * незачем (просьба владельца 2026-09-16). Единицу подсказывает форма выпуска, и делает это не поле,
+ * а тот, кто держит форму (`suggestingUnit`): поле не знает, из чего набрана величина.
+ */
+@Composable
+fun QuantityField(
+    amount: String,
+    unit: UnitPresentationDTO?,
+    units: List<UnitPresentationDTO>,
+    onAmount: (String) -> Unit,
+    onUnit: (UnitPresentationDTO) -> Unit,
+    amountLabel: String,
+    unitLabel: String,
+    modifier: Modifier = Modifier,
+    amountError: Boolean = false,
+    unitError: Boolean = false,
+    amountSupporting: String? = null,
+    unitSupporting: String? = null,
+    emptyUnits: String? = null
+) {
+    Row(modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+        OutlinedTextField(
+            value = amount,
+            onValueChange = onAmount,
+            label = { Text(amountLabel) },
+            singleLine = true,
+            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
+            isError = amountError,
+            supportingText = amountSupporting?.let { { Text(it) } },
+            modifier = Modifier.weight(1f).defaultMinSize(minHeight = 48.dp)
+        )
+        PickerField(
+            label = unitLabel,
+            selected = units.firstOrNull { it.id == unit?.id },
+            options = units,
+            optionText = { it.name },
+            onPick = onUnit,
+            isError = unitError,
+            emptyText = emptyUnits,
+            supporting = unitSupporting,
+            modifier = Modifier.weight(1f)
+        )
+    }
+}
 
 /**
  * Дата, которую называет календарь. Печатать её строкой незачем: выбранная дата уже дата, и

@@ -83,7 +83,7 @@ class CoursesJourneyTest {
         compose.onNodeWithText("Новое лечение").assertIsDisplayed()
         compose.onNodeWithText("Название").performTextInput("Нурофен")
         compose.onNodeWithText("Заметка (необязательно)").performTextInput("по 2 после еды")
-        compose.onNodeWithText("Сохранить").performScrollTo().performClick()
+        compose.onNodeWithText("Сохранить").performClick()
 
         // Записанное уводит с формы само: человек заводил лечение, а не форму.
         compose.waitUntil { compose.onAllNodesWithText("Черновики").fetchSemanticsNodes().isNotEmpty() }
@@ -105,7 +105,7 @@ class CoursesJourneyTest {
         compose.onNodeWithText("Записать лечение").performClick()
         compose.onNodeWithText("Название").performTextInput("Нурофен")
         compose.onNodeWithText("Заметка (необязательно)").performTextInput("купить завтра")
-        compose.onNodeWithText("Сохранить").performScrollTo().performClick()
+        compose.onNodeWithText("Сохранить").performClick()
         compose.waitUntil { compose.onAllNodesWithText("Черновики").fetchSemanticsNodes().isNotEmpty() }
 
         compose.onNodeWithText("Нурофен").performClick()
@@ -143,7 +143,7 @@ class CoursesJourneyTest {
 
         compose.waitUntil { compose.onAllNodesWithText("Черновики").fetchSemanticsNodes().isNotEmpty() }
         compose.onNodeWithText("Нурофен").performClick()
-        compose.onNodeWithText("Начать лечение").performScrollTo().performClick()
+        compose.onNodeWithText("Начать лечение").performClick()
 
         // Начатое ведёт на карточку, и первое, что там сказано, — чем лечение обеспечено.
         compose.waitUntil {
@@ -157,7 +157,7 @@ class CoursesJourneyTest {
     fun aDraftIsReopenedFromTheListAndDiscardedAfterAQuestion() {
         compose.onNodeWithText("Записать лечение").performClick()
         compose.onNodeWithText("Название").performTextInput("Нурофен")
-        compose.onNodeWithText("Сохранить").performScrollTo().performClick()
+        compose.onNodeWithText("Сохранить").performClick()
         compose.waitUntil { compose.onAllNodesWithText("Черновики").fetchSemanticsNodes().isNotEmpty() }
 
         compose.onNodeWithText("Нурофен").performClick()
@@ -185,7 +185,7 @@ class CoursesJourneyTest {
         compose.waitUntil { compose.onAllNodesWithText("Подключить ещё").fetchSemanticsNodes().isNotEmpty() }
         compose.onNodeWithContentDescription("Назад").performClick()
 
-        compose.onNodeWithText("Отмена").performScrollTo().performClick()
+        compose.onNodeWithText("Отмена").performClick()
         compose.onNodeWithText("Оставить черновик?").assertIsDisplayed()
         compose.onNodeWithText("Удалить").performClick()
 

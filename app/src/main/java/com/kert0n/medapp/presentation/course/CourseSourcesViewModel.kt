@@ -12,6 +12,8 @@ import com.kert0n.medapp.feature.course.CourseDrafting
 import com.kert0n.medapp.feature.course.SourceEditing
 import com.kert0n.medapp.feature.course.SourceEstimates
 import com.kert0n.medapp.feature.time.Today
+import com.kert0n.medapp.presentation.value.QuantityPresentationDTO
+import com.kert0n.medapp.presentation.value.toPresentationDTO
 import com.kert0n.medapp.storage.course.CourseStorageRepository
 import com.kert0n.medapp.storage.medkit.MedKitStorageRepository
 import com.kert0n.medapp.storage.pack.PackageQuery
@@ -124,6 +126,9 @@ class CourseSourcesViewModel @AssistedInject constructor(
             val estimate = stored.estimate(shown, boxes)
             CourseSourcesUiState(
                 title = stored.title,
+                // Доза — мера, которой меряют строки: без неё «целой дозы не наберётся» просит
+                // человека считать в уме (H3 №16).
+                dose = stored.dose?.quantity?.toPresentationDTO(),
                 isDraft = stored.isDraft,
                 isFinished = stored.isFinished,
                 sources = stored.rows(shown, boxes, shelves, estimate),
@@ -352,6 +357,8 @@ class CourseSourcesViewModel @AssistedInject constructor(
  */
 data class CourseSourcesUiState(
     val title: String? = null,
+    /** Чем меряют выделения: одна доза лечения. `null` — у черновика её ещё не назвали. */
+    val dose: QuantityPresentationDTO? = null,
     val sources: List<CourseSourcePresentationDTO> = emptyList(),
     val coverage: CourseCoveragePresentationDTO? = null,
     /** Что получится у собранного состава: считается на месте, без записи (H3 №16). */

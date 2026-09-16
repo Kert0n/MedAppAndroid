@@ -67,7 +67,7 @@ class LocalRecordsJourneyTest {
         compose.onNodeWithText("Новая аптечка").assertIsDisplayed()
         compose.onNodeWithText("Название").performTextInput("Домашняя")
         compose.onNodeWithText("Место хранения (необязательно)").performTextInput("В ванной")
-        compose.onNodeWithText("Сохранить").performScrollTo().performClick()
+        compose.onNodeWithText("Сохранить").performClick()
 
         // Записанное уводит с формы само: человек заводил полку, а не форму.
         compose.waitUntil {
@@ -122,7 +122,7 @@ class LocalRecordsJourneyTest {
     fun everyScreenOfTheSetIsReachableAndLeadsBack() {
         aShelfWithABox()
 
-        compose.onNodeWithText("Перенести").performScrollTo().performClick()
+        compose.onNodeWithText("Перенести").performClick()
         compose.waitUntil { compose.onAllNodesWithText("Куда перенести").fetchSemanticsNodes().isNotEmpty() }
         compose.onNodeWithText("Переносить некуда", substring = true).assertIsDisplayed()
         back()
@@ -150,7 +150,7 @@ class LocalRecordsJourneyTest {
     fun aSuggestionFillsTheFormWithWhatTheCardKnows() {
         compose.onNodeWithText("Завести аптечку").performClick()
         compose.onNodeWithText("Название").performTextInput("Домашняя")
-        compose.onNodeWithText("Сохранить").performScrollTo().performClick()
+        compose.onNodeWithText("Сохранить").performClick()
         compose.waitUntil { compose.onAllNodesWithText("Пока пусто").fetchSemanticsNodes().isNotEmpty() }
         compose.onNodeWithText("Домашняя").performClick()
         compose.onNodeWithText("Завести упаковку").performClick()
@@ -162,7 +162,7 @@ class LocalRecordsJourneyTest {
         // На 360×640 dp поле производителя ниже экрана: до него докручивают.
         compose.onNodeWithText("Reckitt").performScrollTo().assertIsDisplayed()
         compose.onNodeWithText("Количество").performScrollTo().performTextInput("20")
-        compose.onNodeWithText("Сохранить").performScrollTo().performClick()
+        compose.onNodeWithText("Сохранить").performClick()
         compose.waitUntil { compose.onAllNodesWithText("Сколько есть").fetchSemanticsNodes().isNotEmpty() }
         compose.onNodeWithText("Reckitt").performScrollTo().assertIsDisplayed()
     }
@@ -171,7 +171,7 @@ class LocalRecordsJourneyTest {
     private fun aShelfWithABox() {
         compose.onNodeWithText("Завести аптечку").performClick()
         compose.onNodeWithText("Название").performTextInput("Домашняя")
-        compose.onNodeWithText("Сохранить").performScrollTo().performClick()
+        compose.onNodeWithText("Сохранить").performClick()
         compose.waitUntil { compose.onAllNodesWithText("Пока пусто").fetchSemanticsNodes().isNotEmpty() }
 
         compose.onNodeWithText("Домашняя").performClick()
@@ -180,7 +180,7 @@ class LocalRecordsJourneyTest {
         compose.onNodeWithText("Количество").performTextInput("20")
         compose.onNodeWithText("Единица").performScrollTo().performClick()
         compose.onNodeWithText("таблетка").performClick()
-        compose.onNodeWithText("Сохранить").performScrollTo().performClick()
+        compose.onNodeWithText("Сохранить").performClick()
 
         // Заведённая коробка открывается карточкой: человек заводил её, чтобы посмотреть.
         compose.waitUntil { compose.onAllNodesWithText("Сколько есть").fetchSemanticsNodes().isNotEmpty() }

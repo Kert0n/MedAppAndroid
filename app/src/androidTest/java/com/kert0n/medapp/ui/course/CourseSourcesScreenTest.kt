@@ -99,6 +99,24 @@ class CourseSourcesScreenTest {
         compose.onNodeWithText("выделено 3 приёма · 6 таблетка").assertIsDisplayed()
     }
 
+    /**
+     * Коробка, в которой нет ни одной целой дозы, говорит **какой** дозы не хватает. Без этого
+     * строка «свободно 20 шт» рядом с молчаливым «целой дозы не наберётся» читается как ошибка
+     * приложения: человек не видит, что доза — 21 шт, а доза берётся из одной коробки (C1).
+     */
+    @Test
+    fun aBoxTooSmallForASingleDoseNamesTheDose() {
+        show(
+            CourseSourcesUiState(
+                dose = QuantityPresentationDTO("21", TABLETS.toPresentationDTO()),
+                sources = listOf(source(allocatedDoses = 0, maxDoses = 0))
+            )
+        )
+
+        compose.onNodeWithText("Одной дозы (21 таблетка) здесь не наберётся: доза берётся из одной коробки.")
+            .assertIsDisplayed()
+    }
+
     /** Отключённый источник объясняет себя словами, а не одним цветом. */
     @Test
     fun aFaultedSourceSaysWhatHappened() {

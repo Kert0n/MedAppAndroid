@@ -50,15 +50,15 @@ class CourseFormMapperTest {
     }
 
     /**
-     * Единица без числа — незаконченное поле, а не «дозы нет»: доза это одна вещь (ТЗ 4.1.1.4.1),
-     * и записанная половина теряла единицу молча — у черновика для неё отдельного места нет.
+     * Единица без числа дозой не становится и записи не мешает: черновик «название и форма
+     * выпуска» — законная запись (H3 §15), а единицу к следующему открытию принесёт форма выпуска.
      */
     @Test
-    fun aUnitWithoutAnAmountIsAnUnfinishedField() {
-        assertEquals(
-            ParsedInput.Rejected(CourseFormError.Input.DOSE_MISSING),
-            CourseFormPresentationDTO(title = "Нурофен", unit = TABLETS.toPresentationDTO()).parsed(VOCABULARY)
-        )
+    fun aUnitWithoutAnAmountIsNoDoseAndNoRefusal() {
+        val parsed = CourseFormPresentationDTO(title = "Нурофен", unit = TABLETS.toPresentationDTO())
+            .parsed(VOCABULARY)
+
+        assertEquals(ParsedInput.Parsed(CourseDescription("Нурофен", null)), parsed)
     }
 
     /** Черновик «название и форма выпуска» записывается: дозы у него нет вовсе, а не половина (H3 §15). */
