@@ -82,6 +82,10 @@ sealed interface Screen : NavKey {
     @Serializable
     data object MedKitJoining : Screen
 
+    /** Состояние синхронизации (PLAN H3 №28): данных не несёт — очередь одна. */
+    @Serializable
+    data object SyncStatus : Screen
+
     /**
      * Редактор лечения (PLAN H3 №15): без [courseId] — новый черновик, с ним — записанный
      * черновик или идущее лечение; что из двух, экран узнаёт у базы.

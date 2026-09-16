@@ -217,6 +217,39 @@
     <string name="med_kit_joining_invalid">Такого приглашения нет. Попросите новый код.</string>
     <string name="med_kit_joining_already_member">Вы уже в этой аптечке — она есть в списке.</string>
 
+    <!-- Состояние синхронизации (экран 28) и место «Опции» -->
+    <string name="options_title">Опции</string>
+    <string name="sync_status">Синхронизация</string>
+    <string name="sync_status_supporting">Что уехало на сервер, а что ещё ждёт</string>
+    <string name="sync_status_attention">Есть незакрытые операции</string>
+    <string name="sync_refresh">Обновить</string>
+    <string name="sync_running">Идёт обмен с сервером</string>
+    <string name="sync_offline">Связи нет — очередь подождёт</string>
+    <string name="sync_refreshed_at">Последний обмен в %1$s</string>
+    <string name="sync_never">Обмена ещё не было</string>
+    <string name="sync_all_delivered">Всё доехало</string>
+    <string name="sync_recount">Пересчитать коробку</string>
+    <string name="sync_dismiss">Разобрал</string>
+    <string name="sync_waiting">Отправится, когда будет связь</string>
+    <string name="sync_retry_at">Повторим в %1$s</string>
+    <string name="sync_refused">Сервер отказал</string>
+    <string name="sync_unreadable">Эту строку нечем прочитать</string>
+    <string name="sync_about_named">%1$s: «%2$s»</string>
+    <string name="sync_about_package_created">Новая упаковка</string>
+    <string name="sync_about_package_changed">Изменение упаковки</string>
+    <string name="sync_about_package_moved">Перенос упаковки</string>
+    <string name="sync_about_package_removed">Удаление упаковки</string>
+    <string name="sync_about_intake">Приём</string>
+    <string name="sync_about_claim">Выделение лечению</string>
+    <string name="sync_about_med_kit">Решение об аптечке</string>
+    <string name="sync_about_unknown">Изменение</string>
+    <string name="sync_reason_invalid">Сервер не принял данные</string>
+    <string name="sync_reason_not_enough">На сервере осталось меньше, чем вы списали</string>
+    <string name="sync_reason_unit_changed">У коробки сменилась единица измерения</string>
+    <string name="sync_reason_stale">Коробку изменили раньше вас</string>
+    <string name="sync_reason_conflict">Коробку изменили раньше вас</string>
+    <string name="sync_reason_superseded">Отменено вместе с тем, от чего зависело</string>
+
     <!-- Карточка упаковки -->
     <string name="pack_title">Упаковка</string>
     <string name="pack_how_much">Сколько есть</string>

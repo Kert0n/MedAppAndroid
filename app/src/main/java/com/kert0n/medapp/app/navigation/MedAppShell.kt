@@ -65,6 +65,7 @@ import com.kert0n.medapp.presentation.medkit.MedKitJoiningViewModel
 import com.kert0n.medapp.presentation.medkit.MedKitSharingViewModel
 import com.kert0n.medapp.presentation.medkit.MedKitListViewModel
 import com.kert0n.medapp.presentation.pack.MedKitContentsViewModel
+import com.kert0n.medapp.presentation.operation.SyncStatusViewModel
 import com.kert0n.medapp.presentation.pack.PackageCardViewModel
 import com.kert0n.medapp.presentation.pack.PackageFormViewModel
 import com.kert0n.medapp.presentation.pack.PackageRecountViewModel
@@ -79,6 +80,8 @@ import com.kert0n.medapp.ui.pack.PackageCardScreen
 import com.kert0n.medapp.ui.pack.PackageFormScreen
 import com.kert0n.medapp.ui.pack.PackageRecountScreen
 import com.kert0n.medapp.ui.pack.PackageTransferScreen
+import com.kert0n.medapp.ui.operation.OptionsScreen
+import com.kert0n.medapp.ui.operation.SyncStatusScreen
 
 /**
  * Оболочка приложения: пять мест внизу и содержимое над ними. Где человек стоит и как глубоко —
@@ -120,8 +123,11 @@ fun MedAppShell(
                 planMode.value = PlanMode.DAY
                 stacks.go(Place.PLAN.key)
             }
-            // Экрана состояния синхронизации ещё нет (U6): ведём в место, где он появится.
-            NotificationTarget.SyncStatus -> stacks.go(Place.OPTIONS.key)
+            // Уведомление обещало очередь — на неё и ведём, а не в корень места.
+            NotificationTarget.SyncStatus -> {
+                stacks.go(Place.OPTIONS.key)
+                stacks.go(Screen.SyncStatus)
+            }
         }
         onOpened()
     }
@@ -540,7 +546,26 @@ private fun screens(stacks: TabStacks, planMode: MutableState<PlanMode>) = entry
             onBack = stacks::back
         )
     }
-    for (place in Place.entries - Place.MED_KITS - Place.PLAN) {
+    entry(Screen.Options) {
+        val model: SyncStatusViewModel = hiltViewModel()
+        OptionsScreen(
+            outstanding = model.state.collectAsStateWithLifecycle().value.rows.size,
+            onSyncStatus = { stacks.go(Screen.SyncStatus) }
+        )
+    }
+    entry(Screen.SyncStatus) {
+        val model: SyncStatusViewModel = hiltViewModel()
+        SyncStatusScreen(
+            state = model.state.collectAsStateWithLifecycle().value,
+            onRefresh = model::refresh,
+            // Расхождение по числу лечится пересчётом — тем же экраном, что и обычный пересчёт
+            // (REQ-045): второго места для одного дела не заводится.
+            onRecount = { stacks.go(Screen.PackageRecount(it)) },
+            onDismiss = model::dismiss,
+            onBack = stacks::back
+        )
+    }
+    for (place in Place.entries - Place.MED_KITS - Place.PLAN - Place.OPTIONS) {
         entry(place.key) { NotReadyYet() }
     }
 }
