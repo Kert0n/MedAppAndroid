@@ -87,7 +87,8 @@ class MissedIntakesTest {
             today = Today(clock, shifts),
             reminders = scenarios.reminderStore,
             intakes = database.intakeRepository(),
-            courses = database.courseRepository()
+            courses = database.courseRepository(),
+            packages = database.packageRepository()
         ).also { opened += it }
     }
 
@@ -218,6 +219,24 @@ class MissedIntakesTest {
             shifts.happened()
             val tomorrow = state.awaiting(PATIENTLY) { !it.isEmpty }
             assertEquals(listOf(today.id), tomorrow.rows.mapNotNull { it.intakeId })
+        }
+    }
+
+    /**
+     * **Из выброшенной коробки быстрого ответа нет.** Коробку выбросили, пока попап ждал: «Принял»
+     * из неё ничего бы не записал, кроме отказа поверх попапа (снимок BigLatest). Строка остаётся —
+     * пропуск по-прежнему не отвечен, — но кнопки у неё нет.
+     */
+    @Test
+    fun aRowWhoseBoxWasThrownAwayOffersNoQuickAnswer(): Unit = runBlocking {
+        startedTwoDaysAgo()
+        scenarios().dailyRound.run()
+        val model = model()
+
+        watching(model.state) { state ->
+            state.awaiting(PATIENTLY) { s -> s.rows.size == 2 && s.rows.all { it.canConfirm } }
+            scenarios().packageRemoval.remove(PACK)
+            state.awaiting(PATIENTLY) { s -> s.rows.size == 2 && s.rows.none { it.canConfirm } }
         }
     }
 

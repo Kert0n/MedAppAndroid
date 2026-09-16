@@ -14,15 +14,18 @@ import com.kert0n.medapp.feature.time.Today
 import com.kert0n.medapp.storage.course.CourseStorageRepository
 import com.kert0n.medapp.storage.intake.IntakeStorageRepository
 import com.kert0n.medapp.storage.notification.ReminderStorageRepository
+import com.kert0n.medapp.storage.pack.PackageStorageRepository
 import dagger.hilt.android.lifecycle.HiltViewModel
 import javax.inject.Inject
 import kotlin.uuid.Uuid
 import kotlinx.coroutines.ExperimentalCoroutinesApi
+import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.flatMapLatest
+import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.flow.update
@@ -46,7 +49,8 @@ class MissedIntakesViewModel @Inject constructor(
     today: Today,
     reminders: ReminderStorageRepository,
     intakes: IntakeStorageRepository,
-    courses: CourseStorageRepository
+    courses: CourseStorageRepository,
+    packages: PackageStorageRepository
 ) : ViewModel() {
 
     /** Закрытое крестиком — ключами, а не флагом: пропуск следующего дня приходит сам. */
@@ -71,16 +75,29 @@ class MissedIntakesViewModel @Inject constructor(
         .flatMapLatest { (notices, day) ->
             listed = notices.mapTo(HashSet()) { it.key }
             val ids = notices.mapNotNullTo(HashSet()) { (it.target as? NotificationTarget.Intake)?.intakeId }
-            combine(intakes.observeOfIds(ids), courses.observeRecords()) { read, records ->
-                val titles = records.associate { it.id to it.title }
-                val waiting = read.filterIsInstance<IntakeProjection.Scheduled>()
-                    .filter { it.status == IntakeStatus.MISSED && it.slot.localDate.isBefore(day.date) }
-                intakesShown = waiting
-                waiting.mapNotNull { intake ->
-                    val title = titles[intake.courseId] ?: return@mapNotNull null
-                    intake.toDayRow(title, day.zone, on = intake.slot.localDate)
+            combine(intakes.observeOfIds(ids), courses.observeRecords()) { read, records -> read to records }
+                .flatMapLatest { (read, records) ->
+                    val titles = records.associate { it.id to it.title }
+                    val waiting = read.filterIsInstance<IntakeProjection.Scheduled>()
+                        .filter { it.status == IntakeStatus.MISSED && it.slot.localDate.isBefore(day.date) }
+                    intakesShown = waiting
+                    // Плановую коробку могли выбросить, пока попап ждал: «Принял» из неё — кнопка,
+                    // которая ничего не сделает, кроме отказа (снимок BigLatest). Такой строке
+                    // быстрого ответа нет; нажатие на неё ведёт на карточку пункта.
+                    val planned = waiting.mapNotNullTo(LinkedHashSet()) { it.plannedPackage?.id }
+                    val usable: Flow<Set<Uuid>> = if (planned.isEmpty()) flowOf(emptySet())
+                    else combine(planned.map { id -> packages.observe(id) }) { boxes ->
+                        boxes.filterNotNull().filter { it.status.allowsUse }.mapTo(HashSet()) { it.id }
+                    }
+                    usable.map { alive ->
+                        waiting.mapNotNull { intake ->
+                            val title = titles[intake.courseId] ?: return@mapNotNull null
+                            intake.toDayRow(title, day.zone, on = intake.slot.localDate).let { row ->
+                                if (intake.plannedPackage?.id in alive) row else row.copy(hasPlannedPackage = false)
+                            }
+                        }
+                    }
                 }
-            }
         }
 
     val state: StateFlow<MissedIntakesUiState> = combine(rows, answering, message) { rows, answering, message ->

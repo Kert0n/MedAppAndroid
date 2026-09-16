@@ -143,23 +143,25 @@ fun MedAppShell(
         val expiring: ExpiringTodayViewModel = hiltViewModel()
         val expiringState = expiring.state.collectAsStateWithLifecycle().value
         // Попап пропущенного — последний шанс ответить за прошлые дни (PLAN C1): там же, на
-        // местах, и после новости о сроке — два окна разом человек не читает.
+        // местах. **Сначала пропуски, потом срок**: из попапа срока коробку выбрасывают, и
+        // ответить за вчерашний приём из неё было бы уже нечем (снимок BigLatest, решение
+        // владельца 2026-09-16). Два окна разом человек не читает.
         val missed: MissedIntakesViewModel = hiltViewModel()
         val missedState = missed.state.collectAsStateWithLifecycle().value
         if (stacks.screen in PLACES) {
-            if (!expiringState.isEmpty) {
-                ExpiringTodayPopup(
-                    state = expiringState,
-                    onOpenPackage = { stacks.go(Screen.PackageCard(it)) },
-                    onDismiss = expiring::dismiss
-                )
-            } else {
+            if (!missedState.isEmpty) {
                 MissedIntakesPopup(
                     state = missedState,
                     onOpen = { row -> row.intakeId?.let { stacks.go(Screen.IntakeCard(it)) } },
                     onConfirm = missed::confirm,
                     onDismiss = missed::dismiss,
                     onDismissMessage = missed::dismissMessage
+                )
+            } else {
+                ExpiringTodayPopup(
+                    state = expiringState,
+                    onOpenPackage = { stacks.go(Screen.PackageCard(it)) },
+                    onDismiss = expiring::dismiss
                 )
             }
         }
