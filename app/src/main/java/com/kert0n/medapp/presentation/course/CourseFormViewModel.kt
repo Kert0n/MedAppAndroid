@@ -368,7 +368,9 @@ class CourseFormViewModel @AssistedInject constructor(
         CourseDrafting.Outcome.Gone -> CourseFormUiState.Gone
         CourseDrafting.Outcome.Stale -> idle().copy(error = CourseFormError.Stale)
         is CourseDrafting.Outcome.Rejected -> idle().copy(error = CourseFormError.Rejected(outcome.reason))
-        // Пачки редактор не трогает: до этого исхода его правки не доходят.
+        // Пачки редактор не трогает: до этих исходов его правки не доходят. Число приёмов он
+        // меняет, но уменьшение снимает лишнее само, и предел после него не нарушен (PLAN D5).
+        is CourseDrafting.Outcome.BeyondLimit,
         CourseDrafting.Outcome.PackageUnusable -> error("редактор назначения пачек не подключает: $outcome")
     }
 }

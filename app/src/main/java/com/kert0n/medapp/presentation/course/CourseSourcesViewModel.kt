@@ -274,6 +274,8 @@ class CourseSourcesViewModel @AssistedInject constructor(
         is CourseDrafting.Outcome.Saved, CourseDrafting.Outcome.Gone -> null
         CourseDrafting.Outcome.Stale -> CourseSourcesMessage.Stale
         is CourseDrafting.Outcome.Rejected -> CourseSourcesMessage.Refused(outcome.reason)
+        is CourseDrafting.Outcome.BeyondLimit ->
+            CourseSourcesMessage.BeyondLimit(nameOf(outcome.packageId), outcome.limit.count)
         CourseDrafting.Outcome.PackageUnusable -> CourseSourcesMessage.Unusable(null)
     }
 

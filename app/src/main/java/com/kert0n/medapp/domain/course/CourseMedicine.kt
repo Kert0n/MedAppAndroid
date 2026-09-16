@@ -173,10 +173,16 @@ class CourseMedicine(sources: List<CourseSource> = emptyList()) {
     ): Doses {
         // Отключённому источнику выделять нечего: он не в той единице, чтобы считать дозы.
         if (faultOf(pkg) != null) return 0.doses
-        val here = allocatedTo(pkg) ?: 0.doses
-        val stillNeeded = required.minusOrNone(allocatedTotal - here)
-        return minOf(availability.dosesOf(pkg, dose), stillNeeded)
+        return minOf(availability.dosesOf(pkg, dose), needLeftFor(pkg, required))
     }
+
+    /**
+     * Сколько [required] оставляет пачке [pkg] сверх выделенного остальным. Без коробок: у
+     * черновика их никто не читал, и предел ему ставит одна потребность (PLAN D5). [pkg] может
+     * ещё не быть в препарате — тогда выделенного у неё нет.
+     */
+    internal fun needLeftFor(pkg: PackageRef, required: Doses): Doses =
+        required.minusOrNone(allocatedTotal - (allocatedTo(pkg) ?: 0.doses))
 
     /**
      * Выделения, зажатые под нехватку и под потребность: каждой пачке — не больше целых доз, что
@@ -192,9 +198,21 @@ class CourseMedicine(sources: List<CourseSource> = emptyList()) {
         val capacities = capacities(dose, availability).associateBy { it.pkg }
         // Отключённый источник остаётся как есть: он ничего не держит и не зажимается.
         val clamped = sources.map { source -> capacities[source.pkg]?.let { CourseSource(source.pkg, it.covers) } ?: source }
-        var excess = clamped.fold(0.doses) { total, it -> total + it.allocatedDoses }
-            .minusOrNone(required)
-        val trimmed = clamped.toMutableList()
+        return withSources(clamped).withinNeed(required)
+    }
+
+    /**
+     * Выделения без избытка сверх [required]: лишнее снимается **с конца**, потому что сверху
+     * расходуют, а снизу освобождают. Выделение здесь только уменьшается.
+     *
+     * Правило отдельно от [clampedTo], потому что просят его порознь: у идущего лечения выделения
+     * зажимает ещё и нехватка в коробках, а у черновика коробок никто не читал — ему нужно ровно
+     * «не больше, чем приёмов» (PLAN D5).
+     */
+    internal fun withinNeed(required: Doses): CourseMedicine {
+        var excess = allocatedTotal.minusOrNone(required)
+        if (excess.isNone) return this
+        val trimmed = sources.toMutableList()
         for (index in trimmed.indices.reversed()) {
             if (excess.isNone) break
             val source = trimmed[index]
