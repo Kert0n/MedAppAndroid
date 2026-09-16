@@ -61,6 +61,7 @@ import androidx.navigation3.ui.NavDisplay
 import com.kert0n.medapp.R
 import com.kert0n.medapp.presentation.medkit.MedKitFormUiState
 import com.kert0n.medapp.presentation.medkit.MedKitFormViewModel
+import com.kert0n.medapp.presentation.medkit.MedKitJoiningViewModel
 import com.kert0n.medapp.presentation.medkit.MedKitSharingViewModel
 import com.kert0n.medapp.presentation.medkit.MedKitListViewModel
 import com.kert0n.medapp.presentation.pack.MedKitContentsViewModel
@@ -71,6 +72,7 @@ import com.kert0n.medapp.presentation.pack.PackageTransferViewModel
 import com.kert0n.medapp.ui.EmptyState
 import com.kert0n.medapp.ui.medkit.MedKitContentsScreen
 import com.kert0n.medapp.ui.medkit.MedKitFormScreen
+import com.kert0n.medapp.ui.medkit.MedKitJoiningScreen
 import com.kert0n.medapp.ui.medkit.MedKitSharingScreen
 import com.kert0n.medapp.ui.medkit.MedKitListScreen
 import com.kert0n.medapp.ui.pack.PackageCardScreen
@@ -184,6 +186,7 @@ private fun screens(stacks: TabStacks, planMode: MutableState<PlanMode>) = entry
             state = model.state.collectAsStateWithLifecycle().value,
             onOpen = { stacks.go(Screen.MedKitContents(it)) },
             onAdd = { stacks.go(Screen.MedKitForm()) },
+            onJoin = { stacks.go(Screen.MedKitJoining) },
             // Ища лекарство, человек не помнит, в какой оно аптечке: поиск ведёт в область
             // «везде», то есть в тот же экран без названной полки.
             onSearch = { stacks.go(Screen.MedKitContents()) }
@@ -230,6 +233,24 @@ private fun screens(stacks: TabStacks, planMode: MutableState<PlanMode>) = entry
             onPickTarget = model::pickTarget,
             onDismissRemoval = model::dismissRemoval,
             onRemove = model::remove,
+            onBack = stacks::back
+        )
+    }
+    entry(Screen.MedKitJoining) {
+        val model: MedKitJoiningViewModel = hiltViewModel()
+        val state = model.state.collectAsStateWithLifecycle().value
+        // Вошёл — идём в саму полку: человек вступал ради лекарств, а не ради формы. Экран формы
+        // из стопки уходит, чтобы «назад» с полки вело к списку, а не к введённому коду.
+        LaunchedEffect(state.joined) {
+            state.joined?.let {
+                stacks.back()
+                stacks.go(Screen.MedKitContents(it))
+            }
+        }
+        MedKitJoiningScreen(
+            state = state,
+            onType = model::type,
+            onJoin = model::join,
             onBack = stacks::back
         )
     }

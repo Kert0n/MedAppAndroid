@@ -76,6 +76,13 @@ sealed interface Screen : NavKey {
     data class MedKitSharing(val medKitId: Uuid) : Screen
 
     /**
+     * Присоединиться к чужой аптечке (PLAN H3 №22). Данных не несёт: код человек вводит сам, а
+     * ключ приглашения в маршрут не едет ни при каких условиях (PLAN G3).
+     */
+    @Serializable
+    data object MedKitJoining : Screen
+
+    /**
      * Редактор лечения (PLAN H3 №15): без [courseId] — новый черновик, с ним — записанный
      * черновик или идущее лечение; что из двух, экран узнаёт у базы.
      */
