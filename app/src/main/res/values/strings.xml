@@ -260,6 +260,12 @@
     <string name="pack_unconfirmed">Изменение ещё не доехало до общей аптечки.</string>
     <string name="pack_removal_on_the_way">Удаление в пути: общая аптечка ещё не ответила.</string>
     <string name="pack_lost">Из этой аптечки вышли — коробка ждёт ответа сервера.</string>
+    <!-- Те же пометки строкой списка: коротко, потому что строка не карточка -->
+    <string name="pack_row_unconfirmed">Изменение в пути</string>
+    <string name="pack_row_removal">Удаление в пути</string>
+    <string name="pack_row_lost">Коробка не у нас</string>
+    <string name="med_kit_publishing">Публикуется</string>
+    <string name="med_kit_removing">Убирается</string>
     <string name="pack_what_it_is">Что это</string>
     <string name="pack_dates">Сроки и цена</string>
     <string name="pack_expiry_unknown">Срок не указан</string>

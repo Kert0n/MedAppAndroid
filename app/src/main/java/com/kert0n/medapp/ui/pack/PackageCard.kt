@@ -21,6 +21,7 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import com.kert0n.medapp.R
 import com.kert0n.medapp.domain.pack.ExpiryDate
+import com.kert0n.medapp.domain.pack.PackageStatus
 import com.kert0n.medapp.presentation.pack.PackagePresentationDTO
 import com.kert0n.medapp.presentation.value.toPresentationDTO
 import java.time.LocalDate
@@ -68,6 +69,30 @@ fun PackageCard(
 
             placeName?.let {
                 Text(it, style = MaterialTheme.typography.bodyMedium)
+            }
+
+            // Решение, которое ещё едет серверу, видно **там, где вещь**, а не только в карточке:
+            // человек ищет коробку в списке и должен понимать, почему число у неё оценочное
+            // (PLAN E1, H3 «Набор общей полки»).
+            when (pkg.status) {
+                PackageStatus.REMOVING -> Marker(
+                    icon = R.drawable.ic_cloud_upload,
+                    text = stringResource(R.string.pack_row_removal),
+                    color = if (expired) MaterialTheme.colorScheme.onErrorContainer else MaterialTheme.colorScheme.tertiary
+                )
+                PackageStatus.LOST -> Marker(
+                    icon = R.drawable.ic_warning,
+                    text = stringResource(R.string.pack_row_lost),
+                    color = if (expired) MaterialTheme.colorScheme.onErrorContainer else MaterialTheme.colorScheme.error
+                )
+                PackageStatus.ACTIVE, PackageStatus.CHANGING ->
+                    if (pkg.hasUnconfirmedChanges) {
+                        Marker(
+                            icon = R.drawable.ic_cloud_upload,
+                            text = stringResource(R.string.pack_row_unconfirmed),
+                            color = if (expired) MaterialTheme.colorScheme.onErrorContainer else MaterialTheme.colorScheme.tertiary
+                        )
+                    }
             }
 
             val expiry = pkg.expiresOn

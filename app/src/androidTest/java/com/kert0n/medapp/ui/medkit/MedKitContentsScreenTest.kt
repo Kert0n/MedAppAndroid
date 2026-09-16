@@ -316,4 +316,28 @@ class MedKitContentsScreenTest {
         compose.onNodeWithText("Дача").performClick()
         compose.onNodeWithText("Перенести и убрать").assertIsEnabled()
     }
+
+    /**
+     * Решение, которое ещё едет серверу, видно **там, где вещь**: человек ищет коробку в списке и
+     * должен понимать, почему число у неё оценочное (PLAN E1).
+     *
+     * Красная проверка: держать пометку только в карточке — из списка не видно, что с коробкой
+     * что-то происходит, и человек считает показанное число окончательным.
+     */
+    @Test
+    fun aDecisionOnItsWayIsMarkedInTheListToo() {
+        show(
+            MedKitContentsUiState(
+                medKit = medKit(id = HOME_KIT, name = "Домашняя")
+                    .projection(MedKitContents(packages = 1, expired = 0)).toPresentationDTO(),
+                packages = listOf(
+                    pack(id = PACK, name = "Нурофен").projected(hasUnconfirmedChanges = true).toPresentationDTO()
+                ),
+                today = today,
+                isLoaded = true
+            )
+        )
+
+        compose.onNodeWithText("Изменение в пути").assertIsDisplayed()
+    }
 }
