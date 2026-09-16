@@ -90,9 +90,12 @@ sealed interface Screen : NavKey {
      * Карточка пункта плана. Назван **только пункт**: столько же знает уведомление, которое сюда
      * ведёт (`NotificationTarget.Intake`), а лечение карточка находит по самому приёму. Два входа
      * в одно место с разными знаниями расходятся первыми (PLAN G3, H3 №18).
+     *
+     * [answerAtOnce] — человек нажал «Принял» в шторке: карточка отвечает сама, а вопросы, если
+     * они есть, показывает ему. Молча записывать по нажатию в шторке нельзя (PLAN D6).
      */
     @Serializable
-    data class IntakeCard(val intakeId: Uuid) : Screen
+    data class IntakeCard(val intakeId: Uuid, val answerAtOnce: Boolean = false) : Screen
 
     /**
      * История приёмов. Спрашивается об **одном**: или о лечении, или о коробке — и это разные

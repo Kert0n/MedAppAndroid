@@ -8,7 +8,9 @@ import androidx.test.ext.junit.runners.AndroidJUnit4
 import com.kert0n.medapp.HiltTestActivity
 import com.kert0n.medapp.domain.intake.CourseIntake
 import com.kert0n.medapp.domain.notification.NotificationOpening
+import com.kert0n.medapp.domain.notification.NotificationAction
 import com.kert0n.medapp.domain.notification.NotificationTarget
+import com.kert0n.medapp.domain.pack.ExpiryDate
 import com.kert0n.medapp.domain.value.Doses
 import com.kert0n.medapp.feature.course.CourseDrafting
 import com.kert0n.medapp.fixture.CAPSULE_FORM
@@ -39,6 +41,7 @@ import java.time.LocalDate
 import javax.inject.Inject
 import kotlin.uuid.Uuid
 import kotlinx.coroutines.runBlocking
+import org.junit.Assert.assertEquals
 import org.junit.Before
 import org.junit.Rule
 import org.junit.Test
@@ -78,15 +81,21 @@ class NotificationRoutingTest {
         }
     }
 
-    private fun open(target: NotificationTarget) {
+    private fun open(target: NotificationTarget, action: NotificationAction? = null) {
         compose.setContent {
             MedAppTheme {
-                MedAppShell(opening = NotificationOpening(target, action = null))
+                MedAppShell(opening = NotificationOpening(target, action))
             }
         }
     }
 
-    private fun started(): Uuid = runBlocking {
+    private fun started(expiresOn: LocalDate? = null): Uuid = runBlocking {
+        expiresOn?.let {
+            database.packageRepository().describe(
+                PACK,
+                pack(id = PACK, name = "Нурофен", quantity = tablets("20"), form = TABLET_FORM, expiresOn = ExpiryDate(it)).facts
+            )
+        }
         val scenarios = Scenarios(database, Instant.now())
         val created = scenarios.courseDrafting.create("Нурофен")
         val saved = scenarios.courseDrafting.edit(
@@ -137,6 +146,29 @@ class NotificationRoutingTest {
         open(NotificationTarget.DayPlan(LocalDate.now(MOSCOW)))
         compose.waitUntil(WAIT) {
             compose.onAllNodesWithText("сегодня", substring = true).fetchSemanticsNodes().isNotEmpty()
+        }
+    }
+
+    /**
+     * «Принял» из шторки по **просроченной** коробке не пишет молча: карточка открывается и
+     * показывает вопрос, а записывает только ответ человека (PLAN D6, C1 «Принял из шторки»).
+     */
+    @Test
+    fun takingFromTheTrayAsksBeforeItWrites() {
+        val courseId = started(expiresOn = LocalDate.now(MOSCOW).minusDays(1))
+        val intakeId = runBlocking {
+            database.intakeRepository().ofCourse(courseId).filterIsInstance<CourseIntake>().minBy { it.slot.at }.id
+        }
+
+        open(NotificationTarget.Intake(intakeId), NotificationAction.TAKE)
+
+        compose.waitUntil(WAIT) {
+            compose.onAllNodesWithText("Прежде чем записать").fetchSemanticsNodes().isNotEmpty()
+        }
+        compose.onNodeWithText("Всё равно принял").assertIsDisplayed()
+        // До ответа не записано ничего: коробка целая.
+        runBlocking {
+            assertEquals(tablets("20"), database.packageRepository().find(PACK)?.quantity)
         }
     }
 }
