@@ -5,11 +5,13 @@ import androidx.activity.ComponentActivity
 import androidx.compose.ui.test.junit4.v2.createAndroidComposeRule
 import androidx.compose.ui.test.onAllNodesWithText
 import androidx.compose.ui.test.onLast
+import android.content.ClipboardManager
 import android.view.WindowManager
 import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
 import androidx.test.ext.junit.runners.AndroidJUnit4
+import androidx.test.platform.app.InstrumentationRegistry
 import com.kert0n.medapp.domain.Unavailability
 import com.kert0n.medapp.domain.medkit.InvitationKey
 import com.kert0n.medapp.presentation.medkit.InvitationPresentationDTO
@@ -192,4 +194,32 @@ class MedKitSharingScreenTest {
         invitation = InvitationPresentationDTO(InvitationKey("K7F-2M9-QX4"), LocalTime.of(15, 30)),
         isFullScreen = isFullScreen
     )
+
+    /**
+     * Код ложится в буфер сам, как только выдан (ТЗ 4.1.1.2, PLAN C1): человек его пересылает, а
+     * не переписывает с экрана по три знака.
+     *
+     * Красная проверка: не копировать — человек диктует ключ голосом или ошибается в одном знаке,
+     * и приглашение не срабатывает без объяснимой причины.
+     */
+    @Test
+    fun theCodeIsInTheClipboardRightAway() {
+        show(shared())
+        compose.waitForIdle()
+
+        val clipboard = runOnUi {
+            compose.activity.getSystemService(ClipboardManager::class.java).primaryClip
+        }
+
+        assertEquals("K7F-2M9-QX4", clipboard?.getItemAt(0)?.text.toString())
+        compose.onNodeWithText("Код скопирован — его можно переслать").assertIsDisplayed()
+    }
+
+    /** Буфер читается с главного потока: система иначе отказывает. */
+    private fun <T> runOnUi(block: () -> T): T {
+        var result: T? = null
+        InstrumentationRegistry.getInstrumentation().runOnMainSync { result = block() }
+        @Suppress("UNCHECKED_CAST")
+        return result as T
+    }
 }

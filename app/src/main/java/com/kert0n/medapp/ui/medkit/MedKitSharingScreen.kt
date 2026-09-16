@@ -26,8 +26,10 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.FilterQuality
 import androidx.compose.foundation.layout.size
@@ -46,6 +48,7 @@ import com.kert0n.medapp.ui.EmptyState
 import com.kert0n.medapp.ui.ErrorMessage
 import com.kert0n.medapp.ui.LoadingState
 import com.kert0n.medapp.ui.SecretOnScreen
+import com.kert0n.medapp.ui.copySecret
 import com.kert0n.medapp.ui.TIME
 import com.kert0n.medapp.ui.text
 
@@ -192,6 +195,11 @@ private fun Shared(
 private fun Code(invitation: InvitationPresentationDTO, onShowFullScreen: () -> Unit) {
     // Ключ на экране — секрет: пока он виден, снимок экрана и показ в недавних запрещены (G3).
     SecretOnScreen()
+    // Код ложится в буфер сам, как только выдан (ТЗ 4.1.1.2, C1 «Текстовый код»): человек его
+    // пересылает, а не переписывает. Ключ — повод: новый код копируется, а поворот экрана нет.
+    val context = LocalContext.current
+    val label = stringResource(R.string.med_kit_sharing_clipboard_label)
+    LaunchedEffect(invitation.key) { context.copySecret(label, invitation.key.value) }
     ElevatedCard(Modifier.fillMaxWidth()) {
         Column(
             modifier = Modifier.padding(16.dp),
@@ -205,6 +213,13 @@ private fun Code(invitation: InvitationPresentationDTO, onShowFullScreen: () -> 
             Text(
                 invitation.key.value,
                 style = MaterialTheme.typography.titleMedium,
+                textAlign = TextAlign.Center,
+                modifier = Modifier.fillMaxWidth()
+            )
+            Text(
+                stringResource(R.string.med_kit_sharing_copied),
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
                 textAlign = TextAlign.Center,
                 modifier = Modifier.fillMaxWidth()
             )

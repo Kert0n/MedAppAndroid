@@ -190,6 +190,8 @@
     <string name="med_kit_sharing_not_shared">Эта аптечка только ваша: сначала сделайте её общей.</string>
     <string name="med_kit_sharing_show_full_screen">Показать во весь экран</string>
     <string name="med_kit_sharing_qr">Код приглашения узором</string>
+    <string name="med_kit_sharing_clipboard_label">Код приглашения в аптечку</string>
+    <string name="med_kit_sharing_copied">Код скопирован — его можно переслать</string>
 
     <!-- Карточка упаковки -->
     <string name="pack_title">Упаковка</string>
