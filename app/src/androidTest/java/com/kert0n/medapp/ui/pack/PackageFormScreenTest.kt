@@ -112,7 +112,7 @@ class PackageFormScreenTest {
         show(adding(suggestions = Suggestions.Unavailable(Unavailability.NO_CONNECTION)))
 
         compose.onNodeWithText("Подсказок нет: Нет связи с сервером. Проверьте подключение.").assertIsDisplayed()
-        compose.onNodeWithText("Сохранить").performScrollTo().performClick()
+        compose.onNodeWithText("Сохранить").performClick()
         assertEquals(1, saved)
     }
 
@@ -145,8 +145,8 @@ class PackageFormScreenTest {
         show(adding(error = PackageFormError.NameEmpty))
 
         compose.onNodeWithText("Название нужно: без него упаковку не найти ни поиском, ни глазами.")
-            .performScrollTo().assertIsDisplayed()
-        compose.onNodeWithText("Сохранить").performScrollTo().performClick()
+            .assertIsDisplayed()
+        compose.onNodeWithText("Сохранить").performClick()
 
         assertEquals(1, saved)
     }
@@ -171,7 +171,7 @@ class PackageFormScreenTest {
         )
 
         compose.onNodeWithText("20 таблетка").performScrollTo().assertIsDisplayed()
-        compose.onNodeWithText("Пересчитать").performScrollTo().performClick()
+        compose.onNodeWithText("Пересчитать").performClick()
 
         assertEquals(1, recounted)
     }
@@ -180,7 +180,7 @@ class PackageFormScreenTest {
     fun cancellingWritesNothing() {
         show(adding())
 
-        compose.onNodeWithText("Отмена").performScrollTo().performClick()
+        compose.onNodeWithText("Отмена").performClick()
 
         assertEquals(1, cancelled)
         assertEquals(0, saved)

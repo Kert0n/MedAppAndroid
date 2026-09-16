@@ -10,9 +10,7 @@ import androidx.compose.foundation.layout.defaultMinSize
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.text.KeyboardOptions
-import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.AssistChip
 import androidx.compose.material3.Button
@@ -55,6 +53,7 @@ import com.kert0n.medapp.presentation.course.CourseFormUiState
 import com.kert0n.medapp.presentation.course.suggestingUnit
 import com.kert0n.medapp.presentation.course.withForm
 import com.kert0n.medapp.ui.DateField
+import com.kert0n.medapp.ui.Form
 import com.kert0n.medapp.ui.ErrorMessage
 import com.kert0n.medapp.ui.LoadingState
 import com.kert0n.medapp.ui.PickerField
@@ -151,12 +150,25 @@ private fun Fields(
 ) {
     val form = state.form
     val field = state.error?.field
-    Column(
-        modifier
-            .fillMaxSize()
-            .verticalScroll(rememberScrollState())
-            .padding(16.dp),
-        verticalArrangement = Arrangement.spacedBy(16.dp)
+    Form(
+        modifier = modifier,
+        actions = {
+            state.error?.let { Text(it.message(), color = MaterialTheme.colorScheme.error) }
+            Button(
+                onClick = onSave,
+                modifier = Modifier.fillMaxWidth().defaultMinSize(minHeight = 48.dp)
+            ) { Text(stringResource(R.string.action_save)) }
+            onStart?.let {
+                FilledTonalButton(
+                    onClick = it,
+                    modifier = Modifier.fillMaxWidth().defaultMinSize(minHeight = 48.dp)
+                ) { Text(stringResource(R.string.course_start_treatment)) }
+            }
+            TextButton(
+                onClick = onBack,
+                modifier = Modifier.fillMaxWidth().defaultMinSize(minHeight = 48.dp)
+            ) { Text(stringResource(R.string.action_cancel)) }
+        }
     ) {
         OutlinedTextField(
             value = form.title,
@@ -244,21 +256,6 @@ private fun Fields(
             supportingText = state.expectedEnd?.let { { Text(stringResource(R.string.course_expected_end, it.format(DAY))) } },
             modifier = Modifier.fillMaxWidth()
         )
-        state.error?.let { Text(it.message(), color = MaterialTheme.colorScheme.error) }
-        Button(
-            onClick = onSave,
-            modifier = Modifier.fillMaxWidth().defaultMinSize(minHeight = 48.dp)
-        ) { Text(stringResource(R.string.action_save)) }
-        onStart?.let {
-            FilledTonalButton(
-                onClick = it,
-                modifier = Modifier.fillMaxWidth().defaultMinSize(minHeight = 48.dp)
-            ) { Text(stringResource(R.string.course_start_treatment)) }
-        }
-        TextButton(
-            onClick = onBack,
-            modifier = Modifier.fillMaxWidth().defaultMinSize(minHeight = 48.dp)
-        ) { Text(stringResource(R.string.action_cancel)) }
     }
 }
 

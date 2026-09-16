@@ -6,9 +6,7 @@ import androidx.compose.foundation.layout.defaultMinSize
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.text.KeyboardOptions
-import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Button
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
@@ -30,6 +28,7 @@ import com.kert0n.medapp.presentation.pack.PackageRecountError
 import com.kert0n.medapp.presentation.pack.PackageRecountPresentationDTO
 import com.kert0n.medapp.presentation.pack.PackageRecountUiState
 import com.kert0n.medapp.ui.EmptyState
+import com.kert0n.medapp.ui.Form
 import com.kert0n.medapp.ui.LoadingState
 import com.kert0n.medapp.ui.text
 
@@ -67,13 +66,22 @@ fun PackageRecountScreen(
         when {
             state.isGone -> EmptyState(text = stringResource(R.string.pack_gone), modifier = Modifier.padding(padding))
             pack == null -> LoadingState(Modifier.padding(padding))
-            else -> Column(
-                Modifier
-                    .padding(padding)
-                    .fillMaxSize()
-                    .verticalScroll(rememberScrollState())
-                    .padding(16.dp),
-                verticalArrangement = Arrangement.spacedBy(16.dp)
+            else -> Form(
+                modifier = Modifier.padding(padding),
+                actions = {
+                    state.error?.let {
+                        Text(it.message(), color = MaterialTheme.colorScheme.error, style = MaterialTheme.typography.bodyMedium)
+                    }
+                    // Кнопка не гаснет: погашенная не объясняет, чего не хватает (H3 №3).
+                    Button(
+                        onClick = onSubmit,
+                        modifier = Modifier.fillMaxWidth().defaultMinSize(minHeight = 48.dp)
+                    ) { Text(stringResource(R.string.recount_record)) }
+                    TextButton(
+                        onClick = onCancel,
+                        modifier = Modifier.fillMaxWidth().defaultMinSize(minHeight = 48.dp)
+                    ) { Text(stringResource(R.string.action_cancel)) }
+                }
             ) {
                 Text(
                     stringResource(R.string.recount_now, pack.effective.amount, pack.effective.unit.name),
@@ -89,18 +97,6 @@ fun PackageRecountScreen(
                     keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
                     modifier = Modifier.fillMaxWidth()
                 )
-                state.error?.let {
-                    Text(it.message(), color = MaterialTheme.colorScheme.error, style = MaterialTheme.typography.bodyMedium)
-                }
-                // Кнопка не гаснет: погашенная не объясняет, чего не хватает (H3 №3).
-                Button(
-                    onClick = onSubmit,
-                    modifier = Modifier.fillMaxWidth().defaultMinSize(minHeight = 48.dp)
-                ) { Text(stringResource(R.string.recount_record)) }
-                TextButton(
-                    onClick = onCancel,
-                    modifier = Modifier.fillMaxWidth().defaultMinSize(minHeight = 48.dp)
-                ) { Text(stringResource(R.string.action_cancel)) }
             }
         }
     }

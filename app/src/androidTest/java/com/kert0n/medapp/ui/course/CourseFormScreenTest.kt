@@ -74,15 +74,17 @@ class CourseFormScreenTest {
         expectedEnd = expectedEnd
     )
 
-    /** Кнопка не гаснет: нажатие с пустым названием — названная причина, а не молчание. */
+    /**
+     * Кнопка не гаснет: нажатие с пустым названием — названная причина, а не молчание. Отказ и
+     * кнопка стоят подвалом, и долистывать до них больше не приходится (H3 «Дизайн»).
+     */
     @Test
     fun theSaveButtonStaysAliveAndTheRefusalNamesItsField() {
         show(editing(error = CourseFormError.Input.TITLE_EMPTY))
 
         // На 360 dp и при крупном шрифте отказ лежит ниже сгиба: до него долистывают, как и до кнопки.
-        compose.onNodeWithText("Название нужно: без него лечение не отличить от других.")
-            .performScrollTo().assertIsDisplayed()
-        compose.onNodeWithText("Сохранить").performScrollTo().performClick()
+        compose.onNodeWithText("Название нужно: без него лечение не отличить от других.").assertIsDisplayed()
+        compose.onNodeWithText("Сохранить").performClick()
 
         assertEquals(1, saved)
     }
@@ -146,7 +148,7 @@ class CourseFormScreenTest {
     fun aScenarioRefusalIsSaidInWords() {
         show(editing(error = CourseFormError.Rejected(CourseRejected.Reason.SCHEDULE_MISSING)))
 
-        compose.onNodeWithText("Чтобы начать, укажите расписание.").performScrollTo().assertIsDisplayed()
+        compose.onNodeWithText("Чтобы начать, укажите расписание.").assertIsDisplayed()
     }
 
     @Test
@@ -225,7 +227,7 @@ class CourseFormScreenTest {
     fun cancelLeavesThroughTheForm() {
         show(editing(mode = CourseFormUiState.Mode.UNASKED_DRAFT))
 
-        compose.onNodeWithText("Отмена").performScrollTo().performClick()
+        compose.onNodeWithText("Отмена").performClick()
 
         assertEquals(1, left)
     }

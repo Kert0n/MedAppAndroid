@@ -9,8 +9,6 @@ import androidx.compose.foundation.layout.defaultMinSize
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Button
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
@@ -38,6 +36,7 @@ import com.kert0n.medapp.presentation.pack.PackageFormUiState
 import com.kert0n.medapp.presentation.pack.Suggestions
 import com.kert0n.medapp.presentation.pack.TemplatePresentationDTO
 import com.kert0n.medapp.ui.DateField
+import com.kert0n.medapp.ui.Form
 import com.kert0n.medapp.ui.PickerField
 import com.kert0n.medapp.ui.text
 
@@ -82,13 +81,19 @@ fun PackageFormScreen(
             )
         }
     ) { padding ->
-        Column(
-            Modifier
-                .padding(padding)
-                .fillMaxSize()
-                .verticalScroll(rememberScrollState())
-                .padding(16.dp),
-            verticalArrangement = Arrangement.spacedBy(16.dp)
+        Form(
+            modifier = Modifier.padding(padding),
+            actions = {
+                state.error?.let { Text(it.message(), color = MaterialTheme.colorScheme.error) }
+                Button(
+                    onClick = onSave,
+                    modifier = Modifier.fillMaxWidth().defaultMinSize(minHeight = 48.dp)
+                ) { Text(stringResource(R.string.action_save)) }
+                TextButton(
+                    onClick = onCancel,
+                    modifier = Modifier.fillMaxWidth().defaultMinSize(minHeight = 48.dp)
+                ) { Text(stringResource(R.string.action_cancel)) }
+            }
         ) {
             if (state.isEditing) {
                 // Аптечка и количество показаны, но не правятся: их меняют перенос и пересчёт.
@@ -232,15 +237,6 @@ fun PackageFormScreen(
                 onPick = { onEdit(form.copy(openedOn = it)) }
             )
 
-            state.error?.let { Text(it.message(), color = MaterialTheme.colorScheme.error) }
-            Button(
-                onClick = onSave,
-                modifier = Modifier.fillMaxWidth().defaultMinSize(minHeight = 48.dp)
-            ) { Text(stringResource(R.string.action_save)) }
-            TextButton(
-                onClick = onCancel,
-                modifier = Modifier.fillMaxWidth().defaultMinSize(minHeight = 48.dp)
-            ) { Text(stringResource(R.string.action_cancel)) }
         }
     }
 }
