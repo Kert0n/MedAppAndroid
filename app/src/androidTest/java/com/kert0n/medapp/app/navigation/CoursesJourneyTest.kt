@@ -70,6 +70,13 @@ class CoursesJourneyTest {
      */
     private val WAIT = 5_000L
 
+    /**
+     * Зона у завязки и у приложения **одна**: приложение живёт на часах устройства, и день оно
+     * считает по ним. Разойдись они — коробка со сроком «сегодня» досталась бы приложению
+     * вчерашней (замечание разбора #54).
+     */
+    private val zone: ZoneId = ZoneId.systemDefault()
+
     @Before
     fun setUp() {
         // Начало лечения спрашивает разрешение на уведомления, и системный диалог закрыл бы окно.
@@ -160,7 +167,7 @@ class CoursesJourneyTest {
                 listOf(
                     CourseDrafting.Edit.SetDose(dose("2")),
                     CourseDrafting.Edit.SetForm(TABLET_FORM),
-                    CourseDrafting.Edit.SetSchedule(schedule(start = LocalDate.now(MOSCOW))),
+                    CourseDrafting.Edit.SetSchedule(schedule(start = LocalDate.now(zone))),
                     CourseDrafting.Edit.SetTotalDoses(Doses(4))
                 )
             )

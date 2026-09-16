@@ -63,6 +63,13 @@ class NotificationRoutingTest {
 
     private val WAIT = 5_000L
 
+    /**
+     * Зона у завязки и у приложения **одна**: приложение живёт на часах устройства, и день оно
+     * считает по ним. Разойдись они — коробка со сроком «сегодня» досталась бы приложению
+     * вчерашней (замечание разбора #54).
+     */
+    private val zone: ZoneId = ZoneId.systemDefault()
+
     @Before
     fun setUp() {
         allowNotifications()
@@ -100,7 +107,7 @@ class NotificationRoutingTest {
             listOf(
                 CourseDrafting.Edit.SetDose(dose("2")),
                 CourseDrafting.Edit.SetForm(TABLET_FORM),
-                CourseDrafting.Edit.SetSchedule(schedule(start = LocalDate.now(MOSCOW))),
+                CourseDrafting.Edit.SetSchedule(schedule(start = LocalDate.now(zone))),
                 CourseDrafting.Edit.SetTotalDoses(Doses(4)),
                 CourseDrafting.Edit.Attach(PACK, Doses(4))
             )
@@ -140,7 +147,7 @@ class NotificationRoutingTest {
     fun theDigestOpensTheDayItself() {
         started()
 
-        open(NotificationTarget.DayPlan(LocalDate.now(MOSCOW)))
+        open(NotificationTarget.DayPlan(LocalDate.now(zone)))
         compose.waitUntil(WAIT) {
             compose.onAllNodesWithText("сегодня", substring = true).fetchSemanticsNodes().isNotEmpty()
         }

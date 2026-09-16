@@ -72,6 +72,13 @@ class DayOfIntakesStoryTest {
     /** Ожидание с запасом: история ждёт состояния из базы, и секунды по умолчанию на это не хватает. */
     private val WAIT = 5_000L
 
+    /**
+     * Зона у завязки и у приложения **одна**: приложение живёт на часах устройства, и день оно
+     * считает по ним. Разойдись они — коробка со сроком «сегодня» досталась бы приложению
+     * вчерашней (замечание разбора #54).
+     */
+    private val zone: ZoneId = ZoneId.systemDefault()
+
     @Before
     fun setUp() {
         hilt.inject()
@@ -111,7 +118,7 @@ class DayOfIntakesStoryTest {
                 CourseDrafting.Edit.SetForm(TABLET_FORM),
                 CourseDrafting.Edit.SetSchedule(
                     schedule(
-                        start = LocalDate.now(MOSCOW),
+                        start = LocalDate.now(zone),
                         times = listOf(LocalTime.of(9, 0), LocalTime.of(21, 0))
                     )
                 ),

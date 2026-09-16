@@ -162,7 +162,7 @@
     <string name="med_kit_remove_throw_away">Убрать вместе с лекарствами</string>
     <string name="med_kit_remove_move">Перенести и убрать</string>
     <string name="med_kit_remove_throw_away_consequence">Аптечка и всё, что в ней лежит, исчезнут</string>
-    <string name="med_kit_remove_move_consequence">Выберете, куда переложить лекарства</string>
+    <string name="med_kit_remove_move_consequence">Выберите, куда переложить лекарства</string>
     <string name="med_kit_remove_empty_consequence">Убирать нечего — аптечка пуста</string>
     <string name="med_kit_remove_affects_courses">Источники потеряют: %1$s. Сами лечения останутся.</string>
     <string name="med_kit_leave">Выйти и оставить остальным</string>
@@ -230,6 +230,8 @@
     <string name="sync_all_delivered">Всё доехало</string>
     <string name="sync_recount">Пересчитать коробку</string>
     <string name="sync_dismiss">Разобрал</string>
+    <string name="sync_dismiss_gone">Этой строки уже нет — её закрыл обмен с сервером.</string>
+    <string name="sync_dismiss_not_awaiting">Здесь нечего разбирать: строка ждёт отправки или уже применена.</string>
     <string name="sync_waiting">Отправится, когда будет связь</string>
     <string name="sync_retry_at">Повторим в %1$s</string>
     <string name="sync_refused">Сервер отказал</string>

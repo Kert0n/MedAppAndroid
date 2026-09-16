@@ -32,11 +32,15 @@ class SyncStatusViewModel @Inject constructor(
 
     private val working = MutableStateFlow(false)
 
+    private val message = MutableStateFlow<DismissMessage?>(null)
+
     val state: StateFlow<SyncStatusUiState> =
-        combine(operations.observeTroubles(), refreshing.state, working) { troubles, sync, working ->
+        combine(operations.observeTroubles(), refreshing.state, working, message) { troubles, sync, working, message ->
             SyncStatusUiState(
                 rows = troubles.map { it.toPresentationDTO() },
                 isRunning = sync.isRunning || working,
+                isWorking = working,
+                message = message,
                 refreshedAt = sync.refreshedAt,
                 isOffline = sync.isOffline,
                 isLoaded = true
@@ -59,16 +63,45 @@ class SyncStatusViewModel @Inject constructor(
         }
     }
 
-    /** Разобрал: строка уходит с экрана, но не из базы. */
+    /**
+     * Разобрал: строка уходит с экрана, но не из базы. Второе нажатие, пока идёт первое, ничего
+     * не делает — признак работы ставится до обращения к сценарию.
+     */
     fun dismiss(operationId: Uuid) {
-        viewModelScope.launch { dismissing.dismiss(operationId) }
+        if (working.value) return
+        working.value = true
+        viewModelScope.launch {
+            try {
+                // Каждый исход сказан, а не проглочен: «разобрано» видно тем, что строка ушла, а
+                // два других человеку объясняются — иначе нажатие выглядит бездействием.
+                message.value = when (dismissing.dismiss(operationId)) {
+                    OperationDismissing.Outcome.DISMISSED -> null
+                    OperationDismissing.Outcome.GONE -> DismissMessage.GONE
+                    OperationDismissing.Outcome.NOT_AWAITING_DECISION -> DismissMessage.NOT_AWAITING_DECISION
+                }
+            } finally {
+                working.value = false
+            }
+        }
+    }
+
+    /** Сказанное о разборе прочитано человеком. */
+    fun dismissMessage() {
+        message.value = null
     }
 }
+
+/** Чем кончился разбор, если строка ушла не по нашей воле (PLAN H3 №28). */
+enum class DismissMessage { GONE, NOT_AWAITING_DECISION }
 
 /** Что показывает экран состояния синхронизации. */
 data class SyncStatusUiState(
     val rows: List<OutstandingOperationPresentationDTO> = emptyList(),
     val isRunning: Boolean = false,
+    /** Идёт наше действие — обновление или разбор: второго поверх него не начинают. */
+    val isWorking: Boolean = false,
+    /** Чем кончился разбор, если сказать есть что. */
+    val message: DismissMessage? = null,
     val refreshedAt: Instant? = null,
     /** Связи нет — это не ошибка: очередь цела, ей просто некуда ехать (PLAN H3 №28). */
     val isOffline: Boolean = false,

@@ -51,8 +51,11 @@ class MedKitJoiningViewModel @Inject constructor(
     }
 
     private suspend fun enter(key: InvitationKey) {
+        val outcome = joining.join(key)
+        // Состояние читается **после** ответа: поле кода во время запроса не гаснет, и
+        // набранное за это время затирать нельзя (PLAN U1 «ввод не затирается»).
         val now = _state.value
-        _state.value = when (val outcome = joining.join(key)) {
+        _state.value = when (outcome) {
             is MedKitJoining.Outcome.Joined -> now.copy(isWorking = false, joined = outcome.medKitId)
             // Уже в полке — не беда и не отказ по делу: полка у человека есть, и сказать об этом
             // честнее, чем молча ничего не сделать (PLAN E4).

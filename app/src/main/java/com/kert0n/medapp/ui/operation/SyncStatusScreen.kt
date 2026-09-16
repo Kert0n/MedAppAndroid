@@ -29,8 +29,9 @@ import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import com.kert0n.medapp.R
-import com.kert0n.medapp.presentation.operation.SyncStatusUiState
+import com.kert0n.medapp.presentation.operation.DismissMessage
 import com.kert0n.medapp.presentation.operation.OutstandingOperationPresentationDTO
+import com.kert0n.medapp.presentation.operation.SyncStatusUiState
 import com.kert0n.medapp.ui.EmptyState
 import com.kert0n.medapp.ui.LoadingState
 import com.kert0n.medapp.ui.TIME
@@ -52,6 +53,7 @@ fun SyncStatusScreen(
     onRefresh: () -> Unit,
     onRecount: (Uuid) -> Unit,
     onDismiss: (Uuid) -> Unit,
+    onDismissMessage: () -> Unit,
     onBack: () -> Unit,
     modifier: Modifier = Modifier,
     zone: ZoneId = ZoneId.systemDefault()
@@ -83,6 +85,21 @@ fun SyncStatusScreen(
         Column(Modifier.padding(padding).fillMaxSize()) {
             if (state.isRunning) LinearProgressIndicator(Modifier.fillMaxWidth())
             Headline(state, zone)
+            // Исход разбора сказан, а не проглочен: строка, ушедшая не по нашей воле, иначе
+            // выглядела бы бездействием кнопки.
+            state.message?.let { message ->
+                Row(
+                    Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 8.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Text(
+                        stringResource(message.text),
+                        color = MaterialTheme.colorScheme.error,
+                        modifier = Modifier.weight(1f)
+                    )
+                    TextButton(onClick = onDismissMessage) { Text(stringResource(R.string.action_got_it)) }
+                }
+            }
             when {
                 !state.isLoaded -> LoadingState()
                 state.isEmpty -> EmptyState(stringResource(R.string.sync_all_delivered))
@@ -91,7 +108,13 @@ fun SyncStatusScreen(
                     verticalArrangement = Arrangement.spacedBy(12.dp)
                 ) {
                     items(state.rows, key = { it.id }) { row ->
-                        Trouble(row, onRecount = { onRecount(it) }, onDismiss = { onDismiss(row.id) }, zone = zone)
+                        Trouble(
+                            row,
+                            isWorking = state.isWorking,
+                            onRecount = { onRecount(it) },
+                            onDismiss = { onDismiss(row.id) },
+                            zone = zone
+                        )
                     }
                 }
             }
@@ -133,6 +156,7 @@ private fun Headline(state: SyncStatusUiState, zone: ZoneId) {
 @Composable
 private fun Trouble(
     row: OutstandingOperationPresentationDTO,
+    isWorking: Boolean,
     onRecount: (Uuid) -> Unit,
     onDismiss: () -> Unit,
     zone: ZoneId
@@ -165,7 +189,7 @@ private fun Trouble(
                 }
             }
             if (bad) {
-                TextButton(onClick = onDismiss, modifier = Modifier.fillMaxWidth()) {
+                TextButton(onClick = onDismiss, enabled = !isWorking, modifier = Modifier.fillMaxWidth()) {
                     Icon(painterResource(R.drawable.ic_check_circle), contentDescription = null)
                     Spacer(Modifier.size(8.dp))
                     Text(stringResource(R.string.sync_dismiss), modifier = Modifier.weight(1f))
@@ -217,3 +241,10 @@ private val OutstandingOperationPresentationDTO.Reason.text: Int
         OutstandingOperationPresentationDTO.Reason.UNREADABLE -> R.string.sync_unreadable
     }
 
+/** Слова исхода — его свойство: экран не выбирает, какими словами называть неудачу. */
+@get:StringRes
+private val DismissMessage.text: Int
+    get() = when (this) {
+        DismissMessage.GONE -> R.string.sync_dismiss_gone
+        DismissMessage.NOT_AWAITING_DECISION -> R.string.sync_dismiss_not_awaiting
+    }

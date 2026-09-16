@@ -566,6 +566,7 @@ private fun screens(stacks: TabStacks, planMode: MutableState<PlanMode>) = entry
             // (REQ-045): второго места для одного дела не заводится.
             onRecount = { stacks.go(Screen.PackageRecount(it)) },
             onDismiss = model::dismiss,
+            onDismissMessage = model::dismissMessage,
             onBack = stacks::back
         )
     }

@@ -1,11 +1,13 @@
 package com.kert0n.medapp.ui.operation
 
 import androidx.compose.ui.test.assertIsDisplayed
+import androidx.compose.ui.test.assertIsNotEnabled
 import androidx.compose.ui.test.junit4.v2.createComposeRule
 import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
 import androidx.test.ext.junit.runners.AndroidJUnit4
+import com.kert0n.medapp.presentation.operation.DismissMessage
 import com.kert0n.medapp.presentation.operation.OutstandingOperationPresentationDTO
 import com.kert0n.medapp.presentation.operation.SyncStatusUiState
 import com.kert0n.medapp.ui.theme.MedAppTheme
@@ -30,6 +32,7 @@ class SyncStatusScreenTest {
     private var refreshed = 0
     private var recounted: Uuid? = null
     private var dismissed: Uuid? = null
+    private var messageRead = 0
 
     private val pack = Uuid.random()
 
@@ -41,6 +44,7 @@ class SyncStatusScreenTest {
                     onRefresh = { refreshed++ },
                     onRecount = { recounted = it },
                     onDismiss = { dismissed = it },
+                    onDismissMessage = { messageRead++ },
                     onBack = {},
                     zone = ZoneOffset.UTC
                 )
@@ -147,5 +151,27 @@ class SyncStatusScreenTest {
 
         compose.onNodeWithText("Всё доехало").assertIsDisplayed()
         compose.onNodeWithText("Последний обмен в 14:02").assertIsDisplayed()
+    }
+
+    /**
+     * Исход разбора сказан, а не проглочен: строку мог закрыть обмен, пока человек до неё
+     * добирался, и тогда нажатие выглядело бы бездействием кнопки.
+     */
+    @Test
+    fun theOutcomeOfDismissingIsSaid() {
+        show(SyncStatusUiState(rows = listOf(unreadable()), message = DismissMessage.GONE, isLoaded = true))
+
+        compose.onNodeWithText("Этой строки уже нет — её закрыл обмен с сервером.").assertIsDisplayed()
+        compose.onNodeWithText("Понятно").performClick()
+
+        assertEquals(1, messageRead)
+    }
+
+    /** Пока разбор идёт, второй его не начинают: кнопка гаснет до ответа сценария. */
+    @Test
+    fun aSecondTapDoesNotStartASecondDismissal() {
+        show(SyncStatusUiState(rows = listOf(unreadable()), isWorking = true, isLoaded = true))
+
+        compose.onNodeWithText("Разобрал").assertIsNotEnabled()
     }
 }
