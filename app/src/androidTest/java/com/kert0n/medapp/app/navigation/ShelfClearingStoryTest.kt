@@ -189,7 +189,8 @@ class ShelfClearingStoryTest {
         runBlocking { server.synchronization(database, world.clock).synchronize() }
         back()
         compose.waitUntil(WAIT) { shown(EXPIRY) && !shown("Лоратадин") }
-        compose.onNodeWithText("Уголь").assertExists()
+        // Уголь остался: на крупном шрифте он ниже видимой части списка — к нему листают.
+        popupList().performScrollToNode(hasClickAction() and hasText("Уголь"))
     }
 
     /**
