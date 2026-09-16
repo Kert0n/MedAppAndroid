@@ -279,6 +279,8 @@
     <string name="intake_card_gone">Этого приёма больше нет</string>
     <string name="intake_planned">Назначено на %1$s в %2$s: %3$s</string>
     <string name="intake_from_package">Из коробки: %1$s</string>
+    <string name="intake_source">Из какой коробки</string>
+    <string name="intake_no_sources">У лечения нет подключённых коробок</string>
     <string name="intake_amount">Сколько принято</string>
     <string name="intake_taken_on">В какой день</string>
     <string name="intake_taken_at">В котором часу</string>

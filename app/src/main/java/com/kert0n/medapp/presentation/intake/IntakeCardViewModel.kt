@@ -2,6 +2,7 @@ package com.kert0n.medapp.presentation.intake
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.kert0n.medapp.domain.course.CourseSource
 import com.kert0n.medapp.domain.intake.IntakeProjection
 import com.kert0n.medapp.domain.intake.IntakeStatus
 import com.kert0n.medapp.domain.value.Dose
@@ -66,17 +67,21 @@ class IntakeCardViewModel @AssistedInject constructor(
 
     private val writing = MutableStateFlow(Writing())
 
+    private val episode = combine(courses.observeRecord(courseId), courses.observePlan(courseId)) { record, plan ->
+        record to plan
+    }
+
     val state: StateFlow<IntakeCardUiState> = combine(
-        courses.observeRecord(courseId),
+        episode,
         intakes.observeOfCourse(courseId),
         today.observe(),
         typed,
         writing
-    ) { record, intakes, day, typed, writing ->
+    ) { (record, plan), intakes, day, typed, writing ->
         val intake = intakes.filterIsInstance<IntakeProjection.Scheduled>().firstOrNull { it.id == intakeId }
         // Пункта нет — расписание перестроили, пока карточку держали открытой: показывать нечего.
         if (record == null || intake == null) IntakeCardUiState(isGone = true)
-        else intake.card(record.title, day.zone, typed, writing)
+        else intake.card(record.title, plan?.sources.orEmpty(), day.zone, typed, writing)
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), IntakeCardUiState(isLoading = true))
 
     fun edit(form: IntakeCardPresentationDTO) {
@@ -148,6 +153,7 @@ class IntakeCardViewModel @AssistedInject constructor(
      */
     private fun IntakeProjection.Scheduled.card(
         title: String,
+        sources: List<CourseSource>,
         zone: ZoneId,
         typed: IntakeCardPresentationDTO?,
         writing: Writing
@@ -155,18 +161,24 @@ class IntakeCardViewModel @AssistedInject constructor(
         // «Сейчас» — по часам приложения, а не по системным: иначе проверка живёт в одном времени,
         // а карточка в другом, и записанный момент разойдётся с тем, что считает сценарий.
         val nowHere = clock.instant().atZone(zone)
+        // Принять можно из любого источника лечения: «беру из этой пачки» решается в момент
+        // записи, а не при постройке плана (PLAN D6). Отключённый источник — не источник.
+        val usable = sources.filter { it.fault == null }.map { IntakeSourcePresentationDTO(it.pkg.id, it.pkg.name) }
+        val chosen = typed?.packageId?.takeIf { id -> usable.any { it.id == id } } ?: plannedPackage?.id
         return IntakeCardUiState(
             title = title,
             plannedOn = slot.localDate,
             plannedAt = slot.at.atZone(zone).toLocalTime(),
-            packageId = plannedPackage?.id,
-            packageName = plannedPackage?.name,
+            packageId = chosen,
+            packageName = usable.firstOrNull { it.id == chosen }?.name ?: plannedPackage?.name,
+            sources = usable,
             plannedAmount = plannedAmount.quantity.toPresentationDTO(),
             unit = plannedAmount.unit.toPresentationDTO(),
             form = typed ?: IntakeCardPresentationDTO(
                 amount = plannedAmount.quantity.toPresentationDTO().amount,
                 on = nowHere.toLocalDate(),
-                at = nowHere.toLocalTime().withSecond(0).withNano(0)
+                at = nowHere.toLocalTime().withSecond(0).withNano(0),
+                packageId = plannedPackage?.id
             ),
             answer = when (status) {
                 IntakeStatus.PLANNED -> null

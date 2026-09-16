@@ -1,6 +1,8 @@
 package com.kert0n.medapp.ui.intake
 
+import androidx.compose.ui.test.assertCountEquals
 import androidx.compose.ui.test.assertIsDisplayed
+import androidx.compose.ui.test.onAllNodesWithText
 import androidx.compose.ui.test.junit4.v2.createComposeRule
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
@@ -9,11 +11,13 @@ import com.kert0n.medapp.fixture.TABLETS
 import com.kert0n.medapp.presentation.intake.IntakeCardPresentationDTO
 import com.kert0n.medapp.presentation.intake.IntakeCardUiState
 import com.kert0n.medapp.presentation.intake.IntakeQuestionPresentationDTO
+import com.kert0n.medapp.presentation.intake.IntakeSourcePresentationDTO
 import com.kert0n.medapp.presentation.value.QuantityPresentationDTO
 import com.kert0n.medapp.presentation.value.toPresentationDTO
 import com.kert0n.medapp.ui.theme.MedAppTheme
 import java.time.LocalDate
 import java.time.LocalTime
+import kotlin.uuid.Uuid
 import org.junit.Assert.assertEquals
 import org.junit.Rule
 import org.junit.Test
@@ -28,6 +32,9 @@ class IntakeCardScreenTest {
 
     @get:Rule
     val compose = createComposeRule()
+
+    private val NUROFEN = Uuid.parse("00000000-0000-4000-8000-0000000000b1")
+    private val IBUPROFEN = Uuid.parse("00000000-0000-4000-8000-0000000000b2")
 
     private var confirmed = 0
     private var acknowledged = 0
@@ -56,7 +63,12 @@ class IntakeCardScreenTest {
         title = "Нурофен",
         plannedOn = LocalDate.of(2027, 3, 10),
         plannedAt = LocalTime.of(9, 0),
+        packageId = NUROFEN,
         packageName = "Нурофен",
+        sources = listOf(
+            IntakeSourcePresentationDTO(NUROFEN, "Нурофен"),
+            IntakeSourcePresentationDTO(IBUPROFEN, "Ибупрофен")
+        ),
         plannedAmount = QuantityPresentationDTO("2", TABLETS.toPresentationDTO()),
         unit = TABLETS.toPresentationDTO(),
         form = IntakeCardPresentationDTO("2", LocalDate.of(2027, 3, 10), LocalTime.of(9, 12)),
@@ -71,7 +83,10 @@ class IntakeCardScreenTest {
         show(waiting())
 
         compose.onNodeWithText("Назначено на 10.03.2027 в 09:00: 2 таблетка").assertIsDisplayed()
-        compose.onNodeWithText("Из коробки: Нурофен").assertIsDisplayed()
+        // Коробка выбирается из источников лечения, и плановая стоит выбранной. Имя «Нурофен»
+        // здесь и в заголовке, и в поле, поэтому спрашивается само поле, а не текст вообще.
+        compose.onNodeWithText("Из какой коробки").assertIsDisplayed()
+        compose.onAllNodesWithText("Нурофен").assertCountEquals(2)
         compose.onNodeWithText("Принял").performClick()
         assertEquals(1, confirmed)
     }
@@ -107,6 +122,8 @@ class IntakeCardScreenTest {
 
         compose.onNodeWithText("принят в 09:12").assertIsDisplayed()
         compose.onNodeWithText("Принял").assertDoesNotExist()
+        // Выбирать отвеченному нечего: он говорит, откуда взяли на самом деле.
+        compose.onNodeWithText("Из коробки: Нурофен").assertIsDisplayed()
     }
 
     /** Пункта больше нет — сказано словами: пустая карточка читается как поломка. */

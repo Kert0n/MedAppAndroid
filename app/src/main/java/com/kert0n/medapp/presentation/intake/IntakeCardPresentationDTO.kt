@@ -19,7 +19,8 @@ import kotlin.uuid.Uuid
 data class IntakeCardPresentationDTO(
     val amount: String = "",
     val on: LocalDate? = null,
-    val at: LocalTime? = null
+    val at: LocalTime? = null,
+    val packageId: Uuid? = null
 )
 
 /**
@@ -37,6 +38,7 @@ data class IntakeCardUiState(
     val plannedAt: LocalTime? = null,
     val packageId: Uuid? = null,
     val packageName: String? = null,
+    val sources: List<IntakeSourcePresentationDTO> = emptyList(),
     val plannedAmount: QuantityPresentationDTO? = null,
     val unit: UnitPresentationDTO? = null,
     val form: IntakeCardPresentationDTO = IntakeCardPresentationDTO(),
@@ -59,6 +61,12 @@ data class IntakeCardUiState(
     val canAnswer: Boolean
         get() = !isWriting && !isGone && (answer == null || answer == Answer.MISSED)
 }
+
+/**
+ * Коробка, из которой можно принять этот пункт: источник лечения. Чужая сюда не попадает — приём
+ * из неё пункта не закрывает, это внеплановый факт (PLAN D5).
+ */
+data class IntakeSourcePresentationDTO(val id: Uuid, val name: String)
 
 /** Вопрос сценария словами экрана: ответ на него — тот же приём, подтверждённый человеком. */
 sealed interface IntakeQuestionPresentationDTO {

@@ -32,6 +32,7 @@ import com.kert0n.medapp.presentation.intake.IntakeCardError
 import com.kert0n.medapp.presentation.intake.IntakeCardPresentationDTO
 import com.kert0n.medapp.presentation.intake.IntakeCardUiState
 import com.kert0n.medapp.presentation.intake.IntakeQuestionPresentationDTO
+import com.kert0n.medapp.ui.PickerField
 import com.kert0n.medapp.ui.DAY
 import com.kert0n.medapp.ui.DateField
 import com.kert0n.medapp.ui.ErrorMessage
@@ -109,8 +110,23 @@ private fun Card(
     fields = {
         // Что назначено: по этому человек и узнаёт пункт, к которому пришёл.
         Text(state.plannedWords(), style = MaterialTheme.typography.bodyLarge)
-        state.packageName?.let { Text(stringResource(R.string.intake_from_package, it)) }
         state.answer?.let { Text(state.answerWords(it), color = MaterialTheme.colorScheme.primary) }
+
+        // Из какой коробки взяли: любая из источников лечения законна, а чужая пункт не закрывает
+        // и здесь не предлагается (H3 №18, PLAN D5). У отвеченного пункта выбирать уже нечего —
+        // он говорит, откуда взяли на самом деле.
+        if (state.canAnswer) {
+            PickerField(
+                label = stringResource(R.string.intake_source),
+                selected = state.sources.firstOrNull { it.id == state.packageId },
+                options = state.sources,
+                optionText = { it.name },
+                onPick = { onEdit(state.form.copy(packageId = it.id)) },
+                emptyText = stringResource(R.string.intake_no_sources)
+            )
+        } else {
+            state.packageName?.let { Text(stringResource(R.string.intake_from_package, it)) }
+        }
 
         OutlinedTextField(
             value = state.form.amount,

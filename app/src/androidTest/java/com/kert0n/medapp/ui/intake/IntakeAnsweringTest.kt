@@ -8,8 +8,10 @@ import com.kert0n.medapp.domain.intake.IntakeStatus
 import com.kert0n.medapp.domain.pack.ExpiryDate
 import com.kert0n.medapp.domain.value.Doses
 import com.kert0n.medapp.feature.course.CourseDrafting
+import com.kert0n.medapp.feature.course.SourceEditing
 import com.kert0n.medapp.feature.plan.DayPlanning
 import com.kert0n.medapp.feature.time.Today
+import com.kert0n.medapp.fixture.OTHER_PACK
 import com.kert0n.medapp.fixture.PACK
 import com.kert0n.medapp.fixture.QuietClock
 import com.kert0n.medapp.fixture.Scenarios
@@ -124,6 +126,23 @@ class IntakeAnsweringTest {
     }
 
     /** Первый пункт лечения — по времени, а не по номеру: сегодняшний, тот, на который отвечают. */
+    /** То же лечение, но коробок у него две: вторая — та, из которой человек возьмёт на самом деле. */
+    private suspend fun startedWithTwoSources(): Uuid {
+        database.packageRepository().add(
+            pack(id = OTHER_PACK, name = "Ибупрофен", quantity = tablets("10"), form = TABLET_FORM)
+        )
+        val courseId = started()
+        val plan = requireNotNull(database.courseRepository().findPlan(courseId))
+        scenarios.sourceEditing.save(
+            courseId, plan.revision,
+            listOf(
+                SourceEditing.Source(PACK, Doses(2)),
+                SourceEditing.Source(OTHER_PACK, Doses(2))
+            )
+        )
+        return courseId
+    }
+
     private suspend fun firstIntake(courseId: Uuid) = database.intakeRepository().ofCourse(courseId)
         .filterIsInstance<CourseIntake>()
         .minBy { it.slot.at }
@@ -238,6 +257,28 @@ class IntakeAnsweringTest {
         }
 
         assertEquals(IntakeStatus.TAKEN, database.intakeRepository().find(intakeId)?.status)
+    }
+
+    /**
+     * Принять можно из **другой коробки лечения**: «беру из этой пачки» решается в момент записи,
+     * а не при постройке плана (PLAN D6). Расход идёт из выбранной, плановая остаётся целой.
+     */
+    @Test
+    fun theIntakeIsTakenFromTheChosenSourceOfTheCourse() = runBlocking {
+        val courseId = startedWithTwoSources()
+        val intakeId = firstIntake(courseId).id
+        val model = cardModel(courseId, intakeId)
+
+        watching(model.state) { state ->
+            val shown = state.awaiting(PATIENTLY) { it.sources.size == 2 }
+            model.edit(shown.form.copy(packageId = OTHER_PACK))
+            state.awaiting(PATIENTLY) { it.packageId == OTHER_PACK }
+            model.confirm()
+            state.awaiting(PATIENTLY) { it.isDone }
+        }
+
+        assertEquals(tablets("20"), database.packageRepository().find(PACK)?.quantity)
+        assertEquals(tablets("8"), database.packageRepository().find(OTHER_PACK)?.quantity)
     }
 
     /** Отвеченный пункт карточка показывает, а не спрашивает: ответ на приём даётся один раз. */
