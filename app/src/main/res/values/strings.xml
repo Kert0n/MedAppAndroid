@@ -270,6 +270,7 @@
     <string name="plan_day_tomorrow">завтра</string>
     <string name="plan_day_also">Ещё в этот день</string>
     <string name="plan_unannounced">О чём не смогли напомнить</string>
+    <string name="intake_acknowledge_miss">Понятно</string>
     <string name="expiry_today_title">Сегодня истекает срок годности</string>
     <string name="expiry_today_close">Закрыть</string>
     <string name="expiry_today_until">годен до %1$s</string>

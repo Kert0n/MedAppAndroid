@@ -69,6 +69,7 @@ fun DayPages(
     onOpen: (DayItemPresentationDTO) -> Unit,
     onConfirm: (Uuid) -> Unit,
     onDecline: (Uuid) -> Unit,
+    onAcknowledge: (Uuid) -> Unit,
     onDismissMessage: () -> Unit,
     onFixNotifications: () -> Unit,
     onFixAlarms: () -> Unit,
@@ -77,7 +78,7 @@ fun DayPages(
     val pager = rememberPagerState(pageCount = { DAYS_AHEAD + 1 })
     HorizontalPager(state = pager, modifier = modifier.fillMaxSize()) { daysAhead ->
         val state = page(daysAhead)
-        DayPage(state, permissions, onOpen, onConfirm, onDecline, onFixNotifications, onFixAlarms)
+        DayPage(state, permissions, onOpen, onConfirm, onDecline, onAcknowledge, onFixNotifications, onFixAlarms)
         // Записать не вышло — сказано словами: молчание после нажатия человек читает как успех.
         (state as? ScreenState.Ready)?.value?.message?.let {
             AlertDialog(
@@ -108,6 +109,7 @@ private fun DayPage(
     onOpen: (DayItemPresentationDTO) -> Unit,
     onConfirm: (Uuid) -> Unit,
     onDecline: (Uuid) -> Unit,
+    onAcknowledge: (Uuid) -> Unit,
     onFixNotifications: () -> Unit,
     onFixAlarms: () -> Unit
 ) {
@@ -172,10 +174,10 @@ private fun DayPage(
                     )
                 }
                 items(day.unannounced, key = { "unannounced-" + it.key }) { item ->
-                    DayCard(item, onOpen, onConfirm, onDecline)
+                    DayCard(item, onOpen, onConfirm, onDecline, onAcknowledge)
                 }
             }
-            items(day.items, key = { it.key }) { item -> DayCard(item, onOpen, onConfirm, onDecline) }
+            items(day.items, key = { it.key }) { item -> DayCard(item, onOpen, onConfirm, onDecline, onAcknowledge = {}) }
             shelf(R.string.plan_day_also, day.alsoOnThisDay, onOpen)
         }
     }
@@ -211,7 +213,7 @@ private fun LazyListScope.shelf(
             modifier = Modifier.padding(top = 8.dp)
         )
     }
-    items(items, key = { it.key }) { item -> DayCard(item, onOpen, onConfirm = {}, onDecline = {}) }
+    items(items, key = { it.key }) { item -> DayCard(item, onOpen, onConfirm = {}, onDecline = {}, onAcknowledge = {}) }
 }
 
 /**
@@ -234,7 +236,8 @@ private fun DayCard(
     item: DayItemPresentationDTO,
     onOpen: (DayItemPresentationDTO) -> Unit,
     onConfirm: (Uuid) -> Unit,
-    onDecline: (Uuid) -> Unit
+    onDecline: (Uuid) -> Unit,
+    onAcknowledge: (Uuid) -> Unit
 ) {
     val intakeId = item.intakeId
     ElevatedCard(
@@ -270,7 +273,7 @@ private fun DayCard(
             }
             // Действия — столбиком справа и по центру: одно действие не заводит под себя целую
             // новую строку и не растягивает карточку.
-            if (intakeId != null && (item.canDecline || item.canConfirm)) {
+            if (intakeId != null && (item.canDecline || item.canConfirm || item.canAcknowledge)) {
                 Column(
                     horizontalAlignment = Alignment.End,
                     verticalArrangement = Arrangement.spacedBy(4.dp)
@@ -283,6 +286,11 @@ private fun DayCard(
                     if (item.canDecline) {
                         TextButton(onClick = { onDecline(intakeId) }, enabled = !item.isAnswering) {
                             Text(stringResource(R.string.intake_decline))
+                        }
+                    }
+                    if (item.canAcknowledge) {
+                        TextButton(onClick = { onAcknowledge(intakeId) }, enabled = !item.isAnswering) {
+                            Text(stringResource(R.string.intake_acknowledge_miss))
                         }
                     }
                 }

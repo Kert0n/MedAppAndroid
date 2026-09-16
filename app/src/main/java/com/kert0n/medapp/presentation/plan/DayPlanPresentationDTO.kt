@@ -94,7 +94,9 @@ data class DayItemPresentationDTO(
     val answeredAt: LocalTime?,
     /** Есть ли у пункта плановая пачка: без неё быстрый ответ брать неоткуда (PLAN D5). */
     val hasPlannedPackage: Boolean = false,
-    val isAnswering: Boolean = false
+    val isAnswering: Boolean = false,
+    /** Пропуск неответом на полке: «Понятно» снимает строку, а пункт не трогает (PLAN C1 «Полка»). */
+    val canAcknowledge: Boolean = false
 ) {
 
     /**

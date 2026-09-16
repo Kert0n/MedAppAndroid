@@ -93,6 +93,7 @@ class DayPagesTest {
         declining = scenarios.intakeDeclining,
         devicePermissions = AllAllowed,
         readiness = readiness,
+        reminderAnswering = scenarios.reminderAnswering,
         clock = clock,
         reminders = scenarios.reminderStore,
         intakes = database.intakeRepository(),
@@ -198,6 +199,35 @@ class DayPagesTest {
                     state.value.unannounced.map { it.intakeId }.toSet() == setOf(yesterday, today)
             }
         }
+    }
+
+    /**
+     * **«Понятно» убирает пропуск с полки** (PLAN C1 «Полка»). Вчерашний пункт стал пропуском
+     * неответом, и о пропуске сказать было нечем: строка стоит на полке с «Понятно». Признал —
+     * строка ушла, а пункт остался пропуском.
+     */
+    @Test
+    fun anAcknowledgedMissLeavesTheShelf(): Unit = runBlocking {
+        val (yesterday, _) = startedYesterdayMorning()
+        // Проход дня сегодняшними часами: вчерашний неотвеченный пункт стал пропуском, а
+        // обязательство о пропуске завёл тот же проход.
+        scenarios.dailyRound.run()
+        val model = model()
+
+        watching(model.page(0)) { page ->
+            val shelf = page.awaiting(PATIENTLY) { state ->
+                state is ScreenState.Ready && state.value.unannounced.any { it.intakeId == yesterday && it.canAcknowledge }
+            }
+            check(shelf is ScreenState.Ready)
+            model.acknowledge(yesterday)
+            page.awaiting(PATIENTLY) { state ->
+                state is ScreenState.Ready && state.value.unannounced.none { it.intakeId == yesterday }
+            }
+        }
+        assertEquals(
+            com.kert0n.medapp.domain.intake.IntakeStatus.MISSED,
+            requireNotNull(database.intakeRepository().find(yesterday)).status
+        )
     }
 
     /**

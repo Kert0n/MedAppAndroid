@@ -346,6 +346,7 @@ private fun screens(stacks: TabStacks, planMode: MutableState<PlanMode>) = entry
             onOpenIntake = { item -> item.intakeId?.let { stacks.go(Screen.IntakeCard(it)) } },
             onConfirmIntake = days::confirm,
             onDeclineIntake = days::decline,
+            onAcknowledgeIntake = days::acknowledge,
             onDismissDayMessage = days::dismissMessage,
             onFixNotifications = context::openNotificationSettings,
             onFixAlarms = context::openExactAlarmSettings,

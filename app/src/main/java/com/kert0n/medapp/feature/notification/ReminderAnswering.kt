@@ -65,6 +65,15 @@ class ReminderAnswering @Inject constructor(
         return if (deferred) Response.Snoozed(at) else Response.Done
     }
 
+    /**
+     * «Понятно» у пропуска на полке дня (PLAN C1 «Полка»): человек прочёл, что доза пропущена, и
+     * напоминать о пропуске больше незачем. Снимается только обещание сказать о пропуске — пункт
+     * остаётся пропуском, и «Принял» за него по-прежнему законен.
+     */
+    suspend fun acknowledge(intakeId: Uuid) {
+        withdrawal.withdrawKeys(listOf(NotificationKey.intake(intakeId, NotificationKind.INTAKE_MISSED)))
+    }
+
     /** Чем кончилось для шторки: карточка гасится либо отложена до названного момента. */
     sealed interface Response {
         data object Done : Response

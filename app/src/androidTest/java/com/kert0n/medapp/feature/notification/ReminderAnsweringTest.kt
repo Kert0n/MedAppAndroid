@@ -6,6 +6,7 @@ import com.kert0n.medapp.domain.intake.IntakeStatus
 import com.kert0n.medapp.domain.notification.NotificationKey
 import com.kert0n.medapp.domain.notification.NotificationAction
 import com.kert0n.medapp.domain.notification.NotificationKind
+import com.kert0n.medapp.domain.notification.NotificationTarget
 import com.kert0n.medapp.domain.notification.Reminder
 import com.kert0n.medapp.domain.pack.ExpiryDate
 import com.kert0n.medapp.domain.value.Doses
@@ -132,6 +133,26 @@ class ReminderAnsweringTest {
         assertEquals(Reminder.State.WITHDRAWN, requireNotNull(scenarios.reminderStore.find(reminderKey(intake))).state)
         scenarios.reminderOutbox.pass()
         assertTrue(scenarios.notifier.dismissed.contains(reminderKey(intake)))
+    }
+
+    /**
+     * **«Понятно» снимает обещание сказать о пропуске и больше ничего** (PLAN C1 «Полка»). Лена
+     * честно пропустила дозу и прочла об этом на полке: напоминать ей о пропуске незачем, а пункт
+     * остаётся пропуском, и «Принял» за него законен. Сними заодно пункт или напоминание о приёме
+     * — и признание ошибки стёрло бы сам факт или чужое обещание.
+     */
+    @Test
+    fun acknowledgingAMissWithdrawsOnlyTheMissNotice() = runTest {
+        val id = treated()
+        val intake = first(id)
+        val missKey = NotificationKey.intake(intake.id, NotificationKind.INTAKE_MISSED)
+        scenarios.intakeDeclining.decline(intake.id, now)
+        scenarios.reminderPromising.promise(listOf(Reminder(missKey, NotificationTarget.Intake(intake.id), now)))
+
+        scenarios.reminderAnswering.acknowledge(intake.id)
+
+        assertEquals(Reminder.State.WITHDRAWN, requireNotNull(scenarios.reminderStore.find(missKey)).state)
+        assertEquals(IntakeStatus.MISSED, requireNotNull(database.intakeRepository().find(intake.id)).status)
     }
 
     /** Отмена курса снимает обязательства всех его пунктов и гасит показанное (PLAN D8). */

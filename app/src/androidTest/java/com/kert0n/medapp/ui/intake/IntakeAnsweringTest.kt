@@ -5,10 +5,6 @@ import androidx.lifecycle.viewModelScope
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import com.kert0n.medapp.domain.intake.CourseIntake
 import com.kert0n.medapp.domain.intake.IntakeStatus
-import com.kert0n.medapp.domain.notification.Reminder
-import com.kert0n.medapp.domain.notification.NotificationTarget
-import com.kert0n.medapp.domain.notification.NotificationKind
-import com.kert0n.medapp.domain.notification.NotificationKey
 import com.kert0n.medapp.domain.pack.ExpiryDate
 import com.kert0n.medapp.domain.value.Doses
 import com.kert0n.medapp.feature.course.CourseDrafting
@@ -87,13 +83,14 @@ class IntakeAnsweringTest {
         database.close()
     }
 
-    private fun dayModel() = DayPlanViewModel(
+    private fun dayModel(clock: Clock = this.clock) = DayPlanViewModel(
         today = Today(clock, QuietClock),
         planning = DayPlanning(Today(clock, QuietClock), database.reportRepository()),
         confirmation = scenarios.intakeConfirmation,
         declining = scenarios.intakeDeclining,
         devicePermissions = AllAllowed,
         readiness = AllAllowed,
+        reminderAnswering = scenarios.reminderAnswering,
         clock = clock,
         reminders = scenarios.reminderStore,
         intakes = database.intakeRepository(),
@@ -340,33 +337,25 @@ class IntakeAnsweringTest {
     }
 
     /**
-     * Телефон промолчал — день говорит сам: обязательство, о котором не смогли напомнить, видно
-     * полкой и отвечается там же. Без неё вчерашний пропущенный приём человек не нашёл бы вовсе:
-     * страница дня листается только вперёд (PLAN D8, H3 «Уведомления на экране»).
+     * Телефон промолчал — день говорит сам: вчерашний пункт, о котором не смогли напомнить, стоит
+     * полкой и отвечается там же. Без неё вчерашний приём человек не нашёл бы вовсе: страница дня
+     * листается только вперёд (PLAN D8, H3 «Уведомления на экране»).
      *
-     * На полке — только **наступившее**: обязательство на послезавтра ещё не просрочено, и без
-     * этого правила полка показывала бы всё будущее лечения (найдено историей Максима).
+     * На полке — только **прошлые дни** (PLAN C1 «Полка»): сегодняшнее уже стоит в самом дне, а
+     * будущее ещё не наступило. Обязательство заводит календарь при начале лечения — проверка его
+     * руками не пишет, иначе проверяла бы состояние, которого приложение не создаёт (разбор U5).
      */
     @Test
-    fun theDayShowsWhatCouldNotBeAnnouncedAndTakesTheAnswerThere() = runBlocking {
+    fun theDayShowsWhatCouldNotBeAnnouncedAndTakesTheAnswerThere(): Unit = runBlocking {
         val courseId = started()
         val intakeId = firstIntake(courseId).id
-        scenarios.reminderPromising.promise(
-            listOf(
-                Reminder(
-                    key = NotificationKey.intake(intakeId, NotificationKind.INTAKE_DUE),
-                    target = NotificationTarget.Intake(intakeId),
-                    dueAt = now
-                )
-            )
-        )
-        val model = dayModel()
+        val model = dayModel(Clock.fixed(now.plus(java.time.Duration.ofDays(1)), ZoneOffset.UTC))
 
         watching(model.page(0)) { page ->
             val shown = page.awaiting(PATIENTLY) { state ->
                 state.ready()?.unannounced.orEmpty().any { it.intakeId == intakeId }
             }
-            // Завтрашние обязательства сюда не попадают: о них скажут вовремя.
+            // Сегодняшние и завтрашние пункты сюда не попадают: они в своих днях.
             assertEquals(listOf(intakeId), shown.ready()?.unannounced.orEmpty().map { it.intakeId })
             model.confirm(intakeId)
             // Отвеченное уходит из полки: напоминать о нём больше нечего (PLAN D8).

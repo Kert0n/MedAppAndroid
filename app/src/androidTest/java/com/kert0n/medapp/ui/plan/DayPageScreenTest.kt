@@ -45,6 +45,7 @@ class DayPageScreenTest {
     private val opened = mutableListOf<DayItemPresentationDTO>()
     private val confirmed = mutableListOf<Uuid>()
     private val declined = mutableListOf<Uuid>()
+    private val acknowledged = mutableListOf<Uuid>()
     private var dismissed = 0
     private var fixedNotifications = 0
     private var fixedAlarms = 0
@@ -81,6 +82,7 @@ class DayPageScreenTest {
                     onOpen = { opened += it },
                     onConfirm = { confirmed += it },
                     onDecline = { declined += it },
+                    onAcknowledge = { acknowledged += it },
                     onDismissMessage = { dismissed++ },
                     modifier = Modifier.fillMaxSize()
                 )
@@ -159,6 +161,25 @@ class DayPageScreenTest {
 
         compose.onNodeWithText("пропущен").assertIsDisplayed()
         compose.onNodeWithText("Принял").assertIsDisplayed()
+    }
+
+    /**
+     * **Пропуск на полке признают словом «Понятно»** (PLAN C1 «Полка»). Честно пропущенная доза
+     * иначе висела бы над каждым днём до конца срока хранения: «Принял» — неправда, а другой кнопки
+     * не было. «Принял» рядом остаётся — вдруг выпил.
+     */
+    @Test
+    fun aMissOnTheShelfIsAcknowledgedInAWord() {
+        val missed = row("Пропущен", state = DayItemPresentationDTO.State.MISSED).copy(
+            on = today.minusDays(1),
+            canAcknowledge = true
+        )
+        show(page(unannounced = listOf(missed)))
+
+        compose.onNodeWithText("Принял").assertIsDisplayed()
+        compose.onNodeWithText("Понятно").performClick()
+
+        assertEquals(listOf(missed.intakeId), acknowledged)
     }
 
     /**
