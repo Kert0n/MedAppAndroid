@@ -281,10 +281,19 @@
     <string name="intake_history_no_amount">доза не записана</string>
     <string name="intake_history_of_package">Приёмы из этой коробки</string>
     <string name="intake_history_of_course">Вся история</string>
-    <string name="course_off_plan_action">Принято мимо плана: %1$d</string>
-    <string name="course_off_plan_title">Принято мимо плана</string>
-    <string name="course_off_plan_field">Сколько доз</string>
+    <string name="course_off_plan_action">Приёмы вне расписания</string>
+    <string name="course_off_plan_explained">Эти приёмы засчитываются лечению, но коробку не трогают и в историю не попадают.</string>
+    <string name="course_off_plan_less">На один меньше</string>
+    <string name="course_off_plan_more">На один больше</string>
+    <plurals name="course_off_plan_count">
+        <item quantity="one">%1$d приём</item>
+        <item quantity="few">%1$d приёма</item>
+        <item quantity="many">%1$d приёмов</item>
+        <item quantity="other">%1$d приёма</item>
+    </plurals>
+    <string name="course_off_plan_title">Приёмы вне расписания</string>
     <string name="intake_card_gone">Этого приёма больше нет</string>
+    <string name="intake_already_answered">На этот приём уже ответили.</string>
     <string name="intake_planned">Назначено на %1$s в %2$s: %3$s</string>
     <string name="intake_from_package">Из коробки: %1$s</string>
     <string name="intake_source">Из какой коробки</string>
@@ -386,7 +395,7 @@
     <string name="course_sources_unsaved">Правка не записана: обеспечение пересчитается после «Сохранить».</string>
     <string name="course_cancel_already_finished">Лечение уже закончилось — отменять нечего.</string>
     <string name="intake_unplanned_title">Принять разово</string>
-    <string name="intake_available_to_me">Доступно мне: %1$s %2$s</string>
+    <string name="intake_free_of_total">Свободно %1$s из %2$s</string>
     <string name="intake_taken_amount">Сколько принял</string>
     <string name="intake_record">Принять</string>
     <string name="intake_not_enough">В коробке столько не наберётся.</string>

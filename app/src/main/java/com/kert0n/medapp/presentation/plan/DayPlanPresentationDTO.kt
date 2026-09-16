@@ -1,5 +1,6 @@
 package com.kert0n.medapp.presentation.plan
 
+import com.kert0n.medapp.domain.intake.IntakeRejected
 import com.kert0n.medapp.presentation.value.QuantityPresentationDTO
 import java.time.LocalDate
 import java.time.LocalTime
@@ -21,9 +22,30 @@ data class DayPagePresentationDTO(
     val date: LocalDate,
     val daysAhead: Int,
     val items: List<DayItemPresentationDTO>,
-    val alsoOnThisDay: List<DayItemPresentationDTO>
+    val alsoOnThisDay: List<DayItemPresentationDTO>,
+    /** Чем кончился ответ, если по самой странице этого не видно (PLAN U1). */
+    val message: DayMessage? = null
 ) {
     val isEmpty: Boolean get() = items.isEmpty() && alsoOnThisDay.isEmpty()
+}
+
+/**
+ * Что страница отвечает на ответ, когда записать его не вышло. Записанное своего случая здесь не
+ * имеет: о нём говорит сама строка, а молчание после «принял» человек и так читает как успех.
+ */
+sealed interface DayMessage {
+
+    /** Домен отверг приём: причина по месту — в коробке не набралось, единица не та, эпизод закрыт. */
+    data class Refused(val reason: IntakeRejected.Reason) : DayMessage
+
+    /** Пункт уже отвечен: страница перечитает, а решение человек повторит, если хотел другого. */
+    data object AlreadyAnswered : DayMessage
+
+    /** Лечение кончилось, пока человек отвечал: план ответов больше не принимает (D6). */
+    data object EpisodeClosed : DayMessage
+
+    /** Пункта больше нет: расписание перестроили, и строка уйдёт со страницы вместе с чтением. */
+    data object Gone : DayMessage
 }
 
 /**
@@ -46,17 +68,22 @@ data class DayItemPresentationDTO(
     val packageName: String?,
     val state: State,
     val answeredAt: LocalTime?,
+    /** Есть ли у пункта плановая пачка: без неё быстрый ответ брать неоткуда (PLAN D5). */
+    val hasPlannedPackage: Boolean = false,
     val isAnswering: Boolean = false
 ) {
 
     /**
-     * Можно ли ещё подтвердить приём. Пропущенный — можно: доза уехала вперёд, и подтвердить её
-     * позже законно (PLAN D6, решение владельца 2026-09-16).
+     * Можно ли ещё подтвердить приём **быстро**. Пропущенный — можно: доза уехала вперёд, и
+     * подтвердить её позже законно (PLAN D6, решение владельца 2026-09-16). А вот пункт без
+     * плановой пачки — нельзя: брать неоткуда, и коробку человек выбирает на карточке; кнопка,
+     * которая ничего не делает, хуже её отсутствия.
      *
      * Идущая запись ([isAnswering]) действие не отменяет, а гасит: исчезнувшая кнопка читалась бы
      * как «уже ответил», а её и не было.
      */
-    val canConfirm: Boolean get() = state == State.PLANNED || state == State.MISSED
+    val canConfirm: Boolean
+        get() = hasPlannedPackage && (state == State.PLANNED || state == State.MISSED)
 
     /** Отказаться можно от того, на что ещё не ответили: пропущенное уже пропущено. */
     val canDecline: Boolean get() = state == State.PLANNED

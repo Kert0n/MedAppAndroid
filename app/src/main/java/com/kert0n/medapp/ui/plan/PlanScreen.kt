@@ -45,6 +45,7 @@ fun PlanScreen(
     onOpenIntake: (DayItemPresentationDTO) -> Unit,
     onConfirmIntake: (Uuid) -> Unit,
     onDeclineIntake: (Uuid) -> Unit,
+    onDismissDayMessage: () -> Unit,
     onOpenCourse: (CoursePresentationDTO) -> Unit,
     onAddCourse: () -> Unit,
     modifier: Modifier = Modifier
@@ -79,6 +80,7 @@ fun PlanScreen(
                     onOpen = onOpenIntake,
                     onConfirm = onConfirmIntake,
                     onDecline = onDeclineIntake,
+                    onDismissMessage = onDismissDayMessage,
                     modifier = Modifier.fillMaxSize()
                 )
                 PlanMode.COURSES -> CourseListContent(

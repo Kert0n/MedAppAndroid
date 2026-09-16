@@ -16,6 +16,7 @@ import androidx.test.ext.junit.runners.AndroidJUnit4
 import com.kert0n.medapp.fixture.TABLETS
 import com.kert0n.medapp.presentation.ScreenState
 import com.kert0n.medapp.presentation.plan.DayItemPresentationDTO
+import com.kert0n.medapp.presentation.plan.DayMessage
 import com.kert0n.medapp.presentation.plan.DayPagePresentationDTO
 import com.kert0n.medapp.presentation.value.QuantityPresentationDTO
 import com.kert0n.medapp.presentation.value.toPresentationDTO
@@ -43,6 +44,7 @@ class DayPageScreenTest {
     private val opened = mutableListOf<DayItemPresentationDTO>()
     private val confirmed = mutableListOf<Uuid>()
     private val declined = mutableListOf<Uuid>()
+    private var dismissed = 0
 
     private fun row(
         title: String,
@@ -58,7 +60,8 @@ class DayPageScreenTest {
         dose = QuantityPresentationDTO("2", TABLETS.toPresentationDTO()),
         packageName = packageName,
         state = state,
-        answeredAt = answeredAt
+        answeredAt = answeredAt,
+        hasPlannedPackage = true
     )
 
     private fun show(vararg pages: DayPagePresentationDTO) {
@@ -71,6 +74,7 @@ class DayPageScreenTest {
                     onOpen = { opened += it },
                     onConfirm = { confirmed += it },
                     onDecline = { declined += it },
+                    onDismissMessage = { dismissed++ },
                     modifier = Modifier.fillMaxSize()
                 )
             }
@@ -80,12 +84,14 @@ class DayPageScreenTest {
     private fun page(
         daysAhead: Int = 0,
         items: List<DayItemPresentationDTO> = emptyList(),
-        alsoOnThisDay: List<DayItemPresentationDTO> = emptyList()
+        alsoOnThisDay: List<DayItemPresentationDTO> = emptyList(),
+        message: DayMessage? = null
     ) = DayPagePresentationDTO(
         date = today.plusDays(daysAhead.toLong()),
         daysAhead = daysAhead,
         items = items,
-        alsoOnThisDay = alsoOnThisDay
+        alsoOnThisDay = alsoOnThisDay,
+        message = message
     )
 
     /**
@@ -175,6 +181,28 @@ class DayPageScreenTest {
 
         assertEquals(emptyList<Uuid>(), confirmed)
         assertEquals(emptyList<Uuid>(), declined)
+    }
+
+    /**
+     * У пункта без плановой пачки быстрого ответа нет: брать неоткуда, и коробку человек выбирает
+     * на карточке. Кнопка, которая ничего не делает, хуже её отсутствия (разбор 2026-09-16).
+     */
+    @Test
+    fun anItemWithoutAPlannedPackageOffersNoQuickAnswer() {
+        show(page(items = listOf(row("Без коробки").copy(hasPlannedPackage = false, packageName = null))))
+
+        compose.onNodeWithText("Принял").assertDoesNotExist()
+    }
+
+    /** Записать не вышло — сказано словами: молчание после нажатия человек читает как успех. */
+    @Test
+    fun aRefusalIsToldInWords() {
+        show(page(items = listOf(row("Ждёт")), message = DayMessage.EpisodeClosed))
+
+        compose.onNodeWithText("Лечение закончено: его план ответов больше не принимает.").assertIsDisplayed()
+        compose.onNodeWithText("Понятно").performClick()
+
+        assertEquals(1, dismissed)
     }
 
     /** Нажатие на саму строку ведёт на карточку пункта — туда, где приём меняют. */

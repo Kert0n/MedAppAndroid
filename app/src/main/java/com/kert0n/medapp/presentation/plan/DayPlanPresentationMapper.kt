@@ -17,7 +17,8 @@ import kotlin.uuid.Uuid
 fun DayPlan.toPresentationDTO(
     daysAhead: Int,
     zone: ZoneId,
-    answering: Set<Uuid> = emptySet()
+    answering: Set<Uuid> = emptySet(),
+    message: DayMessage? = null
 ): DayPagePresentationDTO {
     val rows = items.map { it.toPresentationDTO(zone).copy(isAnswering = it.intakeId in answering) }
     // Отвечают на записанные пункты; разовые приёмы и дозы за окном календаря идут ниже и без
@@ -27,7 +28,8 @@ fun DayPlan.toPresentationDTO(
         date = date,
         daysAhead = daysAhead,
         items = answerable,
-        alsoOnThisDay = rest
+        alsoOnThisDay = rest,
+        message = message
     )
 }
 
@@ -54,6 +56,7 @@ private fun DayPlan.Item.toPresentationDTO(zone: ZoneId): DayItemPresentationDTO
             // Состоявшийся приём говорит о себе сам: сколько взяли и откуда, а не что назначали.
             dose = (taken?.amount ?: intake.plannedAmount).quantity.toPresentationDTO(),
             packageName = (taken?.pkg ?: intake.plannedPackage)?.name,
+            hasPlannedPackage = intake.plannedPackage != null,
             state = intake.status.toState(),
             answeredAt = intake.answer?.at?.atZone(zone)?.toLocalTime()
         )

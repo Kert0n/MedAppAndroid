@@ -89,4 +89,7 @@ sealed interface IntakeCardError {
 
     /** Сценарий отверг приём: в коробке столько не наберётся, эпизод закрыт, пачка не источник. */
     data class Rejected(val reason: IntakeRejected.Reason) : IntakeCardError
+
+    /** На пункт уже ответили — с другого экрана или из шторки: карточка перечитает. */
+    data object AlreadyAnswered : IntakeCardError
 }

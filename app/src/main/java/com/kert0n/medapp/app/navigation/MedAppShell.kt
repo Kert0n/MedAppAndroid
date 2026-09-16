@@ -212,15 +212,24 @@ private fun screens(stacks: TabStacks) = entryProvider<NavKey> {
                 creationCallback = { factory -> factory.create(key.packageId) }
             )
             val taken = intake.state.collectAsStateWithLifecycle().value
-            // Записано — лист закрывается: человек сказал, что хотел, а новое число покажет карточка.
-            LaunchedEffect(taken.isRecorded, taken.isGone) { if (taken.isRecorded || taken.isGone) taking = false }
+            // Записано — лист закрывается: человек сказал, что хотел, а новое число покажет
+            // карточка. Разговор при этом забывается: следующее «Принять» начинает новый приём, и
+            // без этого лист открылся бы уже закрытым (разбор 2026-09-16).
+            LaunchedEffect(taken.isRecorded, taken.isGone) {
+                if (!taken.isRecorded && !taken.isGone) return@LaunchedEffect
+                taking = false
+                intake.forgetTheIntake()
+            }
             UnplannedIntakeSheet(
                 state = taken,
                 onEdit = intake::edit,
                 onRecord = { intake.record() },
                 onAcknowledge = { intake.record(acknowledged = true) },
                 onDismissQuestions = intake::dismissQuestions,
-                onDismiss = { taking = false }
+                onDismiss = {
+                    taking = false
+                    intake.forgetTheIntake()
+                }
             )
         }
     }
@@ -284,6 +293,7 @@ private fun screens(stacks: TabStacks) = entryProvider<NavKey> {
             },
             onConfirmIntake = days::confirm,
             onDeclineIntake = days::decline,
+            onDismissDayMessage = days::dismissMessage,
             // Черновик открывается редактором, идущее и законченное лечение — карточкой.
             onOpenCourse = { course ->
                 stacks.go(

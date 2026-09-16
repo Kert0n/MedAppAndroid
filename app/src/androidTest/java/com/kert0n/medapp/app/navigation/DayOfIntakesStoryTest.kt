@@ -5,6 +5,7 @@ import androidx.compose.ui.test.junit4.v2.createAndroidComposeRule
 import androidx.compose.ui.test.onAllNodesWithText
 import androidx.compose.ui.test.onFirst
 import androidx.compose.ui.test.onLast
+import androidx.compose.ui.test.onAllNodesWithContentDescription
 import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
@@ -139,13 +140,15 @@ class DayOfIntakesStoryTest {
     /** Днём Анна выпивает таблетку просто так — с карточки коробки, не теряя её из виду. */
     private fun atNoonSheTakesOneJustLikeThat() {
         openTheBox()
-        compose.waitUntil(WAIT) { compose.onAllNodesWithText("Принять").fetchSemanticsNodes().isNotEmpty() }
-        compose.onNodeWithText("Принять").performClick()
+        // «Принять» — плавающая кнопка карточки; слово у неё живёт подписью значка.
+        compose.waitUntil(WAIT) {
+            compose.onAllNodesWithContentDescription("Принять").fetchSemanticsNodes().isNotEmpty()
+        }
+        compose.onNodeWithContentDescription("Принять").performClick()
         compose.waitUntil(WAIT) { compose.onAllNodesWithText("Сколько принял").fetchSemanticsNodes().isNotEmpty() }
         compose.onNodeWithText("Сколько принял").performTextReplacement("1")
         closeSoftKeyboard()
-        // В листе кнопка называется так же, как та, что его открыла: их различает место.
-        compose.onAllNodesWithText("Принять").onLast().performClick()
+        compose.onNodeWithText("Принять").performClick()
         compose.waitUntil(WAIT) { compose.onAllNodesWithText("Сколько принял").fetchSemanticsNodes().isEmpty() }
         // В места приложения человек возвращается назад: на карточке коробки нижних мест нет.
         back()

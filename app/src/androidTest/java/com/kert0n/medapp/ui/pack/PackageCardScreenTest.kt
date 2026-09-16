@@ -236,4 +236,18 @@ class PackageCardScreenTest {
 
         assertEquals(1, confirmed)
     }
+
+    /**
+     * «Принять» — самое частое действие с коробкой, и стоит оно плавающей кнопкой: в ряду с
+     * «Пересчитать» они делили ширину, и слово переносилось по слогам (замечание владельца).
+     */
+    @Test
+    fun takingIsTheFloatingActionOfTheCard() {
+        show(card())
+
+        // Слово у плавающей кнопки живёт подписью значка: внутрь своего узла она текста не пускает.
+        compose.onNodeWithContentDescription("Принять").performClick()
+
+        assertEquals(1, taken)
+    }
 }

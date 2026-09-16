@@ -62,7 +62,10 @@ class UnplannedIntakeViewModel @AssistedInject constructor(
             UnplannedIntakeUiState(
                 packageName = pack.facts.name,
                 unit = pack.quantity.unit.toPresentationDTO(),
-                availableToMe = pack.availability.availableToMe.toPresentationDTO(),
+                // То же число, по которому судит сценарий: он спрашивает, когда приём заденет
+                // занятое, и спрашивает он по «свободно любому» (PLAN D4).
+                free = pack.availability.freeForAnyone.toPresentationDTO(),
+                inTheBox = pack.availability.effective.toPresentationDTO(),
                 // До первой правки в поле стоит подсказка коробки: человеку чаще всего её и нужно
                 // подтвердить, а не набирать то же самое руками.
                 form = typed ?: UnplannedIntakePresentationDTO(hint?.amount.orEmpty()),
@@ -85,12 +88,15 @@ class UnplannedIntakeViewModel @AssistedInject constructor(
      * начинает: приём — факт о мире, и второго такого же человек не просил.
      */
     fun record(acknowledged: Boolean = false) {
+        if (recorded.value.busy || recorded.value.recorded) return
         val state = state.value
         val unit = state.unit ?: return
-        if (recorded.value.busy || recorded.value.recorded) return
+        // Набранное берётся у самого набранного, а не у состояния: между вводом и нажатием стоит
+        // поток, и торопливый палец записал бы подсказку коробки вместо своего числа.
+        val form = typed.value ?: state.form
         recorded.value = Recording(busy = true)
         viewModelScope.launch {
-            when (val parsed = state.form.parsed(unit, vocabulary.snapshot())) {
+            when (val parsed = form.parsed(unit, vocabulary.snapshot())) {
                 is ParsedInput.Rejected -> recorded.value = Recording(error = parsed.error)
                 is ParsedInput.Parsed ->
                     recorded.value = told(recording.record(packageId, parsed.value, clock.instant(), acknowledged))
@@ -101,6 +107,15 @@ class UnplannedIntakeViewModel @AssistedInject constructor(
     /** Вопрос закрыт без ответа — не записано ничего: отмена и есть отказ записывать (PLAN D6). */
     fun dismissQuestions() {
         recorded.value = recorded.value.copy(questions = emptyList())
+    }
+
+    /**
+     * Лист закрыт — разговор окончен. Следующее «Принять» начинает **новый** приём: без этого
+     * записанный остаётся записанным, и открытый заново лист закрывается сам, ничего не спросив.
+     */
+    fun forgetTheIntake() {
+        typed.value = null
+        recorded.value = Recording()
     }
 
     /**
@@ -128,8 +143,13 @@ class UnplannedIntakeViewModel @AssistedInject constructor(
 data class UnplannedIntakeUiState(
     val packageName: String = "",
     val unit: UnitPresentationDTO? = null,
-    /** Сколько в коробке моего — по нему человек и решает, сколько взять (PLAN D4). */
-    val availableToMe: QuantityPresentationDTO? = null,
+    /**
+     * Сколько в коробке **никем не занято** и сколько в ней всего. Взять можно и больше — коробка
+     * стоит на полке, и физически её никто не держит, — но это заденет занятое, и сценарий об этом
+     * спросит (PLAN D4).
+     */
+    val free: QuantityPresentationDTO? = null,
+    val inTheBox: QuantityPresentationDTO? = null,
     val form: UnplannedIntakePresentationDTO = UnplannedIntakePresentationDTO(),
     val error: UnplannedIntakeError? = null,
     /** О чём сценарий спросил до записи: пока на это не ответили, не записано ничего (PLAN D6). */

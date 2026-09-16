@@ -147,16 +147,20 @@ private fun Card(
             singleLine = true,
             modifier = Modifier.fillMaxWidth()
         )
-        DateField(
-            label = stringResource(R.string.intake_taken_on),
-            value = state.form.on,
-            onPick = { onEdit(state.form.copy(on = it)) }
-        )
-        TimeField(
-            label = stringResource(R.string.intake_taken_at),
-            value = state.form.at,
-            onPick = { onEdit(state.form.copy(at = it)) }
-        )
+        // У отвеченного пункта момент уже записан: поле, которое меняется, но не сохраняется,
+        // обещает человеку то, чего не будет.
+        if (state.canAnswer) {
+            DateField(
+                label = stringResource(R.string.intake_taken_on),
+                value = state.form.on,
+                onPick = { onEdit(state.form.copy(on = it)) }
+            )
+            TimeField(
+                label = stringResource(R.string.intake_taken_at),
+                value = state.form.at,
+                onPick = { onEdit(state.form.copy(at = it)) }
+            )
+        }
     }
 )
 
@@ -218,4 +222,5 @@ private fun IntakeCardUiState.answerWords(answer: IntakeCardUiState.Answer): Str
 private fun IntakeCardError.words(): String = when (this) {
     is IntakeCardError.Amount -> stringResource(error.text)
     is IntakeCardError.Rejected -> stringResource(reason.text)
+    IntakeCardError.AlreadyAnswered -> stringResource(R.string.intake_already_answered)
 }

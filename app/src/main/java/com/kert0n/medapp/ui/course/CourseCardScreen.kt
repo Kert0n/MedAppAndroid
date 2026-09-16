@@ -30,10 +30,13 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
+import com.kert0n.medapp.ui.NavigationRow
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.pluralStringResource
@@ -191,21 +194,26 @@ private fun Card(
                         Spacer(Modifier.width(8.dp))
                         Text(stringResource(R.string.course_sources_open))
                     }
-                    // Как шло лечение — тем же путём, что и источники: списком, а не в меню.
-                    TextButton(
-                        onClick = onHistory,
-                        modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp).defaultMinSize(minHeight = 48.dp)
-                    ) { Text(stringResource(R.string.intake_history_of_course)) }
-                    // Принято мимо плана — поправка к счёту, а не приём: расписание не трогается,
-                    // а лечение считает, что доз принято больше (PLAN D5).
+                    // Переходы — строками со стрелкой: кнопкой они читались как заголовки, и
+                    // человек не догадывался, что по ним можно нажать (замечание владельца).
+                    NavigationRow(
+                        icon = R.drawable.ic_history,
+                        text = stringResource(R.string.intake_history_of_course),
+                        onClick = onHistory
+                    )
+                    // Приёмы вне расписания — поправка к счёту, а не приём: расписание не
+                    // трогается, а лечение считает, что приёмов сделано больше (PLAN D5).
                     if (state.isRunning) {
-                        TextButton(
-                            onClick = onAskOffPlan,
-                            enabled = !state.isCounting,
-                            modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp).defaultMinSize(minHeight = 48.dp)
-                        ) {
-                            Text(stringResource(R.string.course_off_plan_action, state.offPlanDoses ?: 0))
-                        }
+                        NavigationRow(
+                            icon = R.drawable.ic_event_repeat,
+                            text = stringResource(R.string.course_off_plan_action),
+                            supporting = pluralStringResource(
+                                R.plurals.course_off_plan_count,
+                                state.offPlanDoses ?: 0,
+                                state.offPlanDoses ?: 0
+                            ),
+                            onClick = onAskOffPlan
+                        )
                     }
                 }
             }
@@ -334,29 +342,48 @@ private fun CourseCardMessage.words(): String = stringResource(
 )
 
 /**
- * Сколько доз принято мимо расписания. Спрашивается подтверждением: число уедет в прогресс и может
- * закончить лечение (PLAN D5).
+ * Сколько приёмов сделано вне расписания. Считается **шагами**, а не свободным вводом: число
+ * маленькое и целое, лечение меряет себя приёмами, и печатать здесь нечего — «−» и «+» не дают
+ * набрать ни буквы, ни дроби (замечание владельца 2026-09-16).
+ *
+ * Диалог говорит, чем эти приёмы отличаются от «Принял»: они засчитываются лечению, но коробку не
+ * трогают и в историю не попадают (PLAN D5).
  */
 @Composable
 private fun OffPlanDialog(current: Int, onConfirm: (Int) -> Unit, onDismiss: () -> Unit) {
-    var typed by remember { mutableStateOf(current.toString()) }
+    var count by remember { mutableIntStateOf(current) }
     AlertDialog(
         onDismissRequest = onDismiss,
         title = { Text(stringResource(R.string.course_off_plan_title)) },
         text = {
-            OutlinedTextField(
-                value = typed,
-                onValueChange = { entered -> typed = entered.filter(Char::isDigit) },
-                label = { Text(stringResource(R.string.course_off_plan_field)) },
-                singleLine = true,
-                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number)
-            )
+            Column(verticalArrangement = Arrangement.spacedBy(16.dp)) {
+                Text(stringResource(R.string.course_off_plan_explained))
+                Row(
+                    Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(16.dp, Alignment.CenterHorizontally),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    IconButton(onClick = { count = (count - 1).coerceAtLeast(0) }, enabled = count > 0) {
+                        Icon(
+                            painterResource(R.drawable.ic_remove),
+                            contentDescription = stringResource(R.string.course_off_plan_less)
+                        )
+                    }
+                    Text(
+                        pluralStringResource(R.plurals.course_off_plan_count, count, count),
+                        style = MaterialTheme.typography.titleLarge
+                    )
+                    IconButton(onClick = { count += 1 }) {
+                        Icon(
+                            painterResource(R.drawable.ic_add),
+                            contentDescription = stringResource(R.string.course_off_plan_more)
+                        )
+                    }
+                }
+            }
         },
         confirmButton = {
-            TextButton(
-                onClick = { onConfirm(typed.toIntOrNull() ?: current) },
-                enabled = typed.isNotEmpty()
-            ) { Text(stringResource(R.string.action_save)) }
+            TextButton(onClick = { onConfirm(count) }) { Text(stringResource(R.string.action_save)) }
         },
         dismissButton = { TextButton(onClick = onDismiss) { Text(stringResource(R.string.action_cancel)) } }
     )

@@ -56,6 +56,9 @@ class DayPlanViewModel @Inject constructor(
     /** Пункт, о котором сценарий спросил: отвечать на вопрос человек идёт на карточку (H3 №12). */
     val asksAbout = MutableStateFlow<DayQuestion?>(null)
 
+    /** Чем кончился ответ, если по самой странице этого не видно. */
+    private val message = MutableStateFlow<DayMessage?>(null)
+
     /**
      * Страница дня, отстоящего от сегодняшнего на [daysAhead] дней. Спрашивается из вёрстки, то
      * есть с главного потока, — оттого и обычная карта без замка.
@@ -64,9 +67,9 @@ class DayPlanViewModel @Inject constructor(
      * а «на этот день ничего не назначено» — это пришедшая пустая страница, а не ожидание.
      */
     fun page(daysAhead: Int): StateFlow<ScreenState<DayPagePresentationDTO>> = pages.getOrPut(daysAhead) {
-        combine(reading(daysAhead), answering) { reading, answering ->
+        combine(reading(daysAhead), answering, message) { reading, answering, message ->
             if (reading == null) ScreenState.Loading
-            else ScreenState.Ready(reading.plan.toPresentationDTO(daysAhead, reading.zone, answering))
+            else ScreenState.Ready(reading.plan.toPresentationDTO(daysAhead, reading.zone, answering, message))
         }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), ScreenState.Loading)
     }
 
@@ -80,18 +83,17 @@ class DayPlanViewModel @Inject constructor(
      */
     fun confirm(intakeId: Uuid) {
         if (intakeId in answering.value) return
+        // Пункт без плановой пачки быстрым путём не отвечают: брать неоткуда, и человек выбирает
+        // коробку на карточке. Кнопки у такой строки нет вовсе — нажимать нечего.
         val planned = plannedOf(intakeId) ?: return
         answering.value = answering.value + intakeId
         viewModelScope.launch {
-            val outcome = confirmation.confirm(
-                intakeId = intakeId,
-                packageId = planned.packageId,
-                amount = planned.amount,
-                at = clock.instant()
-            )
-            answering.value = answering.value - intakeId
-            if (outcome is IntakeConfirmation.Outcome.Warned) {
-                asksAbout.value = DayQuestion(planned.courseId, intakeId)
+            try {
+                told(planned, confirmation.confirm(intakeId, planned.packageId, planned.amount, clock.instant()))
+            } finally {
+                // Сорвался сценарий или нет, строка должна снова принимать нажатие: иначе она
+                // останется погашенной до конца жизни экрана.
+                answering.value = answering.value - intakeId
             }
         }
     }
@@ -107,9 +109,41 @@ class DayPlanViewModel @Inject constructor(
         if (intakeId in answering.value) return
         answering.value = answering.value + intakeId
         viewModelScope.launch {
-            declining.decline(intakeId, clock.instant())
-            answering.value = answering.value - intakeId
+            try {
+                told(declining.decline(intakeId, clock.instant()))
+            } finally {
+                answering.value = answering.value - intakeId
+            }
         }
+    }
+
+    /**
+     * Чем кончился быстрый ответ. Записанное человек видит чтением — строка меняется сама; всё
+     * остальное сказать надо: вопрос ведёт на карточку, где он виден, отказ — словами по месту, а
+     * пропавший пункт уходит со страницы вместе с чтением.
+     */
+    private fun told(planned: Planned, outcome: IntakeConfirmation.Outcome) {
+        when (outcome) {
+            is IntakeConfirmation.Outcome.Confirmed -> Unit
+            is IntakeConfirmation.Outcome.Warned -> asksAbout.value = DayQuestion(planned.courseId, planned.intakeId)
+            is IntakeConfirmation.Outcome.Rejected -> message.value = DayMessage.Refused(outcome.reason)
+            IntakeConfirmation.Outcome.Gone -> message.value = DayMessage.Gone
+        }
+    }
+
+    /** Чем кончился отказ. Записанный отказ приходит чтением; остальное — словами. */
+    private fun told(outcome: IntakeDeclining.Outcome) {
+        message.value = when (outcome) {
+            IntakeDeclining.Outcome.DECLINED -> return
+            IntakeDeclining.Outcome.ALREADY_ANSWERED -> DayMessage.AlreadyAnswered
+            IntakeDeclining.Outcome.EPISODE_CLOSED -> DayMessage.EpisodeClosed
+            IntakeDeclining.Outcome.GONE -> DayMessage.Gone
+        }
+    }
+
+    /** Прочитанное сообщение человек уносит сам. */
+    fun dismissMessage() {
+        message.value = null
     }
 
     /** Вопрос показан — карточка открыта, и второй раз открывать её незачем. */
@@ -129,7 +163,7 @@ class DayPlanViewModel @Inject constructor(
         .firstOrNull { it.intake.id == intakeId }
         ?.let { item ->
             val pkg = item.intake.plannedPackage ?: return null
-            Planned(item.intake.courseId, pkg.id, item.intake.plannedAmount)
+            Planned(item.intake.courseId, item.intake.id, pkg.id, item.intake.plannedAmount)
         }
 
     private fun reading(daysAhead: Int): StateFlow<Reading?> = readings.getOrPut(daysAhead) {
@@ -143,6 +177,7 @@ class DayPlanViewModel @Inject constructor(
     /** Плановое пункта — то, что берёт быстрый ответ. */
     private data class Planned(
         val courseId: Uuid,
+        val intakeId: Uuid,
         val packageId: Uuid,
         val amount: Dose
     )

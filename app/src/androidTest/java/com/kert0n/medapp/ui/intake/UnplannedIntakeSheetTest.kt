@@ -58,7 +58,8 @@ class UnplannedIntakeSheetTest {
     ) = UnplannedIntakeUiState(
         packageName = "Нурофен",
         unit = TABLETS.toPresentationDTO(),
-        availableToMe = QuantityPresentationDTO("20", TABLETS.toPresentationDTO()),
+        free = QuantityPresentationDTO("11", TABLETS.toPresentationDTO()),
+        inTheBox = QuantityPresentationDTO("15", TABLETS.toPresentationDTO()),
         form = UnplannedIntakePresentationDTO(amount),
         error = error,
         questions = questions
@@ -85,7 +86,9 @@ class UnplannedIntakeSheetTest {
         show(taking())
 
         compose.onNodeWithText("2").assertIsDisplayed()
-        compose.onNodeWithText("Доступно мне: 20 таблетка").assertIsDisplayed()
+        // Показано то же число, по которому судит сценарий: «свободно», а не «доступно мне» —
+        // своя бронь в «доступно» входила, и человек читал обещание, которого нет.
+        compose.onNodeWithText("Свободно 11 из 15 таблетка").assertIsDisplayed()
     }
 
     /** Набранное уходит в состояние: подсказку человек переписывает, а не обходит. */

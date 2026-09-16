@@ -24,6 +24,7 @@ import com.kert0n.medapp.presentation.intake.UnplannedIntakeError
 import com.kert0n.medapp.presentation.intake.UnplannedIntakePresentationDTO
 import com.kert0n.medapp.presentation.intake.UnplannedIntakeUiState
 import com.kert0n.medapp.ui.text
+import com.kert0n.medapp.ui.words
 
 /**
  * Разовый приём (PLAN H3 №10) — листом снизу на карточке коробки: вопрос один, и ради него незачем
@@ -48,9 +49,11 @@ fun UnplannedIntakeSheet(
             verticalArrangement = Arrangement.spacedBy(16.dp)
         ) {
             Text(stringResource(R.string.intake_unplanned_title), style = MaterialTheme.typography.titleLarge)
-            state.availableToMe?.let {
+            state.free?.let {
                 Text(
-                    stringResource(R.string.intake_available_to_me, it.amount, it.unit.name),
+                    // Единица названа один раз: «свободно 11 из 15 таблеток» — обе половины об
+                    // одном и том же, и повторять её незачем.
+                    stringResource(R.string.intake_free_of_total, it.amount, state.inTheBox?.words().orEmpty()),
                     style = MaterialTheme.typography.bodyMedium,
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )

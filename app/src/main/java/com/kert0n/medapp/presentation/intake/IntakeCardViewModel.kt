@@ -4,6 +4,7 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.kert0n.medapp.domain.course.CourseSource
 import com.kert0n.medapp.domain.intake.IntakeProjection
+import com.kert0n.medapp.domain.intake.IntakeRejected
 import com.kert0n.medapp.domain.intake.IntakeStatus
 import com.kert0n.medapp.domain.value.Dose
 import com.kert0n.medapp.feature.intake.IntakeConfirmation
@@ -102,14 +103,18 @@ class IntakeCardViewModel @AssistedInject constructor(
      * (PLAN D6). Своего решения карточка не принимает — вопрос задаёт сценарий, отвечает человек.
      */
     fun confirm(acknowledged: Boolean = false) {
+        // Сторож — у самой записи, а не у её отражения: состояние собрано `stateIn` и отстаёт от
+        // записи на оборот, и второе нажатие успевало бы начать второй приём.
+        if (writing.value.busy) return
         val shown = state.value
         if (!shown.canAnswer) return
         val unit = shown.unit ?: return
-        // Пункт без плановой пачки принять неоткуда: выбор источника — следующий разговор (H3 №18).
-        val pkg = shown.packageId ?: return
-        // Набранное берётся у самого набранного, а не у состояния: между вводом и нажатием стоит
-        // поток, и палец человека его не ждёт.
+        // Набранное берётся у самого набранного: между вводом и нажатием стоит поток, и палец
+        // человека его не ждёт. Пачка — выбранная, сверенная с источниками лечения.
         val form = typed.value ?: shown.form
+        val pkg = form.packageId?.takeIf { id -> shown.sources.any { it.id == id } }
+            ?: shown.packageId
+            ?: return
         writing.value = Writing(busy = true)
         viewModelScope.launch {
             val known = vocabulary.snapshot()
@@ -123,7 +128,9 @@ class IntakeCardViewModel @AssistedInject constructor(
         }
     }
 
-    /** Момент приёма — тот, что стоит в полях: человек либо оставил сегодняшний, либо назвал свой. */
+    /**
+     * Момент приёма — тот, что стоит в полях: человек либо оставил сегодняшний, либо назвал свой.
+     */
     private fun moment(form: IntakeCardPresentationDTO, zone: ZoneId) =
         ZonedDateTime.of(
             requireNotNull(form.on) { "день приёма стоит в карточке заполненным" },
@@ -134,18 +141,30 @@ class IntakeCardViewModel @AssistedInject constructor(
     /**
      * Отказаться от приёма. Момент отказа — тот же, что у приёма: человек называет, когда это
      * было, а не «когда нажал» (PLAN D6). Ничего не списывается: расхода не было.
+     *
+     * Отказываются от того, на что ещё не отвечали: пропущенное уже пропущено, и сценарий ответил
+     * бы «уже отвечено».
      */
     fun decline() {
+        if (writing.value.busy) return
         val shown = state.value
-        if (!shown.canAnswer) return
+        if (!shown.canDecline) return
         val form = typed.value ?: shown.form
         writing.value = Writing(busy = true)
         viewModelScope.launch {
             val at = moment(form, today.observe().first().zone)
-            declining.decline(intakeId, at)
-            // Исход отказа читается из самого пункта: он станет пропущенным, и карточка уйдёт.
-            writing.value = Writing(done = true)
+            writing.value = told(declining.decline(intakeId, at))
         }
+    }
+
+    /** Чем кончился отказ: записанный уходит с карточки, остальное сказано словами по месту. */
+    private fun told(outcome: IntakeDeclining.Outcome): Writing = when (outcome) {
+        IntakeDeclining.Outcome.DECLINED -> Writing(done = true)
+        // Пункта больше нет: показывать нечего, и чтение скажет то же самое.
+        IntakeDeclining.Outcome.GONE -> Writing(done = true)
+        IntakeDeclining.Outcome.ALREADY_ANSWERED -> Writing(error = IntakeCardError.AlreadyAnswered)
+        IntakeDeclining.Outcome.EPISODE_CLOSED ->
+            Writing(error = IntakeCardError.Rejected(IntakeRejected.Reason.EPISODE_CLOSED))
     }
 
     private fun told(outcome: IntakeConfirmation.Outcome): Writing = when (outcome) {

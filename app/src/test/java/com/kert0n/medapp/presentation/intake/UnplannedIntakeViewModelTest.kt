@@ -1,6 +1,7 @@
 package com.kert0n.medapp.presentation.intake
 
 import com.kert0n.medapp.domain.intake.IntakeRejected
+import com.kert0n.medapp.domain.pack.Claims
 import com.kert0n.medapp.domain.pack.ExpiryDate
 import com.kert0n.medapp.feature.intake.UnplannedIntakeRecording
 import com.kert0n.medapp.storage.intake.IntakeOutcome
@@ -27,6 +28,7 @@ import com.kert0n.medapp.fixture.tablets
 import com.kert0n.medapp.fixture.watching
 import com.kert0n.medapp.presentation.value.QuantityPresentationError
 import com.kert0n.medapp.queue.QueueService
+import java.math.BigDecimal
 import java.time.Clock
 import java.time.Instant
 import java.time.LocalDate
@@ -48,6 +50,16 @@ class UnplannedIntakeViewModelTest {
     private val clock: Clock = Clock.fixed(Instant.parse("2026-09-16T09:00:00Z"), ZoneId.of("Europe/Moscow"))
 
     private val packages = FakePackages(pack(id = PACK, quantity = tablets("20"), defaultIntakeAmount = dose("2")))
+
+    /** Та же коробка, но часть её занята соседом по общей полке: своих пятнадцати — одиннадцать. */
+    private val reservedPackages = FakePackages(
+        pack(
+            id = PACK,
+            quantity = tablets("15"),
+            defaultIntakeAmount = dose("2"),
+            claims = Claims(total = BigDecimal("4"), mine = BigDecimal.ZERO)
+        )
+    )
 
     /** Та же коробка, но просроченная: годна была до вчера. */
     private val expiredPackages = FakePackages(
@@ -227,5 +239,20 @@ class UnplannedIntakeViewModelTest {
         }
 
         assertEquals(UnplannedIntakeError.Amount(QuantityPresentationError.EMPTY), state.error)
+    }
+
+    /**
+     * Экран показывает **то же число, по которому судит сценарий**: «свободно любому», а не
+     * «доступно мне». Своя бронь в «доступно» входила, и человек читал 15 там, где вопрос
+     * «заденет занятое» начинается с двенадцати (замечание владельца 2026-09-16).
+     */
+    @Test
+    fun theSheetShowsWhatIsFreeNotWhatIsMine() {
+        val model = viewModel(reservedPackages)
+
+        val state = watching(model.state) { it.awaiting { s -> !s.isLoading } }
+
+        assertEquals("11", state.free?.amount)
+        assertEquals("15", state.inTheBox?.amount)
     }
 }

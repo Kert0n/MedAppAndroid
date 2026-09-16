@@ -90,11 +90,13 @@ sealed interface Screen : NavKey {
      * Карточка пункта плана. Названы оба: пункт читается среди пунктов своего лечения, а именем
      * лечения карточка и подписана (PLAN H3 №18).
      */
+    @Serializable
     data class IntakeCard(val courseId: Uuid, val intakeId: Uuid) : Screen
 
     /**
      * История приёмов. Спрашивается об **одном**: или о лечении, или о коробке — и это разные
      * вопросы с разными ответами (PLAN H3 №19).
      */
+    @Serializable
     data class IntakeHistory(val courseId: Uuid? = null, val packageId: Uuid? = null) : Screen
 }

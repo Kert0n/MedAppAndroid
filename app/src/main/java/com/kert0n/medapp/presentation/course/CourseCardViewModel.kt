@@ -112,17 +112,26 @@ class CourseCardViewModel @AssistedInject constructor(
     /** Записать новый счёт доз мимо плана; второе нажатие ничего не начинает. */
     fun countOffPlan(total: Int) {
         val now = counting.value
-        val revision = revision ?: return
         if (!now.asking || now.working) return
+        // Плана нет — правят не то, что видели: сказать об этом и закрыть вопрос, иначе кнопка
+        // «Сохранить» отвечает молчанием.
+        val revision = revision ?: run {
+            counting.value = Counting(message = CourseCardMessage.Stale)
+            return
+        }
         counting.value = now.copy(asking = false, working = true)
         viewModelScope.launch {
             counting.value = told(offPlanCounting.set(courseId, revision, Doses(total)))
         }
     }
 
-    /** Прочитанное сообщение человек уносит сам: до ответа оно остаётся на экране. */
+    /**
+     * Прочитанное сообщение человек уносит сам: до ответа оно остаётся на экране. Владельцев у
+     * сообщения два — отмена и счёт приёмов, — и убираются оба: «Понятно» не должно молчать.
+     */
     fun dismissMessage() {
         cancelling.value = cancelling.value.copy(message = null)
+        counting.value = counting.value.copy(message = null)
     }
 
     /**

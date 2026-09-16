@@ -54,10 +54,15 @@ class IntakeHistoryViewModel @AssistedInject constructor(
         }
     }
 
-    /** Чьи приёмы читаем. Заголовок берётся оттуда же: он называет то, о чём человек спросил. */
+    /**
+     * Чьи приёмы читаем. Заголовок называет то, о чём человек спросил, и **переживает** это:
+     * кончившаяся коробка из живых пропадает, а её приёмы остаются — имя тогда берётся у них же,
+     * из ссылки внутри факта (PLAN D3, D6). Живую коробку спрашиваем на случай пустой истории: у
+     * неё ещё нет строк, а имя у экрана уже должно быть.
+     */
     private val subject = when {
         courseId != null -> courses.observeRecord(courseId).map { it?.title.orEmpty() }
-        else -> packages.observe(requireNotNull(packageId)).map { it?.facts?.name.orEmpty() }
+        else -> packages.observe(requireNotNull(packageId)).map { it?.facts?.name }
     }
 
     private val read = when {
@@ -75,7 +80,7 @@ class IntakeHistoryViewModel @AssistedInject constructor(
     ) { intakes, subject, records, day ->
         val titles = records.associate { it.id to it.title }
         IntakeHistoryUiState(
-            title = subject,
+            title = subject ?: intakes.firstNotNullOfOrNull { it.taken?.pkg?.name }.orEmpty(),
             // Сверху — последнее: человек открывает историю, чтобы узнать, что было недавно.
             rows = intakes.sortedByDescending { it.happenedAt }.map { it.row(titles, day.zone) }
         )

@@ -15,9 +15,11 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.pager.HorizontalPager
 import androidx.compose.foundation.pager.rememberPagerState
 import androidx.compose.material3.FilledTonalButton
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.ElevatedCard
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
@@ -28,11 +30,13 @@ import androidx.compose.ui.unit.dp
 import com.kert0n.medapp.R
 import com.kert0n.medapp.presentation.ScreenState
 import com.kert0n.medapp.presentation.plan.DayItemPresentationDTO
+import com.kert0n.medapp.presentation.plan.DayMessage
 import com.kert0n.medapp.presentation.plan.DayPagePresentationDTO
 import com.kert0n.medapp.ui.DAY
 import com.kert0n.medapp.ui.EmptyState
 import com.kert0n.medapp.ui.LoadingState
 import com.kert0n.medapp.ui.TIME
+import com.kert0n.medapp.ui.intake.text
 import com.kert0n.medapp.ui.pack.Marker
 import com.kert0n.medapp.ui.words
 import java.time.LocalTime
@@ -63,12 +67,33 @@ fun DayPages(
     onOpen: (DayItemPresentationDTO) -> Unit,
     onConfirm: (Uuid) -> Unit,
     onDecline: (Uuid) -> Unit,
+    onDismissMessage: () -> Unit,
     modifier: Modifier = Modifier
 ) {
     val pager = rememberPagerState(pageCount = { DAYS_AHEAD + 1 })
     HorizontalPager(state = pager, modifier = modifier.fillMaxSize()) { daysAhead ->
-        DayPage(page(daysAhead), onOpen, onConfirm, onDecline)
+        val state = page(daysAhead)
+        DayPage(state, onOpen, onConfirm, onDecline)
+        // Записать не вышло — сказано словами: молчание после нажатия человек читает как успех.
+        (state as? ScreenState.Ready)?.value?.message?.let {
+            AlertDialog(
+                onDismissRequest = onDismissMessage,
+                text = { Text(it.words()) },
+                confirmButton = {
+                    TextButton(onClick = onDismissMessage) { Text(stringResource(R.string.action_got_it)) }
+                }
+            )
+        }
     }
+}
+
+/** Слова беды подбирает экран: причина — значение, и текст к ней живёт в `R.string.*` (PLAN H1). */
+@Composable
+private fun DayMessage.words(): String = when (this) {
+    is DayMessage.Refused -> stringResource(reason.text)
+    DayMessage.AlreadyAnswered -> stringResource(R.string.intake_already_answered)
+    DayMessage.EpisodeClosed -> stringResource(R.string.intake_episode_closed)
+    DayMessage.Gone -> stringResource(R.string.intake_card_gone)
 }
 
 /** Один день: заголовок с датой, пункты и то, что пришлось на этот день помимо них. */
@@ -145,8 +170,11 @@ private fun LazyListScope.shelf(
  * отводит карточке ровно этот случай — содержимое и действия об одном предмете. Список аптечек
  * устроен так же.
  *
- * Сверху вниз: время и состояние в одной строке, выровненные по её центру; лечение; доза и коробка;
- * действия — внизу справа. Значок повторяет слово глазу и потому экранному чтецу не адресуется.
+ * Слева — время и состояние в одной строке, под ними лечение, доза и коробка; справа, по центру по
+ * вертикали, — действия столбиком. Текст забирает остаток ширины, кнопки меряются своими словами:
+ * вес на кнопке уравнял бы их и порезал текст, а действие в отдельной нижней строке растягивало
+ * карточку под одну кнопку (замечания владельца 2026-09-16). Значок повторяет слово глазу и потому
+ * экранному чтецу не адресуется.
  *
  * Нажимается карточка целиком и ведёт на карточку пункта — туда, где приём меняют, а не отвечают
  * наспех.
@@ -164,38 +192,42 @@ private fun DayCard(
         enabled = intakeId != null,
         modifier = Modifier.fillMaxWidth()
     ) {
-        Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
-            Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
-                Text(
-                    TIME.format(item.at),
-                    style = MaterialTheme.typography.titleMedium,
-                    modifier = Modifier.weight(1f)
-                )
-                if (item.tellsItsState) {
-                    Marker(item.state.icon, item.stateWords(), MaterialTheme.colorScheme.onSurfaceVariant)
-                }
-            }
-            Text(item.title, style = MaterialTheme.typography.bodyLarge)
-            Text(
-                item.details(),
-                style = MaterialTheme.typography.bodyMedium,
-                color = MaterialTheme.colorScheme.onSurfaceVariant
-            )
-            if (intakeId != null && (item.canDecline || item.canConfirm)) {
-                // Кнопки карточки стоят в её нижнем конце, а не посреди содержимого (Material 3).
-                Row(
-                    Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.spacedBy(8.dp, Alignment.End),
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    if (item.canDecline) {
-                        TextButton(onClick = { onDecline(intakeId) }, enabled = !item.isAnswering) {
-                            Text(stringResource(R.string.intake_decline))
-                        }
+        Row(
+            Modifier.padding(16.dp).fillMaxWidth(),
+            horizontalArrangement = Arrangement.spacedBy(12.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            // Текст забирает остаток ширины, действия меряются своими словами: вес на кнопке
+            // уравнял бы их и порезал текст (замечание владельца 2026-09-16).
+            Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                Row(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.CenterVertically) {
+                    Text(TIME.format(item.at), style = MaterialTheme.typography.titleMedium)
+                    if (item.tellsItsState) {
+                        Marker(item.state.icon, item.stateWords(), MaterialTheme.colorScheme.onSurfaceVariant)
                     }
+                }
+                Text(item.title, style = MaterialTheme.typography.bodyLarge)
+                Text(
+                    item.details(),
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            }
+            // Действия — столбиком справа и по центру: одно действие не заводит под себя целую
+            // новую строку и не растягивает карточку.
+            if (intakeId != null && (item.canDecline || item.canConfirm)) {
+                Column(
+                    horizontalAlignment = Alignment.End,
+                    verticalArrangement = Arrangement.spacedBy(4.dp)
+                ) {
                     if (item.canConfirm) {
                         FilledTonalButton(onClick = { onConfirm(intakeId) }, enabled = !item.isAnswering) {
                             Text(stringResource(R.string.intake_confirm))
+                        }
+                    }
+                    if (item.canDecline) {
+                        TextButton(onClick = { onDecline(intakeId) }, enabled = !item.isAnswering) {
+                            Text(stringResource(R.string.intake_decline))
                         }
                     }
                 }

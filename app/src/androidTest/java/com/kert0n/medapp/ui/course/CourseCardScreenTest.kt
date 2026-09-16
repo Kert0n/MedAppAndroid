@@ -194,12 +194,17 @@ class CourseCardScreenTest {
         compose.onNodeWithText("Этого лечения больше нет.").assertIsDisplayed()
     }
 
-    /** Поправка счёта спрашивается, а не пишется с нажатия: число уедет в прогресс (PLAN D5). */
+    /**
+     * Приёмы вне расписания — переход со значком и стрелкой, а не текстовая кнопка: кнопкой он
+     * читался как заголовок (замечание владельца 2026-09-16). Счёт назван приёмами: лечение меряет
+     * себя ими, и третье слово о том же сбивает.
+     */
     @Test
     fun theOffPlanCountIsAskedBeforeItIsWritten() {
         show(CourseCardUiState(course = course(), isRunning = true, offPlanDoses = 1))
 
-        compose.onNodeWithText("Принято мимо плана: 1").performClick()
+        compose.onNodeWithText("1 приём").assertIsDisplayed()
+        compose.onNodeWithText("Приёмы вне расписания").performClick()
 
         assertEquals(1, askedOffPlan)
     }
