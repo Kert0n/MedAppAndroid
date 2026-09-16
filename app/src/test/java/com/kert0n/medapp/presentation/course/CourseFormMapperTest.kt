@@ -42,6 +42,11 @@ class CourseFormMapperTest {
         zone = MOSCOW
     )
 
+    /**
+     * Черновику довольно названия, а пустая заметка — **отсутствие**, а не пустая строка: иначе
+     * «записал у врача, куплю завтра» не сохранить, а в базе заводятся пустые заметки (H3 §15, D5).
+     * Пробелы вокруг названия не его часть — иначе «Нурофен» и «Нурофен » разные лечения.
+     */
     @Test
     fun aTitleAloneIsEnoughAndAnEmptyNoteIsAbsence() {
         val parsed = CourseFormPresentationDTO(title = "  Нурофен  ", note = "  ").parsed(VOCABULARY)
@@ -70,6 +75,10 @@ class CourseFormMapperTest {
         assertEquals(ParsedInput.Parsed(CourseDescription("Нурофен", null, dose = null, form = TABLET_FORM)), parsed)
     }
 
+    /**
+     * Название обязательно, и отказ называет своё поле: без него лечение не отличить в списке, а
+     * безымянный отказ человеку некуда приложить (H3 §15).
+     */
     @Test
     fun anEmptyTitleIsRefusedByName() {
         assertEquals(
@@ -155,6 +164,10 @@ class CourseFormMapperTest {
         assertEquals(listOf(LocalTime.of(8, 15), LocalTime.of(9, 0)), parsed.value.schedule?.times)
     }
 
+    /**
+     * Приёмов бывает целое положительное число: без правила ноль, дробь и слово уезжают в домен,
+     * который ждёт готовую величину, — и расписание строится по мусору (H1, D5).
+     */
     @Test
     fun theNumberOfDosesIsAWholePositiveNumber() {
         assertEquals(ParsedInput.Rejected(CourseFormError.Input.TOTAL_DOSES_INVALID), full().copy(totalDoses = "0").parsed(VOCABULARY))
@@ -172,6 +185,10 @@ class CourseFormMapperTest {
         assertEquals(null, full().copy(days = emptySet()).expectedEnd())
     }
 
+    /**
+     * Записанный черновик возвращается в форму тем же, чем был набран: иначе человек правит не то,
+     * что видел, и «Сохранить» переписывает поля, которых он не трогал (U1 «ввод не затирается»).
+     */
     @Test
     fun aStoredDraftComesBackAsItWasTyped() {
         val stored = course(

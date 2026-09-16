@@ -18,6 +18,10 @@ import org.junit.Test
 /** Лечение в строке списка (PLAN H3 №13): что записано — то и сказано, нехватка — числом и днём. */
 class CoursePresentationMapperTest {
 
+    /**
+     * Черновик показывает ровно то, что записано: без этого правила строка списка достраивает
+     * ненабранное — расписание и форму, которых человек не называл (PLAN D5 «Черновик»).
+     */
     @Test
     fun aDraftShowsOnlyWhatIsWrittenSoFar() {
         val row = course(title = "Нурофен", dose = dose("2")).projection().toPresentationDTO()
@@ -48,6 +52,10 @@ class CoursePresentationMapperTest {
         assertEquals(ShortagePresentationDTO(missingDoses = 4, firstUncoveredOn = LocalDate.of(2027, 3, 4)), row.shortage)
     }
 
+    /**
+     * Обеспеченному лечению нехватки нет: иначе значок и слова «не хватает» встали бы у курса,
+     * которому всего хватает, и человек пошёл бы покупать лишнее (PLAN D8).
+     */
     @Test
     fun aFullyCoveredCourseHasNoShortage() {
         val coverage = CourseCoverage(Doses(7), Doses(7), coveredUntil = null, firstUncoveredAt = null, zone = MOSCOW, perSource = emptyList())

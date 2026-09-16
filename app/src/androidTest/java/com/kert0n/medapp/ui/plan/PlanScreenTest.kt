@@ -113,6 +113,10 @@ class PlanScreenTest {
         assertEquals(1, added)
     }
 
+    /**
+     * До первого чтения — ожидание, а не «лечений пока нет»: пустота, показанная вместо загрузки,
+     * зовёт заводить второе лечение поверх уже записанного (U1).
+     */
     @Test
     fun theListWaitsForTheFirstReading() {
         show(ScreenState.Loading)

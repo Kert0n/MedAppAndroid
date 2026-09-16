@@ -151,6 +151,10 @@ class CourseFormScreenTest {
         compose.onNodeWithText("Чтобы начать, укажите расписание.").assertIsDisplayed()
     }
 
+    /**
+     * Пропавший черновик назван словами, а не показан пустой формой: заполнив её, человек нажал бы
+     * «Сохранить» и не понял, куда делась правка (наследство разбора #16).
+     */
     @Test
     fun aDraftThatIsGoneIsToldAboutInsteadOfAnEmptyForm() {
         show(CourseFormUiState.Gone)
@@ -186,6 +190,10 @@ class CourseFormScreenTest {
         assertEquals(0, confirmed)
     }
 
+    /**
+     * Вопрос об удалении называет, что пропадёт: «удалить?» без последствий человек читает как
+     * «закрыть», и записанное врачом назначение уходит молча (H3, список подтверждений).
+     */
     @Test
     fun theQuestionNamesWhatWillBeLost() {
         show(editing(mode = CourseFormUiState.Mode.DRAFT, asksToDiscard = true))

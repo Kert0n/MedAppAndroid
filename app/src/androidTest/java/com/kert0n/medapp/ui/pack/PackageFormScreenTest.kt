@@ -176,6 +176,10 @@ class PackageFormScreenTest {
         assertEquals(1, recounted)
     }
 
+    /**
+     * «Отмена» уводит с формы и **ничего не пишет**: иначе передумавший человек заводит коробку,
+     * которой не хотел, и ищет потом, откуда она взялась (PLAN H3 №7).
+     */
     @Test
     fun cancellingWritesNothing() {
         show(adding())

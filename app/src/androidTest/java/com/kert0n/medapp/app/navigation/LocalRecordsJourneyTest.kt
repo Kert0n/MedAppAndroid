@@ -60,6 +60,10 @@ class LocalRecordsJourneyTest {
         compose.setContent { MedAppTheme { MedAppShell() } }
     }
 
+    /**
+     * С пустого места человек заводит первую полку и сразу видит её в списке: без этого пути
+     * приложение после установки — тупик, из которого некуда нажать (PLAN H3 №2).
+     */
     @Test
     fun aShelfIsCreatedFromTheEmptyListAndShowsUpThere() {
         compose.onNodeWithText("Завести аптечку").performClick()

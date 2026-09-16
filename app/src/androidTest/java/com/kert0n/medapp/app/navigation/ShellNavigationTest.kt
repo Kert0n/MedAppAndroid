@@ -48,6 +48,10 @@ class ShellNavigationTest {
      */
     private fun place(name: String) = compose.onNode(isSelectable() and hasText(name))
 
+    /**
+     * Пять мест на месте, и человек стоит в первом: без этого правила приложение открывается
+     * неизвестно где, а пропавшее место делает свои экраны недостижимыми (PLAN H3 «Оболочка»).
+     */
     @Test
     fun allFivePlacesAreThereAndTheFirstIsSelected() {
         compose.setContent { MedAppTheme { MedAppShell() } }
@@ -58,6 +62,7 @@ class ShellNavigationTest {
         place("Аптечки").assertIsSelected()
     }
 
+    /** Нажатие на место ведёт в него: иначе выбранная вкладка расходится с тем, что показано. */
     @Test
     fun tappingAPlaceGoesThere() {
         compose.setContent { MedAppTheme { MedAppShell() } }

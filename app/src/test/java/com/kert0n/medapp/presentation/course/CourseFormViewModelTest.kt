@@ -131,6 +131,10 @@ class CourseFormViewModelTest {
         assertTrue(draft.sources.isEmpty())
     }
 
+    /**
+     * Открытый черновик правится **на месте**: без этого правила «Сохранить» заводит второй
+     * черновик, и в списке оказываются два лечения там, где человек вёл одно (H3 §15).
+     */
     @Test
     fun aDraftOpensWithWhatIsWrittenAndIsRenamedInPlace() {
         courses.holding(course(id = COURSE, title = "Нурофен"))
@@ -159,6 +163,10 @@ class CourseFormViewModelTest {
         assertEquals(CourseFormUiState.Gone, state)
     }
 
+    /**
+     * Отказ снимается вводом: иначе названная причина висит над уже исправленным полем и человек
+     * не понимает, чего от него ещё хотят (H3 §15).
+     */
     @Test
     fun anEmptyTitleIsRefusedAndTypingClearsTheRefusal() {
         val model = viewModel()
@@ -324,6 +332,10 @@ class CourseFormViewModelTest {
         assertTrue(courses.drafts.isEmpty())
     }
 
+    /**
+     * Удалять ещё нечего: у незаписанного черновика нет номера, и вопрос «удалить?» обещал бы
+     * действие, которого не существует (H3 §15).
+     */
     @Test
     fun aNewDraftCannotBeDiscardedBeforeItExists() {
         val model = viewModel()

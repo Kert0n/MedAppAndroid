@@ -21,18 +21,21 @@ class UsualUnitsTest {
 
     private fun form(name: String) = FormPresentationDTO(Uuid.random(), name)
 
+    /** Штучное считают штуками: без пары «таблетки → шт» человек набирает единицу руками каждый раз. */
     @Test
     fun tabletsAreCountedInPieces() {
         assertEquals(pieces, form("таблетки").usualUnit(units))
         assertEquals(pieces, form("капсулы").usualUnit(units))
     }
 
+    /** Жидкое меряют миллилитрами: подсказка «шт» у сиропа хуже пустого поля — её пришлось бы стирать. */
     @Test
     fun liquidsAreMeasuredInMillilitres() {
         assertEquals(millilitres, form("сироп").usualUnit(units))
         assertEquals(millilitres, form("капли").usualUnit(units))
     }
 
+    /** Мазь меряют граммами: своя пара у каждой уверенной формы, иначе подсказка молчит там, где могла бы помочь. */
     @Test
     fun ointmentsAreMeasuredInGrams() {
         assertEquals(grams, form("мазь").usualUnit(units))

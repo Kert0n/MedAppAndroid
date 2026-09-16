@@ -32,6 +32,10 @@ class CourseListViewModelTest {
         return (state as ScreenState.Ready).value
     }
 
+    /**
+     * Три полки списка различает исход эпизода, а не что-нибудь ещё: без этого правила черновик
+     * попадает к идущим, а законченное лечение остаётся среди них навсегда (PLAN H3 №13).
+     */
     @Test
     fun runningDraftsAndFinishedAreThreeShelves() {
         val running = Uuid.parse("00000000-0000-4000-8000-000000000051")
@@ -77,6 +81,11 @@ class CourseListViewModelTest {
         assertEquals(listOf("Новое", "Старое"), listed().finished.map { it.title })
     }
 
+    /**
+     * Пусто — это пустой список, а не вечное ожидание: без первого чтения экран показывал бы
+     * кружок там, где человеку надо предложить завести первое лечение (U1, «до первого чтения —
+     * загрузка, а не пустота»).
+     */
     @Test
     fun anEmptyStoreIsAnEmptyListNotLoading() {
         assertEquals(true, listed().isEmpty)
