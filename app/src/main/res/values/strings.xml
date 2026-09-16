@@ -125,7 +125,7 @@
     <string name="contents_everywhere_title">Все лекарства</string>
     <string name="contents_search_here">Поиск по аптечке</string>
     <string name="contents_search_everywhere">Поиск по всем аптечкам</string>
-    <string name="contents_search_clear">Очистить поиск</string>
+    <string name="action_clear_search">Очистить поиск</string>
     <string name="contents_menu">Что сделать с аптечкой</string>
     <string name="contents_edit">Править</string>
     <string name="contents_remove">Убрать</string>
@@ -410,6 +410,8 @@
     <string name="course_attach_other_unit">Другая единица измерения.</string>
     <string name="course_attach_unusable">Выброшена или утрачена — ждёт ответа.</string>
     <string name="course_attach_incomplete">Сначала укажите дозу и форму лечения.</string>
+    <string name="course_picking_search">Поиск по названию</string>
+    <string name="course_picking_nothing_found">Ничего не нашлось. Попробуйте другое название.</string>
     <string name="course_picking_empty">Подходящих пачек нет: заведите коробку на полке или укажите ей форму.</string>
     <string name="action_got_it">Понятно</string>
 </resources>

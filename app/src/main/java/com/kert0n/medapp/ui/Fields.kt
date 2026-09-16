@@ -242,3 +242,35 @@ internal val MoneyPresentationError.text: Int
         MoneyPresentationError.UNKNOWN_CURRENCY -> R.string.price_unknown_currency
         MoneyPresentationError.OUT_OF_CURRENCY_RANGE -> R.string.price_too_big
     }
+
+/**
+ * Поиск по списку: строка с крестиком, который её очищает. Один и тот же на полке и в выборе
+ * источника — искать человек привык одинаково, и двум копиям этого поля незачем расходиться.
+ *
+ * Отбор поле не делает: оно отдаёт набранное тому, кто спрашивает хранение (PLAN H4).
+ */
+@Composable
+fun SearchField(
+    value: String,
+    onValueChange: (String) -> Unit,
+    label: String,
+    modifier: Modifier = Modifier
+) {
+    OutlinedTextField(
+        value = value,
+        onValueChange = onValueChange,
+        singleLine = true,
+        label = { Text(label) },
+        trailingIcon = {
+            if (value.isNotEmpty()) {
+                IconButton(onClick = { onValueChange("") }) {
+                    Icon(
+                        painterResource(R.drawable.ic_close),
+                        contentDescription = stringResource(R.string.action_clear_search)
+                    )
+                }
+            }
+        },
+        modifier = modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 8.dp)
+    )
+}

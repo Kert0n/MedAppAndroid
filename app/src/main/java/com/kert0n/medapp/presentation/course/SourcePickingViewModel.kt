@@ -87,7 +87,12 @@ class SourcePickingViewModel @AssistedInject constructor(
     private val shelves = days
         .flatMapLatest { date -> medKits.observeAll(date).map { kits -> kits.associate { it.id to it.name } } }
 
-    private val boxes = days.flatMapLatest { date -> packages.list(PackageQuery(), date) }
+    /** Что человек ищет. Отбор по названию делает хранение — тем же запросом, что и на полке (H4). */
+    private val query = MutableStateFlow("")
+
+    private val boxes = combine(days, query) { date, text -> date to text }
+        .distinctUntilChanged()
+        .flatMapLatest { (date, text) -> packages.list(PackageQuery(text = text), date) }
 
     /** Чем назван курс, держащий коробку: имя лечения живёт у записи эпизода, а не у плана (D5). */
     private val titles = courses.observeRecords()
@@ -98,19 +103,25 @@ class SourcePickingViewModel @AssistedInject constructor(
         boxes,
         shelves,
         titles,
-        attaching
-    ) { reading, boxes, shelves, titles, attaching ->
+        combine(attaching, query) { attaching, text -> attaching to text }
+    ) { reading, boxes, shelves, titles, (attaching, text) ->
         val stored = reading.stored
-        if (stored == null) SourcePickingUiState(isGone = true)
+        if (stored == null) SourcePickingUiState(isGone = true, text = text)
         else SourcePickingUiState(
             packages = boxes.map {
                 it.toAttachmentPresentationDTO(shelves[it.medKit.id], stored.attachability(it, titles))
             },
+            text = text,
             isAttached = attaching.attached,
             isAttaching = attaching.busy,
             message = attaching.message
         )
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), SourcePickingUiState(isLoading = true))
+
+    /** Искать по названию: пустая строка — снова все коробки. */
+    fun search(text: String) {
+        query.value = text
+    }
 
     init {
         viewModelScope.launch { stored.collect { latest.value = Reading(it) } }
@@ -210,6 +221,8 @@ class SourcePickingViewModel @AssistedInject constructor(
  */
 data class SourcePickingUiState(
     val packages: List<PackageAttachmentPresentationDTO> = emptyList(),
+    /** Что набрано в поиске: пусто — показаны все коробки. */
+    val text: String = "",
     val isLoading: Boolean = false,
     val isGone: Boolean = false,
     val isAttaching: Boolean = false,

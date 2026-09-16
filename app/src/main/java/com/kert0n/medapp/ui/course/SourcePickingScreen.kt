@@ -29,6 +29,7 @@ import com.kert0n.medapp.presentation.course.SourcePickingUiState
 import com.kert0n.medapp.ui.EmptyState
 import com.kert0n.medapp.ui.ErrorMessage
 import com.kert0n.medapp.ui.LoadingState
+import com.kert0n.medapp.ui.SearchField
 import kotlin.uuid.Uuid
 
 /**
@@ -40,6 +41,7 @@ import kotlin.uuid.Uuid
 fun SourcePickingScreen(
     state: SourcePickingUiState,
     onAttach: (Uuid) -> Unit,
+    onSearch: (String) -> Unit,
     onBack: () -> Unit,
     modifier: Modifier = Modifier
 ) {
@@ -65,11 +67,12 @@ fun SourcePickingScreen(
                 text = stringResource(R.string.course_missing),
                 modifier = Modifier.padding(padding)
             )
-            state.packages.isEmpty() -> EmptyState(
-                text = stringResource(R.string.course_picking_empty),
-                modifier = Modifier.padding(padding)
-            )
             else -> Column(Modifier.padding(padding).fillMaxSize()) {
+                SearchField(
+                    value = state.text,
+                    onValueChange = onSearch,
+                    label = stringResource(R.string.course_picking_search)
+                )
                 state.message?.let {
                     Text(
                         it.words(),
@@ -77,9 +80,21 @@ fun SourcePickingScreen(
                         modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp)
                     )
                 }
-                LazyColumn(Modifier.fillMaxSize()) {
-                    items(state.packages, key = { it.packageId }) { pack ->
-                        PackageRow(pack, onAttach = { onAttach(pack.packageId) }, enabled = !state.isAttaching)
+                // Ничего не нашлось — это не «коробок нет»: запрос остаётся на месте, иначе
+                // сбрасывать было бы нечего.
+                if (state.packages.isEmpty()) {
+                    EmptyState(
+                        text = stringResource(
+                            if (state.text.isEmpty()) R.string.course_picking_empty
+                            else R.string.course_picking_nothing_found
+                        ),
+                        modifier = Modifier.fillMaxSize()
+                    )
+                } else {
+                    LazyColumn(Modifier.fillMaxSize()) {
+                        items(state.packages, key = { it.packageId }) { pack ->
+                            PackageRow(pack, onAttach = { onAttach(pack.packageId) }, enabled = !state.isAttaching)
+                        }
                     }
                 }
             }

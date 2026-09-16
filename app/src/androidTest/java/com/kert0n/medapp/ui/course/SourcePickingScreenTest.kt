@@ -4,6 +4,7 @@ import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.junit4.v2.createComposeRule
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
+import androidx.compose.ui.test.performTextInput
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import com.kert0n.medapp.fixture.PACK
 import com.kert0n.medapp.fixture.TABLETS
@@ -28,11 +29,17 @@ class SourcePickingScreenTest {
     val compose = createComposeRule()
 
     private var attached: Uuid? = null
+    private var searched: String? = null
 
     private fun show(state: SourcePickingUiState) {
         compose.setContent {
             MedAppTheme {
-                SourcePickingScreen(state = state, onAttach = { attached = it }, onBack = {})
+                SourcePickingScreen(
+                    state = state,
+                    onAttach = { attached = it },
+                    onSearch = { searched = it },
+                    onBack = {}
+                )
             }
         }
     }
@@ -85,6 +92,24 @@ class SourcePickingScreenTest {
         assertNull(attached)
         compose.onNodeWithText("Укажите форму выпуска у этой пачки, чтобы подключить её к курсу.")
             .assertIsDisplayed()
+    }
+
+    /** Коробок много — их ищут по названию, как на полке (PLAN H4). */
+    @Test
+    fun boxesAreSearchedByName() {
+        show(SourcePickingUiState(packages = listOf(candidate())))
+
+        compose.onNodeWithText("Поиск по названию").performTextInput("нуро")
+
+        assertEquals("нуро", searched)
+    }
+
+    /** Ничего не нашлось — это не «коробок нет»: запрос остаётся, и сказано другое. */
+    @Test
+    fun nothingFoundIsNotTheSameAsNothingAtAll() {
+        show(SourcePickingUiState(text = "варфарин"))
+
+        compose.onNodeWithText("Ничего не нашлось. Попробуйте другое название.").assertIsDisplayed()
     }
 
     /** Подключать нечего — сказано, что с этим делать. */

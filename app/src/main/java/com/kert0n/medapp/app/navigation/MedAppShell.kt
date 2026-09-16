@@ -323,7 +323,12 @@ private fun screens(stacks: TabStacks) = entryProvider<NavKey> {
         val state = model.state.collectAsStateWithLifecycle().value
         // Подключённая коробка ждёт человека в стеке: там он и решит, сколько из неё брать.
         LaunchedEffect(state.isAttached) { if (state.isAttached) stacks.back() }
-        SourcePickingScreen(state = state, onAttach = model::attach, onBack = stacks::back)
+        SourcePickingScreen(
+            state = state,
+            onAttach = model::attach,
+            onSearch = model::search,
+            onBack = stacks::back
+        )
     }
     for (place in Place.entries - Place.MED_KITS - Place.PLAN) {
         entry(place.key) { NotReadyYet() }
