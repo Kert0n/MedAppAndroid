@@ -80,6 +80,12 @@ class CoursesJourneyTest {
         }
         compose.setContent { MedAppTheme { MedAppShell() } }
         compose.onNodeWithText("План").performClick()
+        // До первого чтения место ждёт, а не показывает пустоту (U1). На Sm29 это заметно: там
+        // проход успевал нажать раньше, чем список появлялся.
+        compose.waitUntil(WAIT) {
+            compose.onAllNodesWithText("Записать лечение").fetchSemanticsNodes().isNotEmpty() ||
+                compose.onAllNodesWithText("Черновики").fetchSemanticsNodes().isNotEmpty()
+        }
     }
 
     /** Черновик с одним названием и заметкой сохраняется: «записал у врача, куплю завтра» (D5). */
@@ -126,7 +132,9 @@ class CoursesJourneyTest {
         compose.onNodeWithText("Пачек пока нет — подключите первую.").assertIsDisplayed()
         compose.onNodeWithText("Подключить ещё").performClick()
         // Коробка на полке есть, но подключать её не к чему: доза и форма лечения не названы.
-        compose.onNodeWithText("Сначала укажите дозу и форму лечения.").assertIsDisplayed()
+        // На 360×640 dp причина лежит второй строкой ниже сгиба — до неё долистывают.
+        compose.onNodeWithText("Сначала укажите дозу и форму лечения.")
+            .performScrollTo().assertIsDisplayed()
 
         val held = runBlocking { database.packageRepository().projection(PACK)?.holdingCourseId }
         assertNull(held)

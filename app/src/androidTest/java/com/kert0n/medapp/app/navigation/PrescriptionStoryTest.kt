@@ -89,6 +89,10 @@ class PrescriptionStoryTest {
     /** У врача времени нет: одно название и заметка. Черновик виден в списке и говорит, что записано. */
     private fun inTheCorridorSheWritesDownTheName() {
         compose.onNodeWithText("План").performClick()
+        // До первого чтения место «План» ждёт, а не показывает пустоту (U1): дожидаемся.
+        compose.waitUntil(5_000) {
+            compose.onAllNodesWithText("Записать лечение").fetchSemanticsNodes().isNotEmpty()
+        }
         compose.onNodeWithText("Записать лечение").performClick()
         compose.onNodeWithText("Название").performTextInput("Нурофен")
         compose.onNodeWithText("Заметка (необязательно)").performTextInput("по 2 после еды, купить")

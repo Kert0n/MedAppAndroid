@@ -6,6 +6,7 @@ import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performTextInput
+import androidx.test.espresso.Espresso.closeSoftKeyboard
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import com.kert0n.medapp.fixture.PACK
 import com.kert0n.medapp.fixture.pack
@@ -83,6 +84,8 @@ class PackageRecountScreenTest {
         show(recount())
 
         compose.onNodeWithText("Пересчитал и увидел").performTextInput("17")
+        // Подвал уходит на время ввода: человек убирает клавиатуру, чтобы нажать (H3 «Дизайн»).
+        closeSoftKeyboard()
         compose.onNodeWithText("Записать").performClick()
 
         assertEquals(PackageRecountPresentationDTO("17"), edited)
