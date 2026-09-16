@@ -24,6 +24,7 @@ import com.kert0n.medapp.presentation.course.CourseListPresentationDTO
 import com.kert0n.medapp.presentation.course.CoursePresentationDTO
 import com.kert0n.medapp.presentation.plan.DayItemPresentationDTO
 import com.kert0n.medapp.presentation.plan.DayPagePresentationDTO
+import com.kert0n.medapp.presentation.plan.DayPermissionsPresentationDTO
 import kotlin.uuid.Uuid
 import com.kert0n.medapp.ui.course.CourseListContent
 
@@ -42,10 +43,13 @@ fun PlanScreen(
     onMode: (PlanMode) -> Unit,
     courses: ScreenState<CourseListPresentationDTO>,
     dayPage: @Composable (daysAhead: Int) -> ScreenState<DayPagePresentationDTO>,
+    dayPermissions: DayPermissionsPresentationDTO,
     onOpenIntake: (DayItemPresentationDTO) -> Unit,
     onConfirmIntake: (Uuid) -> Unit,
     onDeclineIntake: (Uuid) -> Unit,
     onDismissDayMessage: () -> Unit,
+    onFixNotifications: () -> Unit,
+    onFixAlarms: () -> Unit,
     onOpenCourse: (CoursePresentationDTO) -> Unit,
     onAddCourse: () -> Unit,
     modifier: Modifier = Modifier
@@ -77,10 +81,13 @@ fun PlanScreen(
             when (mode) {
                 PlanMode.DAY -> DayPages(
                     page = dayPage,
+                    permissions = dayPermissions,
                     onOpen = onOpenIntake,
                     onConfirm = onConfirmIntake,
                     onDecline = onDeclineIntake,
                     onDismissMessage = onDismissDayMessage,
+                    onFixNotifications = onFixNotifications,
+                    onFixAlarms = onFixAlarms,
                     modifier = Modifier.fillMaxSize()
                 )
                 PlanMode.COURSES -> CourseListContent(

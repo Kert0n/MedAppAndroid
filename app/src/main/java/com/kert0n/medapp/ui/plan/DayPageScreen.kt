@@ -30,12 +30,14 @@ import com.kert0n.medapp.R
 import com.kert0n.medapp.presentation.ScreenState
 import com.kert0n.medapp.presentation.plan.DayItemPresentationDTO
 import com.kert0n.medapp.presentation.plan.DayMessage
+import com.kert0n.medapp.presentation.plan.DayPermissionsPresentationDTO
 import com.kert0n.medapp.presentation.plan.DayPagePresentationDTO
 import com.kert0n.medapp.ui.DAY
 import com.kert0n.medapp.ui.EmptyState
 import com.kert0n.medapp.ui.LoadingState
 import com.kert0n.medapp.ui.TIME
 import com.kert0n.medapp.ui.intake.text
+import com.kert0n.medapp.ui.NavigationRow
 import com.kert0n.medapp.ui.pack.Marker
 import com.kert0n.medapp.ui.words
 import java.time.LocalTime
@@ -63,16 +65,19 @@ private const val DAYS_AHEAD = 60
 @Composable
 fun DayPages(
     page: @Composable (daysAhead: Int) -> ScreenState<DayPagePresentationDTO>,
+    permissions: DayPermissionsPresentationDTO,
     onOpen: (DayItemPresentationDTO) -> Unit,
     onConfirm: (Uuid) -> Unit,
     onDecline: (Uuid) -> Unit,
     onDismissMessage: () -> Unit,
+    onFixNotifications: () -> Unit,
+    onFixAlarms: () -> Unit,
     modifier: Modifier = Modifier
 ) {
     val pager = rememberPagerState(pageCount = { DAYS_AHEAD + 1 })
     HorizontalPager(state = pager, modifier = modifier.fillMaxSize()) { daysAhead ->
         val state = page(daysAhead)
-        DayPage(state, onOpen, onConfirm, onDecline)
+        DayPage(state, permissions, onOpen, onConfirm, onDecline, onFixNotifications, onFixAlarms)
         // Записать не вышло — сказано словами: молчание после нажатия человек читает как успех.
         (state as? ScreenState.Ready)?.value?.message?.let {
             AlertDialog(
@@ -99,9 +104,12 @@ private fun DayMessage.words(): String = when (this) {
 @Composable
 private fun DayPage(
     state: ScreenState<DayPagePresentationDTO>,
+    permissions: DayPermissionsPresentationDTO,
     onOpen: (DayItemPresentationDTO) -> Unit,
     onConfirm: (Uuid) -> Unit,
-    onDecline: (Uuid) -> Unit
+    onDecline: (Uuid) -> Unit,
+    onFixNotifications: () -> Unit,
+    onFixAlarms: () -> Unit
 ) {
     val day = (state as? ScreenState.Ready)?.value
     // Первое чтение базы ещё не пришло: говорить «ничего не назначено» рано — это была бы неправда.
@@ -115,6 +123,25 @@ private fun DayPage(
             style = MaterialTheme.typography.titleMedium,
             modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp)
         )
+        // Что мешает напомнить вовремя — над днём: человек пришёл сам, потому что телефон
+        // промолчал, и первое, что он должен узнать, — почему (PLAN H3 «Уведомления на экране»).
+        if (permissions.notificationsOff) {
+            NavigationRow(
+                icon = R.drawable.ic_warning,
+                text = stringResource(R.string.plan_notifications_off),
+                supporting = stringResource(R.string.plan_notifications_off_hint),
+                onClick = onFixNotifications,
+                color = MaterialTheme.colorScheme.error
+            )
+        }
+        if (permissions.alarmsInexact) {
+            NavigationRow(
+                icon = R.drawable.ic_schedule,
+                text = stringResource(R.string.plan_alarms_inexact),
+                supporting = stringResource(R.string.plan_alarms_inexact_hint),
+                onClick = onFixAlarms
+            )
+        }
         if (day.isEmpty) {
             EmptyState(text = stringResource(R.string.plan_day_empty), modifier = Modifier.fillMaxSize())
             return

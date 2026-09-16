@@ -5,6 +5,7 @@ import androidx.lifecycle.viewModelScope
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import com.kert0n.medapp.feature.plan.DayPlanning
 import com.kert0n.medapp.feature.time.Today
+import com.kert0n.medapp.fixture.AllAllowed
 import com.kert0n.medapp.fixture.QuietClock
 import com.kert0n.medapp.fixture.Scenarios
 import com.kert0n.medapp.fixture.awaiting
@@ -62,6 +63,7 @@ class DayPagesTest {
         planning = DayPlanning(Today(clock, QuietClock), database.reportRepository()),
         confirmation = scenarios.intakeConfirmation,
         declining = scenarios.intakeDeclining,
+        devicePermissions = AllAllowed,
         clock = clock
     ).also { opened += it }
 

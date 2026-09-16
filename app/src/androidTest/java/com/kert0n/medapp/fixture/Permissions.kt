@@ -22,3 +22,15 @@ fun allowNotifications() {
         Manifest.permission.POST_NOTIFICATIONS
     )
 }
+
+/**
+ * Разрешения, о которых проверка не спрашивает: всё позволено. Отказ — предмет своих проверок, и
+ * там он называется явно.
+ */
+object AllAllowed : com.kert0n.medapp.platform.settings.DevicePermissions {
+    override fun current() = com.kert0n.medapp.platform.settings.PermissionStates(
+        notifications = true,
+        exactAlarms = true,
+        camera = com.kert0n.medapp.platform.settings.CameraAccess.GRANTED
+    )
+}

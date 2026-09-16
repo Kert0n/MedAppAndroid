@@ -269,6 +269,10 @@
     <string name="plan_day_today">сегодня</string>
     <string name="plan_day_tomorrow">завтра</string>
     <string name="plan_day_also">Ещё в этот день</string>
+    <string name="plan_notifications_off">Напоминания не приходят</string>
+    <string name="plan_notifications_off_hint">Уведомления выключены — включить в настройках</string>
+    <string name="plan_alarms_inexact">Напоминания могут опаздывать</string>
+    <string name="plan_alarms_inexact_hint">Точное время будильников выключено — разрешить в настройках</string>
     <string name="intake_state_planned">ждёт</string>
     <string name="intake_state_taken">принят в %1$s</string>
     <string name="intake_state_missed">пропущен</string>

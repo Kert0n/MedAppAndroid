@@ -8,6 +8,7 @@ import com.kert0n.medapp.feature.intake.IntakeConfirmation
 import com.kert0n.medapp.feature.intake.IntakeDeclining
 import com.kert0n.medapp.feature.plan.DayPlanning
 import com.kert0n.medapp.feature.time.Today
+import com.kert0n.medapp.platform.settings.DevicePermissions
 import com.kert0n.medapp.presentation.ScreenState
 import dagger.hilt.android.lifecycle.HiltViewModel
 import java.time.Clock
@@ -43,6 +44,7 @@ class DayPlanViewModel @Inject constructor(
     private val planning: DayPlanning,
     private val confirmation: IntakeConfirmation,
     private val declining: IntakeDeclining,
+    private val devicePermissions: DevicePermissions,
     private val clock: Clock
 ) : ViewModel() {
 
@@ -58,6 +60,20 @@ class DayPlanViewModel @Inject constructor(
 
     /** Чем кончился ответ, если по самой странице этого не видно. */
     private val message = MutableStateFlow<DayMessage?>(null)
+
+    /**
+     * Что мешает напомнить вовремя. Состояние спрашивается у системы, а меняет его человек в её
+     * настройках — поэтому перечитывается при каждом возвращении на экран ([refreshPermissions]),
+     * а не один раз при создании.
+     */
+    private val quiet = MutableStateFlow(devicePermissions.permissions())
+
+    val permissions: StateFlow<DayPermissionsPresentationDTO> = quiet
+
+    /** Человек вернулся из системных настроек: спрашиваем заново — там он мог всё и починить. */
+    fun refreshPermissions() {
+        quiet.value = devicePermissions.permissions()
+    }
 
     /**
      * Страница дня, отстоящего от сегодняшнего на [daysAhead] дней. Спрашивается из вёрстки, то
@@ -180,6 +196,17 @@ class DayPlanViewModel @Inject constructor(
         val intakeId: Uuid,
         val packageId: Uuid,
         val amount: Dose
+    )
+}
+
+/** Состояние разрешений — словами экрана: точности будильника без самих уведомлений не бывает. */
+private fun DevicePermissions.permissions(): DayPermissionsPresentationDTO {
+    val states = current()
+    return DayPermissionsPresentationDTO(
+        notificationsOff = !states.notifications,
+        // О неточности говорят, только когда сказать вообще есть чем: иначе две беды разом, а
+        // чинить их человеку по одной.
+        alarmsInexact = states.notifications && !states.exactAlarms
     )
 }
 

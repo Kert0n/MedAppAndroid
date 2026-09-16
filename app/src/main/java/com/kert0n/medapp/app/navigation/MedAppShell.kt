@@ -14,6 +14,8 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.ui.platform.LocalContext
+import androidx.lifecycle.compose.LifecycleResumeEffect
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import com.kert0n.medapp.presentation.course.CourseFormUiState
@@ -33,6 +35,8 @@ import com.kert0n.medapp.presentation.intake.IntakeCardViewModel
 import com.kert0n.medapp.presentation.intake.IntakeHistoryViewModel
 import com.kert0n.medapp.presentation.plan.DayPlanViewModel
 import com.kert0n.medapp.ui.intake.IntakeCardScreen
+import com.kert0n.medapp.ui.openExactAlarmSettings
+import com.kert0n.medapp.ui.openNotificationSettings
 import com.kert0n.medapp.ui.rememberNotificationPermissionRequest
 import com.kert0n.medapp.ui.intake.IntakeHistoryScreen
 import com.kert0n.medapp.ui.plan.PlanMode
@@ -270,6 +274,13 @@ private fun screens(stacks: TabStacks) = entryProvider<NavKey> {
         // Режим — состояние места: он переживает уход в другую комнату и возвращение, как и
         // всё, что держит стопка (rememberSaveable под своим ключом маршрута).
         var mode by rememberSaveable { mutableStateOf(PlanMode.COURSES) }
+        val context = LocalContext.current
+        // Разрешения человек меняет у системы: вернулся — спрашиваем заново, своего мнения о них
+        // приложение не держит (PLAN H3 «Уведомления на экране»).
+        LifecycleResumeEffect(days) {
+            days.refreshPermissions()
+            onPauseOrDispose { }
+        }
         // Сценарий спросил — быстрый ответ ведёт на карточку пункта: отвечать на вопрос человек
         // должен зная, а в строке для вопросов места нет (PLAN D6, H3 №12).
         val question = days.asksAbout.collectAsStateWithLifecycle().value
@@ -295,6 +306,9 @@ private fun screens(stacks: TabStacks) = entryProvider<NavKey> {
             onConfirmIntake = days::confirm,
             onDeclineIntake = days::decline,
             onDismissDayMessage = days::dismissMessage,
+            onFixNotifications = context::openNotificationSettings,
+            onFixAlarms = context::openExactAlarmSettings,
+            dayPermissions = days.permissions.collectAsStateWithLifecycle().value,
             // Черновик открывается редактором, идущее и законченное лечение — карточкой.
             onOpenCourse = { course ->
                 stacks.go(

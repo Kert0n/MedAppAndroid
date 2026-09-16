@@ -11,6 +11,7 @@ import com.kert0n.medapp.feature.course.CourseDrafting
 import com.kert0n.medapp.feature.course.SourceEditing
 import com.kert0n.medapp.feature.plan.DayPlanning
 import com.kert0n.medapp.feature.time.Today
+import com.kert0n.medapp.fixture.AllAllowed
 import com.kert0n.medapp.fixture.OTHER_PACK
 import com.kert0n.medapp.fixture.PACK
 import com.kert0n.medapp.fixture.QuietClock
@@ -87,6 +88,7 @@ class IntakeAnsweringTest {
         planning = DayPlanning(Today(clock, QuietClock), database.reportRepository()),
         confirmation = scenarios.intakeConfirmation,
         declining = scenarios.intakeDeclining,
+        devicePermissions = AllAllowed,
         clock = clock
     ).also { opened += it }
 
