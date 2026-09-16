@@ -86,6 +86,7 @@ fun MedKitContentsScreen(
     onPickTarget: () -> Unit,
     onDismissRemoval: () -> Unit,
     onRemove: (Uuid?) -> Unit,
+    onLeave: () -> Unit,
     onBack: () -> Unit,
     modifier: Modifier = Modifier
 ) {
@@ -150,7 +151,7 @@ fun MedKitContentsScreen(
     }
 
     if (state.removing != null) {
-        RemovalDialog(state, onPickTarget, onDismissRemoval, onRemove)
+        RemovalDialog(state, onPickTarget, onDismissRemoval, onRemove, onLeave)
     }
 }
 
@@ -374,7 +375,8 @@ private fun RemovalDialog(
     state: MedKitContentsUiState,
     onPickTarget: () -> Unit,
     onDismiss: () -> Unit,
-    onRemove: (Uuid?) -> Unit
+    onRemove: (Uuid?) -> Unit,
+    onLeave: () -> Unit
 ) {
     val medKit = state.medKit ?: return
     if (state.removing == RemovalStep.PICKING_TARGET) {
@@ -402,6 +404,18 @@ private fun RemovalDialog(
                 if (count > 0 && state.others.isEmpty()) {
                     Text(stringResource(R.string.med_kit_remove_nowhere))
                 }
+                // Лечения не отменяются никогда: теряются только источники с этой полки, а
+                // история остаётся (PLAN C1 «Курсы при выходе»). Сказать это нужно **до**
+                // решения — после него человек уже ничего не выбирает.
+                if (state.affectedCourses.isNotEmpty()) {
+                    Text(
+                        stringResource(
+                            R.string.med_kit_remove_affects_courses,
+                            state.affectedCourses.joinToString(", ")
+                        ),
+                        color = MaterialTheme.colorScheme.tertiary
+                    )
+                }
                 state.removalRefusal?.let {
                     Text(stringResource(it.text), color = MaterialTheme.colorScheme.error)
                 }
@@ -425,6 +439,16 @@ private fun RemovalDialog(
                         text = stringResource(R.string.med_kit_remove_move),
                         supporting = stringResource(R.string.med_kit_remove_move_consequence),
                         onClick = onPickTarget
+                    )
+                }
+                // Выйти можно только из общей: из местной выходить некуда — остальных нет (E6).
+                if (medKit.isShared) {
+                    Fate(
+                        icon = R.drawable.ic_logout,
+                        text = stringResource(R.string.med_kit_leave),
+                        supporting = stringResource(R.string.med_kit_leave_consequence),
+                        color = MaterialTheme.colorScheme.onSurface,
+                        onClick = onLeave
                     )
                 }
             }

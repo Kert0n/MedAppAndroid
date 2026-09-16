@@ -74,6 +74,8 @@ class MedKitContentsViewModelTest {
 
     private val packages = Asked(stored)
 
+    private val courses = FakeCourses()
+
     private val medKits = FakeMedKits(
         medKit(id = HOME_KIT, name = "Домашняя"),
         medKit(id = SHARED_KIT, name = "Дача")
@@ -98,6 +100,7 @@ class MedKitContentsViewModelTest {
         removal = removal,
         packages = packages,
         medKits = medKits,
+        courses = courses,
         today = Today(clock, QuietClock),
         medKitId = medKitId
     )
@@ -306,5 +309,23 @@ class MedKitContentsViewModelTest {
         assertEquals(RemovalRefusal.TARGET_GONE, state.removalRefusal)
         assertEquals(RemovalStep.PICKING_TARGET, state.removing)
         assertTrue(medKits.medKits.any { it.id == HOME_KIT })
+    }
+
+    /**
+     * Из местной аптечки не выходят — её убирают: остальных у неё нет, и оставлять полку некому
+     * (PLAN E6). Отказ назван, а не проглочен.
+     */
+    @Test
+    fun onlyASharedShelfCanBeLeft() {
+        val model = viewModel(medKitId = SHARED_KIT)
+
+        watching(model.state) { state ->
+            state.awaiting { it.isLoaded }
+            model.askToRemove()
+            model.leave()
+            state.awaiting { it.isRemoved || it.removalRefusal != null }
+        }
+
+        assertEquals(RemovalRefusal.NOT_SHARED, model.state.value.removalRefusal)
     }
 }

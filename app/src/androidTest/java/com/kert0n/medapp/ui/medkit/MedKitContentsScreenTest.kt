@@ -48,6 +48,7 @@ class MedKitContentsScreenTest {
     val compose = createComposeRule()
 
     private var reset = 0
+    private var left = 0
     private var added = 0
     private var opened: Uuid? = null
     private var ordered: Ordering? = null
@@ -78,6 +79,7 @@ class MedKitContentsScreenTest {
                     onPickTarget = {},
                     onDismissRemoval = {},
                     onRemove = {},
+                    onLeave = { left++ },
                     onBack = {}
                 )
             }

@@ -211,7 +211,7 @@ class HundredMedKitsTest {
         val today = Today(Clock.fixed(now, ZoneOffset.UTC), QuietClock)
         database.medKitRepository().observeAll(this@HundredMedKitsTest.today).first()
 
-        val contents = MedKitContentsViewModel(scenarios.medKitRemoval, database.packageRepository(), database.medKitRepository(), today, medKitId = null)
+        val contents = MedKitContentsViewModel(scenarios.medKitRemoval, database.packageRepository(), database.medKitRepository(), database.courseRepository(), today, medKitId = null)
         val shown = timed("все лекарства на экране", Duration.ofMillis(600)) { contents.state.first { it.isLoaded } }
         assertEquals(1_000, shown.packages.size)
 

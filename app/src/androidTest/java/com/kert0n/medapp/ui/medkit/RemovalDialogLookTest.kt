@@ -2,13 +2,15 @@ package com.kert0n.medapp.ui.medkit
 
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.getUnclippedBoundsInRoot
 import androidx.compose.ui.test.isDialog
 import androidx.compose.ui.test.junit4.v2.createComposeRule
-import androidx.compose.ui.unit.Density
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
+import androidx.compose.ui.unit.Density
 import androidx.test.ext.junit.runners.AndroidJUnit4
+import com.kert0n.medapp.domain.medkit.MedKit
 import com.kert0n.medapp.domain.medkit.MedKitContents
 import com.kert0n.medapp.fixture.HOME_KIT
 import com.kert0n.medapp.fixture.medKit
@@ -36,6 +38,7 @@ class RemovalDialogLookTest {
     private var thrownAway = 0
     private var picked = 0
     private var dismissed = 0
+    private var left = 0
 
     @Test
     fun everyFateAndCancelAreReachable() {
@@ -63,7 +66,8 @@ class RemovalDialogLookTest {
                     onSearch = {}, onNarrow = {}, onOrder = {}, onReset = {},
                     onOpen = {}, onAdd = {}, onEdit = {}, onShare = {},
                     onAskToRemove = {}, onPickTarget = { picked++ }, onDismissRemoval = { dismissed++ },
-                    onRemove = { thrownAway++ }, onBack = {}
+                    onRemove = { thrownAway++ },
+                    onLeave = { left++ }, onBack = {}
                 )
             }
             }
@@ -88,5 +92,39 @@ class RemovalDialogLookTest {
         assertEquals(1, thrownAway)
         assertEquals(1, picked)
         assertEquals(1, dismissed)
+    }
+
+    /**
+     * У общей полки судьбы три, и выход назван своим последствием; лечения, которые потеряют
+     * источники, названы **до** решения, вместе со словами о том, что сами лечения останутся
+     * (PLAN C1 «Курсы при выходе»).
+     */
+    @Test
+    fun aSharedShelfOffersLeavingAndNamesWhatItCosts() {
+        compose.setContent {
+            MedAppTheme {
+                MedKitContentsScreen(
+                    state = MedKitContentsUiState(
+                        medKit = medKit(
+                            id = HOME_KIT, name = "Семейная",
+                            publication = MedKit.Publication.PUBLISHED, participantCount = 3
+                        ).projection(MedKitContents(packages = 4, expired = 0)).toPresentationDTO(),
+                        isLoaded = true,
+                        removing = RemovalStep.ASKING,
+                        affectedCourses = listOf("Спина", "Колено")
+                    ),
+                    onSearch = {}, onNarrow = {}, onOrder = {}, onReset = {},
+                    onOpen = {}, onAdd = {}, onEdit = {}, onShare = {},
+                    onAskToRemove = {}, onPickTarget = {}, onDismissRemoval = {},
+                    onRemove = {}, onLeave = { left++ }, onBack = {}
+                )
+            }
+        }
+
+        compose.onNodeWithText("Источники потеряют: Спина, Колено. Сами лечения останутся.").assertIsDisplayed()
+        compose.onNodeWithText("Аптечка останется у других, а вам её лекарства будут недоступны").assertIsDisplayed()
+        compose.onNodeWithText("Выйти и оставить остальным").performClick()
+
+        assertEquals(1, left)
     }
 }

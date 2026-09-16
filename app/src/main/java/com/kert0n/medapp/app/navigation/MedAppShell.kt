@@ -233,6 +233,7 @@ private fun screens(stacks: TabStacks, planMode: MutableState<PlanMode>) = entry
             onPickTarget = model::pickTarget,
             onDismissRemoval = model::dismissRemoval,
             onRemove = model::remove,
+            onLeave = model::leave,
             onBack = stacks::back
         )
     }

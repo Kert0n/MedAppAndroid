@@ -379,7 +379,11 @@ class FakeCourses : CourseStorageRepository {
 
     override suspend fun discardDraft(id: Uuid): Boolean = noCourses()
 
-    override fun observeRecords(): Flow<List<CourseRecordProjection>> = noCourses()
+    /**
+     * Записи эпизодов отдаются те, что в подделку положили: экран учёта спрашивает их, чтобы
+     * назвать лечения, которые потеряют источники вместе с полкой (PLAN U2 строка 23).
+     */
+    override fun observeRecords(): Flow<List<CourseRecordProjection>> = MutableStateFlow(records.values.toList())
 
     override fun observeRecord(id: Uuid): Flow<CourseRecordProjection?> = MutableStateFlow(records[id])
 
