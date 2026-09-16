@@ -8,6 +8,7 @@ import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performScrollTo
 import androidx.compose.ui.test.performTextInput
+import androidx.test.espresso.Espresso.closeSoftKeyboard
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import com.kert0n.medapp.HiltTestActivity
 import com.kert0n.medapp.fixture.CAPSULE_FORM
@@ -77,6 +78,8 @@ class LocalRecordsJourneyTest {
         compose.onNodeWithText("Новая аптечка").assertIsDisplayed()
         compose.onNodeWithText("Название").performTextInput("Домашняя")
         compose.onNodeWithText("Место хранения (необязательно)").performTextInput("В ванной")
+        // Подвал уходит на время ввода: человек убирает клавиатуру, чтобы нажать.
+        closeSoftKeyboard()
         compose.onNodeWithText("Сохранить").performClick()
 
         // Записанное уводит с формы само: человек заводил полку, а не форму.
@@ -98,9 +101,12 @@ class LocalRecordsJourneyTest {
     fun aBoxIsAddedOpenedAndRecountedAndTheCardShowsTheNewNumber() {
         aShelfWithABox()
 
+        // Подвал уходит на время ввода: человек убирает клавиатуру, чтобы нажать.
+        closeSoftKeyboard()
         compose.onNodeWithText("Пересчитать").performClick()
         compose.waitUntil(WAIT) { compose.onAllNodesWithText("Сейчас записано: 20 таблетка").fetchSemanticsNodes().isNotEmpty() }
         compose.onNodeWithText("Пересчитал и увидел").performTextInput("17")
+        closeSoftKeyboard()
         compose.onNodeWithText("Записать").performClick()
 
         compose.waitUntil(WAIT) { compose.onAllNodesWithText("17 таблетка").fetchSemanticsNodes().isNotEmpty() }
@@ -112,9 +118,12 @@ class LocalRecordsJourneyTest {
     fun recountingToZeroIsRefusedAndTheBoxStays() {
         aShelfWithABox()
 
+        // Подвал уходит на время ввода: человек убирает клавиатуру, чтобы нажать.
+        closeSoftKeyboard()
         compose.onNodeWithText("Пересчитать").performClick()
         compose.waitUntil(WAIT) { compose.onAllNodesWithText("Сейчас записано: 20 таблетка").fetchSemanticsNodes().isNotEmpty() }
         compose.onNodeWithText("Пересчитал и увидел").performTextInput("0")
+        closeSoftKeyboard()
         compose.onNodeWithText("Записать").performClick()
 
         compose.waitUntil(WAIT) { compose.onAllNodesWithText("Ноль — это выбросить упаковку: сделайте это с её карточки.").fetchSemanticsNodes().isNotEmpty() }
@@ -132,6 +141,8 @@ class LocalRecordsJourneyTest {
     fun everyScreenOfTheSetIsReachableAndLeadsBack() {
         aShelfWithABox()
 
+        // Подвал уходит на время ввода: человек убирает клавиатуру, чтобы нажать.
+        closeSoftKeyboard()
         compose.onNodeWithText("Перенести").performClick()
         compose.waitUntil(WAIT) { compose.onAllNodesWithText("Куда перенести").fetchSemanticsNodes().isNotEmpty() }
         compose.onNodeWithText("Переносить некуда", substring = true).assertIsDisplayed()
@@ -160,6 +171,8 @@ class LocalRecordsJourneyTest {
     fun aSuggestionFillsTheFormWithWhatTheCardKnows() {
         compose.onNodeWithText("Завести аптечку").performClick()
         compose.onNodeWithText("Название").performTextInput("Домашняя")
+        // Подвал уходит на время ввода: человек убирает клавиатуру, чтобы нажать.
+        closeSoftKeyboard()
         compose.onNodeWithText("Сохранить").performClick()
         compose.waitUntil(WAIT) { compose.onAllNodesWithText("Пока пусто").fetchSemanticsNodes().isNotEmpty() }
         compose.onNodeWithText("Домашняя").performClick()
@@ -172,6 +185,8 @@ class LocalRecordsJourneyTest {
         // На 360×640 dp поле производителя ниже экрана: до него докручивают.
         compose.onNodeWithText("Reckitt").performScrollTo().assertIsDisplayed()
         compose.onNodeWithText("Количество").performScrollTo().performTextInput("20")
+        // Подвал уходит на время ввода: человек убирает клавиатуру, чтобы нажать.
+        closeSoftKeyboard()
         compose.onNodeWithText("Сохранить").performClick()
         compose.waitUntil(WAIT) { compose.onAllNodesWithText("Сколько есть").fetchSemanticsNodes().isNotEmpty() }
         compose.onNodeWithText("Reckitt").performScrollTo().assertIsDisplayed()
@@ -181,6 +196,8 @@ class LocalRecordsJourneyTest {
     private fun aShelfWithABox() {
         compose.onNodeWithText("Завести аптечку").performClick()
         compose.onNodeWithText("Название").performTextInput("Домашняя")
+        // Подвал уходит на время ввода: человек убирает клавиатуру, чтобы нажать.
+        closeSoftKeyboard()
         compose.onNodeWithText("Сохранить").performClick()
         compose.waitUntil(WAIT) { compose.onAllNodesWithText("Пока пусто").fetchSemanticsNodes().isNotEmpty() }
 
@@ -190,6 +207,8 @@ class LocalRecordsJourneyTest {
         compose.onNodeWithText("Количество").performTextInput("20")
         compose.onNodeWithText("Единица").performScrollTo().performClick()
         compose.onNodeWithText("таблетка").performClick()
+        // Подвал уходит на время ввода: человек убирает клавиатуру, чтобы нажать.
+        closeSoftKeyboard()
         compose.onNodeWithText("Сохранить").performClick()
 
         // Заведённая коробка открывается карточкой: человек заводил её, чтобы посмотреть.

@@ -14,8 +14,6 @@ import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.AssistChip
 import androidx.compose.material3.Button
-import androidx.compose.material3.DropdownMenu
-import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FilledTonalButton
 import androidx.compose.material3.FilterChip
@@ -117,7 +115,7 @@ fun CourseFormScreen(
                         Icon(painterResource(R.drawable.ic_arrow_back), contentDescription = stringResource(R.string.action_back))
                     }
                 },
-                actions = { if (editing?.mode == CourseFormUiState.Mode.DRAFT) DraftMenu(onAskToDiscard) }
+                actions = { if (editing?.mode == CourseFormUiState.Mode.DRAFT) DiscardAction(onAskToDiscard) }
             )
         }
     ) { padding ->
@@ -292,18 +290,15 @@ private fun TimesField(times: List<LocalTime>, onTimes: (List<LocalTime>) -> Uni
     }
 }
 
-/** Меню черновика: удаление — одно действие, но за меню, а не на виду: случайно его не нажать. */
+/**
+ * Удаление черновика — значок в панели, как у карточки коробки: за меню прячут **выбор**, а одно
+ * действие за ним стоит человеку лишнего нажатия (просьба владельца 2026-09-16). Случайного
+ * нажатия бояться нечего — удаление спрашивает (H3, список подтверждений).
+ */
 @Composable
-private fun DraftMenu(onAskToDiscard: () -> Unit) {
-    var open by remember { mutableStateOf(false) }
-    IconButton(onClick = { open = true }) {
-        Icon(painterResource(R.drawable.ic_more), contentDescription = stringResource(R.string.action_more))
-    }
-    DropdownMenu(expanded = open, onDismissRequest = { open = false }) {
-        DropdownMenuItem(
-            text = { Text(stringResource(R.string.course_discard)) },
-            onClick = { open = false; onAskToDiscard() }
-        )
+private fun DiscardAction(onAskToDiscard: () -> Unit) {
+    IconButton(onClick = onAskToDiscard) {
+        Icon(painterResource(R.drawable.ic_delete), contentDescription = stringResource(R.string.course_discard))
     }
 }
 

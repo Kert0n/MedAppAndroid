@@ -183,11 +183,25 @@ class CourseFormScreenTest {
         show(editing(mode = CourseFormUiState.Mode.DRAFT))
 
         compose.onNodeWithText("Черновик лечения").assertIsDisplayed()
-        compose.onNodeWithContentDescription("Ещё").performClick()
-        compose.onNodeWithText("Удалить черновик").performClick()
+        compose.onNodeWithContentDescription("Удалить черновик").performClick()
 
         assertEquals(1, asked)
         assertEquals(0, confirmed)
+    }
+
+    /**
+     * Удаление черновика — **значок в панели**, а не меню: за тремя точками пряталось одно
+     * действие, и оно стоило человеку двух нажатий вместо одного (просьба владельца 2026-09-16).
+     * Так же устроена карточка коробки: одно действие — один значок со своим именем.
+     */
+    @Test
+    fun discardingADraftIsOneTapInThePanel() {
+        show(editing(mode = CourseFormUiState.Mode.DRAFT))
+
+        compose.onNodeWithContentDescription("Ещё").assertDoesNotExist()
+        compose.onNodeWithContentDescription("Удалить черновик").performClick()
+
+        assertEquals(1, asked)
     }
 
     /**

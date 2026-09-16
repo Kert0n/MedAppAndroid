@@ -13,6 +13,7 @@ import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performScrollTo
 import androidx.compose.ui.test.performTextReplacement
+import androidx.test.espresso.Espresso.closeSoftKeyboard
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import com.kert0n.medapp.HiltTestActivity
 import com.kert0n.medapp.domain.value.Doses
@@ -117,6 +118,8 @@ class ChangingTreatmentStoryTest {
     private fun heStartsTheTreatment() {
         compose.waitUntil { compose.onAllNodesWithText("Черновики").fetchSemanticsNodes().isNotEmpty() }
         compose.onNodeWithText("Ибупрофен").performClick()
+        // Подвал уходит на время ввода: человек убирает клавиатуру, чтобы нажать.
+        closeSoftKeyboard()
         compose.onNodeWithText("Начать лечение").performClick()
 
         compose.waitUntil(5_000) {
@@ -136,6 +139,8 @@ class ChangingTreatmentStoryTest {
         // Перестановка доступна и пальцем (перетаскиванием за ручку), и действием доступности;
         // проверка берёт второе — оно называет себя словом.
         compose.onNodeWithText("Дачная пачка").moveIt("Выше")
+        // Подвал уходит на время ввода: человек убирает клавиатуру, чтобы нажать.
+        closeSoftKeyboard()
         compose.onNodeWithText("Сохранить").performClick()
 
         // Записанный состав виден на самом экране: первой строкой стоит початая коробка.
@@ -152,6 +157,8 @@ class ChangingTreatmentStoryTest {
 
         compose.waitUntil(5_000) { compose.onAllNodesWithText("Доза").fetchSemanticsNodes().isNotEmpty() }
         compose.onNodeWithText("Доза").performScrollTo().performTextReplacement("3")
+        // Подвал уходит на время ввода: человек убирает клавиатуру, чтобы нажать.
+        closeSoftKeyboard()
         compose.onNodeWithText("Сохранить").performClick()
 
         // Карточка показывает назначение словами — и новая доза стоит в нём, а эпизод тот же.
@@ -170,6 +177,8 @@ class ChangingTreatmentStoryTest {
         compose.onAllNodesWithText("Отвязать")[0].performClick()
         compose.onNodeWithText("Отвязать пачку?").assertIsDisplayed()
         compose.onNode(hasText("Отвязать") and hasAnyAncestor(isDialog())).performClick()
+        // Подвал уходит на время ввода: человек убирает клавиатуру, чтобы нажать.
+        closeSoftKeyboard()
         compose.onNodeWithText("Сохранить").performClick()
     }
 

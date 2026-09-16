@@ -8,6 +8,7 @@ import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performScrollTo
 import androidx.compose.ui.test.performTextInput
+import androidx.test.espresso.Espresso.closeSoftKeyboard
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import com.kert0n.medapp.HiltTestActivity
 import com.kert0n.medapp.fixture.CAPSULE_FORM
@@ -89,6 +90,8 @@ class CoursesJourneyTest {
         compose.onNodeWithText("Новое лечение").assertIsDisplayed()
         compose.onNodeWithText("Название").performTextInput("Нурофен")
         compose.onNodeWithText("Заметка (необязательно)").performTextInput("по 2 после еды")
+        // Подвал уходит на время ввода: человек убирает клавиатуру, чтобы нажать.
+        closeSoftKeyboard()
         compose.onNodeWithText("Сохранить").performClick()
 
         // Записанное уводит с формы само: человек заводил лечение, а не форму.
@@ -111,6 +114,8 @@ class CoursesJourneyTest {
         compose.onNodeWithText("Записать лечение").performClick()
         compose.onNodeWithText("Название").performTextInput("Нурофен")
         compose.onNodeWithText("Заметка (необязательно)").performTextInput("купить завтра")
+        // Подвал уходит на время ввода: человек убирает клавиатуру, чтобы нажать.
+        closeSoftKeyboard()
         compose.onNodeWithText("Сохранить").performClick()
         compose.waitUntil(WAIT) { compose.onAllNodesWithText("Черновики").fetchSemanticsNodes().isNotEmpty() }
 
@@ -149,6 +154,8 @@ class CoursesJourneyTest {
 
         compose.waitUntil(WAIT) { compose.onAllNodesWithText("Черновики").fetchSemanticsNodes().isNotEmpty() }
         compose.onNodeWithText("Нурофен").performClick()
+        // Подвал уходит на время ввода: человек убирает клавиатуру, чтобы нажать.
+        closeSoftKeyboard()
         compose.onNodeWithText("Начать лечение").performClick()
 
         // Начатое ведёт на карточку, и первое, что там сказано, — чем лечение обеспечено.
@@ -163,13 +170,14 @@ class CoursesJourneyTest {
     fun aDraftIsReopenedFromTheListAndDiscardedAfterAQuestion() {
         compose.onNodeWithText("Записать лечение").performClick()
         compose.onNodeWithText("Название").performTextInput("Нурофен")
+        // Подвал уходит на время ввода: человек убирает клавиатуру, чтобы нажать.
+        closeSoftKeyboard()
         compose.onNodeWithText("Сохранить").performClick()
         compose.waitUntil(WAIT) { compose.onAllNodesWithText("Черновики").fetchSemanticsNodes().isNotEmpty() }
 
         compose.onNodeWithText("Нурофен").performClick()
         compose.onNodeWithText("Черновик лечения").assertIsDisplayed()
-        compose.onNodeWithContentDescription("Ещё").performClick()
-        compose.onNodeWithText("Удалить черновик").performClick()
+        compose.onNodeWithContentDescription("Удалить черновик").performClick()
         compose.onNodeWithText("Удалить черновик?").assertIsDisplayed()
         compose.onNodeWithText("Удалить черновик").performClick()
 

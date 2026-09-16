@@ -14,6 +14,7 @@ import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performScrollTo
 import androidx.compose.ui.test.performTextInput
 import androidx.compose.ui.test.performTextReplacement
+import androidx.test.espresso.Espresso.closeSoftKeyboard
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import com.kert0n.medapp.HiltTestActivity
 import com.kert0n.medapp.fixture.CAPSULE_FORM
@@ -91,6 +92,8 @@ class PrescriptionStoryTest {
         compose.onNodeWithText("Записать лечение").performClick()
         compose.onNodeWithText("Название").performTextInput("Нурофен")
         compose.onNodeWithText("Заметка (необязательно)").performTextInput("по 2 после еды, купить")
+        // Подвал уходит на время ввода: человек убирает клавиатуру, чтобы нажать.
+        closeSoftKeyboard()
         compose.onNodeWithText("Сохранить").performClick()
 
         compose.waitUntil { compose.onAllNodesWithText("Черновики").fetchSemanticsNodes().isNotEmpty() }
@@ -103,6 +106,8 @@ class PrescriptionStoryTest {
         compose.onNodeWithText("Аптечки").performClick()
         compose.onNodeWithText("Завести аптечку").performClick()
         compose.onNodeWithText("Название").performTextInput("Домашняя")
+        // Подвал уходит на время ввода: человек убирает клавиатуру, чтобы нажать.
+        closeSoftKeyboard()
         compose.onNodeWithText("Сохранить").performClick()
         compose.waitUntil { compose.onAllNodesWithText("Пока пусто").fetchSemanticsNodes().isNotEmpty() }
 
@@ -112,6 +117,8 @@ class PrescriptionStoryTest {
         compose.onNodeWithText("Форма выпуска").performScrollTo().performClick()
         compose.onNodeWithText("таблетки").performClick()
         compose.onNodeWithText("Количество").performScrollTo().performTextInput("20")
+        // Подвал уходит на время ввода: человек убирает клавиатуру, чтобы нажать.
+        closeSoftKeyboard()
         compose.onNodeWithText("Сохранить").performClick()
         compose.waitUntil { compose.onAllNodesWithText("Сколько есть").fetchSemanticsNodes().isNotEmpty() }
         // Заведённая коробка открылась карточкой; в места приложения человек возвращается назад.
@@ -145,8 +152,14 @@ class PrescriptionStoryTest {
      * календаря Material проверке не адресуются, и это её предел, а не правило экрана.
      */
     private fun sheOpensTheCalendarByTappingTheFieldItself() {
+        // Дозу Ирина набрала — клавиатура ей больше не нужна, и она её убирает.
+        closeSoftKeyboard()
         compose.onNodeWithText("С какого дня").performScrollTo().performClick()
 
+        // Календарь приезжает с показом: на плотном экране он успевает не сразу.
+        compose.waitUntil(5_000) {
+            compose.onAllNodesWithText("Выбрать").fetchSemanticsNodes().isNotEmpty()
+        }
         compose.onNodeWithText("Выбрать").assertIsDisplayed()
         // «Отмена» есть и у подвала формы — нужна та, что в самом календаре.
         compose.onNode(hasText("Отмена") and hasAnyAncestor(isDialog())).performClick()
@@ -172,6 +185,8 @@ class PrescriptionStoryTest {
         // Предел строки виден подписью поля, а набирают в само поле: на экране оно одно.
         compose.onNodeWithText("Приёмов из 10", useUnmergedTree = true).assertExists()
         compose.onNode(hasSetTextAction()).performTextReplacement("7")
+        // Подвал уходит на время ввода: человек убирает клавиатуру, чтобы нажать.
+        closeSoftKeyboard()
         compose.onNodeWithText("Сохранить").performClick()
         compose.waitUntil(5_000) {
             compose.onAllNodesWithText("выделено 7 приёмов", substring = true).fetchSemanticsNodes().isNotEmpty()
