@@ -97,6 +97,35 @@ class CourseFormViewModel @AssistedInject constructor(
         }
     }
 
+    /**
+     * Открыть источники. У нового черновика их некуда подключать, пока он не записан, — поэтому
+     * набранное сначала записывается, и лечение получает номер (PLAN H3 №15, D5). Названия нет —
+     * записать нечего, и отказ встаёт у своего поля, как у всякой другой записи.
+     */
+    fun openSources() {
+        val current = editing.value as? CourseFormUiState.Editing ?: return
+        if (current.isBusy) return
+        current.plan?.let { editing.value = current.copy(sourcesOf = it.id); return }
+        current.stored?.let { editing.value = current.copy(sourcesOf = it.id); return }
+        val saving = current.copy(error = null, isSaving = true)
+        editing.value = saving
+        viewModelScope.launch {
+            when (val parsed = current.form.parsed(vocabulary.snapshot())) {
+                is ParsedInput.Rejected -> editing.value = saving.copy(isSaving = false, error = parsed.error)
+                is ParsedInput.Parsed -> {
+                    val written = written(saving, parsed.value) ?: return@launch
+                    editing.value = saving.copy(isSaving = false, stored = written, sourcesOf = written.id)
+                }
+            }
+        }
+    }
+
+    /** Экран источников открыт — второй раз туда же не уводим. */
+    fun sourcesOpened() {
+        val current = editing.value as? CourseFormUiState.Editing ?: return
+        editing.value = current.copy(sourcesOf = null)
+    }
+
     /** Удаление спрашивается **до** сценария: в черновике может лежать единственная запись от врача (H3). */
     fun askToDiscard() {
         val current = editing.value as? CourseFormUiState.Editing ?: return
@@ -306,6 +335,8 @@ sealed interface CourseFormUiState {
         val isSaving: Boolean = false,
         val isSaved: Boolean = false,
         val isStarting: Boolean = false,
+        /** Куда идти за источниками: номер записанного лечения; `null` — идти пока некуда. */
+        val sourcesOf: Uuid? = null,
         /** Лечение началось — этот эпизод и открывают карточкой; `null` — ещё черновик. */
         val startedId: Uuid? = null,
         val asksToDiscard: Boolean = false,

@@ -5,7 +5,11 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.defaultMinSize
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material3.AlertDialog
@@ -17,6 +21,7 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.ListItem
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
@@ -28,6 +33,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.painterResource
+import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import com.kert0n.medapp.R
@@ -72,7 +78,7 @@ fun CourseCardScreen(
                         )
                     }
                 },
-                actions = { if (state.isRunning) RunningMenu(onEdit, onSources, onAskToCancel) }
+                actions = { if (state.isRunning) RunningMenu(onEdit, onAskToCancel) }
             )
         }
     ) { padding ->
@@ -83,7 +89,7 @@ fun CourseCardScreen(
                 modifier = Modifier.padding(padding)
             )
             course == null -> LoadingState(Modifier.padding(padding))
-            else -> Card(state, course, Modifier.padding(padding))
+            else -> Card(state, course, onSources, Modifier.padding(padding))
         }
     }
     if (state.asksToCancel) {
@@ -92,7 +98,12 @@ fun CourseCardScreen(
 }
 
 @Composable
-private fun Card(state: CourseCardUiState, course: CoursePresentationDTO, modifier: Modifier) {
+private fun Card(
+    state: CourseCardUiState,
+    course: CoursePresentationDTO,
+    onSources: () -> Unit,
+    modifier: Modifier
+) {
     LazyColumn(modifier.fillMaxSize(), contentPadding = PaddingValues(bottom = 16.dp)) {
         item("head") {
             Column(
@@ -106,6 +117,51 @@ private fun Card(state: CourseCardUiState, course: CoursePresentationDTO, modifi
                 course.schedule?.let { Text(it.timesWords(), style = MaterialTheme.typography.bodySmall) }
                 if (!state.isRunning) {
                     Text(course.closedWords(), style = MaterialTheme.typography.titleSmall)
+                }
+            }
+        }
+        if (state.isRunning) {
+            item("sources") {
+                Column(Modifier.fillMaxWidth()) {
+                    SectionTitle(R.string.course_sources)
+                    for (source in state.sources) {
+                        ListItem(
+                            headlineContent = { Text(source.name) },
+                            supportingContent = {
+                                Text(
+                                    pluralStringResource(
+                                        R.plurals.course_source_allocated,
+                                        source.allocatedDoses,
+                                        source.allocatedDoses
+                                    )
+                                )
+                            }
+                        )
+                    }
+                    if (state.sources.isEmpty()) {
+                        Text(
+                            stringResource(R.string.course_sources_empty),
+                            style = MaterialTheme.typography.bodyMedium,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            modifier = Modifier.padding(horizontal = 16.dp)
+                        )
+                    }
+                    // Путь к стеку — на виду, а не в меню: за источниками сюда и приходят.
+                    OutlinedButton(
+                        onClick = onSources,
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(horizontal = 16.dp, vertical = 8.dp)
+                            .defaultMinSize(minHeight = 48.dp)
+                    ) {
+                        Icon(
+                            painterResource(R.drawable.ic_medication),
+                            contentDescription = null,
+                            modifier = Modifier.size(18.dp)
+                        )
+                        Spacer(Modifier.width(8.dp))
+                        Text(stringResource(R.string.course_sources_open))
+                    }
                 }
             }
         }
@@ -206,7 +262,7 @@ private fun CoursePresentationDTO.closedWords(): String {
 }
 
 @Composable
-private fun RunningMenu(onEdit: () -> Unit, onSources: () -> Unit, onAskToCancel: () -> Unit) {
+private fun RunningMenu(onEdit: () -> Unit, onAskToCancel: () -> Unit) {
     var open by remember { mutableStateOf(false) }
     IconButton(onClick = { open = true }) {
         Icon(painterResource(R.drawable.ic_more), contentDescription = stringResource(R.string.action_more))
@@ -215,10 +271,6 @@ private fun RunningMenu(onEdit: () -> Unit, onSources: () -> Unit, onAskToCancel
         DropdownMenuItem(
             text = { Text(stringResource(R.string.course_edit_action)) },
             onClick = { open = false; onEdit() }
-        )
-        DropdownMenuItem(
-            text = { Text(stringResource(R.string.course_sources)) },
-            onClick = { open = false; onSources() }
         )
         DropdownMenuItem(
             text = { Text(stringResource(R.string.course_cancel_action)) },

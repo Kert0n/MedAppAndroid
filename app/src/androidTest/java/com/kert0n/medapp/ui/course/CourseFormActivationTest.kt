@@ -190,6 +190,40 @@ class CourseFormActivationTest {
         assertNull(database.courseRepository().findDraft(id))
     }
 
+    /**
+     * У нового черновика источники тоже есть: кнопка сперва записывает набранное — до записи
+     * подключать коробки не к чему, — и лечение получает номер (PLAN H3 №15).
+     */
+    @Test
+    fun aNewDraftIsWrittenBeforeItsSourcesOpen() = runBlocking {
+        val model = model(null)
+
+        val state = watching(model.state) { state ->
+            val open = state.awaiting(PATIENTLY) { it is CourseFormUiState.Editing } as CourseFormUiState.Editing
+            model.edit(open.form.copy(title = "Нурофен"))
+            model.openSources()
+            state.awaiting(PATIENTLY) { it is CourseFormUiState.Editing && it.sourcesOf != null }
+        } as CourseFormUiState.Editing
+
+        val id = requireNotNull(state.sourcesOf)
+        assertNotNull(database.courseRepository().findDraft(id))
+    }
+
+    /** Названия нет — записывать нечего, и отказ встаёт у своего поля, а не уводит с экрана. */
+    @Test
+    fun withoutATitleTheSourcesButtonRefusesAtItsField() = runBlocking {
+        val model = model(null)
+
+        val state = watching(model.state) { state ->
+            state.awaiting(PATIENTLY) { it is CourseFormUiState.Editing }
+            model.openSources()
+            state.awaiting(PATIENTLY) { it is CourseFormUiState.Editing && it.error != null }
+        } as CourseFormUiState.Editing
+
+        assertEquals(CourseFormError.Input.TITLE_EMPTY, state.error)
+        assertNull(state.sourcesOf)
+    }
+
     private companion object {
         val PATIENTLY: Duration = 15.seconds
     }

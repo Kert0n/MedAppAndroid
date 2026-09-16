@@ -3,6 +3,7 @@ package com.kert0n.medapp.presentation.course
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.kert0n.medapp.domain.course.CourseCoverage
+import com.kert0n.medapp.domain.course.CourseProjection
 import com.kert0n.medapp.domain.course.CoverageReduction
 import com.kert0n.medapp.domain.course.CourseRecordProjection
 import com.kert0n.medapp.domain.intake.IntakeProjection
@@ -43,15 +44,20 @@ class CourseCardViewModel @AssistedInject constructor(
 
     private val cancelling = MutableStateFlow(Cancelling())
 
+    /** Эпизод — запись и план вместе: имя живёт у записи, состав пачек — у плана (PLAN D5). */
+    private val episode = combine(courses.observeRecord(courseId), courses.observePlan(courseId)) { record, plan ->
+        record to plan
+    }
+
     val state: StateFlow<CourseCardUiState> = combine(
-        courses.observeRecord(courseId),
+        episode,
         courses.observeCoverage(courseId),
         courses.observeReductions(courseId),
         intakes.observeOfCourse(courseId),
         cancelling
-    ) { record, coverage, reductions, intakes, cancelling ->
+    ) { (record, plan), coverage, reductions, intakes, cancelling ->
         if (record == null) CourseCardUiState(isGone = true)
-        else record.toCardUiState(coverage, reductions, intakes, cancelling)
+        else record.toCardUiState(plan, coverage, reductions, intakes, cancelling)
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), CourseCardUiState(isLoading = true))
 
     /** Отмена спрашивается: будущие приёмы уйдут, а пачки освободятся (H3, список подтверждений). */
@@ -80,6 +86,7 @@ class CourseCardViewModel @AssistedInject constructor(
     }
 
     private fun CourseRecordProjection.toCardUiState(
+        plan: CourseProjection?,
         coverage: CourseCoverage?,
         reductions: List<CoverageReduction>,
         intakes: List<IntakeProjection>,
@@ -90,6 +97,15 @@ class CourseCardViewModel @AssistedInject constructor(
             course = toPresentationDTO(coverage),
             coverage = coverage?.takeIf { isOpen }?.toPresentationDTO(),
             reductions = reductions.map { it.toPresentationDTO(zone, intakes.packageNames()) },
+            // Источники — коротко: чем лечение обеспечивают и сколько из каждой коробки взято.
+            sources = plan?.sources.orEmpty().map { source ->
+                source.toPresentationDTO(
+                    dose = prescription.dose,
+                    pack = null,
+                    medKitName = null,
+                    covered = coverage?.perSource?.firstOrNull { it.pkg == source.pkg }
+                )
+            },
             items = intakes.filterIsInstance<IntakeProjection.Scheduled>().map { it.toPresentationDTO(zone) },
             isRunning = isOpen,
             asksToCancel = cancelling.asking,
@@ -117,6 +133,8 @@ data class CourseCardUiState(
     val course: CoursePresentationDTO? = null,
     val coverage: CourseCoveragePresentationDTO? = null,
     val reductions: List<CoverageReductionPresentationDTO> = emptyList(),
+    /** Чем лечение обеспечивают — коротко; весь стек человек правит на своём экране (H3 №16). */
+    val sources: List<CourseSourcePresentationDTO> = emptyList(),
     val items: List<CourseItemPresentationDTO> = emptyList(),
     val isRunning: Boolean = false,
     val isLoading: Boolean = false,

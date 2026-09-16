@@ -251,14 +251,20 @@ private fun screens(stacks: TabStacks) = entryProvider<NavKey> {
         )
         val state = model.state.collectAsStateWithLifecycle().value
         // Записанное или удалённое — повод уйти: человек заводил лечение, а не форму. Начатое
-        // ведёт дальше, к карточке: с этого мига у лечения есть что показывать.
+        // ведёт дальше, к карточке: с этого мига у лечения есть что показывать. За источниками
+        // ведёт записанный черновик — до записи подключать коробки не к чему.
         LaunchedEffect(state) {
             if (state !is CourseFormUiState.Editing) return@LaunchedEffect
             val started = state.startedId
+            val sources = state.sourcesOf
             when {
                 started != null -> {
                     stacks.back()
                     stacks.go(Screen.CourseCard(started))
+                }
+                sources != null -> {
+                    model.sourcesOpened()
+                    stacks.go(Screen.CourseSources(sources))
                 }
                 state.isSaved || state.isDiscarded -> stacks.back()
             }
@@ -270,8 +276,8 @@ private fun screens(stacks: TabStacks) = entryProvider<NavKey> {
             onAskToDiscard = model::askToDiscard,
             onConfirmDiscard = model::discard,
             onDismissDiscard = model::dismissDiscard,
-            // Источники записанного черновика: у нового их некуда подключать — он ещё не записан.
-            onSources = key.courseId?.let { { stacks.go(Screen.CourseSources(it)) } },
+            // Источники есть у любого лечения: новый черновик по этой кнопке сначала запишется.
+            onSources = model::openSources,
             onStart = model::start.takeIf { state !is CourseFormUiState.Editing || state.mode != CourseFormUiState.Mode.RUNNING },
             onBack = stacks::back
         )

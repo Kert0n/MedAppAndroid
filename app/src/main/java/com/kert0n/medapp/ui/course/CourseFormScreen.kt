@@ -24,6 +24,7 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.InputChip
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
@@ -80,7 +81,7 @@ fun CourseFormScreen(
     onDismissDiscard: () -> Unit,
     onBack: () -> Unit,
     modifier: Modifier = Modifier,
-    /** Путь к источникам; `null` — записывать пачки ещё некуда: черновик не записан (H3 №16). */
+    /** Путь к источникам: у нового черновика он сперва записывает набранное (H3 №15). */
     onSources: (() -> Unit)? = null,
     /** Начать лечение; `null` — у идущего лечения начинать уже нечего. */
     onStart: (() -> Unit)? = null
@@ -190,6 +191,14 @@ private fun Fields(
                 modifier = Modifier.weight(1f)
             )
         }
+        // Источники — сразу под формой и дозой: раньше них подключать нечего, а дальше в списке
+        // полей они бы потерялись (решение владельца 2026-09-16).
+        onSources?.let {
+            OutlinedButton(
+                onClick = it,
+                modifier = Modifier.fillMaxWidth().defaultMinSize(minHeight = 48.dp)
+            ) { Text(stringResource(R.string.course_sources_open)) }
+        }
         DateField(
             label = stringResource(R.string.course_start),
             value = form.start,
@@ -218,12 +227,6 @@ private fun Fields(
             modifier = Modifier.fillMaxWidth()
         )
         state.error?.let { Text(it.message(), color = MaterialTheme.colorScheme.error) }
-        onSources?.let {
-            TextButton(
-                onClick = it,
-                modifier = Modifier.fillMaxWidth().defaultMinSize(minHeight = 48.dp)
-            ) { Text(stringResource(R.string.course_sources)) }
-        }
         Button(
             onClick = onSave,
             modifier = Modifier.fillMaxWidth().defaultMinSize(minHeight = 48.dp)

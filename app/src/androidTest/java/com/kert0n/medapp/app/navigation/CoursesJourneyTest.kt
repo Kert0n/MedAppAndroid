@@ -109,7 +109,7 @@ class CoursesJourneyTest {
         compose.waitUntil { compose.onAllNodesWithText("Черновики").fetchSemanticsNodes().isNotEmpty() }
 
         compose.onNodeWithText("Нурофен").performClick()
-        compose.onNodeWithText("Источники").performScrollTo().performClick()
+        compose.onNodeWithText("Источники лечения").performScrollTo().performClick()
 
         // Стек пуст, и подключать пока нечего: доза и форма ещё не названы, сверять коробку не с чем.
         compose.onNodeWithText("Пачек пока нет — подключите первую.").assertIsDisplayed()

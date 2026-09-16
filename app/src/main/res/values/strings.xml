@@ -343,6 +343,7 @@
     <string name="course_missing">Этого лечения больше нет.</string>
     <string name="course_finished">Это лечение уже закончено.</string>
     <string name="course_sources">Источники</string>
+    <string name="course_sources_open">Источники лечения</string>
     <string name="course_sources_add">Подключить ещё</string>
     <string name="course_sources_empty">Пачек пока нет — подключите первую.</string>
     <string name="course_source_detach">Отвязать</string>
