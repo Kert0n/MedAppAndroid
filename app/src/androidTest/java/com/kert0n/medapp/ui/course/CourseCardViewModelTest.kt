@@ -4,6 +4,7 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import com.kert0n.medapp.domain.course.CourseRecord
+import com.kert0n.medapp.domain.intake.IntakeStatus
 import com.kert0n.medapp.domain.value.Doses
 import com.kert0n.medapp.feature.course.CourseDrafting
 import com.kert0n.medapp.fixture.PACK
@@ -68,6 +69,7 @@ class CourseCardViewModelTest {
 
     private fun model(courseId: Uuid) = CourseCardViewModel(
         cancellation = scenarios.courseCancellation,
+        offPlanCounting = scenarios.courseOffPlanCounting,
         courses = database.courseRepository(),
         intakes = database.intakeRepository(),
         courseId = courseId
@@ -124,6 +126,30 @@ class CourseCardViewModelTest {
         assertNull(database.courseRepository().findPlan(id))
         val record = requireNotNull(database.courseRepository().findRecord(id))
         assertEquals(CourseRecord.Outcome.CANCELLED, record.outcome)
+    }
+
+    /**
+     * «Принял мимо плана» — поправка к **счёту**, а не приём: расписание и пункты те же, коробка
+     * целая, а лечению засчитаны лишние дозы (PLAN D5). Спрашивается подтверждением: число уедет в
+     * прогресс и может закончить лечение.
+     */
+    @Test
+    fun countingDosesTakenOffPlanCorrectsTheProgressWithoutWritingIntakes() = runBlocking {
+        val id = started()
+        val model = model(id)
+
+        watching(model.state) { state ->
+            state.awaiting(PATIENTLY) { it.coverage != null }
+            model.askToCountOffPlan()
+            state.awaiting(PATIENTLY) { it.asksOffPlan }
+            model.countOffPlan(2)
+            state.awaiting(PATIENTLY) { it.offPlanDoses == 2 }
+        }
+
+        assertEquals(Doses(2), database.courseRepository().findPlan(id)?.takenOffPlan)
+        // Приёмов не прибавилось: поправка их не пишет.
+        assertTrue(database.intakeRepository().ofCourse(id).none { it.status == IntakeStatus.TAKEN })
+        assertEquals(tablets("20"), database.packageRepository().find(PACK)?.quantity)
     }
 
     /** Вопрос стоит до сценария: пока человек не ответил, лечение идёт. */

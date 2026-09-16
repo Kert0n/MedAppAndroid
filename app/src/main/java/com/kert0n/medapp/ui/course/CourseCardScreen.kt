@@ -11,6 +11,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material3.AlertDialog
@@ -23,19 +24,24 @@ import androidx.compose.material3.IconButton
 import androidx.compose.material3.ListItem
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
+import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
+import com.kert0n.medapp.ui.NavigationRow
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import com.kert0n.medapp.R
 import com.kert0n.medapp.ui.DAY
@@ -61,6 +67,10 @@ fun CourseCardScreen(
     state: CourseCardUiState,
     onEdit: () -> Unit,
     onSources: () -> Unit,
+    onHistory: () -> Unit,
+    onAskOffPlan: () -> Unit,
+    onCountOffPlan: (Int) -> Unit,
+    onDismissOffPlan: () -> Unit,
     onAskToCancel: () -> Unit,
     onConfirmCancel: () -> Unit,
     onDismissCancel: () -> Unit,
@@ -101,12 +111,21 @@ fun CourseCardScreen(
             when {
                 state.isGone -> ErrorMessage(text = stringResource(R.string.course_missing))
                 course == null -> LoadingState()
-                else -> Card(state, course, onSources)
+                else -> Card(state, course, onSources, onHistory, onAskOffPlan)
             }
         }
     }
     if (state.asksToCancel) {
         CancelDialog(onConfirm = onConfirmCancel, onDismiss = onDismissCancel)
+    }
+    if (state.asksOffPlan) {
+        OffPlanDialog(
+            current = state.offPlanDoses ?: 0,
+            // Больше, чем лечению осталось, набрать нельзя: столько доз ему не назначено (D5).
+            limit = state.offPlanLimit ?: (state.offPlanDoses ?: 0),
+            onConfirm = onCountOffPlan,
+            onDismiss = onDismissOffPlan
+        )
     }
 }
 
@@ -115,6 +134,8 @@ private fun Card(
     state: CourseCardUiState,
     course: CoursePresentationDTO,
     onSources: () -> Unit,
+    onHistory: () -> Unit,
+    onAskOffPlan: () -> Unit,
     modifier: Modifier = Modifier
 ) {
     LazyColumn(modifier.fillMaxSize(), contentPadding = PaddingValues(bottom = 16.dp)) {
@@ -174,6 +195,27 @@ private fun Card(
                         )
                         Spacer(Modifier.width(8.dp))
                         Text(stringResource(R.string.course_sources_open))
+                    }
+                    // Переходы — строками со стрелкой: кнопкой они читались как заголовки, и
+                    // человек не догадывался, что по ним можно нажать (замечание владельца).
+                    NavigationRow(
+                        icon = R.drawable.ic_history,
+                        text = stringResource(R.string.intake_history_of_course),
+                        onClick = onHistory
+                    )
+                    // Приёмы вне расписания — поправка к счёту, а не приём: расписание не
+                    // трогается, а лечение считает, что приёмов сделано больше (PLAN D5).
+                    if (state.isRunning) {
+                        NavigationRow(
+                            icon = R.drawable.ic_event_repeat,
+                            text = stringResource(R.string.course_off_plan_action),
+                            supporting = pluralStringResource(
+                                R.plurals.course_off_plan_count,
+                                state.offPlanDoses ?: 0,
+                                state.offPlanDoses ?: 0
+                            ),
+                            onClick = onAskOffPlan
+                        )
                     }
                 }
             }
@@ -294,11 +336,63 @@ private fun RunningMenu(onEdit: () -> Unit, onAskToCancel: () -> Unit) {
 
 /** Чем кончилась отмена — словами. Цвет один ничего не сообщает (H3 «Дизайн»). */
 @Composable
-private fun CourseCardMessage.words(): String = stringResource(
-    when (this) {
-        CourseCardMessage.AlreadyFinished -> R.string.course_cancel_already_finished
-    }
-)
+private fun CourseCardMessage.words(): String = when (this) {
+    CourseCardMessage.AlreadyFinished -> stringResource(R.string.course_cancel_already_finished)
+    CourseCardMessage.Stale -> stringResource(R.string.course_stale)
+    // Предел называется числом: «столько нельзя» без «а сколько можно» человеку ничего не даёт.
+    is CourseCardMessage.BeyondPlan -> stringResource(
+        R.string.course_off_plan_beyond,
+        pluralStringResource(R.plurals.course_off_plan_count, limit, limit)
+    )
+}
+
+/**
+ * Сколько приёмов сделано вне расписания. Считается **шагами**, а не свободным вводом: число
+ * маленькое и целое, лечение меряет себя приёмами, и печатать здесь нечего — «−» и «+» не дают
+ * набрать ни буквы, ни дроби (замечание владельца 2026-09-16).
+ *
+ * Диалог говорит, чем эти приёмы отличаются от «Принял»: они засчитываются лечению, но коробку не
+ * трогают и в историю не попадают (PLAN D5).
+ */
+@Composable
+private fun OffPlanDialog(current: Int, limit: Int, onConfirm: (Int) -> Unit, onDismiss: () -> Unit) {
+    var count by remember { mutableIntStateOf(current) }
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text(stringResource(R.string.course_off_plan_title)) },
+        text = {
+            Column(verticalArrangement = Arrangement.spacedBy(16.dp)) {
+                Text(stringResource(R.string.course_off_plan_explained))
+                Row(
+                    Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(16.dp, Alignment.CenterHorizontally),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    IconButton(onClick = { count = (count - 1).coerceAtLeast(0) }, enabled = count > 0) {
+                        Icon(
+                            painterResource(R.drawable.ic_remove),
+                            contentDescription = stringResource(R.string.course_off_plan_less)
+                        )
+                    }
+                    Text(
+                        pluralStringResource(R.plurals.course_off_plan_count, count, count),
+                        style = MaterialTheme.typography.titleLarge
+                    )
+                    IconButton(onClick = { count += 1 }, enabled = count < limit) {
+                        Icon(
+                            painterResource(R.drawable.ic_add),
+                            contentDescription = stringResource(R.string.course_off_plan_more)
+                        )
+                    }
+                }
+            }
+        },
+        confirmButton = {
+            TextButton(onClick = { onConfirm(count) }) { Text(stringResource(R.string.action_save)) }
+        },
+        dismissButton = { TextButton(onClick = onDismiss) { Text(stringResource(R.string.action_cancel)) } }
+    )
+}
 
 @Composable
 private fun CancelDialog(onConfirm: () -> Unit, onDismiss: () -> Unit) {

@@ -22,7 +22,9 @@ import com.kert0n.medapp.R
 import com.kert0n.medapp.presentation.ScreenState
 import com.kert0n.medapp.presentation.course.CourseListPresentationDTO
 import com.kert0n.medapp.presentation.course.CoursePresentationDTO
-import com.kert0n.medapp.ui.EmptyState
+import com.kert0n.medapp.presentation.plan.DayItemPresentationDTO
+import com.kert0n.medapp.presentation.plan.DayPagePresentationDTO
+import kotlin.uuid.Uuid
 import com.kert0n.medapp.ui.course.CourseListContent
 
 /** Два состояния места «План»: страница дня и список курсов (PLAN H3 «Набор курсов»). */
@@ -32,8 +34,6 @@ enum class PlanMode { DAY, COURSES }
  * Место «План». Расписание дня и список курсов — две стороны одного «что и когда я принимаю»,
  * поэтому это два состояния одного места, а не два места. Режим держит оболочка: он переживает
  * уход в другое место и возвращение, как и всё состояние стопки.
- *
- * Страница дня — U4; пока её нет, на её месте сказано, что она будет, а не пустой экран.
  */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -41,6 +41,11 @@ fun PlanScreen(
     mode: PlanMode,
     onMode: (PlanMode) -> Unit,
     courses: ScreenState<CourseListPresentationDTO>,
+    dayPage: @Composable (daysAhead: Int) -> ScreenState<DayPagePresentationDTO>,
+    onOpenIntake: (DayItemPresentationDTO) -> Unit,
+    onConfirmIntake: (Uuid) -> Unit,
+    onDeclineIntake: (Uuid) -> Unit,
+    onDismissDayMessage: () -> Unit,
     onOpenCourse: (CoursePresentationDTO) -> Unit,
     onAddCourse: () -> Unit,
     modifier: Modifier = Modifier
@@ -70,7 +75,14 @@ fun PlanScreen(
                 }
             }
             when (mode) {
-                PlanMode.DAY -> EmptyState(text = stringResource(R.string.plan_day_not_ready), modifier = Modifier.fillMaxSize())
+                PlanMode.DAY -> DayPages(
+                    page = dayPage,
+                    onOpen = onOpenIntake,
+                    onConfirm = onConfirmIntake,
+                    onDecline = onDeclineIntake,
+                    onDismissMessage = onDismissDayMessage,
+                    modifier = Modifier.fillMaxSize()
+                )
                 PlanMode.COURSES -> CourseListContent(
                     state = courses,
                     onOpen = onOpenCourse,

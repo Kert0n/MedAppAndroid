@@ -3,6 +3,13 @@ package com.kert0n.medapp.ui.pack
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
+import com.kert0n.medapp.ui.NavigationRow
+import androidx.compose.material3.OutlinedButton
+import androidx.compose.material3.ExtendedFloatingActionButton
+import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.defaultMinSize
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
@@ -54,6 +61,8 @@ import java.util.Currency
 fun PackageCardScreen(
     state: PackageCardUiState,
     onEdit: () -> Unit,
+    onTake: () -> Unit,
+    onHistory: () -> Unit,
     onRecount: () -> Unit,
     onTransfer: () -> Unit,
     onAskToRemove: () -> Unit,
@@ -93,6 +102,24 @@ fun PackageCardScreen(
                     }
                 }
             )
+        },
+        floatingActionButton = {
+            // Принять — самое частое, что человек делает с коробкой: Material 3 отводит для
+            // такого плавающую кнопку, и она не делит ширину ни с кем (решение владельца).
+            if (pack != null) {
+                // Подпись у значка, а не только у слова: плавающая кнопка Material 3 слов внутрь
+                // своего узла не пускает, и экранный чтец назвал бы её просто «кнопка».
+                ExtendedFloatingActionButton(
+                    onClick = onTake,
+                    icon = {
+                        Icon(
+                            painterResource(R.drawable.ic_pill),
+                            contentDescription = stringResource(R.string.intake_record)
+                        )
+                    },
+                    text = { Text(stringResource(R.string.intake_record)) }
+                )
+            }
         }
     ) { padding ->
         when {
@@ -106,7 +133,7 @@ fun PackageCardScreen(
                     .padding(16.dp),
                 verticalArrangement = Arrangement.spacedBy(12.dp)
             ) {
-                HowMuchIsThere(pack, state.holdingCourseTitle, state.isBusy, onRecount)
+                HowMuchIsThere(pack, state.holdingCourseTitle, state.isBusy, onTake, onRecount, onHistory)
                 WhatItIs(pack)
                 DatesAndPrice(pack, state.today, state.lastUsedOn)
                 WhereItLies(pack, state.medKitName, onTransfer)
@@ -127,13 +154,32 @@ private fun HowMuchIsThere(
     pack: PackagePresentationDTO,
     holdingCourseTitle: String?,
     isBusy: Boolean,
-    onRecount: () -> Unit
+    onTake: () -> Unit,
+    onRecount: () -> Unit,
+    onHistory: () -> Unit
 ) {
     Section(title = stringResource(R.string.pack_how_much)) {
-        Row(verticalAlignment = Alignment.CenterVertically) {
-            Text(pack.effective.text(), style = MaterialTheme.typography.headlineMedium, modifier = Modifier.weight(1f))
-            TextButton(onClick = onRecount) { Text(stringResource(R.string.pack_recount)) }
+        Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+            // Число забирает остаток ширины, кнопка меряется своим словом: вес на кнопке уравнял
+            // бы их и порезал текст (замечание владельца 2026-09-16).
+            Text(
+                pack.effective.text(),
+                style = MaterialTheme.typography.headlineMedium,
+                modifier = Modifier.weight(1f)
+            )
+            OutlinedButton(onClick = onRecount, modifier = Modifier.defaultMinSize(minHeight = 48.dp)) {
+                Icon(painterResource(R.drawable.ic_calculate), contentDescription = null, modifier = Modifier.size(18.dp))
+                Spacer(Modifier.width(8.dp))
+                Text(stringResource(R.string.pack_recount))
+            }
         }
+        // История переживает саму коробку: кончившаяся и выброшенная рассказывает о себе так же
+        // (PLAN D3, H3 №19). Переход — строкой со стрелкой, а не кнопкой: он уводит с экрана.
+        NavigationRow(
+            icon = R.drawable.ic_history,
+            text = stringResource(R.string.intake_history_of_package),
+            onClick = onHistory
+        )
         if (pack.availableToMe != pack.effective) {
             Fact(stringResource(R.string.pack_available_to_me), pack.availableToMe.text())
         }

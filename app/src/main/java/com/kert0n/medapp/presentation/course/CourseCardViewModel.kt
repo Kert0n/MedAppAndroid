@@ -3,11 +3,15 @@ package com.kert0n.medapp.presentation.course
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.kert0n.medapp.domain.course.CourseCoverage
+import com.kert0n.medapp.domain.course.Revision
+import com.kert0n.medapp.domain.value.Doses
 import com.kert0n.medapp.domain.course.CourseProjection
 import com.kert0n.medapp.domain.course.CoverageReduction
 import com.kert0n.medapp.domain.course.CourseRecordProjection
 import com.kert0n.medapp.domain.intake.IntakeProjection
+import com.kert0n.medapp.domain.intake.IntakeStatus
 import com.kert0n.medapp.feature.course.CourseCancellation
+import com.kert0n.medapp.feature.course.CourseOffPlanCounting
 import com.kert0n.medapp.storage.course.CourseStorageRepository
 import com.kert0n.medapp.storage.intake.IntakeStorageRepository
 import dagger.assisted.Assisted
@@ -32,6 +36,7 @@ import kotlinx.coroutines.launch
 @HiltViewModel(assistedFactory = CourseCardViewModel.Factory::class)
 class CourseCardViewModel @AssistedInject constructor(
     private val cancellation: CourseCancellation,
+    private val offPlanCounting: CourseOffPlanCounting,
     courses: CourseStorageRepository,
     intakes: IntakeStorageRepository,
     @Assisted private val courseId: Uuid
@@ -44,6 +49,11 @@ class CourseCardViewModel @AssistedInject constructor(
 
     private val cancelling = MutableStateFlow(Cancelling())
 
+    private val counting = MutableStateFlow(Counting())
+
+    /** Редакция плана, которую видел экран: по ней сценарий и узнаёт, что правят виденное (F5). */
+    private var revision: Revision? = null
+
     /** Эпизод — запись и план вместе: имя живёт у записи, состав пачек — у плана (PLAN D5). */
     private val episode = combine(courses.observeRecord(courseId), courses.observePlan(courseId)) { record, plan ->
         record to plan
@@ -54,10 +64,11 @@ class CourseCardViewModel @AssistedInject constructor(
         courses.observeCoverage(courseId),
         courses.observeReductions(courseId),
         intakes.observeOfCourse(courseId),
-        cancelling
-    ) { (record, plan), coverage, reductions, intakes, cancelling ->
+        combine(cancelling, counting) { cancelling, counting -> cancelling to counting }
+    ) { (record, plan), coverage, reductions, intakes, working ->
+        revision = plan?.revision
         if (record == null) CourseCardUiState(isGone = true)
-        else record.toCardUiState(plan, coverage, reductions, intakes, cancelling)
+        else record.toCardUiState(plan, coverage, reductions, intakes, working.first, working.second)
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), CourseCardUiState(isLoading = true))
 
     /** Отмена спрашивается: будущие приёмы уйдут, а пачки освободятся (H3, список подтверждений). */
@@ -84,9 +95,44 @@ class CourseCardViewModel @AssistedInject constructor(
         }
     }
 
-    /** Прочитанное сообщение человек уносит сам: до ответа оно остаётся на экране. */
+    /**
+     * Принял мимо плана. Это **поправка к счёту**, а не приём: расписание и пункты не трогаются,
+     * а лечение считает, что доз принято больше (PLAN D5). Спрашивается подтверждением — число
+     * уедет в прогресс и может закончить лечение.
+     */
+    fun askToCountOffPlan() {
+        if (counting.value.working) return
+        counting.value = Counting(asking = true)
+    }
+
+    fun dismissOffPlan() {
+        if (counting.value.working) return
+        counting.value = Counting()
+    }
+
+    /** Записать новый счёт доз мимо плана; второе нажатие ничего не начинает. */
+    fun countOffPlan(total: Int) {
+        val now = counting.value
+        if (!now.asking || now.working) return
+        // Плана нет — правят не то, что видели: сказать об этом и закрыть вопрос, иначе кнопка
+        // «Сохранить» отвечает молчанием.
+        val revision = revision ?: run {
+            counting.value = Counting(message = CourseCardMessage.Stale)
+            return
+        }
+        counting.value = now.copy(asking = false, working = true)
+        viewModelScope.launch {
+            counting.value = told(offPlanCounting.set(courseId, revision, Doses(total)))
+        }
+    }
+
+    /**
+     * Прочитанное сообщение человек уносит сам: до ответа оно остаётся на экране. Владельцев у
+     * сообщения два — отмена и счёт приёмов, — и убираются оба: «Понятно» не должно молчать.
+     */
     fun dismissMessage() {
         cancelling.value = cancelling.value.copy(message = null)
+        counting.value = counting.value.copy(message = null)
     }
 
     /**
@@ -109,7 +155,8 @@ class CourseCardViewModel @AssistedInject constructor(
         coverage: CourseCoverage?,
         reductions: List<CoverageReduction>,
         intakes: List<IntakeProjection>,
-        cancelling: Cancelling
+        cancelling: Cancelling,
+        counting: Counting
     ): CourseCardUiState {
         val zone = prescription.schedule.zone
         return CourseCardUiState(
@@ -129,7 +176,15 @@ class CourseCardViewModel @AssistedInject constructor(
             isRunning = isOpen,
             asksToCancel = cancelling.asking,
             isCancelling = cancelling.working,
-            message = cancelling.message
+            offPlanDoses = plan?.takenOffPlan?.count,
+            // Сколько ещё можно засчитать мимо плана: больше лечению просто не назначено (D5).
+            offPlanLimit = plan?.let {
+                (prescription.totalDoses.count - intakes.count { taken -> taken.status == IntakeStatus.TAKEN })
+                    .coerceAtLeast(0)
+            },
+            asksOffPlan = counting.asking,
+            isCounting = counting.working,
+            message = cancelling.message ?: counting.message
         )
     }
 
@@ -141,6 +196,23 @@ class CourseCardViewModel @AssistedInject constructor(
             intake.taken?.pkg?.let { put(it.id, it.name) }
         }
     }
+
+    /** Чем кончилась поправка счёта: лечение этим и закончилось — или ничего не вышло. */
+    private fun told(outcome: CourseOffPlanCounting.Outcome): Counting = when (outcome) {
+        is CourseOffPlanCounting.Outcome.Set, CourseOffPlanCounting.Outcome.Gone -> Counting()
+        // Лечение закончилось этим счётом: карточка сама покажет «Завершён», сказать нечего.
+        CourseOffPlanCounting.Outcome.Finished -> Counting()
+        CourseOffPlanCounting.Outcome.AlreadyFinished -> Counting(message = CourseCardMessage.AlreadyFinished)
+        CourseOffPlanCounting.Outcome.Stale -> Counting(message = CourseCardMessage.Stale)
+        // Экран этого не даёт набрать, но он мог отстать от чтения: предел называется словами.
+        is CourseOffPlanCounting.Outcome.BeyondPlan -> Counting(message = CourseCardMessage.BeyondPlan(outcome.limit.count))
+    }
+
+    private data class Counting(
+        val asking: Boolean = false,
+        val working: Boolean = false,
+        val message: CourseCardMessage? = null
+    )
 
     private data class Cancelling(
         val asking: Boolean = false,
@@ -165,6 +237,12 @@ data class CourseCardUiState(
     val isGone: Boolean = false,
     val asksToCancel: Boolean = false,
     val isCancelling: Boolean = false,
+    /** Сколько доз принято мимо расписания: поправка к счёту, а не приёмы (PLAN D5). */
+    val offPlanDoses: Int? = null,
+    /** Предел счёта: больше, чем лечению осталось, мимо плана не принимают (PLAN D5). */
+    val offPlanLimit: Int? = null,
+    val asksOffPlan: Boolean = false,
+    val isCounting: Boolean = false,
     /** Чем кончилось действие человека, если по самой карточке этого не видно. */
     val message: CourseCardMessage? = null
 )
@@ -178,4 +256,10 @@ sealed interface CourseCardMessage {
 
     /** Лечение кончилось само, пока человек шёл сюда: отменять уже нечего. */
     data object AlreadyFinished : CourseCardMessage
+
+    /** Лечение правили с другого экрана: карточка перечитает, а решение человек повторит. */
+    data object Stale : CourseCardMessage
+
+    /** Мимо плана принято больше, чем лечению осталось: назван предел. */
+    data class BeyondPlan(val limit: Int) : CourseCardMessage
 }

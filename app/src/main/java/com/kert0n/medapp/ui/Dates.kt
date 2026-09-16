@@ -7,3 +7,8 @@ import java.time.format.DateTimeFormatter
  * разъехались бы порознь, и человек читал бы дату по-разному на соседних экранах.
  */
 internal val DAY: DateTimeFormatter = DateTimeFormatter.ofPattern("dd.MM.uuuu")
+
+/**
+ * Как приложение пишет время: `09:05`. Тем же доводом, что и [DAY]: один формат на все экраны.
+ */
+internal val TIME: DateTimeFormatter = DateTimeFormatter.ofPattern("HH:mm")

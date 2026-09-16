@@ -46,14 +46,18 @@ class CourseOffPlanCounting @Inject constructor(
         if (before.revision != expected) return@run Outcome.Stale
         val now = clock.instant()
         calendar.missOverdue(before, now)
+        val ofCourse = intakes.ofCourse(courseId).filterIsInstance<CourseIntake>()
+        val progress = CourseProgress.of(ofCourse)
+        // Мимо плана нельзя принять больше, чем лечению осталось: столько доз ему просто не
+        // назначено, и счёт сверх этого — не поправка, а другое число (PLAN D5).
+        val limit = before.totalDoses.minusOrNone(progress.takenDoses)
+        if (total > limit) return@run Outcome.BeyondPlan(limit)
         val course = before.setTakenOffPlan(total, packages.availabilityFor(before), now)
         if (course === before) return@run Outcome.Set(before.projection())
         courses.reallocate(CourseReallocation(course, expected)).readThisTransaction("план")
         following.announceClaims(before, course, now)
 
-        val ofCourse = intakes.ofCourse(courseId).filterIsInstance<CourseIntake>()
-        val progress = CourseProgress.of(ofCourse)
-        val completion = CourseCompletion(course, progress)
+        val completion = CourseCompletion(course, CourseProgress.of(intakes.ofCourse(courseId).filterIsInstance<CourseIntake>()))
         if (completion.reached) {
             val amended = courses.findRecord(courseId).readThisTransaction("запись эпизода")
             closing.close(course, CourseCompletion.Closing.of(amended, CourseRecord.Outcome.COMPLETED, ofCourse, now), now)
@@ -71,6 +75,9 @@ class CourseOffPlanCounting @Inject constructor(
      */
     sealed interface Outcome {
         data class Set(val course: CourseProjection) : Outcome
+
+        /** Больше, чем лечению осталось: столько доз ему не назначено — назван предел (PLAN D5). */
+        data class BeyondPlan(val limit: Doses) : Outcome
         data object Finished : Outcome
         data object AlreadyFinished : Outcome
         data object Gone : Outcome

@@ -1,6 +1,8 @@
 package com.kert0n.medapp.ui.course
 
 import androidx.compose.ui.test.assertIsDisplayed
+import androidx.compose.ui.test.assertIsNotEnabled
+import androidx.compose.ui.test.assertIsEnabled
 import androidx.compose.ui.test.junit4.v2.createComposeRule
 import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithText
@@ -38,6 +40,7 @@ class CourseCardScreenTest {
     val compose = createComposeRule()
 
     private var asked = 0
+    private var askedOffPlan = 0
     private var confirmed = 0
     private var edited = 0
 
@@ -48,6 +51,10 @@ class CourseCardScreenTest {
                     state = state,
                     onEdit = { edited++ },
                     onSources = {},
+                    onHistory = {},
+                    onAskOffPlan = { askedOffPlan++ },
+                    onCountOffPlan = {},
+                    onDismissOffPlan = {},
                     onAskToCancel = { asked++ },
                     onConfirmCancel = { confirmed++ },
                     onDismissCancel = {},
@@ -187,5 +194,40 @@ class CourseCardScreenTest {
         show(CourseCardUiState(isGone = true))
 
         compose.onNodeWithText("Этого лечения больше нет.").assertIsDisplayed()
+    }
+
+    /**
+     * Приёмы вне расписания — переход со значком и стрелкой, а не текстовая кнопка: кнопкой он
+     * читался как заголовок (замечание владельца 2026-09-16). Счёт назван приёмами: лечение меряет
+     * себя ими, и третье слово о том же сбивает.
+     */
+    @Test
+    fun theOffPlanCountIsAskedBeforeItIsWritten() {
+        show(CourseCardUiState(course = course(), isRunning = true, offPlanDoses = 1))
+
+        compose.onNodeWithText("1 приём").assertIsDisplayed()
+        compose.onNodeWithText("Приёмы вне расписания").performClick()
+
+        assertEquals(1, askedOffPlan)
+    }
+
+    /**
+     * Больше, чем лечению осталось, набрать нельзя: «+» гаснет на пределе. Столько доз лечению не
+     * назначено, и счёт сверх этого — не поправка, а другое число (замечание владельца).
+     */
+    @Test
+    fun theOffPlanCountStopsAtWhatTheTreatmentHasLeft() {
+        show(
+            CourseCardUiState(
+                course = course(),
+                isRunning = true,
+                offPlanDoses = 2,
+                offPlanLimit = 2,
+                asksOffPlan = true
+            )
+        )
+
+        compose.onNodeWithContentDescription("На один больше").assertIsNotEnabled()
+        compose.onNodeWithContentDescription("На один меньше").assertIsEnabled()
     }
 }

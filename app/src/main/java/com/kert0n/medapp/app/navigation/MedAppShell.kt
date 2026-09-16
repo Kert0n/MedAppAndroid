@@ -27,6 +27,13 @@ import com.kert0n.medapp.ui.course.CourseCardScreen
 import com.kert0n.medapp.ui.course.CourseFormScreen
 import com.kert0n.medapp.ui.course.CourseSourcesScreen
 import com.kert0n.medapp.ui.course.SourcePickingScreen
+import com.kert0n.medapp.presentation.intake.UnplannedIntakeViewModel
+import com.kert0n.medapp.ui.intake.UnplannedIntakeSheet
+import com.kert0n.medapp.presentation.intake.IntakeCardViewModel
+import com.kert0n.medapp.presentation.intake.IntakeHistoryViewModel
+import com.kert0n.medapp.presentation.plan.DayPlanViewModel
+import com.kert0n.medapp.ui.intake.IntakeCardScreen
+import com.kert0n.medapp.ui.intake.IntakeHistoryScreen
 import com.kert0n.medapp.ui.plan.PlanMode
 import com.kert0n.medapp.ui.plan.PlanScreen
 import androidx.compose.runtime.LaunchedEffect
@@ -184,9 +191,14 @@ private fun screens(stacks: TabStacks) = entryProvider<NavKey> {
         val state = model.state.collectAsStateWithLifecycle().value
         // Выброшенной коробке карточки нет: уходим туда, откуда пришли.
         LaunchedEffect(state.isRemoved) { if (state.isRemoved) stacks.back() }
+        // Разовый приём — лист над карточкой (H3 №10): своего места в стопке у него нет, и
+        // коробку из виду человек не теряет.
+        var taking by rememberSaveable { mutableStateOf(false) }
         PackageCardScreen(
             state = state,
             onEdit = { stacks.go(Screen.PackageForm(packageId = key.packageId)) },
+            onTake = { taking = true },
+            onHistory = { stacks.go(Screen.IntakeHistory(packageId = key.packageId)) },
             onRecount = { stacks.go(Screen.PackageRecount(key.packageId)) },
             onTransfer = { stacks.go(Screen.PackageTransfer(key.packageId)) },
             onAskToRemove = model::askToRemove,
@@ -194,6 +206,32 @@ private fun screens(stacks: TabStacks) = entryProvider<NavKey> {
             onDismissRemoval = model::dismissRemoval,
             onBack = stacks::back
         )
+        if (taking) {
+            val intake = hiltViewModel<UnplannedIntakeViewModel, UnplannedIntakeViewModel.Factory>(
+                key = "intake-${key.packageId}",
+                creationCallback = { factory -> factory.create(key.packageId) }
+            )
+            val taken = intake.state.collectAsStateWithLifecycle().value
+            // Записано — лист закрывается: человек сказал, что хотел, а новое число покажет
+            // карточка. Разговор при этом забывается: следующее «Принять» начинает новый приём, и
+            // без этого лист открылся бы уже закрытым (разбор 2026-09-16).
+            LaunchedEffect(taken.isRecorded, taken.isGone) {
+                if (!taken.isRecorded && !taken.isGone) return@LaunchedEffect
+                taking = false
+                intake.forgetTheIntake()
+            }
+            UnplannedIntakeSheet(
+                state = taken,
+                onEdit = intake::edit,
+                onRecord = { intake.record() },
+                onAcknowledge = { intake.record(acknowledged = true) },
+                onDismissQuestions = intake::dismissQuestions,
+                onDismiss = {
+                    taking = false
+                    intake.forgetTheIntake()
+                }
+            )
+        }
     }
     entry<Screen.PackageRecount> { key ->
         val model = hiltViewModel<PackageRecountViewModel, PackageRecountViewModel.Factory>(
@@ -227,13 +265,35 @@ private fun screens(stacks: TabStacks) = entryProvider<NavKey> {
     }
     entry(Screen.Plan) {
         val model: CourseListViewModel = hiltViewModel()
+        val days: DayPlanViewModel = hiltViewModel()
         // Режим — состояние места: он переживает уход в другую комнату и возвращение, как и
         // всё, что держит стопка (rememberSaveable под своим ключом маршрута).
         var mode by rememberSaveable { mutableStateOf(PlanMode.COURSES) }
+        // Сценарий спросил — быстрый ответ ведёт на карточку пункта: отвечать на вопрос человек
+        // должен зная, а в строке для вопросов места нет (PLAN D6, H3 №12).
+        val question = days.asksAbout.collectAsStateWithLifecycle().value
+        LaunchedEffect(question) {
+            val asked = question ?: return@LaunchedEffect
+            days.questionShown()
+            stacks.go(Screen.IntakeCard(asked.courseId, asked.intakeId))
+        }
         PlanScreen(
             mode = mode,
             onMode = { mode = it },
             courses = model.state.collectAsStateWithLifecycle().value,
+            // Чтение спрашивается у той страницы, которой оно принадлежит: сдвиг называет вёрстка
+            // страницы, а не оболочка.
+            dayPage = { daysAhead -> days.page(daysAhead).collectAsStateWithLifecycle().value },
+            // Нажатие на строку ведёт на карточку пункта; у дозы за окном календаря записи ещё
+            // нет, и открывать по ней нечего.
+            onOpenIntake = { item ->
+                val intakeId = item.intakeId
+                val courseId = item.courseId
+                if (intakeId != null && courseId != null) stacks.go(Screen.IntakeCard(courseId, intakeId))
+            },
+            onConfirmIntake = days::confirm,
+            onDeclineIntake = days::decline,
+            onDismissDayMessage = days::dismissMessage,
             // Черновик открывается редактором, идущее и законченное лечение — карточкой.
             onOpenCourse = { course ->
                 stacks.go(
@@ -242,6 +302,34 @@ private fun screens(stacks: TabStacks) = entryProvider<NavKey> {
                 )
             },
             onAddCourse = { stacks.go(Screen.CourseForm()) }
+        )
+    }
+    entry<Screen.IntakeCard> { key ->
+        val model = hiltViewModel<IntakeCardViewModel, IntakeCardViewModel.Factory>(
+            key = key.toString(),
+            creationCallback = { factory -> factory.create(key.courseId, key.intakeId) }
+        )
+        val state = model.state.collectAsStateWithLifecycle().value
+        // Ответ дан — карточка уходит: человек отвечал на приём, а не заполнял форму.
+        LaunchedEffect(state.isDone) { if (state.isDone) stacks.back() }
+        IntakeCardScreen(
+            state = state,
+            onEdit = model::edit,
+            onConfirm = { model.confirm() },
+            onDecline = model::decline,
+            onAcknowledge = { model.confirm(acknowledged = true) },
+            onDismissQuestions = model::dismissQuestions,
+            onBack = stacks::back
+        )
+    }
+    entry<Screen.IntakeHistory> { key ->
+        val model = hiltViewModel<IntakeHistoryViewModel, IntakeHistoryViewModel.Factory>(
+            key = key.toString(),
+            creationCallback = { factory -> factory.create(key.courseId, key.packageId) }
+        )
+        IntakeHistoryScreen(
+            state = model.state.collectAsStateWithLifecycle().value,
+            onBack = stacks::back
         )
     }
     entry<Screen.CourseForm> { key ->
@@ -294,6 +382,10 @@ private fun screens(stacks: TabStacks) = entryProvider<NavKey> {
             state = model.state.collectAsStateWithLifecycle().value,
             onEdit = { stacks.go(Screen.CourseForm(key.courseId)) },
             onSources = { stacks.go(Screen.CourseSources(key.courseId)) },
+            onHistory = { stacks.go(Screen.IntakeHistory(courseId = key.courseId)) },
+            onAskOffPlan = model::askToCountOffPlan,
+            onCountOffPlan = model::countOffPlan,
+            onDismissOffPlan = model::dismissOffPlan,
             onAskToCancel = model::askToCancel,
             onConfirmCancel = model::cancel,
             onDismissCancel = model::dismissCancel,

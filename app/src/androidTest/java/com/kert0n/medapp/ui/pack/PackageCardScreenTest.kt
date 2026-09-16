@@ -39,6 +39,7 @@ class PackageCardScreenTest {
     val compose = createComposeRule()
 
     private var edited = 0
+    private var taken = 0
     private var recounted = 0
     private var transferred = 0
     private var asked = 0
@@ -71,6 +72,8 @@ class PackageCardScreenTest {
             MedAppTheme {
                 PackageCardScreen(
                     state = state,
+                    onTake = { taken++ },
+                    onHistory = {},
                     onEdit = { edited++ },
                     onRecount = { recounted++ },
                     onTransfer = { transferred++ },
@@ -232,5 +235,19 @@ class PackageCardScreenTest {
         compose.onNodeWithText("Выбросить").performClick()
 
         assertEquals(1, confirmed)
+    }
+
+    /**
+     * «Принять» — самое частое действие с коробкой, и стоит оно плавающей кнопкой: в ряду с
+     * «Пересчитать» они делили ширину, и слово переносилось по слогам (замечание владельца).
+     */
+    @Test
+    fun takingIsTheFloatingActionOfTheCard() {
+        show(card())
+
+        // Слово у плавающей кнопки живёт подписью значка: внутрь своего узла она текста не пускает.
+        compose.onNodeWithContentDescription("Принять").performClick()
+
+        assertEquals(1, taken)
     }
 }
