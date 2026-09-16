@@ -85,4 +85,10 @@ sealed interface Screen : NavKey {
     /** Выбор источника (PLAN H3 №17): какую коробку подключить к этому лечению. */
     @Serializable
     data class SourcePicking(val courseId: Uuid) : Screen
+
+    /**
+     * Карточка пункта плана. Названы оба: пункт читается среди пунктов своего лечения, а именем
+     * лечения карточка и подписана (PLAN H3 №18).
+     */
+    data class IntakeCard(val courseId: Uuid, val intakeId: Uuid) : Screen
 }

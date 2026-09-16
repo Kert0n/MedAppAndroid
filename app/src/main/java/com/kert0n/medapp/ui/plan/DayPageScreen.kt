@@ -2,6 +2,7 @@ package com.kert0n.medapp.ui.plan
 
 import androidx.annotation.DrawableRes
 import androidx.annotation.StringRes
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.fillMaxSize
@@ -11,6 +12,7 @@ import androidx.compose.foundation.lazy.LazyListScope
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.pager.HorizontalPager
 import androidx.compose.foundation.pager.rememberPagerState
+import androidx.compose.material3.FilledTonalButton
 import androidx.compose.material3.Icon
 import androidx.compose.material3.ListItem
 import androidx.compose.material3.MaterialTheme
@@ -30,6 +32,7 @@ import com.kert0n.medapp.ui.LoadingState
 import com.kert0n.medapp.ui.TIME
 import com.kert0n.medapp.ui.words
 import java.time.LocalTime
+import kotlin.uuid.Uuid
 
 /**
  * На сколько дней вперёд листается план. Столько же вперёд календарь пишет пункты
@@ -53,17 +56,23 @@ private const val DAYS_AHEAD = 60
 @Composable
 fun DayPages(
     page: @Composable (daysAhead: Int) -> ScreenState<DayPagePresentationDTO>,
+    onOpen: (DayItemPresentationDTO) -> Unit,
+    onConfirm: (Uuid) -> Unit,
     modifier: Modifier = Modifier
 ) {
     val pager = rememberPagerState(pageCount = { DAYS_AHEAD + 1 })
     HorizontalPager(state = pager, modifier = modifier.fillMaxSize()) { daysAhead ->
-        DayPage(page(daysAhead))
+        DayPage(page(daysAhead), onOpen, onConfirm)
     }
 }
 
 /** Один день: заголовок с датой, пункты и то, что пришлось на этот день помимо них. */
 @Composable
-private fun DayPage(state: ScreenState<DayPagePresentationDTO>) {
+private fun DayPage(
+    state: ScreenState<DayPagePresentationDTO>,
+    onOpen: (DayItemPresentationDTO) -> Unit,
+    onConfirm: (Uuid) -> Unit
+) {
     val day = (state as? ScreenState.Ready)?.value
     // Первое чтение базы ещё не пришло: говорить «ничего не назначено» рано — это была бы неправда.
     if (day == null) {
@@ -81,8 +90,8 @@ private fun DayPage(state: ScreenState<DayPagePresentationDTO>) {
             return
         }
         LazyColumn(Modifier.fillMaxSize(), contentPadding = PaddingValues(bottom = 88.dp)) {
-            items(day.items, key = { it.key }) { item -> DayRow(item) }
-            shelf(R.string.plan_day_also, day.alsoOnThisDay)
+            items(day.items, key = { it.key }) { item -> DayRow(item, onOpen, onConfirm) }
+            shelf(R.string.plan_day_also, day.alsoOnThisDay, onOpen)
         }
     }
 }
@@ -103,7 +112,11 @@ private fun DayPagePresentationDTO.header(): String {
 }
 
 /** Полка «ещё в этот день»: пустая не показывается — заголовок без строк ничего не говорит. */
-private fun LazyListScope.shelf(@StringRes title: Int, items: List<DayItemPresentationDTO>) {
+private fun LazyListScope.shelf(
+    @StringRes title: Int,
+    items: List<DayItemPresentationDTO>,
+    onOpen: (DayItemPresentationDTO) -> Unit
+) {
     if (items.isEmpty()) return
     item(key = "shelf-$title") {
         Text(
@@ -113,21 +126,39 @@ private fun LazyListScope.shelf(@StringRes title: Int, items: List<DayItemPresen
             modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp)
         )
     }
-    items(items, key = { it.key }) { item -> DayRow(item) }
+    items(items, key = { it.key }) { item -> DayRow(item, onOpen, onConfirm = {}) }
 }
 
 /**
- * Строка дня: время, лечение, доза и пачка, а справа — что с ней стало, словом. Значок повторяет
- * то же слово глазу и потому экранному чтецу не адресуется: он прочёл бы состояние дважды.
+ * Строка дня: время, лечение, доза и пачка, а справа — ответ. У неотвеченного пункта это кнопка:
+ * в день приёмов несколько, и просить два нажатия на каждый — просить лишнего (H3 №12). У
+ * отвеченного — слово о том, что записано; значок повторяет его глазу и потому экранному чтецу не
+ * адресуется: он прочёл бы состояние дважды.
+ *
+ * Нажатие на саму строку ведёт на карточку пункта — туда, где приём меняют, а не отвечают наспех.
  */
 @Composable
-private fun DayRow(item: DayItemPresentationDTO) {
+private fun DayRow(
+    item: DayItemPresentationDTO,
+    onOpen: (DayItemPresentationDTO) -> Unit,
+    onConfirm: (Uuid) -> Unit
+) {
     ListItem(
         overlineContent = { Text(TIME.format(item.at)) },
         headlineContent = { Text(item.title) },
         supportingContent = { Text(item.details()) },
         leadingContent = { Icon(painterResource(item.state.icon), contentDescription = null) },
-        trailingContent = { Text(item.stateWords(), style = MaterialTheme.typography.labelLarge) }
+        trailingContent = {
+            val intakeId = item.intakeId
+            if (item.canAnswer && intakeId != null) {
+                FilledTonalButton(onClick = { onConfirm(intakeId) }, enabled = !item.isAnswering) {
+                    Text(stringResource(R.string.plan_answer_now))
+                }
+            } else {
+                Text(item.stateWords(), style = MaterialTheme.typography.labelLarge)
+            }
+        },
+        modifier = Modifier.clickable(enabled = item.intakeId != null) { onOpen(item) }
     )
 }
 

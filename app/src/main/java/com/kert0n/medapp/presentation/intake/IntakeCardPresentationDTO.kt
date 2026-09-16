@@ -1,0 +1,81 @@
+package com.kert0n.medapp.presentation.intake
+
+import com.kert0n.medapp.domain.intake.IntakeRejected
+import com.kert0n.medapp.presentation.value.QuantityPresentationDTO
+import com.kert0n.medapp.presentation.value.QuantityPresentationError
+import com.kert0n.medapp.presentation.value.UnitPresentationDTO
+import java.time.LocalDate
+import java.time.LocalTime
+import kotlin.uuid.Uuid
+
+/**
+ * Что человек набрал на карточке пункта (PLAN H3 №18): сколько принял и когда. Единица не
+ * набирается — её знает лечение, и другой у его пункта быть не может.
+ *
+ * Момент стоит в полях **заполненным**: приём чаще всего записывают сразу, и переключателя
+ * «сейчас или тогда» для этого не нужно — человек либо не трогает поля, либо называет свой день и
+ * час (D6 «принять вчерашнее сегодня законно, пока эпизод открыт»).
+ */
+data class IntakeCardPresentationDTO(
+    val amount: String = "",
+    val on: LocalDate? = null,
+    val at: LocalTime? = null
+)
+
+/**
+ * Карточка пункта целиком.
+ *
+ * [answer] есть у отвеченного пункта: он уже история, и спрашивать по нему нечего — карточка
+ * показывает, что записано, и действий не предлагает. [questions] — то, о чём сценарий спросил до
+ * записи: пока на них не ответили, не записано ничего (D6).
+ */
+data class IntakeCardUiState(
+    val isLoading: Boolean = false,
+    val isGone: Boolean = false,
+    val title: String = "",
+    val plannedOn: LocalDate? = null,
+    val plannedAt: LocalTime? = null,
+    val packageId: Uuid? = null,
+    val packageName: String? = null,
+    val plannedAmount: QuantityPresentationDTO? = null,
+    val unit: UnitPresentationDTO? = null,
+    val form: IntakeCardPresentationDTO = IntakeCardPresentationDTO(),
+    val answer: Answer? = null,
+    val answeredAt: LocalTime? = null,
+    val questions: List<IntakeQuestionPresentationDTO> = emptyList(),
+    val error: IntakeCardError? = null,
+    val isWriting: Boolean = false,
+    val isDone: Boolean = false
+) {
+
+    /** Чем пункт кончился, если кончился. */
+    enum class Answer { TAKEN, MISSED, CANCELLED }
+
+    /**
+     * Можно ли ещё отвечать. Пока идёт запись, второе нажатие ничего не начинает — сторожем служит
+     * само состояние. Пропущенный пункт отвечать **можно**: доза уехала вперёд, и подтвердить её
+     * позже законно (PLAN D6, решение владельца 2026-09-16); принятый и отменённый — история.
+     */
+    val canAnswer: Boolean
+        get() = !isWriting && !isGone && (answer == null || answer == Answer.MISSED)
+}
+
+/** Вопрос сценария словами экрана: ответ на него — тот же приём, подтверждённый человеком. */
+sealed interface IntakeQuestionPresentationDTO {
+
+    /** Коробка просрочена на день приёма (ТЗ 4.1.1.5.5). */
+    data class Expired(val on: LocalDate) : IntakeQuestionPresentationDTO
+
+    /** Приём заденет выделенное лечению или занятое соседями (PLAN D4). */
+    data class TouchesReserved(val free: QuantityPresentationDTO) : IntakeQuestionPresentationDTO
+}
+
+/** Чем кончился разбор набранного или сама запись: у каждой беды своё место и свои слова. */
+sealed interface IntakeCardError {
+
+    /** Число не разобралось; чем именно — говорит разбор величины. */
+    data class Amount(val error: QuantityPresentationError) : IntakeCardError
+
+    /** Сценарий отверг приём: в коробке столько не наберётся, эпизод закрыт, пачка не источник. */
+    data class Rejected(val reason: IntakeRejected.Reason) : IntakeCardError
+}

@@ -4,7 +4,12 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.junit4.v2.createComposeRule
+import androidx.compose.ui.test.assertCountEquals
+import androidx.compose.ui.test.assertIsNotEnabled
+import androidx.compose.ui.test.onAllNodesWithText
+import androidx.compose.ui.test.onFirst
 import androidx.compose.ui.test.onNodeWithText
+import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performTouchInput
 import androidx.compose.ui.test.swipeLeft
 import androidx.test.ext.junit.runners.AndroidJUnit4
@@ -18,6 +23,7 @@ import com.kert0n.medapp.ui.theme.MedAppTheme
 import java.time.LocalDate
 import java.time.LocalTime
 import kotlin.uuid.Uuid
+import org.junit.Assert.assertEquals
 import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
@@ -33,6 +39,9 @@ class DayPageScreenTest {
     val compose = createComposeRule()
 
     private val today: LocalDate = LocalDate.of(2027, 3, 10)
+
+    private val opened = mutableListOf<DayItemPresentationDTO>()
+    private val confirmed = mutableListOf<Uuid>()
 
     private fun row(
         title: String,
@@ -58,6 +67,8 @@ class DayPageScreenTest {
                     page = { daysAhead ->
                         pages.getOrNull(daysAhead)?.let { ScreenState.Ready(it) } ?: ScreenState.Loading
                     },
+                    onOpen = { opened += it },
+                    onConfirm = { confirmed += it },
                     modifier = Modifier.fillMaxSize()
                 )
             }
@@ -76,26 +87,70 @@ class DayPageScreenTest {
     )
 
     /**
-     * Состояние пункта названо **словом**, а не одним значком и цветом: человек, который не
-     * различает цвета или смотрит через экранного чтеца, иначе не узнает, принят приём или ждёт
-     * (PLAN H3 «Цвет не единственный носитель»).
+     * Состояние отвеченного пункта названо **словом**, а не одним значком и цветом: человек,
+     * который не различает цвета или смотрит через экранного чтеца, иначе не узнает, принят приём
+     * или пропущен (PLAN H3 «Цвет не единственный носитель»).
      */
     @Test
-    fun everyStateIsToldInWords() {
+    fun everyAnsweredStateIsToldInWords() {
         show(
             page(
                 items = listOf(
-                    row("Ждёт"),
                     row("Принят", state = DayItemPresentationDTO.State.TAKEN, answeredAt = LocalTime.of(9, 12)),
-                    row("Пропущен", state = DayItemPresentationDTO.State.MISSED)
+                    row("Отменён", state = DayItemPresentationDTO.State.CANCELLED)
+                ),
+                alsoOnThisDay = listOf(
+                    row("Разовый", state = DayItemPresentationDTO.State.ONE_OFF, answeredAt = LocalTime.of(14, 20))
                 )
             )
         )
 
-        compose.onNodeWithText("ждёт").assertIsDisplayed()
         // У принятого рядом со словом стоит время: за ним человек день и открывал.
         compose.onNodeWithText("принят в 09:12").assertIsDisplayed()
-        compose.onNodeWithText("пропущен").assertIsDisplayed()
+        compose.onNodeWithText("отменён").assertIsDisplayed()
+        compose.onNodeWithText("разово в 14:20").assertIsDisplayed()
+    }
+
+    /**
+     * На неотвеченный пункт отвечают **прямо в строке**: в день приёмов несколько, и просить два
+     * нажатия на каждый — просить лишнего (H3 №12). Пропущенному отвечают тоже: доза уехала
+     * вперёд, и подтвердить её позже законно.
+     */
+    @Test
+    fun anUnansweredRowIsAnsweredRightThere() {
+        val waiting = row("Ждёт")
+        val missed = row("Пропущен", state = DayItemPresentationDTO.State.MISSED)
+        show(page(items = listOf(waiting, missed)))
+
+        compose.onAllNodesWithText("Принял").assertCountEquals(2)
+        compose.onAllNodesWithText("Принял").onFirst().performClick()
+
+        assertEquals(listOf(waiting.intakeId), confirmed)
+    }
+
+    /**
+     * Пока идёт запись, кнопка на месте, но погашена: исчезнувшая читалась бы как «уже ответил»,
+     * а нажатая второй раз списала бы коробку дважды.
+     */
+    @Test
+    fun aRowBeingWrittenKeepsItsButtonButDoesNotTakeAPress() {
+        show(page(items = listOf(row("Ждёт").copy(isAnswering = true))))
+
+        compose.onNodeWithText("Принял").assertIsNotEnabled()
+        compose.onNodeWithText("Принял").performClick()
+
+        assertEquals(emptyList<Uuid>(), confirmed)
+    }
+
+    /** Нажатие на саму строку ведёт на карточку пункта — туда, где приём меняют. */
+    @Test
+    fun tappingTheRowItselfOpensTheCard() {
+        val item = row("Нурофен")
+        show(page(items = listOf(item)))
+
+        compose.onNodeWithText("Нурофен").performClick()
+
+        assertEquals(listOf(item), opened)
     }
 
     /** Заголовок называет и число, и слово: «сегодня» человек читает быстрее, чем сравнивает даты. */

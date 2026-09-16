@@ -84,6 +84,8 @@ class PlanScreenTest {
                     // Что на странице дня, проверяет `DayPageScreenTest`; здесь она нужна
                     // настолько, чтобы отличить одно состояние места от другого.
                     dayPage = { ScreenState.Ready(emptyDay) },
+                    onOpenIntake = {},
+                    onConfirmIntake = {},
                     onOpenCourse = { opened = it },
                     onAddCourse = { added++ }
                 )

@@ -29,7 +29,9 @@ import com.kert0n.medapp.ui.course.CourseSourcesScreen
 import com.kert0n.medapp.ui.course.SourcePickingScreen
 import com.kert0n.medapp.presentation.intake.UnplannedIntakeViewModel
 import com.kert0n.medapp.ui.intake.UnplannedIntakeSheet
+import com.kert0n.medapp.presentation.intake.IntakeCardViewModel
 import com.kert0n.medapp.presentation.plan.DayPlanViewModel
+import com.kert0n.medapp.ui.intake.IntakeCardScreen
 import com.kert0n.medapp.ui.plan.PlanMode
 import com.kert0n.medapp.ui.plan.PlanScreen
 import androidx.compose.runtime.LaunchedEffect
@@ -253,6 +255,14 @@ private fun screens(stacks: TabStacks) = entryProvider<NavKey> {
         // Режим — состояние места: он переживает уход в другую комнату и возвращение, как и
         // всё, что держит стопка (rememberSaveable под своим ключом маршрута).
         var mode by rememberSaveable { mutableStateOf(PlanMode.COURSES) }
+        // Сценарий спросил — быстрый ответ ведёт на карточку пункта: отвечать на вопрос человек
+        // должен зная, а в строке для вопросов места нет (PLAN D6, H3 №12).
+        val question = days.asksAbout.collectAsStateWithLifecycle().value
+        LaunchedEffect(question) {
+            val asked = question ?: return@LaunchedEffect
+            days.questionShown()
+            stacks.go(Screen.IntakeCard(asked.courseId, asked.intakeId))
+        }
         PlanScreen(
             mode = mode,
             onMode = { mode = it },
@@ -260,6 +270,14 @@ private fun screens(stacks: TabStacks) = entryProvider<NavKey> {
             // Чтение спрашивается у той страницы, которой оно принадлежит: сдвиг называет вёрстка
             // страницы, а не оболочка.
             dayPage = { daysAhead -> days.page(daysAhead).collectAsStateWithLifecycle().value },
+            // Нажатие на строку ведёт на карточку пункта; у дозы за окном календаря записи ещё
+            // нет, и открывать по ней нечего.
+            onOpenIntake = { item ->
+                val intakeId = item.intakeId
+                val courseId = item.courseId
+                if (intakeId != null && courseId != null) stacks.go(Screen.IntakeCard(courseId, intakeId))
+            },
+            onConfirmIntake = days::confirm,
             // Черновик открывается редактором, идущее и законченное лечение — карточкой.
             onOpenCourse = { course ->
                 stacks.go(
@@ -268,6 +286,23 @@ private fun screens(stacks: TabStacks) = entryProvider<NavKey> {
                 )
             },
             onAddCourse = { stacks.go(Screen.CourseForm()) }
+        )
+    }
+    entry<Screen.IntakeCard> { key ->
+        val model = hiltViewModel<IntakeCardViewModel, IntakeCardViewModel.Factory>(
+            key = key.toString(),
+            creationCallback = { factory -> factory.create(key.courseId, key.intakeId) }
+        )
+        val state = model.state.collectAsStateWithLifecycle().value
+        // Ответ дан — карточка уходит: человек отвечал на приём, а не заполнял форму.
+        LaunchedEffect(state.isDone) { if (state.isDone) stacks.back() }
+        IntakeCardScreen(
+            state = state,
+            onEdit = model::edit,
+            onConfirm = { model.confirm() },
+            onAcknowledge = { model.confirm(acknowledged = true) },
+            onDismissQuestions = model::dismissQuestions,
+            onBack = stacks::back
         )
     }
     entry<Screen.CourseForm> { key ->

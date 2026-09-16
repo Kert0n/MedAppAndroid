@@ -77,13 +77,5 @@ fun UnplannedIntakeSheet(
 @Composable
 private fun UnplannedIntakeError.words(): String = when (this) {
     is UnplannedIntakeError.Amount -> stringResource(error.text)
-    is UnplannedIntakeError.Rejected -> stringResource(
-        when (reason) {
-            IntakeRejected.Reason.INSUFFICIENT -> R.string.intake_not_enough
-            IntakeRejected.Reason.PACKAGE_UNUSABLE -> R.string.intake_package_unusable
-            IntakeRejected.Reason.UNIT_MISMATCH -> R.string.intake_unit_mismatch
-            IntakeRejected.Reason.EPISODE_CLOSED -> R.string.intake_episode_closed
-            IntakeRejected.Reason.PACKAGE_NOT_A_SOURCE -> R.string.intake_not_a_source
-        }
-    )
+    is UnplannedIntakeError.Rejected -> stringResource(reason.text)
 }

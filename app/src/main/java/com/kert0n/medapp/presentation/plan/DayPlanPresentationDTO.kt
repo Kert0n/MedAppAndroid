@@ -45,8 +45,19 @@ data class DayItemPresentationDTO(
     val dose: QuantityPresentationDTO,
     val packageName: String?,
     val state: State,
-    val answeredAt: LocalTime?
+    val answeredAt: LocalTime?,
+    val isAnswering: Boolean = false
 ) {
+
+    /**
+     * Есть ли на что отвечать в строке. Пропущенному отвечают тоже: доза уехала вперёд, и
+     * подтвердить её позже законно (PLAN D6, решение владельца 2026-09-16).
+     *
+     * Идущая запись ([isAnswering]) действие не отменяет, а гасит: исчезнувшая кнопка читалась бы
+     * как «уже ответил», а её и не было.
+     */
+    val canAnswer: Boolean get() = state == State.PLANNED || state == State.MISSED
+
 
     /**
      * Что со строкой, глазами человека. Значений шесть, а не «статус плюс вид»: человек видит
