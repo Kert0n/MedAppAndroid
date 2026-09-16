@@ -92,6 +92,8 @@ class MissedIntakesViewModel @Inject constructor(
                     usable.map { alive ->
                         waiting.mapNotNull { intake ->
                             val title = titles[intake.courseId] ?: return@mapNotNull null
+                            // День — дата пункта, как на странице «Дня»: попап и «День» не расходятся.
+                            // Время — по зоне телефона, как там же; расхождение зон — отдельный вопрос.
                             intake.toDayRow(title, day.zone, on = intake.slot.localDate).let { row ->
                                 if (intake.plannedPackage?.id in alive) row else row.copy(hasPlannedPackage = false)
                             }
