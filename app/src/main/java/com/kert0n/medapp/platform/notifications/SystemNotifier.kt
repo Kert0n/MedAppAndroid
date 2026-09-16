@@ -48,7 +48,8 @@ class SystemNotifier @Inject constructor(
     @ApplicationContext private val context: Context,
     private val intakes: IntakeStorageRepository,
     private val courses: CourseStorageRepository,
-    private val packages: PackageStorageRepository
+    private val packages: PackageStorageRepository,
+    private val channels: NotificationChannels
 ) : Notifier {
 
     override suspend fun show(reminder: Reminder): Delivery {
@@ -58,14 +59,10 @@ class SystemNotifier @Inject constructor(
             ContextCompat.checkSelfPermission(context, Manifest.permission.POST_NOTIFICATIONS) != PackageManager.PERMISSION_GRANTED
         ) return Delivery.NOT_ALLOWED
         if (!NotificationManagerCompat.from(context).areNotificationsEnabled()) return Delivery.NOT_ALLOWED
-        // Разрешение приложению — ещё не разрешение этому разговору: каналов четыре, и человек
+        // Разрешение приложению — ещё не разрешение этому разговору: каналов пять, и человек
         // выключает их по отдельности (PLAN D8). Выключенный канал молчит, а `notify` об этом не
-        // скажет — спрашиваем канал **этого вида**.
-        val channel = context.getSystemService(android.app.NotificationManager::class.java)
-            .getNotificationChannel(reminder.channel.id)
-        if (channel == null || channel.importance == android.app.NotificationManager.IMPORTANCE_NONE) {
-            return Delivery.NOT_ALLOWED
-        }
+        // скажет — спрашиваем **владельца каналов** о канале этого вида.
+        if (channels.mutedOrMissing(reminder.channel.id)) return Delivery.NOT_ALLOWED
         // Текст собирается из чтений по идентификаторам цели: не нашлось — повода больше нет.
         val text = textOf(reminder) ?: return Delivery.SUBJECT_GONE
         val builder = NotificationCompat.Builder(context, reminder.channel.id)

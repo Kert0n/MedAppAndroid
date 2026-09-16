@@ -33,6 +33,21 @@ class NotificationChannels @Inject constructor(@ApplicationContext private val c
         }
     }
 
+    /**
+     * Можно ли вообще показать в этом канале: канала нет — или человек выключил его в системных
+     * настройках (`IMPORTANCE_NONE`). Разрешение приложению — ещё не разрешение этому разговору:
+     * каналов пять, и выключают их по отдельности (PLAN D8).
+     *
+     * Вопрос живёт здесь, у владельца каналов, а не у показа: показ спрашивает, а отвечает тот,
+     * кто их заводит. Так его и проверить можно, не трогая настоящих каналов приложения —
+     * выключенный канал не вернуть обратно, система помнит его настройки и после удаления.
+     */
+    fun mutedOrMissing(channelId: String): Boolean {
+        val channel = context.getSystemService(NotificationManager::class.java)
+            .getNotificationChannel(channelId)
+        return channel == null || channel.importance == NotificationManager.IMPORTANCE_NONE
+    }
+
     companion object {
         val NotificationChannel.id: String
             get() = when (this) {
