@@ -3,6 +3,7 @@ package com.kert0n.medapp.domain.notification
 import com.kert0n.medapp.domain.value.Attempts
 import java.time.Duration
 import java.time.Instant
+import java.time.ZoneId
 
 /**
  * Обязательство сказать человеку (PLAN D8) — сущность: тождество — [key], состояние меняют
@@ -74,7 +75,22 @@ class Reminder(
      * немедленно — проход снова не покажет и снова поставит его на прошлое, и устройство будет
      * будиться без конца.
      */
-    fun wakeAt(now: Instant): Instant? = readyAt.takeIf { state == State.DUE && it.isAfter(now) }
+    fun wakeAt(now: Instant, zone: ZoneId): Instant? =
+        readyAt.takeIf { state == State.DUE && it.isAfter(now) && withinItsDay(it, zone) }
+
+    /**
+     * Говорить ли **сейчас**: наступило, не сказано — и свой день ещё не прошёл (PLAN C1 «В шторку —
+     * только в свой день»). За пределом обязательство не снимается: оно остаётся [isDue] и ждёт
+     * полки дня, а в шторку не идёт. Иначе снятый запрет вываливает в шторку все пропуски за месяц
+     * вперемешку с сегодняшним приёмом.
+     *
+     * День — дата [dueAt] в зоне устройства [zone]: о чём обещали сказать сегодня, сказать стоит до
+     * полуночи. Задержка повтора (`notBefore`) день не продлевает — повод от неё не молодеет.
+     */
+    fun speaksAt(now: Instant, zone: ZoneId): Boolean = isDue(now) && withinItsDay(now, zone)
+
+    private fun withinItsDay(moment: Instant, zone: ZoneId): Boolean =
+        !kind.saysWithinItsDay || moment.isBefore(dueAt.atZone(zone).toLocalDate().plusDays(1).atStartOfDay(zone).toInstant())
 
     /**
      * Карточка в шторке есть, а основания у неё нет: о нём говорили, а сейчас оно не

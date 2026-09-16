@@ -9,6 +9,7 @@ import androidx.lifecycle.LifecycleOwner
 import androidx.lifecycle.ProcessLifecycleOwner
 import com.kert0n.medapp.di.ApplicationScope
 import com.kert0n.medapp.feature.notification.DailyRound
+import com.kert0n.medapp.feature.notification.ReminderOutbox
 import com.kert0n.medapp.queue.Synchronization
 import dagger.hilt.android.qualifiers.ApplicationContext
 import java.util.concurrent.atomic.AtomicBoolean
@@ -31,6 +32,7 @@ class SyncTriggers @Inject constructor(
     @ApplicationContext private val context: Context,
     private val synchronization: Synchronization,
     private val daily: DailyRound,
+    private val reminders: ReminderOutbox,
     @ApplicationScope private val scope: CoroutineScope
 ) {
 
@@ -46,6 +48,10 @@ class SyncTriggers @Inject constructor(
                 // WorkManager это откладывалось до его очереди, а быстрый повторный вход
                 // политикой REPLACE отменял незаконченный проход.
                 scope.launch { attempt { daily.run() } }
+                // Вход — повод и для доставки: человек мог вернуться из настроек, где снял запрет, а
+                // сверка без изменений ничего не пишет и владельца не будит. Сказано будет только
+                // сегодняшнее (PLAN C1 «В шторку — только в свой день»).
+                reminders.runNow()
                 synchronization.request()
             }
         })

@@ -17,6 +17,12 @@ enum class NotificationKind(val channel: NotificationChannel) {
     /** Очередь ждёт решения человека: отвергнутое или нечитаемое — одно обязательство на всю очередь. */
     SYNC_ATTENTION(NotificationChannel.SYNC);
 
+    /**
+     * Говорится ли только в свой день (PLAN C1 «В шторку — только в свой день»). Новость дня назавтра
+     * врёт или тонет; а решить очередь и узнать о чужом сокращении обеспечения нужно и через день.
+     */
+    val saysWithinItsDay: Boolean get() = this != SYNC_ATTENTION && this != COVERAGE_SHORT
+
     /** Точный будильник нужен только напоминанию о приёме: остальное — календарные события дня. */
     val exact: Boolean get() = this == INTAKE_DUE
 
