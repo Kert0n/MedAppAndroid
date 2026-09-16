@@ -5,6 +5,7 @@ import androidx.lifecycle.viewModelScope
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import com.kert0n.medapp.domain.value.Doses
 import com.kert0n.medapp.feature.course.CourseDrafting
+import com.kert0n.medapp.feature.course.SourceEstimates
 import com.kert0n.medapp.feature.time.Today
 import com.kert0n.medapp.fixture.OTHER_PACK
 import com.kert0n.medapp.fixture.PACK
@@ -35,13 +36,14 @@ import kotlinx.coroutines.runBlocking
 import org.junit.After
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNull
+import org.junit.Assert.assertTrue
 import org.junit.Before
 import org.junit.Test
 import org.junit.runner.RunWith
 
 /**
- * Экран источников над настоящими сценариями и базой (PLAN H3 №16, U3): что человек сделал со
- * стеком, то и записано — кнопки «Сохранить» у экрана нет.
+ * Экран источников над настоящими сценариями и базой (PLAN H3 №16, U3): правка местная, а
+ * «Сохранить» уносит её одним решением.
  *
  * Над Room, а не над подделками: состав идущего лечения укладывает `SourceEditing`, а он
  * перестраивает плановые пункты и брони, и подделка сказала бы о записи то, чего не было.
@@ -82,6 +84,7 @@ class CourseSourcesViewModelTest {
     private fun model(courseId: Uuid) = CourseSourcesViewModel(
         drafting = scenarios.courseDrafting,
         sources = scenarios.sourceEditing,
+        estimates = SourceEstimates(),
         courses = database.courseRepository(),
         packages = database.packageRepository(),
         medKits = database.medKitRepository(),
@@ -156,16 +159,24 @@ class CourseSourcesViewModelTest {
         assertEquals("6", first.allocatedAmount?.amount)
     }
 
-    /** Отпущенная строка записана: перестановка уходит в черновик без всякой кнопки. */
+    /** Перестановка видна сразу, а в черновик уходит по «Сохранить» — одним решением. */
     @Test
-    fun movingASourceIsWrittenWithoutASaveButton() = runBlocking {
+    fun movingASourceShowsAtOnceAndIsWrittenOnSave() = runBlocking {
         val id = draft()
         val model = model(id)
 
         watching(model.state) { state ->
             state.awaiting(PATIENTLY) { it.sources.size == 2 }
             model.move(0, 1)
-            state.awaiting(PATIENTLY) { it.sources.firstOrNull()?.packageId == OTHER_PACK }
+            // Порядок на экране уже новый, а в базе — ещё прежний: правка местная.
+            val moved = state.awaiting(PATIENTLY) { it.sources.firstOrNull()?.packageId == OTHER_PACK }
+            assertTrue(moved.hasUnsavedChanges)
+            assertEquals(
+                listOf(PACK, OTHER_PACK),
+                requireNotNull(database.courseRepository().findDraft(id)).sources.map { it.pkg.id }
+            )
+            model.save()
+            state.awaiting(PATIENTLY) { !it.hasUnsavedChanges && !it.isWriting }
         }
 
         val stored = requireNotNull(database.courseRepository().findDraft(id))
@@ -182,6 +193,8 @@ class CourseSourcesViewModelTest {
             state.awaiting(PATIENTLY) { it.sources.size == 2 }
             model.askToDetach(PACK)
             state.awaiting(PATIENTLY) { it.sources.size == 1 }
+            model.save()
+            state.awaiting(PATIENTLY) { !it.hasUnsavedChanges && !it.isWriting }
         }
 
         assertNull(state.asksToDetach)
@@ -202,20 +215,24 @@ class CourseSourcesViewModelTest {
             assertEquals(2, asked.sources.size)
             model.detach()
             state.awaiting(PATIENTLY) { it.sources.size == 1 }
+            model.save()
+            state.awaiting(PATIENTLY) { !it.hasUnsavedChanges && !it.isWriting }
         }
 
         assertEquals(listOf(OTHER_PACK), requireNotNull(database.courseRepository().findPlan(id)).sources.map { it.pkg.id })
     }
 
     /**
-     * Две правки подряд ложатся обе и в своём порядке: вторая ждёт первую, иначе ушла бы с
-     * редакцией, которую первая уже сдвинула.
+     * Несколько движений подряд — **одна** запись: человек собирает стек, каким хочет, и лишь
+     * потом решает. Порядок из трёх коробок: у двух любые две перестановки вернули бы стек к
+     * исходному, и проверка не отличила бы сделанное от несделанного.
      *
-     * Порядок из трёх коробок, а не из двух: у двух любые две перестановки возвращают стек к
-     * исходному, и проверка не отличила бы «обе легли» от «не легла ни одна».
+     * Редакция при этом растёт на число переходов, а не на число решений: каждый переход домена
+     * поднимает её сам, и считать решения по ней нельзя — их видно по тому, что до «Сохранить» в
+     * базе не менялось ничего.
      */
     @Test
-    fun twoMovesInARowBothLandInTheOrderTheyWereMade() = runBlocking {
+    fun manyMovesGoIntoTheStoreAsOneDecision() = runBlocking {
         val id = draftOfThree()
         val before = requireNotNull(database.courseRepository().findDraft(id)).revision
         val model = model(id)
@@ -226,12 +243,14 @@ class CourseSourcesViewModelTest {
             model.move(0, 2)
             model.move(0, 1)
             state.awaiting(PATIENTLY) { it.sources.map { source -> source.packageId } == listOf(third, OTHER_PACK, PACK) }
+            // До «Сохранить» в базе не изменилось ничего: два движения — ещё не решение.
+            assertEquals(before, requireNotNull(database.courseRepository().findDraft(id)).revision)
+            model.save()
+            state.awaiting(PATIENTLY) { !it.hasUnsavedChanges && !it.isWriting }
         }
 
         val stored = requireNotNull(database.courseRepository().findDraft(id))
         assertEquals(listOf(third, OTHER_PACK, PACK), stored.sources.map { it.pkg.id })
-        // Обе записи дошли: редакция выросла дважды, а не один раз.
-        assertEquals(before.number + 2, stored.revision.number)
     }
 
     /**
@@ -249,6 +268,8 @@ class CourseSourcesViewModelTest {
             assertEquals(2, shown.sources[1].maxDoses)
             model.allocate(OTHER_PACK, 99)
             state.awaiting(PATIENTLY) { it.sources.getOrNull(1)?.allocatedDoses == 2 }
+            model.save()
+            state.awaiting(PATIENTLY) { !it.hasUnsavedChanges && !it.isWriting }
         }
 
         val plan = requireNotNull(database.courseRepository().findPlan(id))
@@ -256,16 +277,25 @@ class CourseSourcesViewModelTest {
         assertEquals(Doses(3), plan.sources.first { it.pkg.id == PACK }.allocatedDoses)
     }
 
-    /** Освободив первую коробку, человек сразу может отдать её приёмы второй — без кнопок. */
+    /**
+     * Освободил первую коробку — предел второй вырос **сразу**, до всякой записи: предел считает
+     * экран, и палец не ждёт базу (решение владельца 2026-09-16).
+     */
     @Test
-    fun freeingTheFirstBoxRaisesTheLimitOfTheSecond(): Unit = runBlocking {
+    fun freeingTheFirstBoxRaisesTheLimitOfTheSecondAtOnce(): Unit = runBlocking {
         val id = startedNeeding(5)
         val model = model(id)
 
         watching(model.state) { state ->
             state.awaiting(PATIENTLY) { it.sources.getOrNull(1)?.maxDoses == 2 }
             model.allocate(PACK, 0)
-            state.awaiting(PATIENTLY) { it.sources.getOrNull(1)?.maxDoses == 5 }
+            val raised = state.awaiting(PATIENTLY) { it.sources.getOrNull(1)?.maxDoses == 5 }
+            // В базе ещё прежний состав: предел вырос от местной правки, а не от записи.
+            assertTrue(raised.hasUnsavedChanges)
+            assertEquals(
+                Doses(3),
+                requireNotNull(database.courseRepository().findPlan(id)).sources.first { it.pkg.id == PACK }.allocatedDoses
+            )
         }
     }
 
@@ -284,6 +314,8 @@ class CourseSourcesViewModelTest {
             assertEquals(6, shown.sources[1].maxDoses)
             model.allocate(OTHER_PACK, 99)
             state.awaiting(PATIENTLY) { it.sources.getOrNull(1)?.allocatedDoses == 6 }
+            model.save()
+            state.awaiting(PATIENTLY) { !it.hasUnsavedChanges && !it.isWriting }
         }
 
         val stored = requireNotNull(database.courseRepository().findDraft(id))
@@ -302,6 +334,8 @@ class CourseSourcesViewModelTest {
         watching(model.state) { state ->
             val before = state.awaiting(PATIENTLY) { it.coverage != null }.coverage
             model.move(0, 1)
+            model.save()
+            state.awaiting(PATIENTLY) { !it.hasUnsavedChanges && !it.isWriting }
             val after = state.awaiting(PATIENTLY) { it.sources.firstOrNull()?.packageId == OTHER_PACK }
             assertEquals(before, after.coverage)
         }

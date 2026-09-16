@@ -11,6 +11,7 @@ import androidx.compose.foundation.layout.defaultMinSize
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.itemsIndexed
@@ -22,6 +23,7 @@ import androidx.compose.material3.IconButton
 import androidx.compose.material3.ListItem
 import androidx.compose.material3.ListItemDefaults
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Slider
@@ -57,6 +59,7 @@ import com.kert0n.medapp.R
 import com.kert0n.medapp.ui.DAY
 import com.kert0n.medapp.domain.course.CourseSource
 import com.kert0n.medapp.presentation.course.CourseCoveragePresentationDTO
+import com.kert0n.medapp.presentation.course.CourseEstimatePresentationDTO
 import com.kert0n.medapp.presentation.course.CourseSourcePresentationDTO
 import com.kert0n.medapp.presentation.course.CourseSourcesMessage
 import com.kert0n.medapp.presentation.course.CourseSourcesUiState
@@ -72,8 +75,9 @@ import kotlin.uuid.Uuid
  * Источники лечения (PLAN H3 №16): стек коробок в порядке расходования. Порядок меняется
  * перетаскиванием за ручку и теми же двумя действиями у экранного чтеца — жест ему недоступен.
  *
- * Кнопки «Сохранить» здесь нет: отпущенная строка записана, и обеспечение с пределами приходит
- * следующим чтением. Спрашивают только об отвязке у идущего лечения — она освобождает коробку.
+ * **Правка местная, записывает её «Сохранить»**: ползунок двигают пальцем, и предел под ним
+ * экран считает сам — ждать базу между движениями нельзя. Пока не записано, сводка обеспечения
+ * говорит о прежнем составе и признаётся в этом. Отвязка у идущего лечения спрашивается.
  */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -86,6 +90,7 @@ fun CourseSourcesScreen(
     onDismissDetach: () -> Unit,
     onDismissMessage: () -> Unit,
     onAdd: () -> Unit,
+    onSave: () -> Unit,
     onBack: () -> Unit,
     modifier: Modifier = Modifier
 ) {
@@ -117,7 +122,7 @@ fun CourseSourcesScreen(
                 actionText = stringResource(R.string.course_sources_add).takeUnless { state.isFinished },
                 onAction = onAdd.takeUnless { state.isFinished }
             )
-            else -> Sources(state, onMove, onAllocate, onDetach, onDismissMessage, onAdd, Modifier.padding(padding))
+            else -> Sources(state, onMove, onAllocate, onDetach, onDismissMessage, onAdd, onSave, Modifier.padding(padding))
         }
     }
     state.asksToDetach?.let {
@@ -133,6 +138,7 @@ private fun Sources(
     onDetach: (Uuid) -> Unit,
     onDismissMessage: () -> Unit,
     onAdd: () -> Unit,
+    onSave: () -> Unit,
     modifier: Modifier
 ) {
     var dragging by remember { mutableStateOf<Int?>(null) }
@@ -186,12 +192,34 @@ private fun Sources(
                 )
             }
         }
-        Coverage(state.coverage, isDraft = state.isDraft, modifier = Modifier.padding(horizontal = 16.dp))
+        // Что получится — считается на месте; записанное обеспечение знает ещё и день нехватки.
+        state.estimate?.let { Estimate(it, Modifier.padding(horizontal = 16.dp)) }
+        if (state.hasUnsavedChanges) {
+            Text(
+                stringResource(R.string.course_sources_unsaved),
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                modifier = Modifier.padding(horizontal = 16.dp, vertical = 4.dp)
+            )
+        } else {
+            Coverage(state.coverage, isDraft = state.isDraft, modifier = Modifier.padding(horizontal = 16.dp))
+        }
         if (!state.isFinished) {
-            Button(
+            OutlinedButton(
                 onClick = onAdd,
-                modifier = Modifier.fillMaxWidth().padding(16.dp).defaultMinSize(minHeight = 48.dp)
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 16.dp, vertical = 4.dp)
+                    .defaultMinSize(minHeight = 48.dp)
             ) { Text(stringResource(R.string.course_sources_add)) }
+            Button(
+                onClick = onSave,
+                enabled = !state.isWriting,
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 16.dp, vertical = 8.dp)
+                    .defaultMinSize(minHeight = 48.dp)
+            ) { Text(stringResource(R.string.action_save)) }
         }
     }
 }
@@ -251,7 +279,43 @@ private fun SourceRow(
 }
 
 /**
- * Чем лечение обеспечено: «нужно 28 приёмов · обеспечено 9 · не хватает 19, с 11.09.2026». У
+ * Что получится у собранного состава: «нужно 28 приёмов · обеспечено 9 · не хватает 19». Считается
+ * на месте, без записи, поэтому дня нехватки здесь нет — его знает только записанное обеспечение,
+ * разложенное по пунктам календаря (PLAN H3 №16).
+ */
+@Composable
+private fun Estimate(estimate: CourseEstimatePresentationDTO, modifier: Modifier = Modifier) {
+    val required = pluralStringResource(
+        R.plurals.course_coverage_required,
+        estimate.requiredDoses,
+        estimate.requiredDoses
+    )
+    Column(modifier) {
+        Text(
+            stringResource(R.string.course_coverage_covered, required, estimate.coveredDoses),
+            style = MaterialTheme.typography.bodyMedium
+        )
+        if (estimate.missingDoses > 0) {
+            Row(horizontalArrangement = Arrangement.spacedBy(4.dp), verticalAlignment = Alignment.CenterVertically) {
+                Icon(
+                    painterResource(R.drawable.ic_warning),
+                    contentDescription = null,
+                    tint = MaterialTheme.colorScheme.error,
+                    modifier = Modifier.size(16.dp)
+                )
+                Text(
+                    pluralStringResource(R.plurals.course_shortage, estimate.missingDoses, estimate.missingDoses),
+                    color = MaterialTheme.colorScheme.error,
+                    style = MaterialTheme.typography.bodySmall
+                )
+            }
+        }
+    }
+}
+
+/**
+ * Чем лечение обеспечено по записанному составу: «нужно 28 приёмов · обеспечено 9 · не хватает 19,
+ * с 11.09.2026». У
  * черновика обеспечения нет — оно появится, когда лечение начнётся (PLAN H3 №16, B15). Нехватку
  * несут слова и значок, а не один цвет.
  */
@@ -390,6 +454,7 @@ internal fun CourseSourcesMessage.words(): String = when (this) {
     is CourseSourcesMessage.BeyondLimit ->
         pluralStringResource(R.plurals.course_source_beyond_limit, limit, limit)
     CourseSourcesMessage.Finished -> stringResource(R.string.course_finished)
+    CourseSourcesMessage.Stale -> stringResource(R.string.course_sources_stale)
 }
 
 /** Больше трёх цифр в приёмах не бывает: это поле числа, а не место для вставленной простыни. */

@@ -15,6 +15,7 @@ import com.kert0n.medapp.domain.course.CourseSource
 import com.kert0n.medapp.fixture.OTHER_PACK
 import com.kert0n.medapp.fixture.PACK
 import com.kert0n.medapp.fixture.TABLETS
+import com.kert0n.medapp.presentation.course.CourseEstimatePresentationDTO
 import com.kert0n.medapp.presentation.course.CourseSourcePresentationDTO
 import com.kert0n.medapp.presentation.course.CourseSourcesUiState
 import com.kert0n.medapp.presentation.value.QuantityPresentationDTO
@@ -44,6 +45,7 @@ class CourseSourcesScreenTest {
     private var detached: Uuid? = null
     private var confirmed = 0
     private var added = 0
+    private var saved = 0
 
     private fun show(state: CourseSourcesUiState) {
         compose.setContent {
@@ -57,6 +59,7 @@ class CourseSourcesScreenTest {
                     onDismissDetach = {},
                     onDismissMessage = {},
                     onAdd = { added++ },
+                    onSave = { saved++ },
                     onBack = {}
                 )
             }
@@ -172,6 +175,36 @@ class CourseSourcesScreenTest {
 
         compose.onNodeWithText("Укажите дозу и число приёмов — тогда будет что выделять.").assertIsDisplayed()
         compose.onAllNodes(slider).assertCountEquals(0)
+    }
+
+    /**
+     * Пока правка не записана, экран говорит **что получится** — и просит сохранить. Сводка
+     * записанного обеспечения в это время не показывается: она о прежнем составе.
+     */
+    @Test
+    fun anUnsavedStackShowsWhatItWouldGiveAndAsksToSave() {
+        show(
+            CourseSourcesUiState(
+                sources = listOf(source()),
+                estimate = CourseEstimatePresentationDTO(requiredDoses = 10, coveredDoses = 3, missingDoses = 7),
+                hasUnsavedChanges = true
+            )
+        )
+
+        compose.onNodeWithText("нужно 10 приёмов · обеспечено 3").assertIsDisplayed()
+        compose.onNodeWithText("Не хватает 7 приёмов").assertIsDisplayed()
+        compose.onNodeWithText("Правка не записана: обеспечение пересчитается после «Сохранить».")
+            .assertIsDisplayed()
+    }
+
+    /** «Сохранить» уносит собранный состав одним решением. */
+    @Test
+    fun savingIsOnePress() {
+        show(CourseSourcesUiState(sources = listOf(source()), hasUnsavedChanges = true))
+
+        compose.onNodeWithText("Сохранить").performClick()
+
+        assertEquals(1, saved)
     }
 
     /** Лечения больше нет — это отказ, а не пустой стек. */

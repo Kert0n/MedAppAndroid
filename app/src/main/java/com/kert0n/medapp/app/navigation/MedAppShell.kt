@@ -311,6 +311,7 @@ private fun screens(stacks: TabStacks) = entryProvider<NavKey> {
             onDismissDetach = model::dismissDetach,
             onDismissMessage = model::dismissMessage,
             onAdd = { stacks.go(Screen.SourcePicking(key.courseId)) },
+            onSave = model::save,
             onBack = stacks::back
         )
     }

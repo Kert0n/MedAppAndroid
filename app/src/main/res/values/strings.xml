@@ -345,6 +345,8 @@
     <string name="course_sources">Источники</string>
     <string name="course_sources_open">Источники лечения</string>
     <string name="course_sources_add">Подключить ещё</string>
+    <string name="course_sources_unsaved">Правка не записана: обеспечение пересчитается после «Сохранить».</string>
+    <string name="course_sources_stale">Источники правили с другого экрана — правка начата заново.</string>
     <string name="course_sources_empty">Пачек пока нет — подключите первую.</string>
     <string name="course_source_detach">Отвязать</string>
     <string name="course_source_detach_title">Отвязать пачку?</string>

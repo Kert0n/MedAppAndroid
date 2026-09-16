@@ -5,10 +5,12 @@ import androidx.lifecycle.viewModelScope
 import com.kert0n.medapp.domain.course.CourseCoverage
 import com.kert0n.medapp.domain.course.CourseSource
 import com.kert0n.medapp.domain.course.Revision
+import com.kert0n.medapp.domain.pack.PackageProjection
 import com.kert0n.medapp.domain.value.Dose
 import com.kert0n.medapp.domain.value.Doses
 import com.kert0n.medapp.feature.course.CourseDrafting
 import com.kert0n.medapp.feature.course.SourceEditing
+import com.kert0n.medapp.feature.course.SourceEstimates
 import com.kert0n.medapp.feature.time.Today
 import com.kert0n.medapp.storage.course.CourseStorageRepository
 import com.kert0n.medapp.storage.medkit.MedKitStorageRepository
@@ -20,7 +22,6 @@ import dagger.assisted.AssistedInject
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlin.uuid.Uuid
 import kotlinx.coroutines.ExperimentalCoroutinesApi
-import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
@@ -34,20 +35,23 @@ import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 
 /**
- * Источники лечения (PLAN H3 №16): стек коробок, из которых оно берётся, в порядке расходования.
+ * Источники лечения (PLAN H3 №16): стек коробок в порядке расходования.
  *
- * **Кнопки «Сохранить» у экрана нет**: человек отпустил ползунок или бросил строку — состав
- * записан, и новое чтение само приносит обеспечение и новые пределы. Своего состава экран не
- * держит — только намерение, пока оно едет в сценарий. Записи идут **по одной**, в том порядке, в
- * каком человек их сделал: иначе вторая ушла бы с редакцией, которую первая уже сдвинула.
- * Устаревшая редакция человеку не показывается — он своего не терял, и намерение повторяется по
- * перечитанному составу.
+ * **Правка местная, записывает её «Сохранить»** (решение владельца 2026-09-16). Ползунок двигают
+ * пальцем, и ждать между движениями базу нельзя: предел строки считает домен по составу, который
+ * человек собрал здесь, — вопросом через `SourceEstimates`, без транзакции и записи. Одно решение
+ * человека — один вызов сценария, и до него не уходит ничего.
+ *
+ * Чтение одно на экран и на запись: две подписки на одно и то же расходятся во времени, и
+ * показанное человеку оказалось бы не тем составом, который ушёл в сценарий. Пока правка не
+ * записана, чужое изменение состава её сбрасывает — писать поверх чужого вслепую нельзя (F5).
  */
 @OptIn(ExperimentalCoroutinesApi::class)
 @HiltViewModel(assistedFactory = CourseSourcesViewModel.Factory::class)
 class CourseSourcesViewModel @AssistedInject constructor(
     private val drafting: CourseDrafting,
     private val sources: SourceEditing,
+    private val estimates: SourceEstimates,
     courses: CourseStorageRepository,
     packages: PackageStorageRepository,
     medKits: MedKitStorageRepository,
@@ -69,7 +73,15 @@ class CourseSourcesViewModel @AssistedInject constructor(
         courses.observeCoverage(courseId)
     ) { draft, plan, record, coverage ->
         when {
-            draft != null -> Stored(draft.title, true, draft.revision, draft.dose, draft.sources, null)
+            draft != null -> Stored(
+                title = draft.title,
+                isDraft = true,
+                revision = draft.revision,
+                dose = draft.dose,
+                sources = draft.sources,
+                coverage = null,
+                requiredDoses = draft.totalDoses?.count
+            )
             plan != null -> Stored(
                 title = record?.title,
                 isDraft = false,
@@ -77,21 +89,18 @@ class CourseSourcesViewModel @AssistedInject constructor(
                 dose = plan.prescription.dose,
                 sources = plan.sources,
                 coverage = coverage,
+                requiredDoses = coverage?.requiredDoses?.count,
                 isFinished = record?.isOpen == false
             )
             else -> null
         }
     }
 
-    /**
-     * Единственное чтение лечения: из него и строки на экране, и то, с чем сверяется запись.
-     * Две подписки на одно и то же расходятся во времени — показанное человеку и записанное
-     * оказались бы разными составами. `null` — не прочитано **ещё**, и это не «лечения нет»:
-     * намерение, сделанное до первого чтения, ждёт его, а не пропадает.
-     */
+    /** Последнее чтение: из него и строки экрана, и то, с чем сверяется запись. */
     private val latest = MutableStateFlow<Reading?>(null)
 
-    private val intents = Channel<Intent>(Channel.UNLIMITED)
+    /** Правка человека до «Сохранить»; `null` — он ещё ничего не трогал. */
+    private val editing = MutableStateFlow<Editing?>(null)
 
     private val writing = MutableStateFlow(Writing())
 
@@ -103,73 +112,85 @@ class CourseSourcesViewModel @AssistedInject constructor(
 
     val state: StateFlow<CourseSourcesUiState> = combine(
         latest.filterNotNull(),
+        editing,
         boxes,
         shelves,
         writing
-    ) { reading, boxes, shelves, writing ->
+    ) { reading, editing, boxes, shelves, writing ->
         val stored = reading.stored
-        // Чтение пришло, а лечения в нём нет — его больше не существует; до первого чтения сюда
-        // не доходят вовсе, и «нет» вместо ожидания не показывается.
         if (stored == null) CourseSourcesUiState(isGone = true)
-        else CourseSourcesUiState(
-            title = stored.title,
-            isDraft = stored.isDraft,
-            isFinished = stored.isFinished,
-            sources = stored.sources.map { source ->
-                val pack = boxes[source.pkg.id]
-                source.toPresentationDTO(
-                    dose = stored.dose,
-                    pack = pack,
-                    medKitName = pack?.let { shelves[it.medKit.id] },
-                    covered = stored.coverage?.perSource?.firstOrNull { it.pkg == source.pkg }
-                )
-            },
-            coverage = stored.coverage?.toPresentationDTO(),
-            isWriting = writing.busy,
-            asksToDetach = writing.asksToDetach,
-            message = writing.message
-        )
+        else {
+            val shown = editing?.sources ?: stored.sources
+            val estimate = stored.estimate(shown, boxes)
+            CourseSourcesUiState(
+                title = stored.title,
+                isDraft = stored.isDraft,
+                isFinished = stored.isFinished,
+                sources = stored.rows(shown, boxes, shelves, estimate),
+                // Записанное обеспечение считает база: у него есть и день, с которого не хватает.
+                coverage = stored.coverage?.toPresentationDTO(),
+                // Что получится у собранного состава — пока не записано, это единственный честный
+                // итог: сколько приёмов обеспечено и скольких не хватает.
+                estimate = estimate?.let {
+                    CourseEstimatePresentationDTO(
+                        requiredDoses = it.requiredDoses.count,
+                        coveredDoses = it.coveredDoses.count,
+                        missingDoses = it.missingDoses.count
+                    )
+                },
+                hasUnsavedChanges = shown != stored.sources,
+                isWriting = writing.busy,
+                asksToDetach = writing.asksToDetach,
+                message = writing.message
+            )
+        }
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), CourseSourcesUiState(isLoading = true))
 
     init {
-        // Одно чтение на экран и на запись, и живёт оно, пока жив экран: подписка на время
-        // показа оставила бы запись без того состава, по которому человек её сделал.
-        viewModelScope.launch { stored.collect { latest.value = Reading(it) } }
         viewModelScope.launch {
-            for (intent in intents) {
-                writing.value = writing.value.copy(busy = true)
-                apply(intent)
-                writing.value = writing.value.copy(busy = false)
+            stored.collect { fresh ->
+                latest.value = Reading(fresh)
+                // Состав сменился — правка начинается заново: она была о прежнем составе, и
+                // после нашей же записи, и после чужой.
+                val started = editing.value
+                if (fresh == null || started == null || started.revision != fresh.revision) {
+                    editing.value = fresh?.let { Editing(it.revision, it.sources) }
+                }
             }
         }
     }
 
     /**
-     * Выделить коробке столько приёмов, сколько человек отпустил на ползунке или дописал в поле.
-     * Число зажимается к пределу строки: выше него оно всё равно не запишется, а зажатое видно
-     * сразу (PLAN D5, C1 «Ползунок»). Ползунок в движении сюда не заходит — только отпущенный.
+     * Выделить коробке приёмы. Число зажимается к пределу строки — тому же, что показан рядом, —
+     * и никуда не уходит: движение пальца базу не трогает.
      */
     fun allocate(packageId: Uuid, doses: Int) {
+        val editing = editing.value ?: return
         val source = state.value.sources.firstOrNull { it.packageId == packageId } ?: return
         if (source.fault != null) return
         val wanted = doses.coerceIn(0, source.maxDoses ?: doses)
-        if (wanted == source.allocatedDoses) return
-        intents.trySend(Intent.Allocate(packageId, Doses(wanted)))
+        this.editing.value = editing.copy(
+            sources = editing.sources.map {
+                if (it.pkg.id == packageId) it.copy(allocatedDoses = Doses(wanted)) else it
+            }
+        )
     }
 
     /** Переставить источник: место в списке — очередь расходования (PLAN D5). */
     fun move(from: Int, to: Int) {
-        val count = state.value.sources.size
-        if (from == to || from !in 0 until count || to !in 0 until count) return
-        intents.trySend(Intent.Move(from, to))
+        val editing = editing.value ?: return
+        if (from == to || from !in editing.sources.indices || to !in editing.sources.indices) return
+        this.editing.value = editing.copy(
+            sources = editing.sources.toMutableList().apply { add(to, removeAt(from)) }
+        )
     }
 
     /**
-     * Отвязка у идущего лечения спрашивается: коробка освободится, и её бронь снимется (H3).
-     * У черновика спрашивать нечего — он ничего не занимал.
+     * Отвязка у идущего лечения спрашивается: записанная, она освободит коробку и снимет бронь
+     * (H3). У черновика спрашивать нечего — он ничего не занимал.
      */
     fun askToDetach(packageId: Uuid) {
-        if (state.value.isDraft) intents.trySend(Intent.Detach(packageId))
+        if (state.value.isDraft) detach(packageId)
         else writing.value = writing.value.copy(asksToDetach = packageId)
     }
 
@@ -180,7 +201,12 @@ class CourseSourcesViewModel @AssistedInject constructor(
     fun detach() {
         val packageId = writing.value.asksToDetach ?: return
         writing.value = writing.value.copy(asksToDetach = null)
-        intents.trySend(Intent.Detach(packageId))
+        detach(packageId)
+    }
+
+    private fun detach(packageId: Uuid) {
+        val editing = editing.value ?: return
+        this.editing.value = editing.copy(sources = editing.sources.filterNot { it.pkg.id == packageId })
     }
 
     fun dismissMessage() {
@@ -188,84 +214,112 @@ class CourseSourcesViewModel @AssistedInject constructor(
     }
 
     /**
-     * Записывает намерение по последнему прочитанному составу. Состав правят с другого экрана или
-     * следом за коробкой — редакция уходит вперёд; тогда намерение повторяется по новому чтению.
+     * Записать состав — одним решением и одним вызовом сценария. Второе нажатие, пока идёт первое,
+     * ничего не начинает: сторожем служит само состояние.
      */
-    private suspend fun apply(intent: Intent) {
-        repeat(ATTEMPTS) {
-            // Ждём чтение, а не проверяем его наличие: под нагрузкой первое значение приходит
-            // позже нажатия, и брошенное намерение пропало бы молча.
-            val stored = latest.filterNotNull().first().stored ?: return
-            val wanted = intent.appliedTo(stored.sources) ?: return
-            val written = if (stored.isDraft) {
-                told(drafting.edit(courseId, stored.revision, intent.asEdits()))
+    fun save() {
+        if (writing.value.busy) return
+        writing.value = writing.value.copy(busy = true, message = null)
+        viewModelScope.launch {
+            val reading = latest.filterNotNull().first()
+            val stored = reading.stored
+            val wanted = editing.value?.sources
+            if (stored == null || wanted == null || wanted == stored.sources) {
+                writing.value = writing.value.copy(busy = false)
+                return@launch
+            }
+            val outcome = if (stored.isDraft) {
+                told(drafting.edit(courseId, stored.revision, editsFrom(stored.sources, wanted)))
             } else {
                 told(sources.save(courseId, stored.revision, wanted.map { SourceEditing.Source(it.pkg.id, it.allocatedDoses) }))
             }
-            if (written != Written.STALE) return
-            // Ждём чтение новее того, по которому писали: без него повтор уйдёт с той же редакцией.
-            latest.first { it?.stored != null && it.stored.revision != stored.revision }
+            writing.value = writing.value.copy(busy = false, message = outcome)
         }
     }
 
-    private fun told(outcome: CourseDrafting.Outcome): Written = when (outcome) {
-        // Черновика нет — писать некуда, и экран уже говорит об этом своим чтением.
-        is CourseDrafting.Outcome.Saved, CourseDrafting.Outcome.Gone -> Written.DONE
-        CourseDrafting.Outcome.Stale -> Written.STALE
-        is CourseDrafting.Outcome.Rejected -> refused(CourseSourcesMessage.Refused(outcome.reason))
-        CourseDrafting.Outcome.PackageUnusable -> refused(CourseSourcesMessage.Unusable(null))
+    /**
+     * Та же правка словами черновика: он правится названными действиями, а не готовым составом.
+     * Снятое — отвязкой, изменённое выделение — выделением, порядок — перестановками к целевому
+     * месту, по одной за шаг.
+     */
+    private fun editsFrom(before: List<CourseSource>, after: List<CourseSource>): List<CourseDrafting.Edit> = buildList {
+        val wanted = after.map { it.pkg.id }.toSet()
+        val working = before.toMutableList()
+        for (source in before) {
+            if (source.pkg.id !in wanted) {
+                add(CourseDrafting.Edit.Detach(source.pkg.id))
+                working.removeAll { it.pkg.id == source.pkg.id }
+            }
+        }
+        for (source in after) {
+            val had = before.firstOrNull { it.pkg.id == source.pkg.id } ?: continue
+            if (had.allocatedDoses != source.allocatedDoses) {
+                add(CourseDrafting.Edit.Allocate(source.pkg.id, source.allocatedDoses))
+            }
+        }
+        for ((target, source) in after.withIndex()) {
+            val current = working.indexOfFirst { it.pkg.id == source.pkg.id }
+            if (current < 0 || current == target) continue
+            add(CourseDrafting.Edit.Reorder(current, target))
+            working.add(target, working.removeAt(current))
+        }
     }
 
-    private fun told(outcome: SourceEditing.Outcome): Written = when (outcome) {
-        is SourceEditing.Outcome.Saved, SourceEditing.Outcome.Gone -> Written.DONE
-        SourceEditing.Outcome.Stale -> Written.STALE
-        SourceEditing.Outcome.AlreadyFinished -> refused(CourseSourcesMessage.Finished)
-        is SourceEditing.Outcome.Rejected -> refused(CourseSourcesMessage.Refused(outcome.reason))
-        is SourceEditing.Outcome.PackageTaken -> refused(CourseSourcesMessage.Taken(nameOf(outcome.packageId)))
-        is SourceEditing.Outcome.PackageUnusable -> refused(CourseSourcesMessage.Unusable(nameOf(outcome.packageId)))
+    private fun told(outcome: CourseDrafting.Outcome): CourseSourcesMessage? = when (outcome) {
+        is CourseDrafting.Outcome.Saved, CourseDrafting.Outcome.Gone -> null
+        CourseDrafting.Outcome.Stale -> CourseSourcesMessage.Stale
+        is CourseDrafting.Outcome.Rejected -> CourseSourcesMessage.Refused(outcome.reason)
+        CourseDrafting.Outcome.PackageUnusable -> CourseSourcesMessage.Unusable(null)
+    }
+
+    private fun told(outcome: SourceEditing.Outcome): CourseSourcesMessage? = when (outcome) {
+        is SourceEditing.Outcome.Saved, SourceEditing.Outcome.Gone -> null
+        SourceEditing.Outcome.Stale -> CourseSourcesMessage.Stale
+        SourceEditing.Outcome.AlreadyFinished -> CourseSourcesMessage.Finished
+        is SourceEditing.Outcome.Rejected -> CourseSourcesMessage.Refused(outcome.reason)
+        is SourceEditing.Outcome.PackageTaken -> CourseSourcesMessage.Taken(nameOf(outcome.packageId))
+        is SourceEditing.Outcome.PackageUnusable -> CourseSourcesMessage.Unusable(nameOf(outcome.packageId))
         is SourceEditing.Outcome.BeyondLimit ->
-            refused(CourseSourcesMessage.BeyondLimit(nameOf(outcome.packageId), outcome.limit.count))
-    }
-
-    private fun refused(message: CourseSourcesMessage): Written {
-        writing.value = writing.value.copy(message = message)
-        return Written.DONE
+            CourseSourcesMessage.BeyondLimit(nameOf(outcome.packageId), outcome.limit.count)
     }
 
     private fun nameOf(packageId: Uuid): String? =
         latest.value?.stored?.sources?.firstOrNull { it.pkg.id == packageId }?.pkg?.name
 
-    /** Чтение, которое уже случилось: [stored] `null` — лечения нет, а не «ещё не читали». */
-    private data class Reading(val stored: Stored?)
+    /**
+     * Что получится у собранного состава — вопросом к домену через `feature`: без транзакции и
+     * без ожидания базы. Нечего считать, пока не названы доза и число приёмов.
+     */
+    private fun Stored.estimate(
+        shown: List<CourseSource>,
+        boxes: Map<Uuid, PackageProjection>
+    ): SourceEstimates.Estimate? {
+        if (dose == null || requiredDoses == null) return null
+        return estimates.of(
+            sources = shown,
+            dose = dose,
+            required = Doses(requiredDoses),
+            availableToMe = shown.mapNotNull { source ->
+                boxes[source.pkg.id]?.let { source.pkg.id to it.availability.availableToMe }
+            }.toMap()
+        )
+    }
 
-    private enum class Written { DONE, STALE }
-
-    /** Что человек сделал со стеком: намерение, а не готовый состав — состав считает прочитанное. */
-    private sealed interface Intent {
-
-        data class Move(val from: Int, val to: Int) : Intent
-
-        data class Detach(val packageId: Uuid) : Intent
-
-        data class Allocate(val packageId: Uuid, val doses: Doses) : Intent
-
-        /** Состав после намерения; `null` — применять уже не к чему. */
-        fun appliedTo(sources: List<CourseSource>): List<CourseSource>? = when (this) {
-            is Move ->
-                if (from !in sources.indices || to !in sources.indices) null
-                else sources.toMutableList().apply { add(to, removeAt(from)) }
-            is Detach -> sources.filterNot { it.pkg.id == packageId }.takeIf { it.size != sources.size }
-            is Allocate -> sources
-                .map { if (it.pkg.id == packageId) it.copy(allocatedDoses = doses) else it }
-                .takeIf { it != sources }
-        }
-
-        /** То же намерение словами черновика: он правится названными действиями, а не составом. */
-        fun asEdits(): List<CourseDrafting.Edit> = when (this) {
-            is Move -> listOf(CourseDrafting.Edit.Reorder(from, to))
-            is Detach -> listOf(CourseDrafting.Edit.Detach(packageId))
-            is Allocate -> listOf(CourseDrafting.Edit.Allocate(packageId, doses))
-        }
+    /** Строки экрана по нынешней правке: пределы считаются от неё, а не от записанного состава. */
+    private fun Stored.rows(
+        shown: List<CourseSource>,
+        boxes: Map<Uuid, PackageProjection>,
+        shelves: Map<Uuid, String>,
+        estimate: SourceEstimates.Estimate?
+    ): List<CourseSourcePresentationDTO> = shown.map { source ->
+        val pack = boxes[source.pkg.id]
+        source.toPresentationDTO(
+            dose = dose,
+            pack = pack,
+            medKitName = pack?.let { shelves[it.medKit.id] },
+            covered = coverage?.perSource?.firstOrNull { it.pkg == source.pkg },
+            maxDoses = estimate?.limits?.get(source.pkg.id)?.count
+        )
     }
 
     private data class Stored(
@@ -275,35 +329,39 @@ class CourseSourcesViewModel @AssistedInject constructor(
         val dose: Dose?,
         val sources: List<CourseSource>,
         val coverage: CourseCoverage?,
+        /** Сколько приёмов ещё нужно: у идущего — из обеспечения, у черновика — назначенное число. */
+        val requiredDoses: Int?,
         val isFinished: Boolean = false
     )
+
+    /** Правка человека: состав в том виде, в каком он его собрал, и редакция, от которой начал. */
+    private data class Editing(val revision: Revision, val sources: List<CourseSource>)
+
+    private data class Reading(val stored: Stored?)
 
     private data class Writing(
         val busy: Boolean = false,
         val asksToDetach: Uuid? = null,
         val message: CourseSourcesMessage? = null
     )
-
-    private companion object {
-        /** Повторов записи по перечитанному составу: столько правок подряд с другого экрана — уже не гонка. */
-        const val ATTEMPTS = 3
-    }
 }
 
 /**
- * Что показывает экран источников. [isGone] и [isFinished] различаются тем, что делает человек:
- * первое — лечения больше нет, второе — оно закончено, и источников у него уже не бывает.
+ * Что показывает экран источников. [hasUnsavedChanges] — правка есть, но не записана: сводка
+ * обеспечения тогда говорит о записанном составе, и экран признаёт это словами.
  */
 data class CourseSourcesUiState(
     val title: String? = null,
     val sources: List<CourseSourcePresentationDTO> = emptyList(),
-    /** Чем лечение обеспечено; `null` — у черновика: считать обеспечение ему не по чему (B15). */
     val coverage: CourseCoveragePresentationDTO? = null,
+    /** Что получится у собранного состава: считается на месте, без записи (H3 №16). */
+    val estimate: CourseEstimatePresentationDTO? = null,
     val isDraft: Boolean = false,
     val isLoading: Boolean = false,
     val isGone: Boolean = false,
     val isFinished: Boolean = false,
     val isWriting: Boolean = false,
+    val hasUnsavedChanges: Boolean = false,
     /** Какую коробку человек собрался отвязать у идущего лечения; `null` — вопроса нет. */
     val asksToDetach: Uuid? = null,
     val message: CourseSourcesMessage? = null

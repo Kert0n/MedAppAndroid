@@ -19,7 +19,9 @@ fun CourseSource.toPresentationDTO(
     dose: Dose?,
     pack: PackageProjection?,
     medKitName: String?,
-    covered: CourseCoverage.Source?
+    covered: CourseCoverage.Source?,
+    /** Предел строки при нынешней правке; не назван — берётся из обеспечения записанного состава. */
+    maxDoses: Int? = null
 ): CourseSourcePresentationDTO = CourseSourcePresentationDTO(
     packageId = pkg.id,
     name = pkg.name,
@@ -29,7 +31,7 @@ fun CourseSource.toPresentationDTO(
     allocatedDoses = allocatedDoses.count,
     allocatedAmount = dose?.times(allocatedDoses)?.toPresentationDTO(),
     coveredDoses = covered?.coveredDoses?.count,
-    maxDoses = (covered?.maxDoses ?: dose?.let { pack?.gives(it, fault) })?.count,
+    maxDoses = maxDoses ?: (covered?.maxDoses ?: dose?.let { pack?.gives(it, fault) })?.count,
     fault = fault
 )
 

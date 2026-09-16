@@ -93,6 +93,9 @@ sealed interface CourseSourcesMessage {
     data class BeyondLimit(val name: String?, val limit: Int) : CourseSourcesMessage
 
     data object Finished : CourseSourcesMessage
+
+    /** Состав правили с другого экрана: то, что здесь, устарело (PLAN F5). */
+    data object Stale : CourseSourcesMessage
 }
 
 /**
@@ -109,3 +112,14 @@ data class CourseCoveragePresentationDTO(
 ) {
     val isFullyCovered: Boolean get() = missingDoses == 0
 }
+
+/**
+ * Итог собранного состава (PLAN H3 №16): сколько приёмов нужно, сколько из них покрывают коробки
+ * и скольких не хватает. Считается на месте, по составу на экране, — поэтому дня, с которого не
+ * хватает, здесь нет: его знает только записанное обеспечение, разложенное по пунктам календаря.
+ */
+data class CourseEstimatePresentationDTO(
+    val requiredDoses: Int,
+    val coveredDoses: Int,
+    val missingDoses: Int
+)
