@@ -17,41 +17,32 @@ import androidx.compose.ui.test.performScrollToNode
 import androidx.lifecycle.Lifecycle
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import com.kert0n.medapp.HiltTestActivity
-import com.kert0n.medapp.domain.intake.CourseIntake
 import com.kert0n.medapp.domain.intake.IntakeStatus
 import com.kert0n.medapp.domain.notification.NotificationChannel
 import com.kert0n.medapp.domain.notification.NotificationKey
 import com.kert0n.medapp.domain.notification.NotificationKind
-import com.kert0n.medapp.domain.value.Doses
-import com.kert0n.medapp.feature.course.CourseDrafting
 import com.kert0n.medapp.feature.notification.DailyRound
 import com.kert0n.medapp.feature.notification.NotificationReconciliation
 import com.kert0n.medapp.feature.notification.ReminderAnswering
-import com.kert0n.medapp.fixture.HOME_KIT
 import com.kert0n.medapp.fixture.MOSCOW
-import com.kert0n.medapp.fixture.Scenarios
 import com.kert0n.medapp.fixture.StoryWorld
-import com.kert0n.medapp.fixture.TABLETS
 import com.kert0n.medapp.fixture.TABLET_FORM
 import com.kert0n.medapp.fixture.TestPermissions
-import com.kert0n.medapp.fixture.dose
-import com.kert0n.medapp.fixture.intakeRepository
-import com.kert0n.medapp.fixture.medKit
 import com.kert0n.medapp.fixture.pack
 import com.kert0n.medapp.fixture.packageRepository
-import com.kert0n.medapp.fixture.schedule
 import com.kert0n.medapp.fixture.tablets
+import com.kert0n.medapp.fixture.storySetting
+import com.kert0n.medapp.fixture.treatmentStarted
+import com.kert0n.medapp.fixture.intakeOn
+import com.kert0n.medapp.fixture.moscow
 import com.kert0n.medapp.platform.time.TimeShifts
 import com.kert0n.medapp.queue.Transactions
 import com.kert0n.medapp.storage.database.MedAppDatabase
-import com.kert0n.medapp.storage.medkit.toStorageEntity as toMedKitStorageEntity
 import com.kert0n.medapp.storage.notification.ReminderStorageRepository
-import com.kert0n.medapp.storage.value.toStorageEntity
 import com.kert0n.medapp.ui.theme.MedAppTheme
 import dagger.hilt.android.testing.HiltAndroidRule
 import dagger.hilt.android.testing.HiltAndroidTest
 import java.time.LocalDate
-import java.time.LocalDateTime
 import java.time.LocalTime
 import javax.inject.Inject
 import kotlin.uuid.Uuid
@@ -110,18 +101,14 @@ class NightShiftStoryTest {
         // В раздевалке, в перчатках: системный вопрос смахнут не читая.
         TestPermissions.notifications = false
         runBlocking {
-            database.vocabulary().save(
-                units = listOf(TABLETS).map { it.toStorageEntity() },
-                forms = listOf(TABLET_FORM).map { it.toStorageEntity() }
-            )
-            database.medKits().insertIfMissing(medKit(id = HOME_KIT).toMedKitStorageEntity())
+            database.storySetting()
             val boxes = database.packageRepository()
             boxes.add(pack(id = antibiotic, name = "Амоксиклав", quantity = tablets("30"), form = TABLET_FORM))
             boxes.add(pack(id = pressure, name = "Лозартан", quantity = tablets("30"), form = TABLET_FORM))
             boxes.add(pack(id = vitamin, name = "Витамин D", quantity = tablets("30"), form = TABLET_FORM))
-            antibioticCourse = started("Амоксиклав", antibiotic, listOf(LocalTime.of(8, 0), LocalTime.of(14, 0), LocalTime.of(20, 0)))
-            pressureCourse = started("Лозартан", pressure, listOf(LocalTime.of(9, 0), LocalTime.of(21, 0)))
-            vitaminCourse = started("Витамин D", vitamin, listOf(LocalTime.of(10, 0)))
+            antibioticCourse = database.treatmentStarted(at(shiftDay, 7, 0), "Амоксиклав", antibiotic, shiftDay, listOf(LocalTime.of(8, 0), LocalTime.of(14, 0), LocalTime.of(20, 0)))
+            pressureCourse = database.treatmentStarted(at(shiftDay, 7, 0), "Лозартан", pressure, shiftDay, listOf(LocalTime.of(9, 0), LocalTime.of(21, 0)))
+            vitaminCourse = database.treatmentStarted(at(shiftDay, 7, 0), "Витамин D", vitamin, shiftDay, listOf(LocalTime.of(10, 0)))
         }
         compose.setContent {
             MedAppTheme { MedAppShell(opening = world.opening.value, onOpened = { world.opening.value = null }) }
@@ -191,7 +178,7 @@ class NightShiftStoryTest {
 
         world.moveTo(at(shiftDay.plusDays(1), 8, 1))
         runBlocking { world.settle() }
-        val morning = runBlocking { intakeOn(antibioticCourse, shiftDay.plusDays(1), 8) }
+        val morning = runBlocking { database.intakeOn(antibioticCourse, shiftDay.plusDays(1), 8) }
         compose.waitUntil(WAIT) { world.cardUp(morning.id) }
         assertTrue(
             "в шторке нет вчерашнего: пропуск говорится попапом",
@@ -201,7 +188,7 @@ class NightShiftStoryTest {
 
     /** Смахнула утреннее, не ответив, — назавтра оно ждёт её в попапе, а не пропадает молча. */
     private fun aSwipedReminderComesBackAsTheLastChance() {
-        val morning = runBlocking { intakeOn(antibioticCourse, shiftDay.plusDays(1), 8) }
+        val morning = runBlocking { database.intakeOn(antibioticCourse, shiftDay.plusDays(1), 8) }
         runBlocking { world.shade.dismiss(NotificationKey.intake(morning.id, NotificationKind.INTAKE_DUE)) }
 
         world.moveTo(at(shiftDay.plusDays(2), 7, 30))
@@ -241,28 +228,7 @@ class NightShiftStoryTest {
         }
     }
 
-    private suspend fun started(title: String, box: Uuid, times: List<LocalTime>): Uuid {
-        val scenarios = Scenarios(database, at(shiftDay, 7, 0))
-        val created = scenarios.courseDrafting.create(title)
-        val saved = scenarios.courseDrafting.edit(
-            created.id, created.revision,
-            listOf(
-                CourseDrafting.Edit.SetDose(dose("1")),
-                CourseDrafting.Edit.SetForm(TABLET_FORM),
-                CourseDrafting.Edit.SetSchedule(schedule(start = shiftDay, times = times)),
-                CourseDrafting.Edit.SetTotalDoses(Doses(times.size * 10)),
-                CourseDrafting.Edit.Attach(box, Doses(times.size * 10))
-            )
-        ) as CourseDrafting.Outcome.Saved
-        scenarios.courseActivation.activate(saved.draft.id, saved.draft.revision)
-        return saved.draft.id
-    }
-
-    private suspend fun intakeOn(course: Uuid, day: LocalDate, hour: Int): CourseIntake =
-        database.intakeRepository().ofCourse(course).filterIsInstance<CourseIntake>()
-            .single { it.slot.localDate == day && it.slot.at.atZone(MOSCOW).hour == hour }
-
-    private suspend fun statusOn(course: Uuid, day: LocalDate, hour: Int) = intakeOn(course, day, hour).status
+    private suspend fun statusOn(course: Uuid, day: LocalDate, hour: Int) = database.intakeOn(course, day, hour).status
 
     private fun rowWith(title: String, moment: String): SemanticsMatcher =
         // Карточка сливает тексты своих строк в себя: строка узнаётся по собственному тексту.
@@ -290,7 +256,7 @@ class NightShiftStoryTest {
         compose.onNodeWithText("День").performClick()
     }
 
-    private fun at(day: LocalDate, hour: Int, minute: Int) = LocalDateTime.of(day, LocalTime.of(hour, minute)).atZone(MOSCOW).toInstant()
+    private fun at(day: LocalDate, hour: Int, minute: Int) = moscow(day, hour, minute)
 
     private companion object {
         const val MISSED = "Без ответа за прошлые дни"
