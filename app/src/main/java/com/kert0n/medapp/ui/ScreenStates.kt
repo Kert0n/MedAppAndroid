@@ -1,5 +1,6 @@
 package com.kert0n.medapp.ui
 
+import androidx.annotation.DrawableRes
 import androidx.annotation.StringRes
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -7,14 +8,17 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.defaultMinSize
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.material3.Button
 import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
@@ -41,19 +45,24 @@ fun LoadingState(modifier: Modifier = Modifier) {
 /**
  * Ничего не заведено. Это не отказ: показывать нечего, потому что человек ещё ничего не создал,
  * — и [actionText] предлагает создать, если экрану есть что предложить.
+ *
+ * [icon] называет, о чём речь, там, где одного текста мало: перечёркнутый объектив на пустом
+ * экране сканера говорит о камере раньше, чем человек дочитает фразу.
  */
 @Composable
 fun EmptyState(
     text: String,
     modifier: Modifier = Modifier,
     actionText: String? = null,
-    onAction: (() -> Unit)? = null
+    onAction: (() -> Unit)? = null,
+    @DrawableRes icon: Int? = null
 ) = Told(
     text = text,
     color = MaterialTheme.colorScheme.onSurfaceVariant,
     modifier = modifier,
     actionText = actionText,
-    onAction = onAction
+    onAction = onAction,
+    icon = icon
 )
 
 /**
@@ -91,12 +100,22 @@ private fun Told(
     color: Color,
     modifier: Modifier,
     actionText: String?,
-    onAction: (() -> Unit)?
+    onAction: (() -> Unit)?,
+    @DrawableRes icon: Int? = null
 ) = Middle(modifier) {
     Column(
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.spacedBy(16.dp)
     ) {
+        // Значок молчит для экранного чтеца: он говорит глазу то же, что сказано текстом под ним.
+        if (icon != null) {
+            Icon(
+                painterResource(icon),
+                contentDescription = null,
+                tint = color,
+                modifier = Modifier.size(48.dp)
+            )
+        }
         Text(text, style = MaterialTheme.typography.bodyLarge, color = color, textAlign = TextAlign.Center)
         if (actionText != null && onAction != null) {
             Button(onClick = onAction, modifier = Modifier.defaultMinSize(minHeight = 48.dp)) {

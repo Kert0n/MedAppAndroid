@@ -590,4 +590,16 @@
     <string name="course_picking_nothing_found">Ничего не нашлось. Попробуйте другое название.</string>
     <string name="course_picking_empty">Подходящих пачек нет: заведите коробку на полке или укажите ей форму.</string>
     <string name="action_got_it">Понятно</string>
+    <!-- Сканер (PLAN H3 №24) -->
+    <string name="scanner_aim">Наведите на код с упаковки</string>
+    <string name="scanner_preview">Изображение с камеры</string>
+    <string name="scanner_manual">Ввести вручную</string>
+    <string name="scanner_manual_explained">Если кода нет или он затёрся</string>
+    <string name="scanner_camera_denied">Чтобы читать коды с упаковок, приложению нужна камера.</string>
+    <string name="scanner_camera_allow">Разрешить камеру</string>
+    <string name="scanner_camera_refused">Камера запрещена. Разрешить её можно в настройках приложения.</string>
+    <string name="scanner_camera_settings">Открыть настройки</string>
+    <string name="scanner_camera_absent">На этом устройстве нет камеры. Коробки заводятся вручную.</string>
+    <string name="scanner_unsupported">Этот код не поддерживается: на упаковках лекарств стоит DataMatrix.</string>
+    <string name="scanner_invitation">Это приглашение в аптечку.</string>
 </resources>
