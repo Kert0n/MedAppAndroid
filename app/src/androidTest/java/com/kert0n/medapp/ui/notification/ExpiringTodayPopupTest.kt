@@ -6,6 +6,8 @@ import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
 import androidx.test.ext.junit.runners.AndroidJUnit4
+import com.kert0n.medapp.domain.notification.NotificationKey
+import com.kert0n.medapp.domain.notification.NotificationKind
 import com.kert0n.medapp.domain.pack.ExpiryDate
 import com.kert0n.medapp.fixture.PACK
 import com.kert0n.medapp.fixture.TABLET_FORM
@@ -33,17 +35,20 @@ class ExpiringTodayPopupTest {
     val compose = createComposeRule()
 
     private val opened = mutableListOf<Uuid>()
-    private var dismissed = 0
+    private val dismissed = mutableListOf<Set<NotificationKey>>()
 
     private fun show(state: ExpiringTodayUiState) {
         compose.setContent {
             MedAppTheme {
-                ExpiringTodayPopup(state = state, onOpenPackage = { opened += it }, onDismiss = { dismissed++ })
+                ExpiringTodayPopup(state = state, onOpenPackage = { opened += it }, onDismiss = { dismissed += it })
             }
         }
     }
 
+    private val told = setOf(NotificationKey(NotificationKind.EXPIRY_TODAY, PACK.toString()))
+
     private fun expiring() = ExpiringTodayUiState(
+        told = told,
         boxes = listOf(
             pack(
                 id = PACK,
@@ -75,7 +80,7 @@ class ExpiringTodayPopupTest {
         compose.onNodeWithText("Нурофен").performClick()
 
         assertEquals(listOf(PACK), opened)
-        assertEquals(0, dismissed)
+        assertEquals(emptyList<Set<NotificationKey>>(), dismissed)
     }
 
     /** Закрывает только крестик: подтверждать новость нечем, и кнопки «понятно» у неё нет. */
@@ -85,7 +90,21 @@ class ExpiringTodayPopupTest {
 
         compose.onNodeWithContentDescription("Закрыть").performClick()
 
-        assertEquals(1, dismissed)
+        assertEquals(1, dismissed.size)
+    }
+
+    /**
+     * **Крестик уносит с собой ключи того попапа, который человек прочёл** (CodeRabbit 4030390716).
+     * Иначе сценарий читал бы их заново в момент нажатия: коробка, о которой новость пришла, пока
+     * Нина тянулась к крестику, оказалась бы сказанной — а она её не видела и сегодня уже не увидит.
+     */
+    @Test
+    fun theCrossCarriesTheKeysThatWereDrawn() {
+        show(expiring())
+
+        compose.onNodeWithContentDescription("Закрыть").performClick()
+
+        assertEquals(listOf(told), dismissed)
     }
 
     /** Говорить не о чем — попапа нет: пустой диалог человек читает как поломку. */

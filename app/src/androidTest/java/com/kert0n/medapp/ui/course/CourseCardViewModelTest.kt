@@ -141,8 +141,7 @@ class CourseCardViewModelTest {
         watching(model.state) { state ->
             state.awaiting(PATIENTLY) { it.coverage != null }
             model.askToCountOffPlan()
-            state.awaiting(PATIENTLY) { it.asksOffPlan }
-            model.countOffPlan(2)
+            model.countOffPlan(2, state.awaiting(PATIENTLY) { it.asksOffPlan }.revision)
             state.awaiting(PATIENTLY) { it.offPlanDoses == 2 }
         }
 

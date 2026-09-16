@@ -21,6 +21,7 @@ import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import com.kert0n.medapp.R
+import com.kert0n.medapp.domain.notification.NotificationKey
 import com.kert0n.medapp.presentation.notification.ExpiringTodayUiState
 import com.kert0n.medapp.presentation.pack.PackagePresentationDTO
 import com.kert0n.medapp.ui.DAY
@@ -43,7 +44,7 @@ import kotlin.uuid.Uuid
 fun ExpiringTodayPopup(
     state: ExpiringTodayUiState,
     onOpenPackage: (Uuid) -> Unit,
-    onDismiss: () -> Unit
+    onDismiss: (Set<NotificationKey>) -> Unit
 ) {
     if (state.isEmpty) return
     AlertDialog(
@@ -53,7 +54,9 @@ fun ExpiringTodayPopup(
         title = {
             Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
                 Text(stringResource(R.string.expiry_today_title), modifier = Modifier.weight(1f))
-                IconButton(onClick = onDismiss) {
+                // Крестик уносит с собой ключи **этого** попапа: сказанным становится ровно то,
+                // что человек прочёл (C1 «Действие — по показанному»).
+                IconButton(onClick = { onDismiss(state.told) }) {
                     Icon(
                         painterResource(R.drawable.ic_close),
                         contentDescription = stringResource(R.string.expiry_today_close)

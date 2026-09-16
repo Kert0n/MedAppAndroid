@@ -72,11 +72,13 @@ class ExpiringTodayViewModel @Inject constructor(
     /**
      * Закрыт крестиком: обязательства помечаются сказанными, и сегодня попап больше не придёт.
      * Владелец доставки один и для системы, и для экрана (PLAN D8).
+     *
+     * Ключи приезжают **нажатием**, из нарисованного снимка: прочитай их здесь заново — и сказанной
+     * стала бы новость, пришедшая между взглядом и крестиком (C1 «Действие — по показанному»).
      */
-    fun dismiss() {
-        val keys = state.value.told
-        dismissed.update { it + keys }
-        viewModelScope.launch { outbox.bannerShown(keys) }
+    fun dismiss(told: Set<NotificationKey>) {
+        dismissed.update { it + told }
+        viewModelScope.launch { outbox.bannerShown(told) }
     }
 
 }

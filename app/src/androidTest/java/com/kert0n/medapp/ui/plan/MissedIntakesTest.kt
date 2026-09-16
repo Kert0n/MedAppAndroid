@@ -164,8 +164,8 @@ class MissedIntakesTest {
         val model = model()
 
         watching(model.state) { state ->
-            state.awaiting(PATIENTLY) { it.rows.size == 2 }
-            model.confirm(yesterday.id)
+            val shown = state.awaiting(PATIENTLY) { it.rows.size == 2 }
+            model.confirm(yesterday.id, shown.planned.getValue(yesterday.id))
             state.awaiting(PATIENTLY) { s -> s.rows.none { it.intakeId == yesterday.id } }
         }
 
@@ -185,8 +185,7 @@ class MissedIntakesTest {
         val model = model()
 
         watching(model.state) { state ->
-            state.awaiting(PATIENTLY) { it.rows.size == 2 }
-            model.dismiss()
+            model.dismiss(state.awaiting(PATIENTLY) { it.rows.size == 2 }.told)
             state.awaiting(PATIENTLY) { it.isEmpty }
         }
         val reopened = model()
@@ -210,8 +209,7 @@ class MissedIntakesTest {
         val model = model()
 
         watching(model.state) { state ->
-            state.awaiting(PATIENTLY) { it.rows.size == 2 }
-            model.dismiss()
+            model.dismiss(state.awaiting(PATIENTLY) { it.rows.size == 2 }.told)
             state.awaiting(PATIENTLY) { it.isEmpty }
 
             clock.now = now.plusSeconds(86_400)
@@ -238,8 +236,7 @@ class MissedIntakesTest {
         val model = model()
 
         watching(model.state) { state ->
-            state.awaiting(PATIENTLY) { it.rows.size == 2 }
-            model.dismiss()
+            model.dismiss(state.awaiting(PATIENTLY) { it.rows.size == 2 }.told)
             state.awaiting(PATIENTLY) { it.isEmpty }
             com.kert0n.medapp.fixture.await("крестик отметил сказанное") {
                 scenarios().reminderStore.awaiting(com.kert0n.medapp.domain.notification.NoticeDelivery.IN_APP_BANNER)

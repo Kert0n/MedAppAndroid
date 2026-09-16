@@ -119,10 +119,14 @@ class MissedIntakesViewModel @Inject constructor(
     /**
      * «Принял» за прошлый день: плановая пачка и доза, в момент пункта — тот же сценарий, что
      * быстрый ответ «Дня». Не вышло — сказано словами, а строка остаётся.
+     *
+     * Плановое приезжает **нажатием**, из того снимка, который человек видел: прочитай его здесь
+     * заново — и записалась бы другая коробка, доза или минута, если поток успел провернуться
+     * между взглядом и нажатием, а пропавшая строка съела бы ответ молча (C1 «Действие — по
+     * показанному», CodeRabbit 4030390711).
      */
-    fun confirm(intakeId: Uuid) {
+    fun confirm(intakeId: Uuid, planned: MissedIntakesUiState.Planned) {
         if (intakeId in answering.value) return
-        val planned = state.value.planned[intakeId] ?: return
         answering.update { it + intakeId }
         viewModelScope.launch {
             try {
@@ -141,11 +145,13 @@ class MissedIntakesViewModel @Inject constructor(
      * Крестик: сказанным отмечается **то, что в попапе стояло**, — неотвеченное остаётся пропусками
      * и больше не приходит. Скрытое (пункт сегодняшнего дня телефона) крестик не трогает: назавтра
      * у него свой последний шанс.
+     *
+     * Ключи приезжают нажатием, а не читаются заново: успей поток провернуться перед закрытием —
+     * сказанной оказалась бы новость, которой человек не видел (CodeRabbit 4030390716).
      */
-    fun dismiss() {
-        val keys = state.value.told
-        dismissed.update { it + keys }
-        viewModelScope.launch { outbox.bannerShown(keys) }
+    fun dismiss(told: Set<NotificationKey>) {
+        dismissed.update { it + told }
+        viewModelScope.launch { outbox.bannerShown(told) }
     }
 
     private data class Line(val key: NotificationKey, val row: DayItemPresentationDTO, val answer: MissedIntakesUiState.Planned?)

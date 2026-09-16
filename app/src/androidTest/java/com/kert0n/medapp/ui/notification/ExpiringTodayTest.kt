@@ -104,8 +104,7 @@ class ExpiringTodayTest {
         val model = model()
 
         watching(model.state) { state ->
-            state.awaiting(PATIENTLY) { !it.isEmpty }
-            model.dismiss()
+            model.dismiss(state.awaiting(PATIENTLY) { !it.isEmpty }.told)
             state.awaiting(PATIENTLY) { it.isEmpty }
         }
 
@@ -150,8 +149,7 @@ class ExpiringTodayTest {
         val model = model()
 
         watching(model.state) { state ->
-            state.awaiting(PATIENTLY) { !it.isEmpty }
-            model.dismiss()
+            model.dismiss(state.awaiting(PATIENTLY) { !it.isEmpty }.told)
             state.awaiting(PATIENTLY) { it.isEmpty }
             promised(OTHER_PACK)
             val tomorrow = state.awaiting(PATIENTLY) { !it.isEmpty }

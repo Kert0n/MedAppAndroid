@@ -8,6 +8,7 @@ import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
 import androidx.test.ext.junit.runners.AndroidJUnit4
+import com.kert0n.medapp.domain.course.Revision
 import com.kert0n.medapp.domain.intake.IntakeStatus
 import com.kert0n.medapp.presentation.course.CourseCardUiState
 import com.kert0n.medapp.presentation.course.CourseCoveragePresentationDTO
@@ -41,6 +42,7 @@ class CourseCardScreenTest {
 
     private var asked = 0
     private var askedOffPlan = 0
+    private val counted = mutableListOf<Pair<Int, Revision?>>()
     private var confirmed = 0
     private var edited = 0
 
@@ -53,7 +55,7 @@ class CourseCardScreenTest {
                     onSources = {},
                     onHistory = {},
                     onAskOffPlan = { askedOffPlan++ },
-                    onCountOffPlan = {},
+                    onCountOffPlan = { total, revision -> counted += total to revision },
                     onDismissOffPlan = {},
                     onAskToCancel = { asked++ },
                     onConfirmCancel = { confirmed++ },
@@ -209,6 +211,30 @@ class CourseCardScreenTest {
         compose.onNodeWithText("Приёмы вне расписания").performClick()
 
         assertEquals(1, askedOffPlan)
+    }
+
+    /**
+     * **«Сохранить» уносит с собой редакцию нарисованного плана** (CodeRabbit 4030390705). Иначе
+     * сценарий читал бы её заново в момент нажатия: успей расписание перестроиться, пока диалог
+     * стоял, — и поправка легла бы на план, которого человек не видел, вместо «лечение изменилось».
+     */
+    @Test
+    fun theSaveCarriesTheRevisionThatWasDrawn() {
+        val revision = Revision(3)
+        show(
+            CourseCardUiState(
+                course = course(),
+                isRunning = true,
+                offPlanDoses = 1,
+                offPlanLimit = 5,
+                asksOffPlan = true,
+                revision = revision
+            )
+        )
+
+        compose.onNodeWithText("Сохранить").performClick()
+
+        assertEquals(listOf(1 to revision), counted)
     }
 
     /**

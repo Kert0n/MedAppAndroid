@@ -20,6 +20,7 @@ import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import com.kert0n.medapp.R
+import com.kert0n.medapp.domain.notification.NotificationKey
 import com.kert0n.medapp.presentation.plan.DayItemPresentationDTO
 import com.kert0n.medapp.presentation.plan.MissedIntakesUiState
 import kotlin.uuid.Uuid
@@ -34,8 +35,8 @@ import kotlin.uuid.Uuid
 fun MissedIntakesPopup(
     state: MissedIntakesUiState,
     onOpen: (DayItemPresentationDTO) -> Unit,
-    onConfirm: (Uuid) -> Unit,
-    onDismiss: () -> Unit,
+    onConfirm: (Uuid, MissedIntakesUiState.Planned) -> Unit,
+    onDismiss: (Set<NotificationKey>) -> Unit,
     onDismissMessage: () -> Unit
 ) {
     if (state.isEmpty) return
@@ -52,14 +53,19 @@ fun MissedIntakesPopup(
                         color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
                 }
-                IconButton(onClick = onDismiss) {
+                // Крестик и «Принял» уносят с собой **нарисованное**: ключи этого попапа и плановое
+                // этой строки. Сценарий, читающий состояние заново, отвечал бы уже за другой экран
+                // (C1 «Действие — по показанному»).
+                IconButton(onClick = { onDismiss(state.told) }) {
                     Icon(painterResource(R.drawable.ic_close), contentDescription = stringResource(R.string.missed_close))
                 }
             }
         },
         text = {
             LazyColumn(Modifier.heightIn(max = 420.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                items(state.rows, key = { it.key }) { row -> DayCard(row, onOpen, onConfirm, onDecline = {}) }
+                items(state.rows, key = { it.key }) { row ->
+                    DayCard(row, onOpen, onConfirm = { id -> state.planned[id]?.let { onConfirm(id, it) } }, onDecline = {})
+                }
             }
         },
         confirmButton = {}

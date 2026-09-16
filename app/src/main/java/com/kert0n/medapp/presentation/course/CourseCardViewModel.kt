@@ -106,15 +106,20 @@ class CourseCardViewModel @AssistedInject constructor(
         counting.value = Counting()
     }
 
-    /** Записать новый счёт доз мимо плана; второе нажатие ничего не начинает. */
-    fun countOffPlan(total: Int) {
+    /**
+     * Записать новый счёт доз мимо плана; второе нажатие ничего не начинает.
+     *
+     * Редакция приезжает **нажатием**, вместе с числом: по ней сценарий узнаёт, что правят
+     * виденное. Прочитай её здесь заново — и правка легла бы на расписание, изменившееся
+     * между взглядом и «Сохранить», а `Stale` из сценария так и не пришёл бы
+     * (F5, C1 «Действие — по показанному», CodeRabbit 4030390705).
+     */
+    fun countOffPlan(total: Int, revision: Revision?) {
         val now = counting.value
         if (!now.asking || now.working) return
         // Плана нет — правят не то, что видели: сказать об этом и закрыть вопрос, иначе кнопка
         // «Сохранить» отвечает молчанием.
-        // Редакция — из того же снимка, что нарисован: по ней сценарий и узнаёт, что правят виденное
-        // (F5, C1 «Действие — по показанному»).
-        val revision = state.value.revision ?: run {
+        if (revision == null) {
             counting.value = Counting(message = CourseCardMessage.Stale)
             return
         }

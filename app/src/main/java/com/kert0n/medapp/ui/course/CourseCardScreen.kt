@@ -45,6 +45,7 @@ import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import com.kert0n.medapp.R
 import com.kert0n.medapp.ui.DAY
+import com.kert0n.medapp.domain.course.Revision
 import com.kert0n.medapp.domain.intake.IntakeStatus
 import com.kert0n.medapp.presentation.course.CourseCardMessage
 import com.kert0n.medapp.presentation.course.CourseCardUiState
@@ -69,7 +70,7 @@ fun CourseCardScreen(
     onSources: () -> Unit,
     onHistory: () -> Unit,
     onAskOffPlan: () -> Unit,
-    onCountOffPlan: (Int) -> Unit,
+    onCountOffPlan: (Int, Revision?) -> Unit,
     onDismissOffPlan: () -> Unit,
     onAskToCancel: () -> Unit,
     onConfirmCancel: () -> Unit,
@@ -123,7 +124,9 @@ fun CourseCardScreen(
             current = state.offPlanDoses ?: 0,
             // Больше, чем лечению осталось, набрать нельзя: столько доз ему не назначено (D5).
             limit = state.offPlanLimit ?: (state.offPlanDoses ?: 0),
-            onConfirm = onCountOffPlan,
+            // Редакция уезжает с числом: правят **нарисованный** план, а не тот, что пришёл
+            // чтением, пока диалог стоял (C1 «Действие — по показанному»).
+            onConfirm = { total -> onCountOffPlan(total, state.revision) },
             onDismiss = onDismissOffPlan
         )
     }
