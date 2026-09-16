@@ -1,5 +1,7 @@
 package com.kert0n.medapp.ui.medkit
 
+import androidx.annotation.DrawableRes
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -13,6 +15,7 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.selection.selectable
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
@@ -21,6 +24,8 @@ import androidx.compose.material3.FilterChip
 import androidx.compose.material3.FloatingActionButton
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
+import androidx.compose.material3.ListItem
+import androidx.compose.material3.ListItemDefaults
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.RadioButton
@@ -36,12 +41,12 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import com.kert0n.medapp.R
-import com.kert0n.medapp.ui.SearchField
 import com.kert0n.medapp.presentation.medkit.MedKitPresentationDTO
 import com.kert0n.medapp.presentation.pack.MedKitContentsUiState
 import com.kert0n.medapp.presentation.pack.Narrowing
@@ -50,6 +55,8 @@ import com.kert0n.medapp.presentation.pack.RemovalRefusal
 import com.kert0n.medapp.presentation.pack.RemovalStep
 import com.kert0n.medapp.ui.EmptyState
 import com.kert0n.medapp.ui.LoadingState
+import com.kert0n.medapp.ui.NavigationRow
+import com.kert0n.medapp.ui.SearchField
 import com.kert0n.medapp.ui.pack.PackageCard
 import kotlin.uuid.Uuid
 
@@ -351,9 +358,16 @@ private fun ShelfMenu(isShared: Boolean, onEdit: () -> Unit, onShare: () -> Unit
 
 /**
  * Уборка полки — **разговор, а не кнопка** (PLAN H3 №4). Пустая спрашивается одним
- * подтверждением; непустая называет, сколько в ней коробок, и обе судьбы названы своими
- * последствиями: «Убрать вместе с лекарствами» и «Перенести и убрать». Слова «удалить» здесь
- * нет — человек убирает полку, а не строку в базе.
+ * подтверждением; непустая называет, сколько в ней коробок, и каждая судьба стоит строкой:
+ * значок, что произойдёт, и **последствие** под ним. Слова «удалить» здесь нет — человек убирает
+ * полку, а не строку в базе.
+ *
+ * **Судьбы — строки списка, а не кнопки**, и это два замечания владельца разом. Текстовой кнопкой
+ * выбор читался набором заголовков, и нажать на него человек не догадывался (2026-09-16, оттуда
+ * же `NavigationRow`). Колонка кнопок в слоте `AlertDialog` — это один ряд без прокрутки, и на
+ * крупном шрифте нижнее действие обрезалось вместе с «Отменой» (2026-09-17). А последствие выбора
+ * жило только в плане: человек выбирал между двумя похожими фразами, не зная, чем они
+ * различаются.
  */
 @Composable
 private fun RemovalDialog(
@@ -370,9 +384,13 @@ private fun RemovalDialog(
     val count = medKit.contents.packages
     AlertDialog(
         onDismissRequest = onDismiss,
+        icon = { Icon(painterResource(R.drawable.ic_delete), contentDescription = null) },
         title = { Text(stringResource(R.string.med_kit_remove_title, medKit.name)) },
         text = {
-            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+            Column(
+                modifier = Modifier.verticalScroll(rememberScrollState()),
+                verticalArrangement = Arrangement.spacedBy(4.dp)
+            ) {
                 Text(
                     if (count == 0) {
                         stringResource(R.string.med_kit_remove_empty)
@@ -387,27 +405,57 @@ private fun RemovalDialog(
                 state.removalRefusal?.let {
                     Text(stringResource(it.text), color = MaterialTheme.colorScheme.error)
                 }
-            }
-        },
-        confirmButton = {
-            TextButton(onClick = { onRemove(null) }) {
-                Text(
-                    stringResource(
+                // Действие на месте — строка без стрелки: оно никуда не уводит. Перенос уводит к
+                // выбору полки, и стрелка у него честная.
+                Fate(
+                    icon = R.drawable.ic_delete,
+                    text = stringResource(
                         if (count == 0) R.string.contents_remove else R.string.med_kit_remove_throw_away
-                    )
+                    ),
+                    supporting = stringResource(
+                        if (count == 0) R.string.med_kit_remove_empty_consequence
+                        else R.string.med_kit_remove_throw_away_consequence
+                    ),
+                    color = MaterialTheme.colorScheme.error,
+                    onClick = { onRemove(null) }
                 )
+                if (count > 0 && state.others.isNotEmpty()) {
+                    NavigationRow(
+                        icon = R.drawable.ic_drive_file_move,
+                        text = stringResource(R.string.med_kit_remove_move),
+                        supporting = stringResource(R.string.med_kit_remove_move_consequence),
+                        onClick = onPickTarget
+                    )
+                }
             }
         },
-        dismissButton = {
-            Column {
-                if (count > 0 && state.others.isNotEmpty()) {
-                    TextButton(onClick = onPickTarget) {
-                        Text(stringResource(R.string.med_kit_remove_move))
-                    }
-                }
-                TextButton(onClick = onDismiss) { Text(stringResource(R.string.action_cancel)) }
-            }
+        // Кнопкой остаётся одна «Отмена»: она и есть «ничего не делать», и ряд из неё одной не
+        // разъезжается ни при каком шрифте.
+        confirmButton = {
+            TextButton(onClick = onDismiss) { Text(stringResource(R.string.action_cancel)) }
         }
+    )
+}
+
+/**
+ * Судьба коробок, которая случится **здесь**: значок, что произойдёт, и последствие под ним.
+ * Стрелки нет — строка не уводит, и стрелка ей соврала бы (`NavigationRow`). Нажимается строка
+ * целиком, и на крупном шрифте она переносится, а не обрезается.
+ */
+@Composable
+private fun Fate(
+    @DrawableRes icon: Int,
+    text: String,
+    supporting: String,
+    color: Color,
+    onClick: () -> Unit
+) {
+    ListItem(
+        headlineContent = { Text(text, color = color) },
+        supportingContent = { Text(supporting) },
+        leadingContent = { Icon(painterResource(icon), contentDescription = null, tint = color) },
+        colors = ListItemDefaults.colors(containerColor = Color.Transparent),
+        modifier = Modifier.fillMaxWidth().clickable(onClick = onClick)
     )
 }
 

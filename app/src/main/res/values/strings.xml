@@ -161,6 +161,9 @@
     <string name="med_kit_remove_nowhere">Переносить некуда: другой аптечки нет.</string>
     <string name="med_kit_remove_throw_away">Убрать вместе с лекарствами</string>
     <string name="med_kit_remove_move">Перенести и убрать</string>
+    <string name="med_kit_remove_throw_away_consequence">Аптечка и всё, что в ней лежит, исчезнут</string>
+    <string name="med_kit_remove_move_consequence">Выберете, куда переложить лекарства</string>
+    <string name="med_kit_remove_empty_consequence">Убирать нечего — аптечка пуста</string>
     <string name="med_kit_remove_target_title">Куда перенести лекарства?</string>
     <string name="med_kit_removal_busy">Аптечка ждёт ответа сервера на другое решение — убрать её пока нельзя.</string>
     <string name="med_kit_removal_target_gone">Той аптечки больше нет — выберите другую.</string>
@@ -173,9 +176,17 @@
     <string name="med_kit_sharing_menu">Поделиться аптечкой</string>
     <string name="med_kit_sharing_invite_menu">Пригласить</string>
     <string name="med_kit_sharing_becomes_shared">Станет общим</string>
-    <string name="med_kit_sharing_becomes_shared_list">Название упаковки, количество и единица, форма, категория, производитель, страна, описание.</string>
+    <string-array name="med_kit_sharing_becomes_shared_items">
+        <item>Название упаковки, количество и единица</item>
+        <item>Форма и категория</item>
+        <item>Производитель, страна, описание</item>
+    </string-array>
     <string name="med_kit_sharing_stays_yours">Останется у вас</string>
-    <string name="med_kit_sharing_stays_yours_list">Срок годности, разовая доза, заметка, цена, дата покупки и дата вскрытия. Название аптечки и место хранения — тоже только ваши.</string>
+    <string-array name="med_kit_sharing_stays_yours_items">
+        <item>Срок годности и разовая доза</item>
+        <item>Заметка, цена, даты покупки и вскрытия</item>
+        <item>Название аптечки и место хранения</item>
+    </string-array>
     <string name="med_kit_sharing_irreversible">Это необратимо: переданный доступ нельзя отозвать. Любой участник сможет удалить аптечку у всех.</string>
     <string name="med_kit_sharing_publish">Сделать общей</string>
     <string name="med_kit_sharing_publish_title">Сделать «%1$s» общей?</string>
@@ -192,6 +203,16 @@
     <string name="med_kit_sharing_qr">Код приглашения узором</string>
     <string name="med_kit_sharing_clipboard_label">Код приглашения в аптечку</string>
     <string name="med_kit_sharing_copied">Код скопирован — его можно переслать</string>
+    <string name="med_kit_sharing_copy">Скопировать код</string>
+
+    <!-- Присоединиться (экран 22) -->
+    <string name="med_kit_joining_menu">Присоединиться к аптечке</string>
+    <string name="med_kit_joining_explained">Попросите код у того, кто уже пользуется аптечкой. Вы увидите все её лекарства.</string>
+    <string name="med_kit_joining_code">Код приглашения</string>
+    <string name="med_kit_joining_join">Присоединиться</string>
+    <string name="med_kit_joining_code_empty">Введите код, который вам прислали.</string>
+    <string name="med_kit_joining_invalid">Такого приглашения нет. Попросите новый код.</string>
+    <string name="med_kit_joining_already_member">Вы уже в этой аптечке — она есть в списке.</string>
 
     <!-- Карточка упаковки -->
     <string name="pack_title">Упаковка</string>
