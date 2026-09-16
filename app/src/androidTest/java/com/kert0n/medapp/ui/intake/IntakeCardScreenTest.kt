@@ -37,6 +37,7 @@ class IntakeCardScreenTest {
     private val IBUPROFEN = Uuid.parse("00000000-0000-4000-8000-0000000000b2")
 
     private var confirmed = 0
+    private var declined = 0
     private var acknowledged = 0
     private var dismissed = 0
 
@@ -47,6 +48,7 @@ class IntakeCardScreenTest {
                     state = state,
                     onEdit = {},
                     onConfirm = { confirmed++ },
+                    onDecline = { declined++ },
                     onAcknowledge = { acknowledged++ },
                     onDismissQuestions = { dismissed++ },
                     onBack = {}
@@ -115,6 +117,17 @@ class IntakeCardScreenTest {
         assertEquals(0, dismissed)
     }
 
+    /** Отказ — такое же решение, как приём, и стоит он рядом (PLAN D6). */
+    @Test
+    fun theRefusalStandsNextToTheConfirmation() {
+        show(waiting())
+
+        compose.onNodeWithText("Пропустил").performClick()
+
+        assertEquals(1, declined)
+        assertEquals(0, confirmed)
+    }
+
     /** Отвеченный пункт карточка показывает, а не спрашивает: кнопки ответа у него нет. */
     @Test
     fun anAnsweredItemHasNoAnswerButton() {
@@ -122,6 +135,7 @@ class IntakeCardScreenTest {
 
         compose.onNodeWithText("принят в 09:12").assertIsDisplayed()
         compose.onNodeWithText("Принял").assertDoesNotExist()
+        compose.onNodeWithText("Пропустил").assertDoesNotExist()
         // Выбирать отвеченному нечего: он говорит, откуда взяли на самом деле.
         compose.onNodeWithText("Из коробки: Нурофен").assertIsDisplayed()
     }

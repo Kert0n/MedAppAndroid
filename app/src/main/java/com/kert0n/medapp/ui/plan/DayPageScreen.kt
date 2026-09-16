@@ -5,6 +5,7 @@ import androidx.annotation.StringRes
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
+import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
@@ -17,7 +18,9 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.ListItem
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
@@ -58,11 +61,12 @@ fun DayPages(
     page: @Composable (daysAhead: Int) -> ScreenState<DayPagePresentationDTO>,
     onOpen: (DayItemPresentationDTO) -> Unit,
     onConfirm: (Uuid) -> Unit,
+    onDecline: (Uuid) -> Unit,
     modifier: Modifier = Modifier
 ) {
     val pager = rememberPagerState(pageCount = { DAYS_AHEAD + 1 })
     HorizontalPager(state = pager, modifier = modifier.fillMaxSize()) { daysAhead ->
-        DayPage(page(daysAhead), onOpen, onConfirm)
+        DayPage(page(daysAhead), onOpen, onConfirm, onDecline)
     }
 }
 
@@ -71,7 +75,8 @@ fun DayPages(
 private fun DayPage(
     state: ScreenState<DayPagePresentationDTO>,
     onOpen: (DayItemPresentationDTO) -> Unit,
-    onConfirm: (Uuid) -> Unit
+    onConfirm: (Uuid) -> Unit,
+    onDecline: (Uuid) -> Unit
 ) {
     val day = (state as? ScreenState.Ready)?.value
     // Первое чтение базы ещё не пришло: говорить «ничего не назначено» рано — это была бы неправда.
@@ -90,7 +95,7 @@ private fun DayPage(
             return
         }
         LazyColumn(Modifier.fillMaxSize(), contentPadding = PaddingValues(bottom = 88.dp)) {
-            items(day.items, key = { it.key }) { item -> DayRow(item, onOpen, onConfirm) }
+            items(day.items, key = { it.key }) { item -> DayRow(item, onOpen, onConfirm, onDecline) }
             shelf(R.string.plan_day_also, day.alsoOnThisDay, onOpen)
         }
     }
@@ -126,7 +131,7 @@ private fun LazyListScope.shelf(
             modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp)
         )
     }
-    items(items, key = { it.key }) { item -> DayRow(item, onOpen, onConfirm = {}) }
+    items(items, key = { it.key }) { item -> DayRow(item, onOpen, onConfirm = {}, onDecline = {}) }
 }
 
 /**
@@ -141,7 +146,8 @@ private fun LazyListScope.shelf(
 private fun DayRow(
     item: DayItemPresentationDTO,
     onOpen: (DayItemPresentationDTO) -> Unit,
-    onConfirm: (Uuid) -> Unit
+    onConfirm: (Uuid) -> Unit,
+    onDecline: (Uuid) -> Unit
 ) {
     ListItem(
         overlineContent = { Text(TIME.format(item.at)) },
@@ -151,8 +157,15 @@ private fun DayRow(
         trailingContent = {
             val intakeId = item.intakeId
             if (item.canAnswer && intakeId != null) {
-                FilledTonalButton(onClick = { onConfirm(intakeId) }, enabled = !item.isAnswering) {
-                    Text(stringResource(R.string.plan_answer_now))
+                // Ответа два, и оба — решения: «принял» и «не принял». Молчание ответом не
+                // считается, но и не спрашивается дважды (PLAN D6).
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    TextButton(onClick = { onDecline(intakeId) }, enabled = !item.isAnswering) {
+                        Text(stringResource(R.string.intake_decline))
+                    }
+                    FilledTonalButton(onClick = { onConfirm(intakeId) }, enabled = !item.isAnswering) {
+                        Text(stringResource(R.string.intake_confirm))
+                    }
                 }
             } else {
                 Text(item.stateWords(), style = MaterialTheme.typography.labelLarge)

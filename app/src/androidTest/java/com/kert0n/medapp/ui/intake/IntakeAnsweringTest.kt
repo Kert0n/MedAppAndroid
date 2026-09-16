@@ -29,6 +29,7 @@ import com.kert0n.medapp.fixture.tablets
 import com.kert0n.medapp.fixture.watching
 import com.kert0n.medapp.presentation.intake.IntakeCardViewModel
 import com.kert0n.medapp.presentation.ScreenState
+import com.kert0n.medapp.presentation.plan.DayItemPresentationDTO
 import com.kert0n.medapp.presentation.plan.DayPagePresentationDTO
 import com.kert0n.medapp.presentation.plan.DayPlanViewModel
 import com.kert0n.medapp.storage.database.MedAppDatabase
@@ -85,11 +86,13 @@ class IntakeAnsweringTest {
         today = Today(clock, QuietClock),
         planning = DayPlanning(Today(clock, QuietClock), database.reportRepository()),
         confirmation = scenarios.intakeConfirmation,
+        declining = scenarios.intakeDeclining,
         clock = clock
     ).also { opened += it }
 
     private fun cardModel(courseId: Uuid, intakeId: Uuid) = IntakeCardViewModel(
         confirmation = scenarios.intakeConfirmation,
+        declining = scenarios.intakeDeclining,
         vocabulary = VocabularyRoomRepository(database.vocabulary()),
         today = Today(clock, QuietClock),
         clock = clock,
@@ -279,6 +282,29 @@ class IntakeAnsweringTest {
 
         assertEquals(tablets("20"), database.packageRepository().find(PACK)?.quantity)
         assertEquals(tablets("8"), database.packageRepository().find(OTHER_PACK)?.quantity)
+    }
+
+    /**
+     * Отказ — решение: доза считается пропущенной, а коробка остаётся целой. Расхода не было, и
+     * списывать нечего (PLAN D6); молчание тем и отличается от отказа, что после него пункт всё
+     * ещё ждёт ответа.
+     */
+    @Test
+    fun aRefusalMarksTheDoseMissedAndSpendsNothing() = runBlocking {
+        val courseId = started()
+        val intakeId = firstIntake(courseId).id
+        val model = dayModel()
+
+        watching(model.page(0)) { page ->
+            page.awaiting(PATIENTLY) { it.ready()?.items?.isNotEmpty() == true }
+            model.decline(intakeId)
+            page.awaiting(PATIENTLY) { state ->
+                state.ready()?.items.orEmpty().any { it.state == DayItemPresentationDTO.State.MISSED }
+            }
+        }
+
+        assertEquals(IntakeStatus.MISSED, database.intakeRepository().find(intakeId)?.status)
+        assertEquals(tablets("20"), database.packageRepository().find(PACK)?.quantity)
     }
 
     /** Отвеченный пункт карточка показывает, а не спрашивает: ответ на приём даётся один раз. */

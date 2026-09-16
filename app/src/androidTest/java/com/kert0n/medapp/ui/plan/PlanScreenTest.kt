@@ -86,6 +86,7 @@ class PlanScreenTest {
                     dayPage = { ScreenState.Ready(emptyDay) },
                     onOpenIntake = {},
                     onConfirmIntake = {},
+                    onDeclineIntake = {},
                     onOpenCourse = { opened = it },
                     onAddCourse = { added++ }
                 )

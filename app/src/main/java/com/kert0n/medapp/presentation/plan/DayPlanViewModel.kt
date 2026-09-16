@@ -5,6 +5,7 @@ import androidx.lifecycle.viewModelScope
 import com.kert0n.medapp.domain.report.DayPlan
 import com.kert0n.medapp.domain.value.Dose
 import com.kert0n.medapp.feature.intake.IntakeConfirmation
+import com.kert0n.medapp.feature.intake.IntakeDeclining
 import com.kert0n.medapp.feature.plan.DayPlanning
 import com.kert0n.medapp.feature.time.Today
 import com.kert0n.medapp.presentation.ScreenState
@@ -41,6 +42,7 @@ class DayPlanViewModel @Inject constructor(
     private val today: Today,
     private val planning: DayPlanning,
     private val confirmation: IntakeConfirmation,
+    private val declining: IntakeDeclining,
     private val clock: Clock
 ) : ViewModel() {
 
@@ -91,6 +93,22 @@ class DayPlanViewModel @Inject constructor(
             if (outcome is IntakeConfirmation.Outcome.Warned) {
                 asksAbout.value = DayQuestion(planned.courseId, intakeId)
             }
+        }
+    }
+
+    /**
+     * Отказ от приёма — **решение**, а не молчание: человек говорит «не принял», и лечение считает
+     * эту дозу пропущенной (PLAN D6). Ничего не списывается: расхода не было.
+     *
+     * Вопросов у отказа нет — спрашивать не о чем, ничего не тратится. Сторож тот же, что у
+     * подтверждения: второе нажатие, пока идёт первое, ничего не начинает.
+     */
+    fun decline(intakeId: Uuid) {
+        if (intakeId in answering.value) return
+        answering.value = answering.value + intakeId
+        viewModelScope.launch {
+            declining.decline(intakeId, clock.instant())
+            answering.value = answering.value - intakeId
         }
     }
 

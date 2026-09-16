@@ -278,6 +278,7 @@ private fun screens(stacks: TabStacks) = entryProvider<NavKey> {
                 if (intakeId != null && courseId != null) stacks.go(Screen.IntakeCard(courseId, intakeId))
             },
             onConfirmIntake = days::confirm,
+            onDeclineIntake = days::decline,
             // Черновик открывается редактором, идущее и законченное лечение — карточкой.
             onOpenCourse = { course ->
                 stacks.go(
@@ -300,6 +301,7 @@ private fun screens(stacks: TabStacks) = entryProvider<NavKey> {
             state = state,
             onEdit = model::edit,
             onConfirm = { model.confirm() },
+            onDecline = model::decline,
             onAcknowledge = { model.confirm(acknowledged = true) },
             onDismissQuestions = model::dismissQuestions,
             onBack = stacks::back

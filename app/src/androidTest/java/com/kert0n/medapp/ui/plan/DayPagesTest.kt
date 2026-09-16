@@ -61,6 +61,7 @@ class DayPagesTest {
         today = Today(clock, QuietClock),
         planning = DayPlanning(Today(clock, QuietClock), database.reportRepository()),
         confirmation = scenarios.intakeConfirmation,
+        declining = scenarios.intakeDeclining,
         clock = clock
     ).also { opened += it }
 

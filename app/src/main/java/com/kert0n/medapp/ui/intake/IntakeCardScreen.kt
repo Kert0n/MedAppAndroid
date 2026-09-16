@@ -57,6 +57,7 @@ fun IntakeCardScreen(
     state: IntakeCardUiState,
     onEdit: (IntakeCardPresentationDTO) -> Unit,
     onConfirm: () -> Unit,
+    onDecline: () -> Unit,
     onAcknowledge: () -> Unit,
     onDismissQuestions: () -> Unit,
     onBack: () -> Unit,
@@ -80,7 +81,7 @@ fun IntakeCardScreen(
                 state.isLoading -> LoadingState(Modifier.fillMaxSize())
                 // Пункта больше нет — сказано словами: пустая карточка читается как поломка.
                 state.isGone -> ErrorMessage(stringResource(R.string.intake_card_gone), Modifier.fillMaxSize())
-                else -> Card(state, onEdit, onConfirm, onBack)
+                else -> Card(state, onEdit, onConfirm, onDecline, onBack)
             }
         }
     }
@@ -94,6 +95,7 @@ private fun Card(
     state: IntakeCardUiState,
     onEdit: (IntakeCardPresentationDTO) -> Unit,
     onConfirm: () -> Unit,
+    onDecline: () -> Unit,
     onBack: () -> Unit
 ) = Form(
     actions = {
@@ -101,6 +103,10 @@ private fun Card(
         if (state.canAnswer) {
             Button(onClick = onConfirm, enabled = !state.isWriting, modifier = Modifier.fillMaxWidth()) {
                 Text(stringResource(R.string.intake_confirm))
+            }
+            // Отказ — решение, а не молчание: лечение считает эту дозу пропущенной (PLAN D6).
+            TextButton(onClick = onDecline, enabled = !state.isWriting, modifier = Modifier.fillMaxWidth()) {
+                Text(stringResource(R.string.intake_decline))
             }
         }
         TextButton(onClick = onBack, modifier = Modifier.fillMaxWidth()) {

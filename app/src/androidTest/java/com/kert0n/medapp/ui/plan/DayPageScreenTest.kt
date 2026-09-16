@@ -42,6 +42,7 @@ class DayPageScreenTest {
 
     private val opened = mutableListOf<DayItemPresentationDTO>()
     private val confirmed = mutableListOf<Uuid>()
+    private val declined = mutableListOf<Uuid>()
 
     private fun row(
         title: String,
@@ -69,6 +70,7 @@ class DayPageScreenTest {
                     },
                     onOpen = { opened += it },
                     onConfirm = { confirmed += it },
+                    onDecline = { declined += it },
                     modifier = Modifier.fillMaxSize()
                 )
             }
@@ -129,6 +131,21 @@ class DayPageScreenTest {
     }
 
     /**
+     * Отказ стоит рядом с подтверждением: «не принял» — такое же решение, как «принял», и
+     * молчанием его не заменяют (PLAN D6).
+     */
+    @Test
+    fun theRefusalStandsNextToTheConfirmation() {
+        val waiting = row("Ждёт")
+        show(page(items = listOf(waiting)))
+
+        compose.onNodeWithText("Пропустил").performClick()
+
+        assertEquals(listOf(waiting.intakeId), declined)
+        assertEquals(emptyList<Uuid>(), confirmed)
+    }
+
+    /**
      * Пока идёт запись, кнопка на месте, но погашена: исчезнувшая читалась бы как «уже ответил»,
      * а нажатая второй раз списала бы коробку дважды.
      */
@@ -138,8 +155,10 @@ class DayPageScreenTest {
 
         compose.onNodeWithText("Принял").assertIsNotEnabled()
         compose.onNodeWithText("Принял").performClick()
+        compose.onNodeWithText("Пропустил").performClick()
 
         assertEquals(emptyList<Uuid>(), confirmed)
+        assertEquals(emptyList<Uuid>(), declined)
     }
 
     /** Нажатие на саму строку ведёт на карточку пункта — туда, где приём меняют. */

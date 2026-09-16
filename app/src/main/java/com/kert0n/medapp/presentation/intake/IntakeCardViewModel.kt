@@ -7,6 +7,7 @@ import com.kert0n.medapp.domain.intake.IntakeProjection
 import com.kert0n.medapp.domain.intake.IntakeStatus
 import com.kert0n.medapp.domain.value.Dose
 import com.kert0n.medapp.feature.intake.IntakeConfirmation
+import com.kert0n.medapp.feature.intake.IntakeDeclining
 import com.kert0n.medapp.feature.intake.IntakeWarning
 import com.kert0n.medapp.feature.time.Today
 import com.kert0n.medapp.presentation.ParsedInput
@@ -45,6 +46,7 @@ import kotlinx.coroutines.launch
 @HiltViewModel(assistedFactory = IntakeCardViewModel.Factory::class)
 class IntakeCardViewModel @AssistedInject constructor(
     private val confirmation: IntakeConfirmation,
+    private val declining: IntakeDeclining,
     private val vocabulary: VocabularyStorageRepository,
     private val today: Today,
     private val clock: Clock,
@@ -128,6 +130,23 @@ class IntakeCardViewModel @AssistedInject constructor(
             requireNotNull(form.at) { "время приёма стоит в карточке заполненным" },
             zone
         ).toInstant()
+
+    /**
+     * Отказаться от приёма. Момент отказа — тот же, что у приёма: человек называет, когда это
+     * было, а не «когда нажал» (PLAN D6). Ничего не списывается: расхода не было.
+     */
+    fun decline() {
+        val shown = state.value
+        if (!shown.canAnswer) return
+        val form = typed.value ?: shown.form
+        writing.value = Writing(busy = true)
+        viewModelScope.launch {
+            val at = moment(form, today.observe().first().zone)
+            declining.decline(intakeId, at)
+            // Исход отказа читается из самого пункта: он станет пропущенным, и карточка уйдёт.
+            writing.value = Writing(done = true)
+        }
+    }
 
     private fun told(outcome: IntakeConfirmation.Outcome): Writing = when (outcome) {
         // Записано — карточка уходит: человек отвечал на приём, а не заполнял форму.

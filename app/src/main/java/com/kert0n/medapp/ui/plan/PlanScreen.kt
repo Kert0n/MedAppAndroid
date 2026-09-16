@@ -44,6 +44,7 @@ fun PlanScreen(
     dayPage: @Composable (daysAhead: Int) -> ScreenState<DayPagePresentationDTO>,
     onOpenIntake: (DayItemPresentationDTO) -> Unit,
     onConfirmIntake: (Uuid) -> Unit,
+    onDeclineIntake: (Uuid) -> Unit,
     onOpenCourse: (CoursePresentationDTO) -> Unit,
     onAddCourse: () -> Unit,
     modifier: Modifier = Modifier
@@ -77,6 +78,7 @@ fun PlanScreen(
                     page = dayPage,
                     onOpen = onOpenIntake,
                     onConfirm = onConfirmIntake,
+                    onDecline = onDeclineIntake,
                     modifier = Modifier.fillMaxSize()
                 )
                 PlanMode.COURSES -> CourseListContent(
