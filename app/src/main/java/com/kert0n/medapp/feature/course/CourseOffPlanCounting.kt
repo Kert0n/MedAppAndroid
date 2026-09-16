@@ -46,6 +46,9 @@ class CourseOffPlanCounting @Inject constructor(
         if (before.revision != expected) return@run Outcome.Stale
         val now = clock.instant()
         calendar.missOverdue(before, now)
+        // Прогресс читается **после** отметки прошлого и берёт его во внимание: пропуски этого
+        // прохода уже записаны, и предел считается по тому, что в базе, а не по тому, что экран
+        // видел до захода (PLAN F4, F5).
         val ofCourse = intakes.ofCourse(courseId).filterIsInstance<CourseIntake>()
         val progress = CourseProgress.of(ofCourse)
         // Мимо плана нельзя принять больше, чем лечению осталось: столько доз ему просто не
