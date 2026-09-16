@@ -60,6 +60,12 @@ class CoursesJourneyTest {
     @Inject
     lateinit var database: MedAppDatabase
 
+    /**
+     * Ожидание с запасом: у сквозных проходов на одном устройстве набор тяжелее, чем у одиночной
+     * проверки, и секунды по умолчанию не хватает — прогон краснел не о коде, а о занятости машины.
+     */
+    private val WAIT = 5_000L
+
     @Before
     fun setUp() {
         hilt.inject()
@@ -86,7 +92,7 @@ class CoursesJourneyTest {
         compose.onNodeWithText("Сохранить").performClick()
 
         // Записанное уводит с формы само: человек заводил лечение, а не форму.
-        compose.waitUntil { compose.onAllNodesWithText("Черновики").fetchSemanticsNodes().isNotEmpty() }
+        compose.waitUntil(WAIT) { compose.onAllNodesWithText("Черновики").fetchSemanticsNodes().isNotEmpty() }
         compose.onNodeWithText("Нурофен").assertIsDisplayed()
         compose.onNodeWithText("по 2 после еды").assertIsDisplayed()
     }
@@ -106,7 +112,7 @@ class CoursesJourneyTest {
         compose.onNodeWithText("Название").performTextInput("Нурофен")
         compose.onNodeWithText("Заметка (необязательно)").performTextInput("купить завтра")
         compose.onNodeWithText("Сохранить").performClick()
-        compose.waitUntil { compose.onAllNodesWithText("Черновики").fetchSemanticsNodes().isNotEmpty() }
+        compose.waitUntil(WAIT) { compose.onAllNodesWithText("Черновики").fetchSemanticsNodes().isNotEmpty() }
 
         compose.onNodeWithText("Нурофен").performClick()
         compose.onNodeWithText("Источники лечения").performScrollTo().performClick()
@@ -141,12 +147,12 @@ class CoursesJourneyTest {
             )
         }
 
-        compose.waitUntil { compose.onAllNodesWithText("Черновики").fetchSemanticsNodes().isNotEmpty() }
+        compose.waitUntil(WAIT) { compose.onAllNodesWithText("Черновики").fetchSemanticsNodes().isNotEmpty() }
         compose.onNodeWithText("Нурофен").performClick()
         compose.onNodeWithText("Начать лечение").performClick()
 
         // Начатое ведёт на карточку, и первое, что там сказано, — чем лечение обеспечено.
-        compose.waitUntil {
+        compose.waitUntil(WAIT) {
             compose.onAllNodesWithText("Не хватает 4 приёмов", substring = true).fetchSemanticsNodes().isNotEmpty()
         }
         compose.onNodeWithText("нужно 4 приёма · обеспечено 0").assertIsDisplayed()
@@ -158,7 +164,7 @@ class CoursesJourneyTest {
         compose.onNodeWithText("Записать лечение").performClick()
         compose.onNodeWithText("Название").performTextInput("Нурофен")
         compose.onNodeWithText("Сохранить").performClick()
-        compose.waitUntil { compose.onAllNodesWithText("Черновики").fetchSemanticsNodes().isNotEmpty() }
+        compose.waitUntil(WAIT) { compose.onAllNodesWithText("Черновики").fetchSemanticsNodes().isNotEmpty() }
 
         compose.onNodeWithText("Нурофен").performClick()
         compose.onNodeWithText("Черновик лечения").assertIsDisplayed()
@@ -167,7 +173,7 @@ class CoursesJourneyTest {
         compose.onNodeWithText("Удалить черновик?").assertIsDisplayed()
         compose.onNodeWithText("Удалить черновик").performClick()
 
-        compose.waitUntil { compose.onAllNodesWithText("Лечений пока нет.", substring = true).fetchSemanticsNodes().isNotEmpty() }
+        compose.waitUntil(WAIT) { compose.onAllNodesWithText("Лечений пока нет.", substring = true).fetchSemanticsNodes().isNotEmpty() }
     }
 
     /**
@@ -182,14 +188,14 @@ class CoursesJourneyTest {
         compose.onNodeWithText("Источники лечения").performScrollTo().performClick()
 
         // Источники открылись — значит, черновик записан.
-        compose.waitUntil { compose.onAllNodesWithText("Подключить ещё").fetchSemanticsNodes().isNotEmpty() }
+        compose.waitUntil(WAIT) { compose.onAllNodesWithText("Подключить ещё").fetchSemanticsNodes().isNotEmpty() }
         compose.onNodeWithContentDescription("Назад").performClick()
 
         compose.onNodeWithText("Отмена").performClick()
         compose.onNodeWithText("Оставить черновик?").assertIsDisplayed()
         compose.onNodeWithText("Удалить").performClick()
 
-        compose.waitUntil {
+        compose.waitUntil(WAIT) {
             compose.onAllNodesWithText("Лечений пока нет.", substring = true).fetchSemanticsNodes().isNotEmpty()
         }
     }

@@ -6,6 +6,7 @@ import androidx.compose.ui.test.SemanticsMatcher
 import androidx.compose.ui.test.assertCountEquals
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.hasAnyAncestor
+import androidx.compose.ui.test.hasSetTextAction
 import androidx.compose.ui.test.hasText
 import androidx.compose.ui.test.isDialog
 import androidx.compose.ui.test.performTouchInput
@@ -13,6 +14,7 @@ import androidx.compose.ui.test.junit4.v2.createComposeRule
 import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
+import androidx.compose.ui.test.performTextReplacement
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import com.kert0n.medapp.domain.course.CourseSource
 import com.kert0n.medapp.fixture.OTHER_PACK
@@ -115,6 +117,20 @@ class CourseSourcesScreenTest {
 
         compose.onNodeWithText("Одной дозы (21 таблетка) здесь не наберётся: доза берётся из одной коробки.")
             .assertIsDisplayed()
+    }
+
+    /**
+     * Набранное в поле число уезжает **сразу**, а не когда человек уйдёт из поля. Иначе «Сохранить»
+     * пишет прежний состав: палец с поля на кнопку фокус не уводит, и набранные приёмы пропадают
+     * молча — это нашла история Ирины (PLAN U1 «история человека»).
+     */
+    @Test
+    fun aTypedNumberLeavesTheFieldAtOnce() {
+        show(CourseSourcesUiState(sources = listOf(source(allocatedDoses = 0, maxDoses = 10))))
+
+        compose.onNode(hasSetTextAction()).performTextReplacement("7")
+
+        assertEquals(listOf(PACK to 7), allocations)
     }
 
     /** Отключённый источник объясняет себя словами, а не одним цветом. */

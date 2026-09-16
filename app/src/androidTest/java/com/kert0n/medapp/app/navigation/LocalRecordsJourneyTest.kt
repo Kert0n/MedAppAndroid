@@ -47,6 +47,12 @@ class LocalRecordsJourneyTest {
     @Inject
     lateinit var database: MedAppDatabase
 
+    /**
+     * Ожидание с запасом: у сквозных проходов на одном устройстве набор тяжелее, чем у одиночной
+     * проверки, и секунды по умолчанию не хватает — прогон краснел не о коде, а о занятости машины.
+     */
+    private val WAIT = 5_000L
+
     @Before
     fun setUp() {
         hilt.inject()
@@ -74,7 +80,7 @@ class LocalRecordsJourneyTest {
         compose.onNodeWithText("Сохранить").performClick()
 
         // Записанное уводит с формы само: человек заводил полку, а не форму.
-        compose.waitUntil {
+        compose.waitUntil(WAIT) {
             compose.onAllNodesWithText("Найти лекарство во всех аптечках").fetchSemanticsNodes().isNotEmpty()
         }
         compose.onNodeWithText("Домашняя").assertIsDisplayed()
@@ -93,11 +99,11 @@ class LocalRecordsJourneyTest {
         aShelfWithABox()
 
         compose.onNodeWithText("Пересчитать").performClick()
-        compose.waitUntil { compose.onAllNodesWithText("Сейчас записано: 20 таблетка").fetchSemanticsNodes().isNotEmpty() }
+        compose.waitUntil(WAIT) { compose.onAllNodesWithText("Сейчас записано: 20 таблетка").fetchSemanticsNodes().isNotEmpty() }
         compose.onNodeWithText("Пересчитал и увидел").performTextInput("17")
         compose.onNodeWithText("Записать").performClick()
 
-        compose.waitUntil { compose.onAllNodesWithText("17 таблетка").fetchSemanticsNodes().isNotEmpty() }
+        compose.waitUntil(WAIT) { compose.onAllNodesWithText("17 таблетка").fetchSemanticsNodes().isNotEmpty() }
         compose.onNodeWithText("Сколько есть").assertIsDisplayed()
     }
 
@@ -107,15 +113,15 @@ class LocalRecordsJourneyTest {
         aShelfWithABox()
 
         compose.onNodeWithText("Пересчитать").performClick()
-        compose.waitUntil { compose.onAllNodesWithText("Сейчас записано: 20 таблетка").fetchSemanticsNodes().isNotEmpty() }
+        compose.waitUntil(WAIT) { compose.onAllNodesWithText("Сейчас записано: 20 таблетка").fetchSemanticsNodes().isNotEmpty() }
         compose.onNodeWithText("Пересчитал и увидел").performTextInput("0")
         compose.onNodeWithText("Записать").performClick()
 
-        compose.waitUntil { compose.onAllNodesWithText("Ноль — это выбросить упаковку: сделайте это с её карточки.").fetchSemanticsNodes().isNotEmpty() }
+        compose.waitUntil(WAIT) { compose.onAllNodesWithText("Ноль — это выбросить упаковку: сделайте это с её карточки.").fetchSemanticsNodes().isNotEmpty() }
         // Экран остался пересчётом: ни ухода, ни вопроса — отказ и та же форма.
         compose.onNodeWithText("Записать").assertIsDisplayed()
         back()
-        compose.waitUntil { compose.onAllNodesWithText("20 таблетка").fetchSemanticsNodes().isNotEmpty() }
+        compose.waitUntil(WAIT) { compose.onAllNodesWithText("20 таблетка").fetchSemanticsNodes().isNotEmpty() }
     }
 
     /**
@@ -127,22 +133,22 @@ class LocalRecordsJourneyTest {
         aShelfWithABox()
 
         compose.onNodeWithText("Перенести").performClick()
-        compose.waitUntil { compose.onAllNodesWithText("Куда перенести").fetchSemanticsNodes().isNotEmpty() }
+        compose.waitUntil(WAIT) { compose.onAllNodesWithText("Куда перенести").fetchSemanticsNodes().isNotEmpty() }
         compose.onNodeWithText("Переносить некуда", substring = true).assertIsDisplayed()
         back()
-        compose.waitUntil { compose.onAllNodesWithText("Сколько есть").fetchSemanticsNodes().isNotEmpty() }
+        compose.waitUntil(WAIT) { compose.onAllNodesWithText("Сколько есть").fetchSemanticsNodes().isNotEmpty() }
 
         compose.onNodeWithContentDescription("Править сведения").performClick()
-        compose.waitUntil { compose.onAllNodesWithText("Правка упаковки").fetchSemanticsNodes().isNotEmpty() }
+        compose.waitUntil(WAIT) { compose.onAllNodesWithText("Правка упаковки").fetchSemanticsNodes().isNotEmpty() }
         back()
-        compose.waitUntil { compose.onAllNodesWithText("Сколько есть").fetchSemanticsNodes().isNotEmpty() }
+        compose.waitUntil(WAIT) { compose.onAllNodesWithText("Сколько есть").fetchSemanticsNodes().isNotEmpty() }
 
         back()
-        compose.waitUntil { compose.onAllNodesWithText("Поиск по аптечке").fetchSemanticsNodes().isNotEmpty() }
+        compose.waitUntil(WAIT) { compose.onAllNodesWithText("Поиск по аптечке").fetchSemanticsNodes().isNotEmpty() }
         compose.onNodeWithText("Нурофен").assertIsDisplayed()
 
         back()
-        compose.waitUntil { compose.onAllNodesWithText("Найти лекарство во всех аптечках").fetchSemanticsNodes().isNotEmpty() }
+        compose.waitUntil(WAIT) { compose.onAllNodesWithText("Найти лекарство во всех аптечках").fetchSemanticsNodes().isNotEmpty() }
         compose.onNodeWithText("1 упаковка").assertIsDisplayed()
     }
 
@@ -155,7 +161,7 @@ class LocalRecordsJourneyTest {
         compose.onNodeWithText("Завести аптечку").performClick()
         compose.onNodeWithText("Название").performTextInput("Домашняя")
         compose.onNodeWithText("Сохранить").performClick()
-        compose.waitUntil { compose.onAllNodesWithText("Пока пусто").fetchSemanticsNodes().isNotEmpty() }
+        compose.waitUntil(WAIT) { compose.onAllNodesWithText("Пока пусто").fetchSemanticsNodes().isNotEmpty() }
         compose.onNodeWithText("Домашняя").performClick()
         compose.onNodeWithText("Завести упаковку").performClick()
 
@@ -167,7 +173,7 @@ class LocalRecordsJourneyTest {
         compose.onNodeWithText("Reckitt").performScrollTo().assertIsDisplayed()
         compose.onNodeWithText("Количество").performScrollTo().performTextInput("20")
         compose.onNodeWithText("Сохранить").performClick()
-        compose.waitUntil { compose.onAllNodesWithText("Сколько есть").fetchSemanticsNodes().isNotEmpty() }
+        compose.waitUntil(WAIT) { compose.onAllNodesWithText("Сколько есть").fetchSemanticsNodes().isNotEmpty() }
         compose.onNodeWithText("Reckitt").performScrollTo().assertIsDisplayed()
     }
 
@@ -176,7 +182,7 @@ class LocalRecordsJourneyTest {
         compose.onNodeWithText("Завести аптечку").performClick()
         compose.onNodeWithText("Название").performTextInput("Домашняя")
         compose.onNodeWithText("Сохранить").performClick()
-        compose.waitUntil { compose.onAllNodesWithText("Пока пусто").fetchSemanticsNodes().isNotEmpty() }
+        compose.waitUntil(WAIT) { compose.onAllNodesWithText("Пока пусто").fetchSemanticsNodes().isNotEmpty() }
 
         compose.onNodeWithText("Домашняя").performClick()
         compose.onNodeWithText("Завести упаковку").performClick()
@@ -187,7 +193,7 @@ class LocalRecordsJourneyTest {
         compose.onNodeWithText("Сохранить").performClick()
 
         // Заведённая коробка открывается карточкой: человек заводил её, чтобы посмотреть.
-        compose.waitUntil { compose.onAllNodesWithText("Сколько есть").fetchSemanticsNodes().isNotEmpty() }
+        compose.waitUntil(WAIT) { compose.onAllNodesWithText("Сколько есть").fetchSemanticsNodes().isNotEmpty() }
         compose.onNodeWithText("20 таблетка").assertIsDisplayed()
     }
 

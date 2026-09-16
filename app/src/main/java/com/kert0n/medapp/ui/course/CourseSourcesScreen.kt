@@ -396,7 +396,8 @@ private fun Allocation(
         )
         return
     }
-    // Пока палец на ползунке или в поле, число — человека; отпустил — снова записанное.
+    // Пока палец на ползунке, число — человека; отпустил — снова то, что в правке. Набранное в
+    // поле держать незачем: оно уезжает с каждой цифрой, а зажатое под предел приходит обратно.
     var held by remember(source.packageId) { mutableStateOf<Int?>(null) }
     val shown = held ?: source.allocatedDoses
     val commit = {
@@ -415,8 +416,13 @@ private fun Allocation(
         )
         OutlinedTextField(
             value = shown.toString(),
-            // Число приёмов целое: в поле идут только цифры, а предел держит сам курс.
-            onValueChange = { typed -> held = typed.filter(Char::isDigit).take(MAX_TYPED).toIntOrNull() ?: 0 },
+            // Число приёмов целое: в поле идут только цифры, а предел держит сам курс. Набранное
+            // уезжает **сразу**: палец с поля на «Сохранить» фокус не уводит, и число, ждущее
+            // ухода из поля, пропало бы молча (история Ирины).
+            onValueChange = { typed ->
+                held = null
+                onAllocate(source.packageId, typed.filter(Char::isDigit).take(MAX_TYPED).toIntOrNull() ?: 0)
+            },
             label = { Text(stringResource(R.string.course_source_doses, limit)) },
             singleLine = true,
             enabled = enabled,
