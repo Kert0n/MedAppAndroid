@@ -28,6 +28,7 @@ import kotlin.time.Duration.Companion.seconds
 import kotlin.uuid.Uuid
 import kotlinx.coroutines.cancel
 import kotlinx.coroutines.runBlocking
+import com.kert0n.medapp.fixture.await
 import org.junit.After
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
@@ -108,7 +109,9 @@ class ExpiringTodayTest {
             state.awaiting(PATIENTLY) { it.isEmpty }
         }
 
-        assertTrue(scenarios.reminderStore.awaiting(NoticeDelivery.IN_APP_BANNER).isEmpty())
+        // Экран пустеет сразу, а отметка пишется следом: ждётся запись, а не мгновение после
+        // крестика (прежняя проверка спрашивала таблицу раньше записи и падала через раз).
+        await("крестик отметил сказанное") { scenarios.reminderStore.awaiting(NoticeDelivery.IN_APP_BANNER).isEmpty() }
     }
 
     /**
@@ -129,6 +132,30 @@ class ExpiringTodayTest {
             scenarios.packageRemoval.remove(OTHER_PACK)
             val left = state.awaiting(PATIENTLY) { it.boxes.size == 1 }
             assertEquals(listOf("Нурофен"), left.boxes.map { box -> box.name })
+        }
+    }
+
+    /**
+     * **Закрытый попап приходит назавтра.** Нина закрыла его в воскресенье, приложение живёт в
+     * памяти до понедельника, и в понедельник истекает другая коробка. «Закрыто» — это сказанные
+     * ключи, а не флаг экрана: новый ключ приходит сам. Запомни экран «закрыто» флагом — и
+     * понедельничная новость не придёт, пока окно не пересоздадут.
+     */
+    @Test
+    fun aClosedPopupComesBackWithTomorrowsNews() = runBlocking {
+        database.packageRepository().add(
+            pack(id = OTHER_PACK, name = "Цетрин", quantity = tablets("10"), form = TABLET_FORM, expiresOn = ExpiryDate(LocalDate.of(2027, 3, 11)))
+        )
+        promised()
+        val model = model()
+
+        watching(model.state) { state ->
+            state.awaiting(PATIENTLY) { !it.isEmpty }
+            model.dismiss()
+            state.awaiting(PATIENTLY) { it.isEmpty }
+            promised(OTHER_PACK)
+            val tomorrow = state.awaiting(PATIENTLY) { !it.isEmpty }
+            assertEquals(listOf("Цетрин"), tomorrow.boxes.map { box -> box.name })
         }
     }
 
