@@ -1,5 +1,6 @@
 package com.kert0n.medapp.app.navigation
 
+import androidx.compose.ui.semantics.SemanticsProperties
 import androidx.compose.ui.semantics.SemanticsActions
 import androidx.compose.ui.test.SemanticsNodeInteraction
 import androidx.compose.ui.test.assertIsDisplayed
@@ -43,6 +44,8 @@ import java.time.Instant
 import java.time.LocalDate
 import javax.inject.Inject
 import kotlinx.coroutines.runBlocking
+import org.junit.Assert.assertEquals
+import org.junit.Assert.assertTrue
 import org.junit.Before
 import org.junit.Rule
 import org.junit.Test
@@ -68,6 +71,12 @@ class ChangingTreatmentStoryTest {
 
     @Inject
     lateinit var database: MedAppDatabase
+
+    /**
+     * Ожидание с запасом: история ждёт состояния, пришедшего из базы, и секунды по умолчанию на
+     * это не хватает — краснело бы не о коде, а о занятости машины.
+     */
+    private val WAIT = 5_000L
 
     @Before
     fun setUp() {
@@ -100,7 +109,9 @@ class ChangingTreatmentStoryTest {
     private fun hisPrescriptionIsWrittenAndTwoBoxesAreAttached() = runBlocking {
         val scenarios = Scenarios(database, Instant.now())
         val created = scenarios.courseDrafting.create("Ибупрофен")
-        scenarios.courseDrafting.edit(
+        // Завязка отвечает за себя сама: не записалась — падаем здесь, а не через три экрана
+        // непонятным ожиданием.
+        val written = scenarios.courseDrafting.edit(
             created.id, created.revision,
             listOf(
                 CourseDrafting.Edit.SetDose(dose("2")),
@@ -111,18 +122,18 @@ class ChangingTreatmentStoryTest {
                 CourseDrafting.Edit.Attach(OTHER_PACK, Doses(5))
             )
         )
-        Unit
+        assertTrue("завязка не записалась: $written", written is CourseDrafting.Outcome.Saved)
     }
 
     /** Лечение начинается с карточки: первое, что она говорит, — чем оно обеспечено. */
     private fun heStartsTheTreatment() {
-        compose.waitUntil { compose.onAllNodesWithText("Черновики").fetchSemanticsNodes().isNotEmpty() }
+        compose.waitUntil(WAIT) { compose.onAllNodesWithText("Черновики").fetchSemanticsNodes().isNotEmpty() }
         compose.onNodeWithText("Ибупрофен").performClick()
         // Подвал уходит на время ввода: человек убирает клавиатуру, чтобы нажать.
         closeSoftKeyboard()
         compose.onNodeWithText("Начать лечение").performClick()
 
-        compose.waitUntil(5_000) {
+        compose.waitUntil(WAIT) {
             compose.onAllNodesWithText("обеспечен", substring = true).fetchSemanticsNodes().isNotEmpty()
         }
         // Коробок хватает на все десять приёмов, и карточка говорит, до какого дня.
@@ -132,7 +143,7 @@ class ChangingTreatmentStoryTest {
     /** Початую коробку жалко: Пётр ставит её первой в расход и записывает состав. */
     private fun heSpendsTheOpenedBoxFirst() {
         compose.onNodeWithText("Источники лечения").performScrollTo().performClick()
-        compose.waitUntil(5_000) {
+        compose.waitUntil(WAIT) {
             compose.onAllNodesWithText("Подключить ещё").fetchSemanticsNodes().isNotEmpty()
         }
 
@@ -143,10 +154,14 @@ class ChangingTreatmentStoryTest {
         closeSoftKeyboard()
         compose.onNodeWithText("Сохранить").performClick()
 
-        // Записанный состав виден на самом экране: первой строкой стоит початая коробка.
-        compose.waitUntil(5_000) {
+        compose.waitUntil(WAIT) {
             compose.onAllNodesWithText("Правка не записана", substring = true).fetchSemanticsNodes().isEmpty()
         }
+        // Записанный состав виден на самом экране, и порядок в нём — тот, что выбрал Пётр:
+        // початая коробка стоит первой. Без этого шаг проходил бы и со сломанной перестановкой.
+        val rows = compose.onAllNodes(hasText("Дачная пачка") or hasText("Домашняя пачка"))
+            .fetchSemanticsNodes().sortedBy { it.positionInRoot.y }
+        assertEquals("Дачная пачка", rows.first().config[SemanticsProperties.Text].first().text)
     }
 
     /** Врач поднял дозу: лечение остаётся тем же эпизодом, а не заводится заново. */
@@ -155,14 +170,14 @@ class ChangingTreatmentStoryTest {
         compose.onNodeWithContentDescription("Ещё").performClick()
         compose.onNodeWithText("Изменить").performClick()
 
-        compose.waitUntil(5_000) { compose.onAllNodesWithText("Доза").fetchSemanticsNodes().isNotEmpty() }
+        compose.waitUntil(WAIT) { compose.onAllNodesWithText("Доза").fetchSemanticsNodes().isNotEmpty() }
         compose.onNodeWithText("Доза").performScrollTo().performTextReplacement("3")
         // Подвал уходит на время ввода: человек убирает клавиатуру, чтобы нажать.
         closeSoftKeyboard()
         compose.onNodeWithText("Сохранить").performClick()
 
         // Карточка показывает назначение словами — и новая доза стоит в нём, а эпизод тот же.
-        compose.waitUntil(5_000) {
+        compose.waitUntil(WAIT) {
             compose.onAllNodesWithText("3 таблетка", substring = true).fetchSemanticsNodes().isNotEmpty()
         }
     }
@@ -170,7 +185,7 @@ class ChangingTreatmentStoryTest {
     /** Дачную пачку он отдал соседу — отвязка идущего лечения спрашивает, прежде чем снять бронь. */
     private fun heGivesTheOtherBoxAway() {
         compose.onNodeWithText("Источники лечения").performScrollTo().performClick()
-        compose.waitUntil(5_000) {
+        compose.waitUntil(WAIT) {
             compose.onAllNodesWithText("Подключить ещё").fetchSemanticsNodes().isNotEmpty()
         }
 
@@ -193,7 +208,7 @@ class ChangingTreatmentStoryTest {
         // Подтверждение названо тем же словом, что и действие в меню, — берём кнопку из диалога.
         compose.onNode(hasText("Отменить лечение") and hasAnyAncestor(isDialog())).performClick()
 
-        compose.waitUntil(5_000) {
+        compose.waitUntil(WAIT) {
             compose.onAllNodesWithText("Отменён", substring = true).fetchSemanticsNodes().isNotEmpty()
         }
     }

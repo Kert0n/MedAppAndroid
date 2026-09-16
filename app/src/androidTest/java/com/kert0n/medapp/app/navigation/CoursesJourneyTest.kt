@@ -38,6 +38,7 @@ import dagger.hilt.android.testing.HiltAndroidTest
 import javax.inject.Inject
 import kotlinx.coroutines.runBlocking
 import org.junit.Assert.assertNull
+import org.junit.Assert.assertTrue
 import org.junit.Before
 import org.junit.Rule
 import org.junit.Test
@@ -149,7 +150,8 @@ class CoursesJourneyTest {
         val scenarios = Scenarios(database, Instant.now())
         runBlocking {
             val created = scenarios.courseDrafting.create("Нурофен")
-            scenarios.courseDrafting.edit(
+            // Завязка отвечает за себя: не записалась — падаем здесь, а не ожиданием на экране.
+            val written = scenarios.courseDrafting.edit(
                 created.id, created.revision,
                 listOf(
                     CourseDrafting.Edit.SetDose(dose("2")),
@@ -158,6 +160,7 @@ class CoursesJourneyTest {
                     CourseDrafting.Edit.SetTotalDoses(Doses(4))
                 )
             )
+            assertTrue("завязка не записалась: $written", written is CourseDrafting.Outcome.Saved)
         }
 
         compose.waitUntil(WAIT) { compose.onAllNodesWithText("Черновики").fetchSemanticsNodes().isNotEmpty() }

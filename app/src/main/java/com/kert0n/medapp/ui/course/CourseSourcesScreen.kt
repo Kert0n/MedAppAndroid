@@ -421,7 +421,9 @@ private fun Allocation(
             // ухода из поля, пропало бы молча (история Ирины).
             onValueChange = { typed ->
                 held = null
-                onAllocate(source.packageId, typed.filter(Char::isDigit).take(MAX_TYPED).toIntOrNull() ?: 0)
+                // Цифры — и только они; предел держит курс, а не длина набранного: «1000» у
+                // лечения на тысячу приёмов это тысяча, а не сто (разбор #47).
+                onAllocate(source.packageId, typed.filter(Char::isDigit).toIntOrNull() ?: 0)
             },
             label = { Text(stringResource(R.string.course_source_doses, limit)) },
             singleLine = true,
@@ -475,8 +477,6 @@ internal fun CourseSourcesMessage.words(): String = when (this) {
     CourseSourcesMessage.Stale -> stringResource(R.string.course_sources_stale)
 }
 
-/** Больше трёх цифр в приёмах не бывает: это поле числа, а не место для вставленной простыни. */
-private const val MAX_TYPED = 3
 
 @Composable
 private fun DetachDialog(onConfirm: () -> Unit, onDismiss: () -> Unit) {

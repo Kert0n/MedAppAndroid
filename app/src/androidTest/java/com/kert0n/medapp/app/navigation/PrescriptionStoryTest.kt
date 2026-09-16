@@ -66,6 +66,12 @@ class PrescriptionStoryTest {
      */
     private val pieces = QuantityUnit(Uuid.parse("00000000-0000-4000-8000-0000000000a1"), "шт")
 
+    /**
+     * Ожидание с запасом: история ждёт состояния, пришедшего из базы, и секунды по умолчанию на
+     * это не хватает — краснело бы не о коде, а о занятости машины.
+     */
+    private val WAIT = 5_000L
+
     @Before
     fun setUp() {
         hilt.inject()
@@ -90,7 +96,7 @@ class PrescriptionStoryTest {
     private fun inTheCorridorSheWritesDownTheName() {
         compose.onNodeWithText("План").performClick()
         // До первого чтения место «План» ждёт, а не показывает пустоту (U1): дожидаемся.
-        compose.waitUntil(5_000) {
+        compose.waitUntil(WAIT) {
             compose.onAllNodesWithText("Записать лечение").fetchSemanticsNodes().isNotEmpty()
         }
         compose.onNodeWithText("Записать лечение").performClick()
@@ -100,7 +106,7 @@ class PrescriptionStoryTest {
         closeSoftKeyboard()
         compose.onNodeWithText("Сохранить").performClick()
 
-        compose.waitUntil { compose.onAllNodesWithText("Черновики").fetchSemanticsNodes().isNotEmpty() }
+        compose.waitUntil(WAIT) { compose.onAllNodesWithText("Черновики").fetchSemanticsNodes().isNotEmpty() }
         // Строка черновика говорит тем, что записано: заметкой, раз назначения ещё нет.
         compose.onNodeWithText("по 2 после еды, купить").assertIsDisplayed()
     }
@@ -113,7 +119,7 @@ class PrescriptionStoryTest {
         // Подвал уходит на время ввода: человек убирает клавиатуру, чтобы нажать.
         closeSoftKeyboard()
         compose.onNodeWithText("Сохранить").performClick()
-        compose.waitUntil { compose.onAllNodesWithText("Пока пусто").fetchSemanticsNodes().isNotEmpty() }
+        compose.waitUntil(WAIT) { compose.onAllNodesWithText("Пока пусто").fetchSemanticsNodes().isNotEmpty() }
 
         compose.onNodeWithText("Домашняя").performClick()
         compose.onNodeWithText("Завести упаковку").performClick()
@@ -124,7 +130,7 @@ class PrescriptionStoryTest {
         // Подвал уходит на время ввода: человек убирает клавиатуру, чтобы нажать.
         closeSoftKeyboard()
         compose.onNodeWithText("Сохранить").performClick()
-        compose.waitUntil { compose.onAllNodesWithText("Сколько есть").fetchSemanticsNodes().isNotEmpty() }
+        compose.waitUntil(WAIT) { compose.onAllNodesWithText("Сколько есть").fetchSemanticsNodes().isNotEmpty() }
         // Заведённая коробка открылась карточкой; в места приложения человек возвращается назад.
         back()
         back()
@@ -161,7 +167,7 @@ class PrescriptionStoryTest {
         compose.onNodeWithText("С какого дня").performScrollTo().performClick()
 
         // Календарь приезжает с показом: на плотном экране он успевает не сразу.
-        compose.waitUntil(5_000) {
+        compose.waitUntil(WAIT) {
             compose.onAllNodesWithText("Выбрать").fetchSemanticsNodes().isNotEmpty()
         }
         compose.onNodeWithText("Выбрать").assertIsDisplayed()
@@ -175,7 +181,7 @@ class PrescriptionStoryTest {
      */
     private fun sheAttachesTheBoxAndAllocatesDoses() {
         compose.onNodeWithText("Источники лечения").performScrollTo().performClick()
-        compose.waitUntil(5_000) {
+        compose.waitUntil(WAIT) {
             compose.onAllNodesWithText("Подключить ещё").fetchSemanticsNodes().isNotEmpty()
         }
         compose.onNodeWithText("Подключить ещё").performClick()
@@ -183,7 +189,7 @@ class PrescriptionStoryTest {
         compose.onNodeWithText("Сначала укажите дозу и форму лечения.").assertDoesNotExist()
         compose.onNodeWithText("Нурофен").performClick()
 
-        compose.waitUntil(5_000) {
+        compose.waitUntil(WAIT) {
             compose.onAllNodesWithText("выделено 0 приёмов", substring = true).fetchSemanticsNodes().isNotEmpty()
         }
         // Предел строки виден подписью поля, а набирают в само поле: на экране оно одно.
@@ -192,7 +198,7 @@ class PrescriptionStoryTest {
         // Подвал уходит на время ввода: человек убирает клавиатуру, чтобы нажать.
         closeSoftKeyboard()
         compose.onNodeWithText("Сохранить").performClick()
-        compose.waitUntil(5_000) {
+        compose.waitUntil(WAIT) {
             compose.onAllNodesWithText("выделено 7 приёмов", substring = true).fetchSemanticsNodes().isNotEmpty()
         }
     }
