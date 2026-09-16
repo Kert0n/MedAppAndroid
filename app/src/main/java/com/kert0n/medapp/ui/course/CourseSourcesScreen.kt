@@ -327,7 +327,8 @@ private fun Estimate(estimate: CourseEstimatePresentationDTO, modifier: Modifier
 internal fun Coverage(
     coverage: CourseCoveragePresentationDTO?,
     isDraft: Boolean,
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier,
+    onShortage: ((ShortagePresentationDTO) -> Unit)? = null
 ) {
     if (coverage == null) {
         if (isDraft) {
@@ -359,9 +360,8 @@ internal fun Coverage(
             stringResource(R.string.course_coverage_covered, required, coverage.coveredDoses),
             style = MaterialTheme.typography.bodyMedium
         )
-        Shortage(
-            ShortagePresentationDTO(coverage.missingDoses, coverage.firstUncoveredOn)
-        )
+        val shortage = ShortagePresentationDTO(coverage.missingDoses, coverage.firstUncoveredOn)
+        Shortage(shortage, onClick = onShortage?.let { { it(shortage) } })
     }
 }
 

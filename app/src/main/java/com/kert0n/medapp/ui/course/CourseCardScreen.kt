@@ -4,16 +4,16 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.defaultMinSize
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.defaultMinSize
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.width
-import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
@@ -30,9 +30,8 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
-import com.kert0n.medapp.ui.NavigationRow
-import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
@@ -44,16 +43,18 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import com.kert0n.medapp.R
-import com.kert0n.medapp.ui.DAY
 import com.kert0n.medapp.domain.course.Revision
 import com.kert0n.medapp.domain.intake.IntakeStatus
 import com.kert0n.medapp.presentation.course.CourseCardMessage
 import com.kert0n.medapp.presentation.course.CourseCardUiState
 import com.kert0n.medapp.presentation.course.CourseItemPresentationDTO
-import com.kert0n.medapp.presentation.course.CoverageReductionPresentationDTO
 import com.kert0n.medapp.presentation.course.CoursePresentationDTO
+import com.kert0n.medapp.presentation.course.CoverageReductionPresentationDTO
+import com.kert0n.medapp.presentation.course.ShortagePresentationDTO
+import com.kert0n.medapp.ui.DAY
 import com.kert0n.medapp.ui.ErrorMessage
 import com.kert0n.medapp.ui.LoadingState
+import com.kert0n.medapp.ui.NavigationRow
 
 /**
  * Карточка лечения (PLAN H3 №14). Первым — обеспечение: за ним человек сюда и приходит. Дальше
@@ -68,6 +69,8 @@ fun CourseCardScreen(
     state: CourseCardUiState,
     onEdit: () -> Unit,
     onSources: () -> Unit,
+    onAttachSource: () -> Unit,
+    onAddPackage: () -> Unit,
     onHistory: () -> Unit,
     onAskOffPlan: () -> Unit,
     onCountOffPlan: (Int, Revision?) -> Unit,
@@ -97,6 +100,9 @@ fun CourseCardScreen(
         }
     ) { padding ->
         val course = state.course
+        // Какой нехваткой человек сейчас занят: лист живёт над карточкой и закрывается возвратом
+        // к ней, а не уходом в новое место.
+        var remedy by remember { mutableStateOf<ShortagePresentationDTO?>(null) }
         Column(Modifier.padding(padding).fillMaxSize()) {
             // Чем кончилась отмена, если по самой карточке этого не видно: закрытый диалог
             // человеку ничего не сказал бы (PLAN H3 №14).
@@ -112,7 +118,16 @@ fun CourseCardScreen(
             when {
                 state.isGone -> ErrorMessage(text = stringResource(R.string.course_missing))
                 course == null -> LoadingState()
-                else -> Card(state, course, onSources, onHistory, onAskOffPlan)
+                else -> Card(state, course, onSources, onHistory, onAskOffPlan) { remedy = it }
+            }
+            remedy?.let { shortage ->
+                ShortageRemedies(
+                    shortage = shortage,
+                    onAttach = { remedy = null; onAttachSource() },
+                    onReallocate = { remedy = null; onSources() },
+                    onBuy = { remedy = null; onAddPackage() },
+                    onDismiss = { remedy = null }
+                )
             }
         }
     }
@@ -139,17 +154,18 @@ private fun Card(
     onSources: () -> Unit,
     onHistory: () -> Unit,
     onAskOffPlan: () -> Unit,
-    modifier: Modifier = Modifier
+    onShortage: (ShortagePresentationDTO) -> Unit
 ) {
-    LazyColumn(modifier.fillMaxSize(), contentPadding = PaddingValues(bottom = 16.dp)) {
+    LazyColumn(Modifier.fillMaxSize(), contentPadding = PaddingValues(bottom = 16.dp)) {
         item("head") {
             Column(
                 Modifier.fillMaxWidth().padding(16.dp),
                 verticalArrangement = Arrangement.spacedBy(8.dp)
             ) {
                 course.note?.let { Text(it, style = MaterialTheme.typography.bodyMedium) }
-                // Обеспечение первым: за ним человек и открыл карточку.
-                Coverage(state.coverage, isDraft = false)
+                // Обеспечение первым: за ним человек и открыл карточку. Нехватка не просто
+                // названа — по ней нажимают и попадают к тому, чем её лечить.
+                Coverage(state.coverage, isDraft = false, onShortage = onShortage)
                 Text(course.prescriptionWords(), style = MaterialTheme.typography.bodyMedium)
                 course.schedule?.let { Text(it.timesWords(), style = MaterialTheme.typography.bodySmall) }
                 if (!state.isRunning) {

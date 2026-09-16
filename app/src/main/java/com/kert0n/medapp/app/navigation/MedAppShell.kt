@@ -500,6 +500,10 @@ private fun screens(stacks: TabStacks, planMode: MutableState<PlanMode>) = entry
             state = model.state.collectAsStateWithLifecycle().value,
             onEdit = { stacks.go(Screen.CourseForm(key.courseId)) },
             onSources = { stacks.go(Screen.CourseSources(key.courseId)) },
+            // Три выхода из нехватки ведут туда, где они делаются: подключить — выбор источника,
+            // переставить выделения — сами источники, докупить — заведение упаковки.
+            onAttachSource = { stacks.go(Screen.SourcePicking(key.courseId)) },
+            onAddPackage = { stacks.go(Screen.PackageForm()) },
             onHistory = { stacks.go(Screen.IntakeHistory(courseId = key.courseId)) },
             onAskOffPlan = model::askToCountOffPlan,
             onCountOffPlan = model::countOffPlan,

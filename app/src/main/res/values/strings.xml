@@ -437,6 +437,13 @@
         <item quantity="other">Не хватает %1$d приёма</item>
     </plurals>
     <string name="course_shortage_from">%1$s с %2$s</string>
+    <string name="course_shortage_what_to_do">Что можно сделать</string>
+    <string name="course_shortage_attach">Подключить ещё коробку</string>
+    <string name="course_shortage_attach_explained">Из тех, что подходят этому лечению</string>
+    <string name="course_shortage_reallocate">Изменить выделения</string>
+    <string name="course_shortage_reallocate_explained">Переставить, сколько берётся из каждой коробки</string>
+    <string name="course_shortage_buy">Завести купленную коробку</string>
+    <string name="course_shortage_buy_explained">Добавить упаковку и подключить её к лечению</string>
     <string name="course_new">Новое лечение</string>
     <string name="course_edit">Черновик лечения</string>
     <string name="course_title">Название</string>
