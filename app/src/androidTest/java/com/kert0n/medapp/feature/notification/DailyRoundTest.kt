@@ -86,14 +86,10 @@ class DailyRoundTest {
             .filter { it.state == com.kert0n.medapp.domain.notification.Reminder.State.DUE }
             .map { Uuid.parse(it.key.subject) }.toSet()
         assertEquals(byDay.filterKeys { it != start }.values.map { it.id }.toSet(), owed)
-        // В шторку сказан срок источника за день. Пропуск ждёт попапа пропущенного при входе, а не
-        // шторки (C1 «Попап пропущенного»); приёмы ещё впереди, сводка — к своему часу.
+        // В шторку сказан срок источника за день; приёмы ещё впереди, сводка — к своему часу. Куда
+        // идёт пропуск — своя проверка ниже.
         assertEquals(setOf(NotificationKind.EXPIRY_SOURCE_1D), nextMorning.notifier.shown.map { it.kind }.toSet())
         assertEquals(1, delivered.shown)
-        assertEquals(
-            listOf(NotificationKind.INTAKE_MISSED),
-            nextMorning.reminderStore.awaiting(com.kert0n.medapp.domain.notification.NoticeDelivery.IN_APP_BANNER).map { it.kind }
-        )
         assertEquals(1, nextMorning.reminderStore.ofKinds(listOf(NotificationKind.DAILY_DIGEST)).size)
         // Будильник один, и он на ближайший невыполненный срок — сегодняшний приём в 09:00 МСК.
         assertEquals(byDay.getValue(start.plusDays(1)).plannedAt, nextMorning.reminders.wakeAt)
@@ -104,6 +100,27 @@ class DailyRoundTest {
         assertEquals(0, again.missed)
         assertEquals(0, nextMorning.reminderOutbox.pass().shown)
         assertEquals(1, nextMorning.notifier.shown.size)
+    }
+
+    /**
+     * **Пропуск — не в шторку, а в попап при входе** (C1 «Попап пропущенного»). Проход дня отмечает
+     * вчерашнее неотвеченным и обещает сказать о нём баннером приложения. Скажи он это шторкой — и
+     * человек снова получает «пропущен» уведомлением, которое смахнёт, а последнего шанса ответить
+     * за вчера у него не будет.
+     */
+    @Test
+    fun aMissWaitsForTheEntryPopupNotTheShade() = runTest {
+        treated(Scenarios(database, Instant.parse("2027-03-10T05:00:00Z")))
+        val nextMorning = Scenarios(database, Instant.parse("2027-03-11T05:00:00Z"))
+
+        nextMorning.dailyRound.run()
+        nextMorning.reminderOutbox.pass()
+
+        assertTrue(nextMorning.notifier.shown.none { it.kind == NotificationKind.INTAKE_MISSED })
+        assertEquals(
+            listOf(NotificationKind.INTAKE_MISSED),
+            nextMorning.reminderStore.awaiting(com.kert0n.medapp.domain.notification.NoticeDelivery.IN_APP_BANNER).map { it.kind }
+        )
     }
 
     /** Без лечения и с годными коробками проход молчит, ничего не обещает и не будит — счастливый путь. */

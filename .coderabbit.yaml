@@ -56,8 +56,11 @@ reviews:
       instructions: >-
         One test per rule, named by the behaviour it stops, with a KDoc saying what would go wrong
         without the rule. Fakes answer only the questions the test is about and fail loudly on
-        everything else. Instrumented time budgets are valid only on the reference emulator and
-        must skip elsewhere. Do not suggest generated tests or docstrings.
+        everything else. Instrumented time budgets — assertions that an operation is fast enough — are
+        valid only on the reference emulator and must skip elsewhere; a ceiling on waiting for
+        asynchronous state (`waitUntil`, `awaiting`) is not a budget and needs no guard. A story test
+        (`docs/истории.md`) is one `@Test` on purpose: it checks a sequence of a person's actions, and
+        each rule it crosses has its own test elsewhere. Do not suggest generated tests or docstrings.
   tools:
     detekt:
       enabled: false
