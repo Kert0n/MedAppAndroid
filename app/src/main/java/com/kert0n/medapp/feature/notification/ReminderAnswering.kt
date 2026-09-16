@@ -9,6 +9,7 @@ import com.kert0n.medapp.domain.intake.IntakeRejected
 import com.kert0n.medapp.domain.notification.NotificationTarget
 import com.kert0n.medapp.feature.intake.IntakeConfirmation
 import com.kert0n.medapp.feature.intake.IntakeDeclining
+import com.kert0n.medapp.queue.Transactions
 import com.kert0n.medapp.storage.intake.IntakeStorageRepository
 import com.kert0n.medapp.storage.notification.ReminderStorageRepository
 import java.time.Clock
@@ -30,7 +31,7 @@ class ReminderAnswering @Inject constructor(
     private val reminders: ReminderStorageRepository,
     private val withdrawal: ReminderWithdrawal,
     private val settings: NotificationSettingsSource,
-    private val transactions: com.kert0n.medapp.queue.Transactions,
+    private val transactions: Transactions,
     private val clock: Clock
 ) {
 
@@ -42,12 +43,16 @@ class ReminderAnswering @Inject constructor(
      *
      * Не вышло — не пишется ничего, и молча это не проходит: заводится обязательство «нужно ваше
      * решение», нажатие на него ведёт на карточку пункта. Курс закрыт или пункта нет — решать нечего.
+     *
+     * Всё — **одной транзакцией** (F5, C1 «Ответ из шторки — одной транзакцией»): «не записалось»
+     * верно только там, где прочитано. Отказ с карточки, пришедший между отказом записи и решением,
+     * снял бы обязательства, а решение легло бы после и висело над отвеченным пунктом.
      */
-    suspend fun take(intakeId: Uuid): Response {
-        val intake = intakes.find(intakeId) as? CourseIntake ?: return Response.Done
+    suspend fun take(intakeId: Uuid): Response = transactions.run {
+        val intake = intakes.find(intakeId) as? CourseIntake ?: return@run Response.Done
         val planned = intake.plannedPackage
         val outcome = planned?.let { confirmation.confirm(intakeId, it.id, intake.plannedAmount, clock.instant()) }
-        return when {
+        when {
             outcome is IntakeConfirmation.Outcome.Confirmed || outcome == IntakeConfirmation.Outcome.Gone -> Response.Done
             outcome is IntakeConfirmation.Outcome.Rejected && outcome.reason == IntakeRejected.Reason.EPISODE_CLOSED -> {
                 withdrawal.withdraw(intakeId)
@@ -61,12 +66,14 @@ class ReminderAnswering @Inject constructor(
     }
 
     /** Отказ человека: пункт становится пропуском, и напоминать о нём больше нечего. */
-    suspend fun skip(intakeId: Uuid): Response = when (declining.decline(intakeId, clock.instant())) {
-        IntakeDeclining.Outcome.DECLINED, IntakeDeclining.Outcome.ALREADY_ANSWERED -> Response.Done
-        // Курса или пункта больше нет — напоминать не о чем, и говорить человеку нечего.
-        IntakeDeclining.Outcome.EPISODE_CLOSED, IntakeDeclining.Outcome.GONE -> {
-            withdrawal.withdraw(intakeId)
-            Response.Done
+    suspend fun skip(intakeId: Uuid): Response = transactions.run {
+        when (declining.decline(intakeId, clock.instant())) {
+            IntakeDeclining.Outcome.DECLINED, IntakeDeclining.Outcome.ALREADY_ANSWERED -> Response.Done
+            // Курса или пункта больше нет — напоминать не о чем, и говорить человеку нечего.
+            IntakeDeclining.Outcome.EPISODE_CLOSED, IntakeDeclining.Outcome.GONE -> {
+                withdrawal.withdraw(intakeId)
+                Response.Done
+            }
         }
     }
 

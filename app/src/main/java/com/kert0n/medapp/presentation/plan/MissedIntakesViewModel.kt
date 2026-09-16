@@ -8,6 +8,7 @@ import com.kert0n.medapp.domain.notification.NoticeDelivery
 import com.kert0n.medapp.domain.notification.NotificationKey
 import com.kert0n.medapp.domain.notification.NotificationKind
 import com.kert0n.medapp.domain.notification.NotificationTarget
+import com.kert0n.medapp.domain.value.Dose
 import com.kert0n.medapp.feature.intake.IntakeConfirmation
 import com.kert0n.medapp.feature.notification.ReminderOutbox
 import com.kert0n.medapp.feature.time.Today
@@ -16,6 +17,7 @@ import com.kert0n.medapp.storage.intake.IntakeStorageRepository
 import com.kert0n.medapp.storage.notification.ReminderStorageRepository
 import com.kert0n.medapp.storage.pack.PackageStorageRepository
 import dagger.hilt.android.lifecycle.HiltViewModel
+import java.time.Instant
 import javax.inject.Inject
 import kotlin.uuid.Uuid
 import kotlinx.coroutines.ExperimentalCoroutinesApi
@@ -65,22 +67,20 @@ class MissedIntakesViewModel @Inject constructor(
         all.filter { it.key.kind == NotificationKind.INTAKE_MISSED && it.key !in closed }
     }
 
-    /** Что в попапе сейчас: закрывая, отмечается сказанным именно это. */
-    private var listed: Set<NotificationKey> = emptySet()
-
-    /** Пункты, по которым отвечают, — читаются заново перед каждой записью не экраном, а сценарием. */
-    private var intakesShown: List<IntakeProjection.Scheduled> = emptyList()
-
-    private val rows = combine(notices, today.observe()) { notices, day -> notices to day }
+    /**
+     * Строки попапа — вместе с тем, по чему на них отвечают: ключом обязательства и плановым. Всё
+     * едет **одним снимком** с нарисованным: нажатие читает то, что человек видел, а не переменную,
+     * записанную сбоку, — та опережала бы экран на оборот потока или расходилась с ним фильтром
+     * (C1 «Действие — по показанному»).
+     */
+    private val lines = combine(notices, today.observe()) { notices, day -> notices to day }
         .flatMapLatest { (notices, day) ->
-            listed = notices.mapTo(HashSet()) { it.key }
-            val ids = notices.mapNotNullTo(HashSet()) { (it.target as? NotificationTarget.Intake)?.intakeId }
-            combine(intakes.observeOfIds(ids), courses.observeRecords()) { read, records -> read to records }
+            val keys = notices.mapNotNull { notice -> (notice.target as? NotificationTarget.Intake)?.let { it.intakeId to notice.key } }.toMap()
+            combine(intakes.observeOfIds(keys.keys), courses.observeRecords()) { read, records -> read to records }
                 .flatMapLatest { (read, records) ->
                     val titles = records.associate { it.id to it.title }
                     val waiting = read.filterIsInstance<IntakeProjection.Scheduled>()
                         .filter { it.status == IntakeStatus.MISSED && it.slot.localDate.isBefore(day.date) }
-                    intakesShown = waiting
                     // Плановую коробку могли выбросить, пока попап ждал: «Принял» из неё — кнопка,
                     // которая ничего не сделает, кроме отказа (снимок BigLatest). Такой строке
                     // быстрого ответа нет; нажатие на неё ведёт на карточку пункта.
@@ -92,18 +92,28 @@ class MissedIntakesViewModel @Inject constructor(
                     usable.map { alive ->
                         waiting.mapNotNull { intake ->
                             val title = titles[intake.courseId] ?: return@mapNotNull null
+                            val key = keys[intake.id] ?: return@mapNotNull null
+                            val pkg = intake.plannedPackage?.id?.takeIf { it in alive }
                             // День — дата пункта, как на странице «Дня»: попап и «День» не расходятся.
                             // Время — по зоне телефона, как там же; расхождение зон — отдельный вопрос.
-                            intake.toDayRow(title, day.zone, on = intake.slot.localDate).let { row ->
-                                if (intake.plannedPackage?.id in alive) row else row.copy(hasPlannedPackage = false)
-                            }
+                            val row = intake.toDayRow(title, day.zone, on = intake.slot.localDate)
+                            Line(
+                                key = key,
+                                row = if (pkg != null) row else row.copy(hasPlannedPackage = false),
+                                answer = pkg?.let { MissedIntakesUiState.Planned(it, intake.plannedAmount, intake.slot.at) }
+                            )
                         }
                     }
                 }
         }
 
-    val state: StateFlow<MissedIntakesUiState> = combine(rows, answering, message) { rows, answering, message ->
-        MissedIntakesUiState(rows.map { it.copy(isAnswering = it.intakeId in answering) }, message)
+    val state: StateFlow<MissedIntakesUiState> = combine(lines, answering, message) { lines, answering, message ->
+        MissedIntakesUiState(
+            rows = lines.map { it.row.copy(isAnswering = it.row.intakeId in answering) },
+            message = message,
+            told = lines.mapTo(HashSet()) { it.key },
+            planned = lines.mapNotNull { line -> line.answer?.let { answer -> line.row.intakeId?.let { it to answer } } }.toMap()
+        )
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), MissedIntakesUiState())
 
     /**
@@ -112,12 +122,11 @@ class MissedIntakesViewModel @Inject constructor(
      */
     fun confirm(intakeId: Uuid) {
         if (intakeId in answering.value) return
-        val intake = intakesShown.firstOrNull { it.id == intakeId } ?: return
-        val pkg = intake.plannedPackage ?: return
+        val planned = state.value.planned[intakeId] ?: return
         answering.update { it + intakeId }
         viewModelScope.launch {
             try {
-                when (val outcome = confirmation.confirm(intakeId, pkg.id, intake.plannedAmount, intake.slot.at)) {
+                when (val outcome = confirmation.confirm(intakeId, planned.packageId, planned.amount, planned.at)) {
                     is IntakeConfirmation.Outcome.Confirmed -> Unit
                     is IntakeConfirmation.Outcome.Rejected -> message.value = DayMessage.Refused(outcome.reason)
                     IntakeConfirmation.Outcome.Gone -> message.value = DayMessage.Gone
@@ -128,22 +137,39 @@ class MissedIntakesViewModel @Inject constructor(
         }
     }
 
-    /** Крестик: всё, что в попапе, сказано; неотвеченное остаётся пропусками и больше не приходит. */
+    /**
+     * Крестик: сказанным отмечается **то, что в попапе стояло**, — неотвеченное остаётся пропусками
+     * и больше не приходит. Скрытое (пункт сегодняшнего дня телефона) крестик не трогает: назавтра
+     * у него свой последний шанс.
+     */
     fun dismiss() {
-        val keys = listed
+        val keys = state.value.told
         dismissed.update { it + keys }
         viewModelScope.launch { outbox.bannerShown(keys) }
     }
+
+    private data class Line(val key: NotificationKey, val row: DayItemPresentationDTO, val answer: MissedIntakesUiState.Planned?)
 
     fun dismissMessage() {
         message.value = null
     }
 }
 
-/** Неотвеченные пункты прошлых дней — строками «Дня», со своим днём у каждой. */
+/**
+ * Неотвеченные пункты прошлых дней — строками «Дня», со своим днём у каждой. [told] и [planned] не
+ * рисуются: по ним отвечают крестик и «Принял», и едут они тем же снимком, что и строки.
+ */
 data class MissedIntakesUiState(
     val rows: List<DayItemPresentationDTO> = emptyList(),
-    val message: DayMessage? = null
+    val message: DayMessage? = null,
+    /** Обязательства показанных строк: их и только их крестик отмечает сказанными. */
+    val told: Set<NotificationKey> = emptySet(),
+    /** Плановое строк, у которых есть быстрый ответ, — по номеру пункта. */
+    val planned: Map<Uuid, Planned> = emptyMap()
 ) {
-    val isEmpty: Boolean get() = rows.isEmpty()
+    /** Сказать нечего: ни строк, ни ответа, который человек ещё не прочёл. */
+    val isEmpty: Boolean get() = rows.isEmpty() && message == null
+
+    /** Что записывает «Принял»: плановая пачка и доза, в момент пункта. */
+    data class Planned(val packageId: Uuid, val amount: Dose, val at: Instant)
 }

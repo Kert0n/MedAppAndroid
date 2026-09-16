@@ -51,12 +51,6 @@ class ExpiringTodayViewModel @Inject constructor(
      */
     private val dismissed = MutableStateFlow<Set<NotificationKey>>(emptySet())
 
-    /**
-     * Какие обязательства показаны. Снимок берётся из чтения и **не** сужается, пока попап открыт:
-     * коробка может уйти из списка, а обязательство о ней остаётся сказанным.
-     */
-    private val shown = MutableStateFlow<Set<NotificationKey>>(emptySet())
-
     /** Баннеры приложения — только свои: пропуски приходят своим попапом и этим крестиком не закрываются. */
     private val awaiting = reminders.observeAwaiting(NoticeDelivery.IN_APP_BANNER)
         .map { notices -> notices.filter { it.key.kind == NotificationKind.EXPIRY_TODAY } }
@@ -66,10 +60,12 @@ class ExpiringTodayViewModel @Inject constructor(
     }.flatMapLatest { notices ->
         // Коробки читаются живыми: выброшенная уходит из попапа сама, пока человек на него смотрит.
         val ids = notices.mapNotNull { (it.target as? NotificationTarget.PackageCard)?.packageId }
-        shown.value = notices.map { it.key }.toSet()
+        // Ключи едут тем же снимком, что и коробки, и **не** сужаются вместе со списком: коробка
+        // может уйти из попапа, а обязательство о ней остаётся сказанным (C1 «Действие — по показанному»).
+        val keys = notices.mapTo(HashSet()) { it.key }
         if (ids.isEmpty()) flowOf(ExpiringTodayUiState())
         else combine(ids.map { packages.observe(it) }) { boxes ->
-            ExpiringTodayUiState(boxes = boxes.filterNotNull().map { it.toPresentationDTO() })
+            ExpiringTodayUiState(boxes = boxes.filterNotNull().map { it.toPresentationDTO() }, told = keys)
         }
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), ExpiringTodayUiState())
 
@@ -78,7 +74,7 @@ class ExpiringTodayViewModel @Inject constructor(
      * Владелец доставки один и для системы, и для экрана (PLAN D8).
      */
     fun dismiss() {
-        val keys = shown.value
+        val keys = state.value.told
         dismissed.update { it + keys }
         viewModelScope.launch { outbox.bannerShown(keys) }
     }
@@ -89,6 +85,10 @@ class ExpiringTodayViewModel @Inject constructor(
  * Что показывает попап: коробки, у которых срок кончается сегодня. Пустой попап не показывается —
  * говорить не о чем.
  */
-data class ExpiringTodayUiState(val boxes: List<PackagePresentationDTO> = emptyList()) {
+data class ExpiringTodayUiState(
+    val boxes: List<PackagePresentationDTO> = emptyList(),
+    /** Обязательства, о которых попап сейчас говорит: их отмечает крестик. Не рисуется. */
+    val told: Set<NotificationKey> = emptySet()
+) {
     val isEmpty: Boolean get() = boxes.isEmpty()
 }

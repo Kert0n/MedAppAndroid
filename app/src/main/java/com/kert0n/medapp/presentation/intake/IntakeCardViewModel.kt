@@ -111,11 +111,11 @@ class IntakeCardViewModel @AssistedInject constructor(
         if (!shown.canAnswer) return
         val unit = shown.unit ?: return
         // Набранное берётся у самого набранного: между вводом и нажатием стоит поток, и палец
-        // человека его не ждёт. Пачка — выбранная, сверенная с источниками лечения.
+        // человека его не ждёт. Пачка — выбранная, сверенная с показанным: плановая или один из
+        // источников. Выбора, которого больше нет, плановой не подменяют — человек её не выбирал
+        // (C1 «Действие — по показанному»).
         val form = typed.value ?: shown.form
-        val pkg = form.packageId?.takeIf { id -> shown.sources.any { it.id == id } }
-            ?: shown.packageId
-            ?: return
+        val pkg = form.packageId?.takeIf { id -> id == shown.packageId || shown.sources.any { it.id == id } } ?: return
         writing.value = Writing(busy = true)
         viewModelScope.launch {
             val known = vocabulary.snapshot()
@@ -201,7 +201,10 @@ class IntakeCardViewModel @AssistedInject constructor(
         // Принять можно из любого источника лечения: «беру из этой пачки» решается в момент
         // записи, а не при постройке плана (PLAN D6). Отключённый источник — не источник.
         val usable = sources.filter { it.fault == null }.map { IntakeSourcePresentationDTO(it.pkg.id, it.pkg.name) }
-        val chosen = typed?.packageId?.takeIf { id -> usable.any { it.id == id } } ?: plannedPackage?.id
+        // Выбранное человеком, которого больше нет среди источников, — пустой выбор, а не плановая
+        // коробка: подменённое молча списало бы не оттуда, откуда он брал.
+        val picked = typed?.packageId?.takeIf { it != plannedPackage?.id }
+        val chosen = if (picked != null) picked.takeIf { id -> usable.any { it.id == id } } else plannedPackage?.id
         return IntakeCardUiState(
             title = title,
             plannedOn = slot.localDate,

@@ -39,7 +39,8 @@ fun MissedIntakesPopup(
     onDismissMessage: () -> Unit
 ) {
     if (state.isEmpty) return
-    AlertDialog(
+    // Строк нет, а ответ на последнюю не прочитан — окно уходит, а слова остаются.
+    if (state.rows.isNotEmpty()) AlertDialog(
         onDismissRequest = {},
         title = {
             Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {

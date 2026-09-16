@@ -93,7 +93,7 @@ private fun Card(
     actions = {
         state.error?.let { Text(it.words(), color = MaterialTheme.colorScheme.error) }
         if (state.canAnswer) {
-            Button(onClick = onConfirm, enabled = !state.isWriting, modifier = Modifier.fillMaxWidth()) {
+            Button(onClick = onConfirm, enabled = state.canConfirm, modifier = Modifier.fillMaxWidth()) {
                 Text(stringResource(R.string.intake_confirm))
             }
             // Отказ — решение, а не молчание: лечение считает эту дозу пропущенной (PLAN D6).

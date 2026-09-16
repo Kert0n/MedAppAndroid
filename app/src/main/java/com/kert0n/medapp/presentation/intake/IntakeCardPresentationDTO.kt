@@ -59,6 +59,12 @@ data class IntakeCardUiState(
     val canAnswer: Boolean
         get() = !isWriting && !isGone && (answer == null || answer == Answer.MISSED)
 
+    /**
+     * Записать приём можно, когда есть откуда: выбор, ушедший из источников, пуст, и кнопка ждёт
+     * нового выбора, а не молчит на нажатие (C1 «Действие — по показанному»).
+     */
+    val canConfirm: Boolean get() = canAnswer && packageId != null
+
     /** Отказаться можно от того, на что ещё не ответили: пропущенное уже пропущено. */
     val canDecline: Boolean get() = canAnswer && answer == null
 }
