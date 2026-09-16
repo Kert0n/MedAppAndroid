@@ -3,24 +3,23 @@ package com.kert0n.medapp.ui.pack
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
-import com.kert0n.medapp.ui.NavigationRow
-import androidx.compose.material3.OutlinedButton
-import androidx.compose.material3.ExtendedFloatingActionButton
-import androidx.compose.foundation.layout.width
-import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.layout.defaultMinSize
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.defaultMinSize
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.ElevatedCard
 import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.ExtendedFloatingActionButton
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
@@ -32,7 +31,6 @@ import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import com.kert0n.medapp.R
-import com.kert0n.medapp.ui.DAY
 import com.kert0n.medapp.domain.attempt
 import com.kert0n.medapp.domain.pack.ExpiryDate
 import com.kert0n.medapp.domain.pack.PackageStatus
@@ -41,8 +39,10 @@ import com.kert0n.medapp.presentation.pack.PackagePresentationDTO
 import com.kert0n.medapp.presentation.value.MoneyPresentationDTO
 import com.kert0n.medapp.presentation.value.QuantityPresentationDTO
 import com.kert0n.medapp.presentation.value.toPresentationDTO
+import com.kert0n.medapp.ui.DAY
 import com.kert0n.medapp.ui.EmptyState
 import com.kert0n.medapp.ui.LoadingState
+import com.kert0n.medapp.ui.NavigationRow
 import java.time.LocalDate
 import java.util.Currency
 
@@ -141,6 +141,17 @@ fun PackageCardScreen(
                 verticalArrangement = Arrangement.spacedBy(12.dp)
             ) {
                 HowMuchIsThere(pack, state.holdingCourseTitle, state.isBusy, onTake, onRecount, onHistory)
+                // Отказ сервера о числе виден там, где о числе и говорят, и ведёт туда, чем он
+                // лечится: спор в том, сколько в коробке на самом деле (PLAN E3, REQ-045).
+                if (state.isRefusedByServer) {
+                    NavigationRow(
+                        icon = R.drawable.ic_sync_problem,
+                        text = stringResource(R.string.pack_refused_by_server),
+                        supporting = stringResource(R.string.pack_refused_by_server_explained),
+                        onClick = onRecount,
+                        color = MaterialTheme.colorScheme.error
+                    )
+                }
                 DatesAndPrice(pack, state.today, state.lastUsedOn)
                 WhereItLies(pack, state.medKitName, onTransfer)
                 WhatItIs(pack)

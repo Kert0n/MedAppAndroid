@@ -264,6 +264,8 @@
     <string name="pack_row_unconfirmed">Изменение в пути</string>
     <string name="pack_row_removal">Удаление в пути</string>
     <string name="pack_row_lost">Коробка не у нас</string>
+    <string name="pack_refused_by_server">Сервер отклонил изменение</string>
+    <string name="pack_refused_by_server_explained">Пересчитайте коробку — спор о том, сколько в ней на самом деле</string>
     <string name="med_kit_publishing">Публикуется</string>
     <string name="med_kit_removing">Убирается</string>
     <string name="pack_what_it_is">Что это</string>

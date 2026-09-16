@@ -160,9 +160,11 @@ class PackageCardScreenTest {
     fun whatIsFilledInIsShown() {
         show(card(pack = box(manufacturer = "Reckitt", expiresOn = "2027-03-31")))
 
-        compose.onNodeWithText("Что это").assertIsDisplayed()
-        compose.onNodeWithText("Reckitt").assertIsDisplayed()
+        // «Что это» теперь последнее: на узком экране до него долистывают, и это нормально —
+        // справочное не должно занимать первый экран (решение владельца 2026-09-17).
         compose.onNodeWithText("Годен до 03.2027").performScrollTo().assertIsDisplayed()
+        compose.onNodeWithText("Что это").performScrollTo().assertIsDisplayed()
+        compose.onNodeWithText("Reckitt").performScrollTo().assertIsDisplayed()
     }
 
     /** Цена со знакомой валютой — знаком, с незнакомым кодом — самим кодом, а не падением. */
@@ -277,4 +279,22 @@ class PackageCardScreenTest {
         assertTrue("описание идёт последним", what.top > where.top)
     }
 
+
+    /**
+     * Отказ сервера о числе виден там, где о числе и говорят, и ведёт туда, чем он лечится:
+     * спор в том, сколько в коробке на самом деле (PLAN E3, REQ-045). Пересчёт начинается с
+     * того числа, которое принёс снимок, — экран не придумывает своего.
+     *
+     * Красная проверка: промолчать об отказе — человек видит серверное число и не понимает, куда
+     * делась его правка.
+     */
+    @Test
+    fun aServerRefusalAboutTheNumberLeadsToRecounting() {
+        show(card().copy(isRefusedByServer = true))
+
+        compose.onNodeWithText("Сервер отклонил изменение").assertIsDisplayed()
+        compose.onNodeWithText("Пересчитайте коробку — спор о том, сколько в ней на самом деле").performClick()
+
+        assertEquals(1, recounted)
+    }
 }

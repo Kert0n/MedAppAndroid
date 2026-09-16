@@ -1,7 +1,6 @@
 package com.kert0n.medapp.scale
 
 import android.os.Build
-
 import androidx.room.withTransaction
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import com.kert0n.medapp.domain.course.CourseDraft
@@ -14,8 +13,6 @@ import com.kert0n.medapp.domain.report.SpendingPeriod
 import com.kert0n.medapp.feature.time.Today
 import com.kert0n.medapp.fixture.MOSCOW
 import com.kert0n.medapp.fixture.QuietClock
-import com.kert0n.medapp.presentation.pack.MedKitContentsViewModel
-import com.kert0n.medapp.presentation.pack.PackageCardViewModel
 import com.kert0n.medapp.fixture.Scenarios
 import com.kert0n.medapp.fixture.TABLET_FORM
 import com.kert0n.medapp.fixture.activeCourse
@@ -28,6 +25,7 @@ import com.kert0n.medapp.fixture.medKitRepository
 import com.kert0n.medapp.fixture.pack
 import com.kert0n.medapp.fixture.packageRepository
 import com.kert0n.medapp.fixture.plannedIntake
+import com.kert0n.medapp.fixture.queueRepository
 import com.kert0n.medapp.fixture.reportRepository
 import com.kert0n.medapp.fixture.save
 import com.kert0n.medapp.fixture.schedule
@@ -37,6 +35,8 @@ import com.kert0n.medapp.fixture.tablets
 import com.kert0n.medapp.network.pack.PackageSnapshot
 import com.kert0n.medapp.network.pack.PackageSyncState
 import com.kert0n.medapp.network.server.ResourceVersion
+import com.kert0n.medapp.presentation.pack.MedKitContentsViewModel
+import com.kert0n.medapp.presentation.pack.PackageCardViewModel
 import com.kert0n.medapp.queue.ServerSnapshot
 import com.kert0n.medapp.storage.database.MedAppDatabase
 import com.kert0n.medapp.storage.intake.toStorageEntity
@@ -215,7 +215,7 @@ class HundredMedKitsTest {
         val shown = timed("все лекарства на экране", Duration.ofMillis(600)) { contents.state.first { it.isLoaded } }
         assertEquals(1_000, shown.packages.size)
 
-        val card = PackageCardViewModel(scenarios.packageRemoval, database.packageRepository(), database.medKitRepository(), database.courseRepository(), today, seed.packages.first())
+        val card = PackageCardViewModel(scenarios.packageRemoval, database.packageRepository(), database.medKitRepository(), database.courseRepository(), database.queueRepository(), today, seed.packages.first())
         val opened = timed("карточка коробки", Duration.ofMillis(300)) { card.state.first { !it.isLoading } }
         assertEquals("Полка 0", opened.medKitName)
     }

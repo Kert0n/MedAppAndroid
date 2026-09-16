@@ -7,6 +7,7 @@ import com.kert0n.medapp.feature.time.Today
 import com.kert0n.medapp.storage.course.CourseStorageRepository
 import com.kert0n.medapp.storage.medkit.MedKitStorageRepository
 import com.kert0n.medapp.storage.pack.PackageStorageRepository
+import com.kert0n.medapp.storage.server.SyncOperationStorageRepository
 import dagger.assisted.Assisted
 import dagger.assisted.AssistedFactory
 import dagger.assisted.AssistedInject
@@ -40,6 +41,7 @@ class PackageCardViewModel @AssistedInject constructor(
     packages: PackageStorageRepository,
     medKits: MedKitStorageRepository,
     courses: CourseStorageRepository,
+    operations: SyncOperationStorageRepository,
     today: Today,
     @Assisted private val packageId: Uuid
 ) : ViewModel() {
@@ -63,13 +65,25 @@ class PackageCardViewModel @AssistedInject constructor(
         .distinctUntilChanged()
         .flatMapLatest { courseId -> courseId?.let(courses::observeRecord) ?: flowOf(null) }
 
-    val state: StateFlow<PackageCardUiState> = combine(pack, place, course, days, removing) { pack, place, course, day, removing ->
+    /**
+     * Отказ сервера **об этой коробке**: расхождение по числу лечится пересчётом, и путь к нему
+     * начинается там, где человек о расхождении узнаёт (PLAN E3, REQ-045). Спор о сведениях сюда
+     * не попадает — пересчётом он не лечится.
+     */
+    private val refused = operations.observeTroubles()
+        .map { troubles -> troubles.any { it.recountable == packageId } }
+        .distinctUntilChanged()
+
+    private val seenAndRefused = combine(days, refused) { day, refused -> day to refused }
+
+    val state: StateFlow<PackageCardUiState> = combine(pack, place, course, seenAndRefused, removing) { pack, place, course, (day, refused), removing ->
         PackageCardUiState(
             pack = pack?.toPresentationDTO(),
             medKitName = place?.name,
             holdingCourseTitle = course?.title,
             lastUsedOn = pack?.lastUsedAt?.atZone(day.zone)?.toLocalDate(),
             today = day.date,
+            isRefusedByServer = refused,
             // «Нет» говорится только после чтения: до него это состояние сюда не доходит.
             isGone = pack == null,
             asksToRemove = removing.asking,
@@ -127,6 +141,8 @@ data class PackageCardUiState(
     val holdingCourseTitle: String? = null,
     /** Когда из коробки брали последний раз — днём в зоне человека, как он это помнит. */
     val lastUsedOn: LocalDate? = null,
+    /** Сервер отверг изменение этой коробки: расхождение о числе, и лечится оно пересчётом. */
+    val isRefusedByServer: Boolean = false,
     val today: LocalDate = LocalDate.MIN,
     val isGone: Boolean = false,
     val asksToRemove: Boolean = false,
