@@ -231,6 +231,36 @@ class CourseFormViewModelTest {
     }
 
     /**
+     * Переход к источникам уносит **набранное**, а не записанное когда-то раньше. Без этого
+     * правила черновик, открытый из списка, уходит на экран источников со старым назначением: на
+     * форме доза и форма выпуска стоят, а подключение отвечает «сначала укажите дозу и форму» —
+     * оно читает базу, в которой их нет (находка владельца 2026-09-16).
+     */
+    @Test
+    fun goingToTheSourcesCarriesWhatIsTypedNotWhatWasWrittenBefore() {
+        courses.holding(course(id = COURSE, title = "Нурофен"))
+        val model = viewModel(courseId = COURSE)
+
+        watching(model.state) { state ->
+            state.awaiting { it is CourseFormUiState.Editing }
+            model.edit(
+                CourseFormPresentationDTO(
+                    title = "Нурофен",
+                    doseAmount = "2",
+                    unit = TABLETS.toPresentationDTO(),
+                    form = TABLET_FORM.toPresentationDTO()
+                )
+            )
+            model.openSources()
+            state.awaiting { it is CourseFormUiState.Editing && it.sourcesOf != null }
+        }
+
+        val draft = courses.drafts.getValue(COURSE)
+        assertEquals(dose("2"), draft.dose)
+        assertEquals(TABLET_FORM, draft.form)
+    }
+
+    /**
      * Отказ на пути «Начать» снимает занятость целиком. Без этого правила гаснет только признак
      * записи, `isBusy` остаётся истинным навсегда — и форма заперта с ошибкой, которую нечем
      * снять: ни сохранить, ни начать, ни уйти (C1 «Занятость формы снимается состоянием»).

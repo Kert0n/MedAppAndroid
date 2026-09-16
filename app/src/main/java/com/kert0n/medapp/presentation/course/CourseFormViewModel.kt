@@ -116,15 +116,19 @@ class CourseFormViewModel @AssistedInject constructor(
     }
 
     /**
-     * Открыть источники. У нового черновика их некуда подключать, пока он не записан, — поэтому
-     * набранное сначала записывается, и лечение получает номер (PLAN H3 №15, D5). Названия нет —
-     * записать нечего, и отказ встаёт у своего поля, как у всякой другой записи.
+     * Открыть источники. Набранное **сначала записывается**: подключение читает базу, и уйти туда
+     * с одним лишь состоянием формы значит показать человеку чужое назначение — доза и форма
+     * стоят на экране, а соседний отвечает «сначала укажите дозу и форму» (PLAN H3 №15, D5).
+     * Заодно у нового черновика появляется номер, без которого коробкам не к чему подключаться.
+     * Названия нет — записать нечего, и отказ встаёт у своего поля, как у всякой другой записи.
+     *
+     * Идущее лечение — исключение: его назначение уже записано, а правит его «Сохранить» одним
+     * изменением эпизода (`CourseAmendment`). Открытие источников лечения не меняет.
      */
     fun openSources() {
         val current = editing.value as? CourseFormUiState.Editing ?: return
         if (current.isBusy) return
         current.plan?.let { editing.value = current.copy(sourcesOf = it.id); return }
-        current.stored?.let { editing.value = current.copy(sourcesOf = it.id); return }
         val saving = current.copy(error = null, isSaving = true)
         editing.value = saving
         viewModelScope.launch {
@@ -132,9 +136,14 @@ class CourseFormViewModel @AssistedInject constructor(
                 is ParsedInput.Rejected -> editing.value = saving.copy(isSaving = false, error = parsed.error)
                 is ParsedInput.Parsed -> {
                     val written = written(saving, parsed.value) ?: return@launch
-                    // С этой минуты редактор правит записанное: второй раз заводить его нельзя.
                     editing.value = saving.copy(
-                        mode = CourseFormUiState.Mode.UNASKED_DRAFT,
+                        // С этой минуты редактор правит записанное: второй раз заводить его
+                        // нельзя. Открытый из списка черновик остаётся собой — уходит он молча.
+                        mode = if (saving.mode == CourseFormUiState.Mode.NEW_DRAFT) {
+                            CourseFormUiState.Mode.UNASKED_DRAFT
+                        } else {
+                            saving.mode
+                        },
                         isSaving = false,
                         stored = written,
                         sourcesOf = written.id
