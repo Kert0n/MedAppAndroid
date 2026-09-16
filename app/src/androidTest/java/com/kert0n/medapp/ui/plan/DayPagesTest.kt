@@ -30,6 +30,24 @@ import com.kert0n.medapp.domain.notification.NotificationChannel
 import com.kert0n.medapp.domain.notification.NotificationReadiness
 import com.kert0n.medapp.domain.notification.Readiness
 import com.kert0n.medapp.presentation.plan.DayPermissionsPresentationDTO
+import com.kert0n.medapp.domain.value.Doses
+import com.kert0n.medapp.feature.course.CourseDrafting
+import com.kert0n.medapp.feature.time.ClockShifts
+import com.kert0n.medapp.fixture.HOME_KIT
+import com.kert0n.medapp.fixture.PACK
+import com.kert0n.medapp.fixture.StoryClock
+import com.kert0n.medapp.fixture.TABLETS
+import com.kert0n.medapp.fixture.TABLET_FORM
+import com.kert0n.medapp.fixture.dose
+import com.kert0n.medapp.fixture.medKit
+import com.kert0n.medapp.fixture.pack
+import com.kert0n.medapp.fixture.packageRepository
+import com.kert0n.medapp.fixture.schedule
+import com.kert0n.medapp.fixture.tablets
+import com.kert0n.medapp.platform.time.TimeShifts
+import com.kert0n.medapp.storage.medkit.toStorageEntity as toMedKitStorageEntity
+import com.kert0n.medapp.storage.value.toStorageEntity
+import java.time.LocalTime
 import org.junit.After
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertSame
@@ -64,9 +82,13 @@ class DayPagesTest {
         database.close()
     }
 
-    private fun model(readiness: NotificationReadiness = AllAllowed) = DayPlanViewModel(
-        today = Today(clock, QuietClock),
-        planning = DayPlanning(Today(clock, QuietClock), database.reportRepository()),
+    private fun model(
+        readiness: NotificationReadiness = AllAllowed,
+        clock: Clock = this.clock,
+        shifts: ClockShifts = QuietClock
+    ) = DayPlanViewModel(
+        today = Today(clock, shifts),
+        planning = DayPlanning(Today(clock, shifts), database.reportRepository()),
         confirmation = scenarios.intakeConfirmation,
         declining = scenarios.intakeDeclining,
         devicePermissions = AllAllowed,
@@ -131,6 +153,83 @@ class DayPagesTest {
         }
 
         assertEquals(DayPermissionsPresentationDTO(), model(muted).permissions.value)
+    }
+
+    /**
+     * **На полке — только прошлые дни** (PLAN C1 «Полка»). Лечение идёт со вчера, сказать было
+     * нечем: вчерашний пункт ждёт на полке, а сегодняшний и так стоит в самом дне с кнопками.
+     * Положи его ещё и на полку — и человек видит одну дозу дважды и не понимает, одна она или две
+     * (разбор U5, `BigLatest`).
+     */
+    @Test
+    fun onlyPastDaysStandOnTheShelf(): Unit = runBlocking {
+        val (yesterday, today) = startedYesterdayMorning()
+        val model = model()
+
+        watching(model.page(0)) { page ->
+            val ready = page.awaiting(PATIENTLY) { state ->
+                state is ScreenState.Ready && state.value.unannounced.map { it.intakeId }.toSet() == setOf(yesterday)
+            }
+            assertEquals(listOf(today), (ready as ScreenState.Ready).value.items.mapNotNull { it.intakeId })
+        }
+    }
+
+    /**
+     * **Полка меняется сменой дня, а не записью в таблицу** (разбор #51). Страница открыта через
+     * полночь: сегодняшний неотвеченный пункт становится вчерашним и уходит на полку сам, хотя
+     * обязательства за это время не менялись. Спроси полку часами только при записи в таблицу — и
+     * она стоит прежней, пока что-нибудь постороннее не запишется.
+     */
+    @Test
+    fun theShelfFollowsTheDayWithoutAWriteToTheTable(): Unit = runBlocking {
+        val (yesterday, today) = startedYesterdayMorning()
+        val moving = StoryClock(now, ZoneOffset.UTC)
+        val shifts = TimeShifts()
+        val model = model(clock = moving, shifts = shifts)
+
+        watching(model.page(0)) { page ->
+            page.awaiting(PATIENTLY) { state ->
+                state is ScreenState.Ready && state.value.unannounced.map { it.intakeId }.toSet() == setOf(yesterday)
+            }
+            moving.now = now.plus(java.time.Duration.ofDays(1))
+            shifts.happened()
+            page.awaiting(PATIENTLY) { state ->
+                state is ScreenState.Ready && state.value.date == LocalDate.of(2027, 3, 11) &&
+                    state.value.unannounced.map { it.intakeId }.toSet() == setOf(yesterday, today)
+            }
+        }
+    }
+
+    /**
+     * Лечение со вчерашнего утра, в 08:00 по Москве: вчерашний и сегодняшний пункты наступили, ответа
+     * нет. Обязательства заводит сам календарь при начале лечения — проверка их руками не пишет.
+     */
+    private suspend fun startedYesterdayMorning(): Pair<kotlin.uuid.Uuid, kotlin.uuid.Uuid> {
+        database.vocabulary().save(
+            units = listOf(TABLETS).map { it.toStorageEntity() },
+            forms = listOf(TABLET_FORM).map { it.toStorageEntity() }
+        )
+        database.medKits().insertIfMissing(medKit(id = HOME_KIT).toMedKitStorageEntity())
+        database.packageRepository().add(pack(id = PACK, name = "Нурофен", quantity = tablets("20"), form = TABLET_FORM))
+        val created = scenarios.courseDrafting.create("Нурофен")
+        val saved = scenarios.courseDrafting.edit(
+            created.id, created.revision,
+            listOf(
+                CourseDrafting.Edit.SetDose(dose("1")),
+                CourseDrafting.Edit.SetForm(TABLET_FORM),
+                CourseDrafting.Edit.SetSchedule(schedule(start = LocalDate.of(2027, 3, 9), times = listOf(LocalTime.of(8, 0)))),
+                CourseDrafting.Edit.SetTotalDoses(Doses(3)),
+                CourseDrafting.Edit.Attach(PACK, Doses(3))
+            )
+        ) as CourseDrafting.Outcome.Saved
+        scenarios.courseActivation.activate(saved.draft.id, saved.draft.revision)
+        // Календарь держит окно вперёд, и завтрашний пункт тоже есть: история о вчера и сегодня.
+        val byDay = database.intakeRepository().ofCourse(saved.draft.id)
+            .filterIsInstance<com.kert0n.medapp.domain.intake.CourseIntake>()
+            .associateBy { it.slot.localDate }
+        val yesterday = checkNotNull(byDay[LocalDate.of(2027, 3, 9)]) { "завязка: нет вчерашнего пункта среди ${byDay.keys}" }
+        val today = checkNotNull(byDay[LocalDate.of(2027, 3, 10)]) { "завязка: нет сегодняшнего пункта среди ${byDay.keys}" }
+        return yesterday.id to today.id
     }
 
     private companion object {
