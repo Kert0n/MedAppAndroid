@@ -251,4 +251,26 @@ class MedKitSharingViewModelTest {
 
         assertTrue((state as MedKitSharingUiState.Shared).isFullScreen)
     }
+
+    /**
+     * Ключ не переживает смерть процесса — и это честно: в маршрут он не едет (G3), а сервер
+     * сроку не обещает и мог забыть его раньше (B6). Человек видит полку общей и «Пригласить», а
+     * не пустой узор, который камера всё равно не прочитает.
+     */
+    @Test
+    fun theCodeDoesNotSurviveTheProcessAndTheScreenOffersANewOne() {
+        val first = viewModel(medKitId = SHARED_KIT)
+        watching(first.state) { state ->
+            first.invite()
+            state.awaiting { it is MedKitSharingUiState.Shared && it.invitation != null }
+        }
+
+        // Заново поднятый экран — то же самое, что после смерти процесса.
+        val afterDeath = viewModel(medKitId = SHARED_KIT)
+        val state = watching(afterDeath.state) { it.awaiting { s -> s is MedKitSharingUiState.Shared } }
+
+        val shared = state as MedKitSharingUiState.Shared
+        assertNull(shared.invitation)
+        assertTrue(!shared.isFullScreen)
+    }
 }

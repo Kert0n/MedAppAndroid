@@ -11,6 +11,7 @@ import com.kert0n.medapp.fixture.FakeCourses
 import com.kert0n.medapp.fixture.FakeMedKits
 import com.kert0n.medapp.fixture.FakePackages
 import com.kert0n.medapp.fixture.FakeQueue
+import com.kert0n.medapp.fixture.FakeSyncOperations
 import com.kert0n.medapp.fixture.HOME_KIT
 import com.kert0n.medapp.fixture.HeldPackages
 import com.kert0n.medapp.fixture.HeldTransactions
@@ -76,6 +77,8 @@ class PackageCardViewModelTest {
 
     private val queue = QueueService(DirectTransactions, FakeQueue())
 
+    private val operations = FakeSyncOperations()
+
     private fun viewModel(
         packages: PackageStorageRepository = stored,
         transactions: Transactions = DirectTransactions
@@ -84,6 +87,7 @@ class PackageCardViewModelTest {
         packages = packages,
         medKits = medKits,
         courses = courses,
+        operations = operations,
         today = Today(clock, QuietClock),
         packageId = PACK
     )
