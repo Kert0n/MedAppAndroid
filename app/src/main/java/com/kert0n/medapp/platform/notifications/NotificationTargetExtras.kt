@@ -22,9 +22,26 @@ object NotificationTargetExtras {
     }
 
     /** Цель и действие из намерения; намерение без цели или с незнакомой — `null`: открывается просто приложение. */
-    fun read(intent: Intent): NotificationOpening? = decode(
+    fun read(intent: Intent): NotificationOpening? = decode(extrasOf(intent))
+
+    /**
+     * С чем открыто **окно**: цель из шторки — только у свежего запуска и у нового намерения.
+     *
+     * Восстановленное окно ([windowRestored]) и запуск из недавних (`FLAG_ACTIVITY_LAUNCHED_FROM_HISTORY`)
+     * несут исходное намерение системы — с теми же extras, что и в первый раз. Применить его снова
+     * значит вернуть человека на карточку, от которой он давно ушёл: после смерти процесса — на уже
+     * отвеченный приём (PLAN C1 «Открытие из шторки — один раз»).
+     */
+    fun launchOpening(intent: Intent, windowRestored: Boolean): NotificationOpening? =
+        launchOpening(extrasOf(intent), intent.flags, windowRestored)
+
+    fun launchOpening(extras: Map<String, String>, flags: Int, windowRestored: Boolean): NotificationOpening? {
+        if (windowRestored || flags and Intent.FLAG_ACTIVITY_LAUNCHED_FROM_HISTORY != 0) return null
+        return decode(extras)
+    }
+
+    private fun extrasOf(intent: Intent): Map<String, String> =
         listOf(KIND, ID, DATE, ACTION).mapNotNull { key -> intent.getStringExtra(key)?.let { key to it } }.toMap()
-    )
 
     fun encode(target: NotificationTarget, action: NotificationAction? = null): Map<String, String> {
         val fields = when (target) {
