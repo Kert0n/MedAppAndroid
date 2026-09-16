@@ -50,6 +50,7 @@ import com.kert0n.medapp.domain.course.CourseRejected
 import com.kert0n.medapp.presentation.course.CourseFormError
 import com.kert0n.medapp.presentation.course.CourseFormPresentationDTO
 import com.kert0n.medapp.presentation.course.CourseFormUiState
+import com.kert0n.medapp.presentation.course.withForm
 import com.kert0n.medapp.ui.DateField
 import com.kert0n.medapp.ui.ErrorMessage
 import com.kert0n.medapp.ui.LoadingState
@@ -158,6 +159,16 @@ private fun Fields(
             isError = field == CourseFormError.Field.NOTE,
             modifier = Modifier.fillMaxWidth()
         )
+        // Форма выпуска — первой: она подсказывает единицу, а обратный порядок ничего не решает.
+        PickerField(
+            label = stringResource(R.string.course_form),
+            selected = state.forms.firstOrNull { it.id == form.form?.id },
+            options = state.forms,
+            optionText = { it.name },
+            onPick = { onEdit(form.withForm(it, state.units)) },
+            isError = field == CourseFormError.Field.FORM,
+            emptyText = stringResource(R.string.pack_no_forms)
+        )
         Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
             OutlinedTextField(
                 value = form.doseAmount,
@@ -179,15 +190,6 @@ private fun Fields(
                 modifier = Modifier.weight(1f)
             )
         }
-        PickerField(
-            label = stringResource(R.string.course_form),
-            selected = state.forms.firstOrNull { it.id == form.form?.id },
-            options = state.forms,
-            optionText = { it.name },
-            onPick = { onEdit(form.copy(form = it)) },
-            isError = field == CourseFormError.Field.FORM,
-            emptyText = stringResource(R.string.pack_no_forms)
-        )
         DateField(
             label = stringResource(R.string.course_start),
             value = form.start,

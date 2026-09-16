@@ -33,6 +33,7 @@ import androidx.compose.ui.unit.dp
 import com.kert0n.medapp.R
 import com.kert0n.medapp.presentation.pack.PackageFormError
 import com.kert0n.medapp.presentation.pack.PackageFormPresentationDTO
+import com.kert0n.medapp.presentation.pack.withForm
 import com.kert0n.medapp.presentation.pack.PackageFormUiState
 import com.kert0n.medapp.presentation.pack.Suggestions
 import com.kert0n.medapp.presentation.pack.TemplatePresentationDTO
@@ -126,6 +127,17 @@ fun PackageFormScreen(
 
             SuggestionList(state.suggestions, onPick)
 
+            // Форма выпуска — перед количеством: она подсказывает единицу, которой это меряют.
+            PickerField(
+                label = stringResource(R.string.pack_form),
+                selected = state.forms.firstOrNull { it.id == form.form?.id },
+                options = state.forms,
+                optionText = { it.name },
+                onPick = { onEdit(form.withForm(it, state.units)) },
+                isError = state.error?.field == PackageFormError.Field.FORM,
+                emptyText = stringResource(R.string.pack_no_forms)
+            )
+
             if (!state.isEditing) {
                 OutlinedTextField(
                     value = form.amount,
@@ -148,16 +160,6 @@ fun PackageFormScreen(
                     supporting = stringResource(R.string.field_required).takeIf { form.unit == null }
                 )
             }
-
-            PickerField(
-                label = stringResource(R.string.pack_form),
-                selected = state.forms.firstOrNull { it.id == form.form?.id },
-                options = state.forms,
-                optionText = { it.name },
-                onPick = { onEdit(form.copy(form = it)) },
-                isError = state.error?.field == PackageFormError.Field.FORM,
-                emptyText = stringResource(R.string.pack_no_forms)
-            )
             OutlinedTextField(
                 value = form.expiresOn,
                 onValueChange = { onEdit(form.copy(expiresOn = it)) },

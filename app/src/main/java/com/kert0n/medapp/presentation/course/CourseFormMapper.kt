@@ -12,7 +12,10 @@ import com.kert0n.medapp.domain.value.Dose
 import com.kert0n.medapp.domain.value.Doses
 import com.kert0n.medapp.domain.value.Vocabulary
 import com.kert0n.medapp.presentation.ParsedInput
+import com.kert0n.medapp.presentation.value.FormPresentationDTO
 import com.kert0n.medapp.presentation.value.QuantityPresentationDTO
+import com.kert0n.medapp.presentation.value.UnitPresentationDTO
+import com.kert0n.medapp.presentation.value.usualUnit
 import com.kert0n.medapp.presentation.value.toDomain
 import com.kert0n.medapp.presentation.value.toPresentationDTO
 import java.time.LocalDate
@@ -157,3 +160,13 @@ fun CourseDescription.changesSince(prescription: Prescription): List<CourseAmend
     schedule?.takeIf { it != prescription.schedule }?.let { add(CourseAmendment.Change.SetSchedule(it)) }
     totalDoses?.takeIf { it != prescription.totalDoses }?.let { add(CourseAmendment.Change.SetTotalDoses(it)) }
 }
+
+/**
+ * Человек выбрал форму выпуска. Единица подставляется **только в пустое поле**: названную
+ * человеком форма не переписывает — он мог поставить её намеренно, и молча менять его решение
+ * нельзя (решение владельца 2026-09-16). Незнакомой форме подставлять нечего.
+ */
+fun CourseFormPresentationDTO.withForm(
+    chosen: FormPresentationDTO,
+    units: List<UnitPresentationDTO>
+): CourseFormPresentationDTO = copy(form = chosen, unit = unit ?: chosen.usualUnit(units))
