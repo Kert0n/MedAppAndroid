@@ -5,6 +5,8 @@ import androidx.lifecycle.viewModelScope
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import com.kert0n.medapp.feature.plan.DayPlanning
 import com.kert0n.medapp.feature.time.Today
+import com.kert0n.medapp.fixture.intakeRepository
+import com.kert0n.medapp.fixture.courseRepository
 import com.kert0n.medapp.fixture.AllAllowed
 import com.kert0n.medapp.fixture.QuietClock
 import com.kert0n.medapp.fixture.Scenarios
@@ -64,7 +66,10 @@ class DayPagesTest {
         confirmation = scenarios.intakeConfirmation,
         declining = scenarios.intakeDeclining,
         devicePermissions = AllAllowed,
-        clock = clock
+        clock = clock,
+        reminders = scenarios.reminderStore,
+        intakes = database.intakeRepository(),
+        courses = database.courseRepository()
     ).also { opened += it }
 
     private fun shown(model: DayPlanViewModel, daysAhead: Int): DayPagePresentationDTO {

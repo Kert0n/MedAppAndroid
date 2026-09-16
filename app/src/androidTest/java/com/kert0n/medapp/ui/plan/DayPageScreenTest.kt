@@ -92,12 +92,14 @@ class DayPageScreenTest {
         daysAhead: Int = 0,
         items: List<DayItemPresentationDTO> = emptyList(),
         alsoOnThisDay: List<DayItemPresentationDTO> = emptyList(),
+        unannounced: List<DayItemPresentationDTO> = emptyList(),
         message: DayMessage? = null
     ) = DayPagePresentationDTO(
         date = today.plusDays(daysAhead.toLong()),
         daysAhead = daysAhead,
         items = items,
         alsoOnThisDay = alsoOnThisDay,
+        unannounced = unannounced,
         message = message
     )
 
@@ -310,5 +312,23 @@ class DayPageScreenTest {
 
         compose.onNodeWithText("Напоминания не приходят").assertDoesNotExist()
         compose.onNodeWithText("Напоминания могут опаздывать").assertDoesNotExist()
+    }
+
+    /**
+     * О чём не смогли напомнить — своей полкой и **первым**: человек пришёл сам, потому что телефон
+     * промолчал, и это ответ на его вопрос «что я пропустил». У вчерашнего обязательства в строке
+     * стоит его день: время без дня ничего не говорит.
+     */
+    @Test
+    fun whatCouldNotBeAnnouncedStandsFirstAndCarriesItsDay() {
+        show(
+            page(
+                items = listOf(row("Сегодняшний")),
+                unannounced = listOf(row("Вчерашний").copy(on = today.minusDays(1)))
+            )
+        )
+
+        compose.onNodeWithText("О чём не смогли напомнить").assertIsDisplayed()
+        compose.onNodeWithText("09.03.2027 · 09:00").assertIsDisplayed()
     }
 }

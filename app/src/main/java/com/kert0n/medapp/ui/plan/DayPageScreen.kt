@@ -151,6 +151,21 @@ private fun DayPage(
             contentPadding = PaddingValues(start = 16.dp, end = 16.dp, bottom = 88.dp),
             verticalArrangement = Arrangement.spacedBy(8.dp)
         ) {
+            // О чём не смогли напомнить — первым: человек пришёл сам, потому что телефон
+            // промолчал, и это ответ на его вопрос «что я пропустил» (PLAN H3 «Уведомления»).
+            if (day.unannounced.isNotEmpty()) {
+                item(key = "unannounced") {
+                    Text(
+                        stringResource(R.string.plan_unannounced),
+                        style = MaterialTheme.typography.titleSmall,
+                        color = MaterialTheme.colorScheme.primary,
+                        modifier = Modifier.padding(top = 8.dp)
+                    )
+                }
+                items(day.unannounced, key = { "unannounced-" + it.key }) { item ->
+                    DayCard(item, onOpen, onConfirm, onDecline)
+                }
+            }
             items(day.items, key = { it.key }) { item -> DayCard(item, onOpen, onConfirm, onDecline) }
             shelf(R.string.plan_day_also, day.alsoOnThisDay, onOpen)
         }
@@ -227,7 +242,12 @@ private fun DayCard(
             // уравнял бы их и порезал текст (замечание владельца 2026-09-16).
             Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(4.dp)) {
                 Row(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.CenterVertically) {
-                    Text(TIME.format(item.at), style = MaterialTheme.typography.titleMedium)
+                    // День стоит у строки, только если он не сегодняшний: у вчерашнего
+                    // обязательства время без дня ничего не говорит.
+                    Text(
+                        listOfNotNull(item.on?.let { DAY.format(it) }, TIME.format(item.at)).joinToString(" · "),
+                        style = MaterialTheme.typography.titleMedium
+                    )
                     if (item.tellsItsState) {
                         Marker(item.state.icon, item.stateWords(), MaterialTheme.colorScheme.onSurfaceVariant)
                     }

@@ -5,6 +5,10 @@ import androidx.lifecycle.viewModelScope
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import com.kert0n.medapp.domain.intake.CourseIntake
 import com.kert0n.medapp.domain.intake.IntakeStatus
+import com.kert0n.medapp.domain.notification.Reminder
+import com.kert0n.medapp.domain.notification.NotificationTarget
+import com.kert0n.medapp.domain.notification.NotificationKind
+import com.kert0n.medapp.domain.notification.NotificationKey
 import com.kert0n.medapp.domain.pack.ExpiryDate
 import com.kert0n.medapp.domain.value.Doses
 import com.kert0n.medapp.feature.course.CourseDrafting
@@ -89,7 +93,10 @@ class IntakeAnsweringTest {
         confirmation = scenarios.intakeConfirmation,
         declining = scenarios.intakeDeclining,
         devicePermissions = AllAllowed,
-        clock = clock
+        clock = clock,
+        reminders = scenarios.reminderStore,
+        intakes = database.intakeRepository(),
+        courses = database.courseRepository()
     ).also { opened += it }
 
     private fun cardModel(intakeId: Uuid) = IntakeCardViewModel(
@@ -329,5 +336,39 @@ class IntakeAnsweringTest {
     private companion object {
         /** Столько ждём чтения: между действием и состоянием стоят сценарий и потоки Room. */
         val PATIENTLY: Duration = 15.seconds
+    }
+
+    /**
+     * Телефон промолчал — день говорит сам: обязательство, о котором не смогли напомнить, видно
+     * полкой и отвечается там же. Без неё вчерашний пропущенный приём человек не нашёл бы вовсе:
+     * страница дня листается только вперёд (PLAN D8, H3 «Уведомления на экране»).
+     */
+    @Test
+    fun theDayShowsWhatCouldNotBeAnnouncedAndTakesTheAnswerThere() = runBlocking {
+        val courseId = started()
+        val intakeId = firstIntake(courseId).id
+        scenarios.reminderPromising.promise(
+            listOf(
+                Reminder(
+                    key = NotificationKey.intake(intakeId, NotificationKind.INTAKE_DUE),
+                    target = NotificationTarget.Intake(intakeId),
+                    dueAt = now
+                )
+            )
+        )
+        val model = dayModel()
+
+        watching(model.page(0)) { page ->
+            page.awaiting(PATIENTLY) { state ->
+                state.ready()?.unannounced.orEmpty().any { it.intakeId == intakeId }
+            }
+            model.confirm(intakeId)
+            // Отвеченное уходит из полки: напоминать о нём больше нечего (PLAN D8).
+            page.awaiting(PATIENTLY) { state ->
+                state.ready()?.unannounced.orEmpty().none { it.intakeId == intakeId }
+            }
+        }
+
+        assertEquals(IntakeStatus.TAKEN, database.intakeRepository().find(intakeId)?.status)
     }
 }

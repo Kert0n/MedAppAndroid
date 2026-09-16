@@ -23,10 +23,16 @@ data class DayPagePresentationDTO(
     val daysAhead: Int,
     val items: List<DayItemPresentationDTO>,
     val alsoOnThisDay: List<DayItemPresentationDTO>,
+    /**
+     * О чём не смогли напомнить: обязательства, которые приложение не сказало вовремя — телефон
+     * молчал, а человек пришёл сам (PLAN D8, H3 «Уведомления на экране»). Отвечают на них теми же
+     * двумя кнопками: отдельного листа для этого не заводится.
+     */
+    val unannounced: List<DayItemPresentationDTO> = emptyList(),
     /** Чем кончился ответ, если по самой странице этого не видно (PLAN U1). */
     val message: DayMessage? = null
 ) {
-    val isEmpty: Boolean get() = items.isEmpty() && alsoOnThisDay.isEmpty()
+    val isEmpty: Boolean get() = items.isEmpty() && alsoOnThisDay.isEmpty() && unannounced.isEmpty()
 }
 
 /**
@@ -77,6 +83,8 @@ data class DayItemPresentationDTO(
     val intakeId: Uuid?,
     val courseId: Uuid?,
     val title: String,
+    /** День пункта, когда он не сегодняшний: у вчерашнего обязательства время без дня немо. */
+    val on: LocalDate? = null,
     val at: LocalTime,
     val dose: QuantityPresentationDTO,
     val packageName: String?,
