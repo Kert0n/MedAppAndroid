@@ -8,6 +8,7 @@ import com.kert0n.medapp.domain.course.Revision
 import com.kert0n.medapp.domain.value.DosageForm
 import com.kert0n.medapp.domain.value.Dose
 import com.kert0n.medapp.domain.value.Doses
+import com.kert0n.medapp.domain.value.doses
 import com.kert0n.medapp.queue.Transactions
 import com.kert0n.medapp.storage.course.CourseStorageRepository
 import com.kert0n.medapp.storage.pack.PackageStorageRepository
@@ -76,6 +77,16 @@ class CourseDrafting @Inject constructor(
             }
         }
         if (edited === draft) return@run Outcome.Saved(draft.projection())
+
+        // Больше, чем лечению нужно, не выделяют — отказом, а не подрезкой: снять разницу с чужой
+        // строки за человека нельзя (C1 «Ползунок»). Уменьшение числа приёмов сюда не попадает —
+        // оно снимает лишнее само (PLAN D5). Предел нарушает прежде всего та пачка, которой
+        // прибавили: её человек и двигал.
+        edited.sources
+            .sortedByDescending { source -> draft.sources.none { it.pkg == source.pkg && it.allocatedDoses >= source.allocatedDoses } }
+            .firstOrNull { source -> edited.needLeftFor(source.pkg)?.let { source.allocatedDoses > it } == true }
+            ?.let { return@run Outcome.BeyondLimit(it.pkg.id, edited.needLeftFor(it.pkg) ?: 0.doses) }
+
         if (!courses.saveDraft(edited, expected)) return@run Outcome.Gone
         Outcome.Saved(edited.projection())
     }
@@ -101,14 +112,15 @@ class CourseDrafting @Inject constructor(
 
     /**
      * Чем кончилось. Сохранили — экран показывает записанное; черновика нет (удалён или лечение уже
-     * началось) — закрыть; устарел — перечитать; домен отказал — причина по месту; пачки нет или
-     * ею пользоваться нельзя — выбрать другую.
+     * началось) — закрыть; устарел — перечитать; домен отказал — причина по месту; пачке выделено
+     * больше предела — назвать её и предел; пачки нет или ею пользоваться нельзя — выбрать другую.
      */
     sealed interface Outcome {
         data class Saved(val draft: CourseDraftProjection) : Outcome
         data object Gone : Outcome
         data object Stale : Outcome
         data class Rejected(val reason: CourseRejected.Reason) : Outcome
+        data class BeyondLimit(val packageId: Uuid, val limit: Doses) : Outcome
         data object PackageUnusable : Outcome
     }
 }

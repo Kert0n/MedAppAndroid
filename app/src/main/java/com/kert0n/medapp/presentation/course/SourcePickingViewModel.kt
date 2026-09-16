@@ -162,6 +162,8 @@ class SourcePickingViewModel @AssistedInject constructor(
         // сказать «подключил» о том, чего не было (H3 №17).
         CourseDrafting.Outcome.Stale -> Attaching(message = CourseSourcesMessage.Stale)
         is CourseDrafting.Outcome.Rejected -> Attaching(message = CourseSourcesMessage.Refused(outcome.reason))
+        is CourseDrafting.Outcome.BeyondLimit ->
+            Attaching(message = CourseSourcesMessage.BeyondLimit(null, outcome.limit.count))
         CourseDrafting.Outcome.PackageUnusable -> Attaching(message = CourseSourcesMessage.Unusable(null))
     }
 

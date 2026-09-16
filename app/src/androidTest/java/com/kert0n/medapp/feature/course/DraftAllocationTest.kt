@@ -98,6 +98,29 @@ class DraftAllocationTest {
     }
 
     /**
+     * Обратный вход в то же расхождение: приёмов десять, а человек просит выделить двадцать.
+     * Запись отвергает просьбу и называет предел — молча подрезать её нельзя, это был бы ответ не
+     * о том, о чём просили. Без правила черновик снова держит «выделено 20» при потребности в 10,
+     * и держит его до самого начала лечения (найдено разбором 2026-09-16).
+     */
+    @Test
+    fun allocatingMoreThanTheTreatmentNeedsIsRefused() = runTest {
+        val id = draftWithTwentyAllocated()
+        val courses = database.courseRepository()
+        val lowered = requireNotNull(courses.findDraft(id))
+        scenarios.courseDrafting.edit(id, lowered.revision, listOf(CourseDrafting.Edit.SetTotalDoses(Doses(10))))
+
+        val draft = requireNotNull(courses.findDraft(id))
+        val outcome = scenarios.courseDrafting.edit(
+            id, draft.revision, listOf(CourseDrafting.Edit.Allocate(PACK, Doses(20)))
+        )
+
+        assertEquals(CourseDrafting.Outcome.BeyondLimit(PACK, Doses(10)), outcome)
+        val after = requireNotNull(courses.findDraft(id))
+        assertEquals(Doses(10), after.medicine.sources.single().allocatedDoses)
+    }
+
+    /**
      * Что бы ни лежало в черновике, бронь просит по потребности: начало лечения зажимает выделение
      * и объявляет **десять** доз, а не двадцать.
      */
