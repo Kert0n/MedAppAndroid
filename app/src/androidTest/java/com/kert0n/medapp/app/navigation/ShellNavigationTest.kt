@@ -111,12 +111,16 @@ class ShellNavigationTest {
         place("Опции").assertIsDisplayed()
     }
 
-    /** За местом, экрана у которого ещё нет, стоит общее «показывать нечего». */
+    /**
+     * За местом, экрана у которого ещё нет, стоит общее «показывать нечего». Мест без экрана
+     * остаётся всё меньше: «Сканер» получил свой в U9, и проверка переехала на «Отчёты» — они
+     * ждут U10.
+     */
     @Test
     fun aPlaceWithoutItsScreenSaysSo() {
         compose.setContent { MedAppTheme { MedAppShell() } }
 
-        place("Сканер").performClick()
+        place("Отчёты").performClick()
 
         compose.waitUntil {
             compose.onAllNodesWithText("Этот экран ещё не готов.").fetchSemanticsNodes().isNotEmpty()
