@@ -26,6 +26,7 @@ import java.time.Instant
 import javax.inject.Inject
 import kotlin.uuid.Uuid
 import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.flow.map
 
 class IntakeRoomRepository @Inject constructor(
@@ -46,6 +47,15 @@ class IntakeRoomRepository @Inject constructor(
             val words = vocabulary.snapshot()
             intakes.takenFrom(packageId).map { it.toDomain(words).projection() }
         }
+
+    override fun observeOfIds(ids: Set<Uuid>): Flow<List<IntakeProjection>> {
+        // Ни о чём не спросили — отвечать нечем: пустой `IN ()` вернул бы всё, а это другой ответ.
+        if (ids.isEmpty()) return flowOf(emptyList())
+        return database.observing("intakes", "package_records") {
+            val words = vocabulary.snapshot()
+            intakes.ofIds(ids).map { it.toDomain(words).projection() }
+        }
+    }
 
     /** Строки и словарь — одной транзакцией: единица, записанная между ними, не потеряется. */
     override suspend fun ofCourse(courseId: Uuid): List<Intake> = database.withTransaction {

@@ -28,6 +28,15 @@ interface IntakeDao {
     @Query("SELECT * FROM intakes WHERE course_id = :courseId ORDER BY scheduled_at")
     suspend fun ofCourse(courseId: Uuid): List<IntakeStorageRow>
 
+    /**
+     * Приёмы, названные номерами: так их спрашивает тот, у кого на руках обязательства, — они
+     * несут номер приёма и больше ничего (PLAN D8). Порядок — по месту в расписании: строки
+     * читает человек, и вчерашнее стоит выше сегодняшнего.
+     */
+    @Transaction
+    @Query("SELECT * FROM intakes WHERE id IN (:ids) ORDER BY scheduled_at")
+    suspend fun ofIds(ids: Collection<Uuid>): List<IntakeStorageRow>
+
     @Transaction
     @Query(
         "SELECT * FROM intakes WHERE status = 'PLANNED' AND scheduled_at < :until " +

@@ -35,6 +35,8 @@ object UnaskedIntakes : IntakeStorageRepository {
 
     override fun observeOfPackage(packageId: Uuid): Flow<List<IntakeProjection>> = emptyFlow()
 
+    override fun observeOfIds(ids: Set<Uuid>): Flow<List<IntakeProjection>> = emptyFlow()
+
     override suspend fun ofCourse(courseId: Uuid): List<Intake> = unasked("ofCourse")
 
     override suspend fun find(id: Uuid): Intake? = unasked("find")
