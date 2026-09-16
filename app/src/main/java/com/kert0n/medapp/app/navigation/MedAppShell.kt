@@ -139,13 +139,19 @@ fun MedAppShell(
             predictivePopTransitionSpec = { SWITCH }
         )
         // Попап срока живёт **над** местами, а не в одном из них: уход на карточку коробки — это
-        // тот же разговор, и возврат его не обрывает (PLAN H3 «Уведомления на экране»).
+        // тот же разговор, и возврат его не обрывает (PLAN H3 «Уведомления на экране»). Показан он
+        // только **на** месте: окно модальное, и над карточкой коробки оно не давало бы с ней
+        // ничего сделать — «Выбросить» и «назад» не отвечали (PLAN C1 «Попап вне мест»). Модель
+        // живёт и в глубине: вернулся — попап на месте, с живым содержимым.
         val expiring: ExpiringTodayViewModel = hiltViewModel()
-        ExpiringTodayPopup(
-            state = expiring.state.collectAsStateWithLifecycle().value,
-            onOpenPackage = { stacks.go(Screen.PackageCard(it)) },
-            onDismiss = expiring::dismiss
-        )
+        val expiringState = expiring.state.collectAsStateWithLifecycle().value
+        if (stacks.screen in PLACES) {
+            ExpiringTodayPopup(
+                state = expiringState,
+                onOpenPackage = { stacks.go(Screen.PackageCard(it)) },
+                onDismiss = expiring::dismiss
+            )
+        }
     }
 }
 

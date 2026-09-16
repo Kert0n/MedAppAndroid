@@ -129,8 +129,9 @@ class ExpiryNewsStoryTest {
     private fun sheGoesToTheBoxAndThrowsItAway() {
         compose.onNodeWithText("Нурофен").performClick()
         compose.waitUntil(WAIT) { compose.onAllNodesWithText("Сколько есть").fetchSemanticsNodes().isNotEmpty() }
-        // Новость никуда не делась, пока Нина смотрит на коробку.
-        compose.onNodeWithText("Сегодня истекает срок годности").assertIsDisplayed()
+        // Над карточкой попапа нет: окно модальное и не дало бы выбросить коробку (PLAN C1
+        // «Попап вне мест»). Новость никуда не делась — она ждёт возвращения на место.
+        compose.onNodeWithText("Сегодня истекает срок годности").assertDoesNotExist()
 
         compose.onNodeWithContentDescription("Выбросить").performClick()
         compose.waitUntil(WAIT) { compose.onAllNodesWithText("Выбросить упаковку?").fetchSemanticsNodes().isNotEmpty() }

@@ -20,6 +20,7 @@ import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.flatMapLatest
 import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.flow.stateIn
+import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 
 /**
@@ -41,8 +42,12 @@ class ExpiringTodayViewModel @Inject constructor(
     private val packages: PackageStorageRepository
 ) : ViewModel() {
 
-    /** Закрыл ли человек попап: до крестика он висит, что бы ни менялось под ним. */
-    private val closed = MutableStateFlow(false)
+    /**
+     * Что человек закрыл крестиком — **ключами** обязательств, а не флагом «попап закрыт». Закрытое
+     * уходит с экрана сразу, не дожидаясь записи отметки, а новость с новым ключом приходит сама:
+     * флаг держал бы попап закрытым и назавтра, пока окно живёт (PLAN C1 «Попап вне мест»).
+     */
+    private val dismissed = MutableStateFlow<Set<NotificationKey>>(emptySet())
 
     /**
      * Какие обязательства показаны. Снимок берётся из чтения и **не** сужается, пока попап открыт:
@@ -52,8 +57,8 @@ class ExpiringTodayViewModel @Inject constructor(
 
     private val awaiting = reminders.observeAwaiting(NoticeDelivery.IN_APP_BANNER)
 
-    val state: StateFlow<ExpiringTodayUiState> = combine(awaiting, closed) { notices, closed ->
-        if (closed) emptyList() else notices
+    val state: StateFlow<ExpiringTodayUiState> = combine(awaiting, dismissed) { notices, dismissed ->
+        notices.filter { it.key !in dismissed }
     }.flatMapLatest { notices ->
         // Коробки читаются живыми: выброшенная уходит из попапа сама, пока человек на него смотрит.
         val ids = notices.mapNotNull { (it.target as? NotificationTarget.PackageCard)?.packageId }
@@ -70,7 +75,7 @@ class ExpiringTodayViewModel @Inject constructor(
      */
     fun dismiss() {
         val keys = shown.value
-        closed.value = true
+        dismissed.update { it + keys }
         viewModelScope.launch { outbox.bannerShown(keys) }
     }
 
