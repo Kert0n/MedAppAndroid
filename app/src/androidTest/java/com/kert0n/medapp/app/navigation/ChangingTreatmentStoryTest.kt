@@ -41,6 +41,7 @@ import com.kert0n.medapp.storage.value.toStorageEntity
 import com.kert0n.medapp.ui.theme.MedAppTheme
 import dagger.hilt.android.testing.HiltAndroidRule
 import dagger.hilt.android.testing.HiltAndroidTest
+import java.time.ZoneId
 import java.time.Instant
 import java.time.LocalDate
 import javax.inject.Inject
@@ -110,7 +111,7 @@ class ChangingTreatmentStoryTest {
 
     /** Назначение и две коробки записаны заранее: путь к ним проходит история Ирины. */
     private fun hisPrescriptionIsWrittenAndTwoBoxesAreAttached() = runBlocking {
-        val scenarios = Scenarios(database, Instant.now())
+        val scenarios = Scenarios(database, Instant.now(), ZoneId.systemDefault())
         val created = scenarios.courseDrafting.create("Ибупрофен")
         // Завязка отвечает за себя сама: не записалась — падаем здесь, а не через три экрана
         // непонятным ожиданием.

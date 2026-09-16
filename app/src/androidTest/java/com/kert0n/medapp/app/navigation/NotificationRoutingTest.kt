@@ -33,6 +33,7 @@ import com.kert0n.medapp.storage.value.toStorageEntity
 import com.kert0n.medapp.ui.theme.MedAppTheme
 import dagger.hilt.android.testing.HiltAndroidRule
 import dagger.hilt.android.testing.HiltAndroidTest
+import java.time.ZoneId
 import java.time.Instant
 import java.time.LocalDate
 import javax.inject.Inject
@@ -92,7 +93,7 @@ class NotificationRoutingTest {
                 pack(id = PACK, name = "Нурофен", quantity = tablets("20"), form = TABLET_FORM, expiresOn = ExpiryDate(it)).facts
             )
         }
-        val scenarios = Scenarios(database, Instant.now())
+        val scenarios = Scenarios(database, Instant.now(), ZoneId.systemDefault())
         val created = scenarios.courseDrafting.create("Нурофен")
         val saved = scenarios.courseDrafting.edit(
             created.id, created.revision,

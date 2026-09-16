@@ -29,6 +29,7 @@ import com.kert0n.medapp.fixture.pack
 import com.kert0n.medapp.fixture.packageRepository
 import com.kert0n.medapp.fixture.tablets
 import com.kert0n.medapp.storage.database.MedAppDatabase
+import java.time.ZoneId
 import java.time.Instant
 import java.time.LocalDate
 import com.kert0n.medapp.storage.medkit.toStorageEntity as toMedKitStorageEntity
@@ -150,7 +151,7 @@ class CoursesJourneyTest {
      */
     @Test
     fun aCourseWithoutABoxStartsAndSaysItIsNotCovered() {
-        val scenarios = Scenarios(database, Instant.now())
+        val scenarios = Scenarios(database, Instant.now(), ZoneId.systemDefault())
         runBlocking {
             val created = scenarios.courseDrafting.create("Нурофен")
             // Завязка отвечает за себя: не записалась — падаем здесь, а не ожиданием на экране.

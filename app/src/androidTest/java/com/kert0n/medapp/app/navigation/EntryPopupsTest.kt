@@ -31,6 +31,7 @@ import com.kert0n.medapp.storage.value.toStorageEntity
 import com.kert0n.medapp.ui.theme.MedAppTheme
 import dagger.hilt.android.testing.HiltAndroidRule
 import dagger.hilt.android.testing.HiltAndroidTest
+import java.time.ZoneId
 import java.time.Instant
 import java.time.LocalDate
 import java.time.LocalTime
@@ -85,7 +86,7 @@ class EntryPopupsTest {
             packages.add(pack(id = OTHER_PACK, name = "Цетрин", quantity = tablets("10"), form = TABLET_FORM, expiresOn = ExpiryDate(LocalDate.now(MOSCOW))))
             startedYesterdayMorning()
             // Сегодняшний проход дня: вчерашнее стало пропуском, срок годности сверен.
-            Scenarios(database, Instant.now()).dailyRound.run()
+            Scenarios(database, Instant.now(), ZoneId.systemDefault()).dailyRound.run()
         }
         compose.setContent { MedAppTheme { MedAppShell() } }
     }

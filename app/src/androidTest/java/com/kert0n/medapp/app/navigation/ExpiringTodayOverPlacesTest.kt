@@ -29,6 +29,7 @@ import com.kert0n.medapp.storage.value.toStorageEntity
 import com.kert0n.medapp.ui.theme.MedAppTheme
 import dagger.hilt.android.testing.HiltAndroidRule
 import dagger.hilt.android.testing.HiltAndroidTest
+import java.time.ZoneId
 import java.time.Instant
 import java.time.LocalDate
 import javax.inject.Inject
@@ -75,7 +76,7 @@ class ExpiringTodayOverPlacesTest {
             database.packageRepository().add(
                 pack(id = PACK, name = "Нурофен", quantity = tablets("10"), form = TABLET_FORM, expiresOn = ExpiryDate(LocalDate.now(MOSCOW)))
             )
-            Scenarios(database, Instant.now()).reminderPromising.promise(
+            Scenarios(database, Instant.now(), ZoneId.systemDefault()).reminderPromising.promise(
                 listOf(
                     Reminder(
                         key = NotificationKey(NotificationKind.EXPIRY_TODAY, PACK.toString()),

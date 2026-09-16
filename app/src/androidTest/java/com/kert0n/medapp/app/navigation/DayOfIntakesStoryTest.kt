@@ -35,6 +35,7 @@ import com.kert0n.medapp.storage.value.toStorageEntity
 import com.kert0n.medapp.ui.theme.MedAppTheme
 import dagger.hilt.android.testing.HiltAndroidRule
 import dagger.hilt.android.testing.HiltAndroidTest
+import java.time.ZoneId
 import java.time.Instant
 import java.time.LocalDate
 import java.time.LocalTime
@@ -101,7 +102,7 @@ class DayOfIntakesStoryTest {
      * по-разному.
      */
     private fun herTreatmentIsAlreadyRunning() = runBlocking {
-        val scenarios = Scenarios(database, Instant.now())
+        val scenarios = Scenarios(database, Instant.now(), ZoneId.systemDefault())
         val created = scenarios.courseDrafting.create("Цетрин")
         val written = scenarios.courseDrafting.edit(
             created.id, created.revision,

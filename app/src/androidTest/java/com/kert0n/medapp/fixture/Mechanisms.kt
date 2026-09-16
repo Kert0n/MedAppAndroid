@@ -31,11 +31,11 @@ class Mechanisms(scenarios: Scenarios, at: java.time.Instant) : AutoCloseable {
 
     val outbox: ReminderOutbox = ReminderOutbox(
         scenarios.reminderStore, scenarios.notifier, scenarios.reminders, scenarios.freshness,
-        scenarios.transactions, Clock.fixed(at, ZoneOffset.UTC), scope
+        scenarios.transactions, Clock.fixed(at, scenarios.zone), scope
     ).also { it.start() }
 
     val upkeep: NotificationUpkeep = NotificationUpkeep(
-        scenarios.reminderStore, scenarios.notificationReconciliation, Clock.fixed(at, ZoneOffset.UTC), scope
+        scenarios.reminderStore, scenarios.notificationReconciliation, Clock.fixed(at, scenarios.zone), scope
     ).also { it.start() }
 
     init {
