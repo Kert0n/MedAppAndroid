@@ -6,7 +6,8 @@ import com.kert0n.medapp.di.SettingsFile
 import com.kert0n.medapp.di.SettingsModule
 import com.kert0n.medapp.domain.notification.NotificationSettingsSource
 import com.kert0n.medapp.feature.settings.SettingsStore
-import com.kert0n.medapp.platform.settings.AndroidDevicePermissions
+import com.kert0n.medapp.platform.settings.CameraAccess
+import com.kert0n.medapp.platform.settings.PermissionStates
 import com.kert0n.medapp.platform.settings.DataStoreSettings
 import com.kert0n.medapp.platform.settings.DevicePermissions
 import com.kert0n.medapp.platform.settings.StoredNotificationSettings
@@ -53,7 +54,31 @@ object TestSettingsModule {
     @Singleton
     fun notificationSettings(implementation: StoredNotificationSettings): NotificationSettingsSource = implementation
 
+    /**
+     * Разрешения проверкам называет [TestPermissions], а не система: отзывать их у приложения
+     * нельзя — Android убивает процесс, и проверка падает не о том, о чём написана. А история
+     * человека, забывшего включить уведомления, — ровно о том, что видно при отказе.
+     */
     @Provides
     @Singleton
-    fun permissions(implementation: AndroidDevicePermissions): DevicePermissions = implementation
+    fun permissions(): DevicePermissions = TestPermissions
+}
+
+/**
+ * Что система «разрешила» в проверке. По умолчанию — всё: истории, которым разрешения безразличны,
+ * о них и не говорят. Отказ называется явно, и после каждой истории состояние возвращается
+ * ([reset]): граф заводится заново, а объект живёт весь прогон.
+ */
+object TestPermissions : DevicePermissions {
+
+    var notifications: Boolean = true
+    var exactAlarms: Boolean = true
+
+    override fun current(): PermissionStates =
+        PermissionStates(notifications = notifications, exactAlarms = exactAlarms, camera = CameraAccess.GRANTED)
+
+    fun reset() {
+        notifications = true
+        exactAlarms = true
+    }
 }
