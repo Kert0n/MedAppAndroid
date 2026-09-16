@@ -2,6 +2,9 @@ package com.kert0n.medapp.ui.course
 
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.PaddingValues
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
@@ -11,12 +14,14 @@ import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.ListItem
+import androidx.compose.material3.ElevatedCard
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
@@ -91,7 +96,11 @@ fun SourcePickingScreen(
                         modifier = Modifier.fillMaxSize()
                     )
                 } else {
-                    LazyColumn(Modifier.fillMaxSize()) {
+                    LazyColumn(
+                        Modifier.fillMaxSize(),
+                        contentPadding = PaddingValues(16.dp),
+                        verticalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
                         items(state.packages, key = { it.packageId }) { pack ->
                             PackageRow(pack, onAttach = { onAttach(pack.packageId) }, enabled = !state.isAttaching)
                         }
@@ -103,33 +112,47 @@ fun SourcePickingScreen(
 }
 
 /**
- * Строка коробки: чем она названа, где лежит и сколько в ней свободно. Неподходящая не прячется,
- * а выключается и второй строкой говорит **почему** — иначе человек ищет пропавшую коробку
- * глазами и не находит (PLAN H3 №17).
+ * Коробка — **карточка**, а не строка списка: у неё есть граница, значок и своё нажатие, и в
+ * списке из десятка коробок глазу нужно за что-то зацепиться (замечание владельца 2026-09-16).
+ * Вид тот же, что у пункта дня, — два списка одного приложения незачем делать разными.
+ *
+ * Неподходящая не прячется, а гаснет и второй строкой говорит **почему**: иначе человек ищет
+ * пропавшую коробку глазами и не находит (PLAN H3 №17).
  */
 @Composable
 private fun PackageRow(pack: PackageAttachmentPresentationDTO, onAttach: () -> Unit, enabled: Boolean) {
     val takeable = pack.isAttachable
-    ListItem(
-        headlineContent = { Text(pack.name) },
-        supportingContent = {
-            Column {
+    ElevatedCard(
+        onClick = onAttach,
+        enabled = enabled && takeable,
+        modifier = Modifier.fillMaxWidth().alpha(if (takeable) 1f else 0.6f)
+    ) {
+        Row(
+            Modifier.padding(16.dp).fillMaxWidth(),
+            horizontalArrangement = Arrangement.spacedBy(12.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Icon(painterResource(R.drawable.ic_medication), contentDescription = null)
+            Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                Text(pack.name, style = MaterialTheme.typography.bodyLarge)
                 Text(
                     listOfNotNull(
                         pack.medKitName,
                         pack.availableToMe?.let { stringResource(R.string.course_source_free, it.amount, it.unit.name) }
-                    ).joinToString(" · ")
+                    ).joinToString(" · "),
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
                 if (!takeable) {
-                    Text(pack.attachability.words(), color = MaterialTheme.colorScheme.error)
+                    Text(
+                        pack.attachability.words(),
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.error
+                    )
                 }
             }
-        },
-        modifier = Modifier
-            .fillMaxWidth()
-            .alpha(if (takeable) 1f else 0.6f)
-            .clickable(enabled = enabled && takeable, onClick = onAttach)
-    )
+        }
+    }
 }
 
 /** Почему коробку нельзя взять — словами, которые ведут к действию. */
