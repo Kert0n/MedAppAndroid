@@ -33,6 +33,7 @@ import com.kert0n.medapp.presentation.intake.IntakeCardViewModel
 import com.kert0n.medapp.presentation.intake.IntakeHistoryViewModel
 import com.kert0n.medapp.presentation.plan.DayPlanViewModel
 import com.kert0n.medapp.ui.intake.IntakeCardScreen
+import com.kert0n.medapp.ui.rememberNotificationPermissionRequest
 import com.kert0n.medapp.ui.intake.IntakeHistoryScreen
 import com.kert0n.medapp.ui.plan.PlanMode
 import com.kert0n.medapp.ui.plan.PlanScreen
@@ -338,6 +339,7 @@ private fun screens(stacks: TabStacks) = entryProvider<NavKey> {
             creationCallback = { factory -> factory.create(key.courseId) }
         )
         val state = model.state.collectAsStateWithLifecycle().value
+        val askAboutNotifications = rememberNotificationPermissionRequest()
         // Записанное или удалённое — повод уйти: человек заводил лечение, а не форму. Начатое
         // ведёт дальше, к карточке: с этого мига у лечения есть что показывать. За источниками
         // ведёт записанный черновик — до записи подключать коробки не к чему.
@@ -347,6 +349,9 @@ private fun screens(stacks: TabStacks) = entryProvider<NavKey> {
             val sources = state.sourcesOf
             when {
                 started != null -> {
+                    // Лечение только что завело напоминания — вот и повод спросить разрешение:
+                    // польза видна в этот же миг (PLAN H3 «Уведомления на экране»).
+                    askAboutNotifications()
                     stacks.back()
                     stacks.go(Screen.CourseCard(started))
                 }

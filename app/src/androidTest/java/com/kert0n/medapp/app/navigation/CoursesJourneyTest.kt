@@ -11,6 +11,7 @@ import androidx.compose.ui.test.performTextInput
 import androidx.test.espresso.Espresso.closeSoftKeyboard
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import com.kert0n.medapp.HiltTestActivity
+import com.kert0n.medapp.fixture.allowNotifications
 import com.kert0n.medapp.fixture.CAPSULE_FORM
 import com.kert0n.medapp.domain.value.Doses
 import com.kert0n.medapp.feature.course.CourseDrafting
@@ -70,6 +71,8 @@ class CoursesJourneyTest {
 
     @Before
     fun setUp() {
+        // Начало лечения спрашивает разрешение на уведомления, и системный диалог закрыл бы окно.
+        allowNotifications()
         hilt.inject()
         runBlocking {
             database.vocabulary().save(

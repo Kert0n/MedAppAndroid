@@ -19,6 +19,7 @@ import androidx.test.ext.junit.runners.AndroidJUnit4
 import com.kert0n.medapp.HiltTestActivity
 import com.kert0n.medapp.domain.value.Doses
 import com.kert0n.medapp.feature.course.CourseDrafting
+import com.kert0n.medapp.fixture.allowNotifications
 import com.kert0n.medapp.fixture.CAPSULE_FORM
 import com.kert0n.medapp.fixture.HOME_KIT
 import com.kert0n.medapp.fixture.MILLILITRES
@@ -80,6 +81,8 @@ class ChangingTreatmentStoryTest {
 
     @Before
     fun setUp() {
+        // Начало лечения спрашивает разрешение на уведомления, и системный диалог закрыл бы окно.
+        allowNotifications()
         hilt.inject()
         runBlocking {
             database.vocabulary().save(
