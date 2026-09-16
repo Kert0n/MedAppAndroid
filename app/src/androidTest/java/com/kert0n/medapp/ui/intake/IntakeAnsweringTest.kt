@@ -261,6 +261,36 @@ class IntakeAnsweringTest {
     }
 
     /**
+     * **Выбранную коробку не подменяют плановой** (CodeRabbit 4030083072). Человек выбрал
+     * «Ибупрофен», а пока он набирал время, коробку отключили от лечения на другом экране. Карточка
+     * молча вернула в выбор плановый «Нурофен», и «Принять» списало бы из коробки, которую человек не
+     * выбирал. Выбор пропадает словами поля — пустым, — и записывать нечего, пока не выберут заново.
+     */
+    @Test
+    fun aChosenBoxThatLeftTheCourseIsNotSwappedForThePlannedOne() = runBlocking {
+        val courseId = startedWithTwoSources()
+        val intakeId = firstIntake(courseId).id
+        val model = cardModel(intakeId)
+
+        watching(model.state) { state ->
+            val shown = state.awaiting(PATIENTLY) { it.sources.size == 2 }
+            model.edit(shown.form.copy(packageId = OTHER_PACK))
+            state.awaiting(PATIENTLY) { it.packageId == OTHER_PACK }
+
+            val plan = requireNotNull(database.courseRepository().findPlan(courseId))
+            scenarios.sourceEditing.save(courseId, plan.revision, listOf(SourceEditing.Source(PACK, Doses(4))))
+            state.awaiting(PATIENTLY) { it.sources.size == 1 }
+            model.confirm()
+            // Записи ждать нечего: даём сценарию время, за которое он записал бы.
+            kotlinx.coroutines.delay(1_000)
+            assertEquals("выбор подменён плановой коробкой", null, state.value.packageId)
+        }
+
+        assertEquals(tablets("20"), database.packageRepository().find(PACK)?.quantity)
+        assertEquals(IntakeStatus.PLANNED, database.intakeRepository().find(intakeId)?.status)
+    }
+
+    /**
      * Отказ — решение: доза считается пропущенной, а коробка остаётся целой. Расхода не было, и
      * списывать нечего (PLAN D6); молчание тем и отличается от отказа, что после него пункт всё
      * ещё ждёт ответа.

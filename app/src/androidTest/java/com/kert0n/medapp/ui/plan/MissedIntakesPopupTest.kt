@@ -102,6 +102,20 @@ class MissedIntakesPopupTest {
         assertEquals(1, dismissed)
     }
 
+    /**
+     * **Ответ на последнюю строку не пропадает вместе с ней** (CodeRabbit 4030083088). Нина нажала
+     * «Принял» за вчерашний приём, а его как раз убрали перестройкой расписания: строка ушла, и с
+     * ней ушло окно — «этого приёма больше нет» так и не было сказано, а всплыло бы при следующем
+     * пропуске чужим ответом.
+     */
+    @Test
+    fun theAnswerToTheLastRowIsToldAfterTheRowLeaves() {
+        show(MissedIntakesUiState(rows = emptyList(), message = com.kert0n.medapp.presentation.plan.DayMessage.Gone))
+
+        compose.onNodeWithText("Этого приёма больше нет").assertIsDisplayed()
+        compose.onNodeWithText("Без ответа за прошлые дни").assertDoesNotExist()
+    }
+
     /** Нечего спрашивать — окна нет вовсе. */
     @Test
     fun nothingMissedShowsNothing() {

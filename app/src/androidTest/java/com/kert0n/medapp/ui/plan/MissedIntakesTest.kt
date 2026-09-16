@@ -223,6 +223,37 @@ class MissedIntakesTest {
     }
 
     /**
+     * **Крестик отмечает сказанным только то, что в попапе стояло** (CodeRabbit 4030083081). Лечение
+     * назначено по Москве, а телефон живёт на час-три западнее: в 01:00 по Москве сегодняшний
+     * пункт уже пропуск, но на телефоне ещё тот же день, и попап его не показывает. Крестик по
+     * прочим строкам отметил сказанным и его — и назавтра последнего шанса у пункта не было.
+     */
+    @Test
+    fun theCrossDoesNotTellWhatThePopupHid(): Unit = runBlocking {
+        val intakes = startedTwoDaysAgo()
+        // 22:00 по Гринвичу — 01:00 11 марта по Москве: пункт 10-го пропущен, а на телефоне ещё 10-е.
+        clock.now = Instant.parse("2027-03-10T22:00:00Z")
+        scenarios().dailyRound.run()
+        val today = intakes.getValue(LocalDate.of(2027, 3, 10))
+        val model = model()
+
+        watching(model.state) { state ->
+            state.awaiting(PATIENTLY) { it.rows.size == 2 }
+            model.dismiss()
+            state.awaiting(PATIENTLY) { it.isEmpty }
+            com.kert0n.medapp.fixture.await("крестик отметил сказанное") {
+                scenarios().reminderStore.awaiting(com.kert0n.medapp.domain.notification.NoticeDelivery.IN_APP_BANNER)
+                    .none { it.key.subject.startsWith(intakes.getValue(LocalDate.of(2027, 3, 9)).id.toString()) }
+            }
+
+            clock.now = Instant.parse("2027-03-11T09:00:00Z")
+            shifts.happened()
+            val tomorrow = state.awaiting(PATIENTLY) { !it.isEmpty }
+            assertEquals(listOf(today.id), tomorrow.rows.mapNotNull { it.intakeId })
+        }
+    }
+
+    /**
      * **Из выброшенной коробки быстрого ответа нет.** Коробку выбросили, пока попап ждал: «Принял»
      * из неё ничего бы не записал, кроме отказа поверх попапа (снимок BigLatest). Строка остаётся —
      * пропуск по-прежнему не отвечен, — но кнопки у неё нет.

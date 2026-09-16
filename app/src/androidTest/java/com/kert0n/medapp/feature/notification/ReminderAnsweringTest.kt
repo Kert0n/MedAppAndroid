@@ -29,7 +29,14 @@ import java.time.Instant
 import java.time.LocalDate
 import java.time.ZoneOffset
 import kotlin.uuid.Uuid
+import kotlinx.coroutines.CompletableDeferred
+import kotlinx.coroutines.DelicateCoroutinesApi
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.GlobalScope
+import kotlinx.coroutines.async
+import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.test.runTest
+import kotlinx.coroutines.withTimeoutOrNull
 import org.junit.After
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNull
@@ -133,6 +140,47 @@ class ReminderAnsweringTest {
         val decision = requireNotNull(scenarios.reminderStore.find(NotificationKey.intake(intake.id, NotificationKind.INTAKE_DECISION)))
         assertEquals(Reminder.State.DUE, decision.state)
         assertEquals(com.kert0n.medapp.domain.notification.NotificationTarget.Intake(intake.id), decision.target)
+    }
+
+    /**
+     * **«Принял» из шторки — одной транзакцией** (PLAN F5, CodeRabbit 4030083049). Коробку убрали,
+     * и «Принял» не записался; пока он заводил «нужно ваше решение», Светлана на карточке нажала
+     * «Пропустил». Отказ снял обязательства, какие были, — а решение легло после него и висит в
+     * шторке над уже отвеченным пунктом. Прочитанное «не записалось» верно только в той транзакции,
+     * где его прочли.
+     */
+    @OptIn(DelicateCoroutinesApi::class)
+    @Test
+    fun aRefusalWhileTakeAsksForADecisionLeavesNoDecisionBehind(): Unit = runBlocking {
+        val id = treated()
+        val intake = first(id)
+        scenarios.packageRemoval.remove(PACK)
+        val real = database.transactions()
+        val refusal = CompletableDeferred<kotlinx.coroutines.Deferred<*>>()
+        // Отказ приходит ровно перед тем, как «Принял» заводит решение: чужой транзакцией, со своего экрана.
+        val refusingBeforePromise = object : com.kert0n.medapp.queue.Transactions {
+            override suspend fun <T> run(block: suspend () -> T): T {
+                if (!refusal.isCompleted) {
+                    val declined = GlobalScope.async(Dispatchers.IO) { scenarios.intakeDeclining.decline(intake.id, now) }
+                    refusal.complete(declined)
+                    withTimeoutOrNull(1_000) { declined.await() }
+                }
+                return real.run(block)
+            }
+        }
+        val answering = ReminderAnswering(
+            scenarios.intakeDeclining, scenarios.intakeConfirmation, database.intakeRepository(),
+            ReminderPromising(scenarios.reminderStore, scenarios.notificationSettings, refusingBeforePromise),
+            scenarios.reminderStore, scenarios.reminderWithdrawal, scenarios.notificationSettings, real,
+            Clock.fixed(now, ZoneOffset.UTC)
+        )
+
+        answering.take(intake.id)
+        refusal.await().await()
+
+        assertEquals(IntakeStatus.MISSED, requireNotNull(database.intakeRepository().find(intake.id)).status)
+        val decision = scenarios.reminderStore.find(NotificationKey.intake(intake.id, NotificationKind.INTAKE_DECISION))
+        assertTrue("решение висит над отвеченным пунктом: $decision", decision == null || decision.state == Reminder.State.WITHDRAWN)
     }
 
     /** Решение принято на карточке — «нужно ваше решение» снимается вместе с напоминанием. */
