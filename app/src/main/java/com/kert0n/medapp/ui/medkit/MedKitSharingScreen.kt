@@ -1,15 +1,19 @@
 package com.kert0n.medapp.ui.medkit
 
+import androidx.annotation.DrawableRes
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.defaultMinSize
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.AlertDialog
@@ -20,6 +24,8 @@ import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedButton
+import androidx.compose.material3.OutlinedCard
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
@@ -29,17 +35,17 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.FilterQuality
-import androidx.compose.foundation.layout.size
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.painterResource
+import androidx.compose.ui.res.stringArrayResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
-import androidx.annotation.DrawableRes
 import com.kert0n.medapp.R
 import com.kert0n.medapp.presentation.medkit.InvitationPresentationDTO
 import com.kert0n.medapp.presentation.medkit.MedKitSharingRefusal
@@ -47,9 +53,10 @@ import com.kert0n.medapp.presentation.medkit.MedKitSharingUiState
 import com.kert0n.medapp.ui.EmptyState
 import com.kert0n.medapp.ui.ErrorMessage
 import com.kert0n.medapp.ui.LoadingState
+import com.kert0n.medapp.ui.NavigationRow
 import com.kert0n.medapp.ui.SecretOnScreen
-import com.kert0n.medapp.ui.copySecret
 import com.kert0n.medapp.ui.TIME
+import com.kert0n.medapp.ui.copySecret
 import com.kert0n.medapp.ui.text
 
 /**
@@ -114,8 +121,18 @@ private fun Deciding(
         modifier = modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(16.dp),
         verticalArrangement = Arrangement.spacedBy(16.dp)
     ) {
-        What(R.string.med_kit_sharing_becomes_shared, R.string.med_kit_sharing_becomes_shared_list)
-        What(R.string.med_kit_sharing_stays_yours, R.string.med_kit_sharing_stays_yours_list)
+        What(
+            icon = R.drawable.ic_public,
+            title = R.string.med_kit_sharing_becomes_shared,
+            items = R.array.med_kit_sharing_becomes_shared_items,
+            tint = MaterialTheme.colorScheme.tertiary
+        )
+        What(
+            icon = R.drawable.ic_lock,
+            title = R.string.med_kit_sharing_stays_yours,
+            items = R.array.med_kit_sharing_stays_yours_items,
+            tint = MaterialTheme.colorScheme.primary
+        )
         Warning(stringResource(R.string.med_kit_sharing_irreversible))
         state.refusal?.let { Refusal(it) }
         Button(
@@ -123,6 +140,8 @@ private fun Deciding(
             enabled = !state.isWorking,
             modifier = Modifier.fillMaxWidth().defaultMinSize(minHeight = 48.dp)
         ) {
+            Icon(painterResource(R.drawable.ic_public), contentDescription = null)
+            Spacer(Modifier.size(8.dp))
             Text(stringResource(R.string.med_kit_sharing_publish))
         }
         if (state.isWorking) Waiting()
@@ -157,19 +176,18 @@ private fun Shared(
             stringResource(R.string.med_kit_sharing_shared, state.name),
             style = MaterialTheme.typography.bodyLarge
         )
-        state.invitation?.let { Code(it, onShowFullScreen) }
+        state.invitation?.let { Code(it, onShowFullScreen, onInvite = onAsk) }
         state.refusal?.let { Refusal(it) }
-        Button(
-            onClick = onAsk,
-            enabled = !state.isWorking,
-            modifier = Modifier.fillMaxWidth().defaultMinSize(minHeight = 48.dp)
-        ) {
-            Text(
-                stringResource(
-                    if (state.invitation == null) R.string.med_kit_sharing_invite
-                    else R.string.med_kit_sharing_invite_again
-                )
-            )
+        if (state.invitation == null) {
+            Button(
+                onClick = onAsk,
+                enabled = !state.isWorking,
+                modifier = Modifier.fillMaxWidth().defaultMinSize(minHeight = 48.dp)
+            ) {
+                Icon(painterResource(R.drawable.ic_key), contentDescription = null)
+                Spacer(Modifier.size(8.dp))
+                Text(stringResource(R.string.med_kit_sharing_invite))
+            }
         }
         if (state.isWorking) Waiting()
     }
@@ -192,7 +210,7 @@ private fun Shared(
  * его кэша раньше (PLAN B6, C1 «Приглашение»).
  */
 @Composable
-private fun Code(invitation: InvitationPresentationDTO, onShowFullScreen: () -> Unit) {
+private fun Code(invitation: InvitationPresentationDTO, onShowFullScreen: () -> Unit, onInvite: () -> Unit) {
     // Ключ на экране — секрет: пока он виден, снимок экрана и показ в недавних запрещены (G3).
     SecretOnScreen()
     // Код ложится в буфер сам, как только выдан (ТЗ 4.1.1.2, C1 «Текстовый код»): человек его
@@ -204,66 +222,111 @@ private fun Code(invitation: InvitationPresentationDTO, onShowFullScreen: () -> 
         Column(
             modifier = Modifier.padding(16.dp),
             horizontalAlignment = Alignment.CenterHorizontally,
-            verticalArrangement = Arrangement.spacedBy(8.dp)
+            verticalArrangement = Arrangement.spacedBy(12.dp)
         ) {
-            Pattern(invitation.key.value, Modifier.size(180.dp))
-            TextButton(onClick = onShowFullScreen) {
-                Text(stringResource(R.string.med_kit_sharing_show_full_screen))
-            }
-            Text(
+            Pattern(
                 invitation.key.value,
-                style = MaterialTheme.typography.titleMedium,
-                textAlign = TextAlign.Center,
+                Modifier.size(180.dp).clip(MaterialTheme.shapes.medium).clickable(onClick = onShowFullScreen)
+            )
+            // Сам код — в рамке и крупно: его читают вслух и сверяют по одному знаку.
+            OutlinedCard(Modifier.fillMaxWidth()) {
+                Row(
+                    modifier = Modifier.padding(start = 16.dp, top = 4.dp, end = 4.dp, bottom = 4.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Text(
+                        invitation.key.value,
+                        style = MaterialTheme.typography.titleMedium,
+                        modifier = Modifier.weight(1f)
+                    )
+                    // Значок копирования — настоящая кнопка: нарисованный просто так, он обещает
+                    // нажатие и не отвечает на него. Код уже в буфере, но человек, потерявший его
+                    // там, кладёт заново отсюда.
+                    IconButton(onClick = { context.copySecret(label, invitation.key.value) }) {
+                        Icon(
+                            painterResource(R.drawable.ic_content_copy),
+                            contentDescription = stringResource(R.string.med_kit_sharing_copy),
+                            tint = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    }
+                }
+            }
+            Marker(
+                icon = R.drawable.ic_check_circle,
+                text = stringResource(R.string.med_kit_sharing_copied),
+                tint = MaterialTheme.colorScheme.onSurfaceVariant
+            )
+            Marker(
+                icon = R.drawable.ic_schedule,
+                text = stringResource(R.string.med_kit_sharing_expires_around, TIME.format(invitation.expiresAround)),
+                tint = MaterialTheme.colorScheme.onSurfaceVariant
+            )
+            // Два действия **столбцом, а не рядом**: рядом они делят ширину, и на крупном шрифте
+            // подписи обрезаются (замечание владельца 2026-09-17, третий случай того же класса).
+            // Показ уводит на весь экран — это строка со стрелкой; обновление случается здесь —
+            // это кнопка.
+            NavigationRow(
+                icon = R.drawable.ic_fullscreen,
+                text = stringResource(R.string.med_kit_sharing_show_full_screen),
+                onClick = onShowFullScreen,
                 modifier = Modifier.fillMaxWidth()
             )
-            Text(
-                stringResource(R.string.med_kit_sharing_copied),
-                style = MaterialTheme.typography.bodyMedium,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                textAlign = TextAlign.Center,
-                modifier = Modifier.fillMaxWidth()
-            )
-            Text(
-                stringResource(R.string.med_kit_sharing_expires_around, TIME.format(invitation.expiresAround)),
-                style = MaterialTheme.typography.bodyMedium,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                textAlign = TextAlign.Center,
-                modifier = Modifier.fillMaxWidth()
-            )
+            OutlinedButton(
+                onClick = onInvite,
+                modifier = Modifier.fillMaxWidth().defaultMinSize(minHeight = 48.dp)
+            ) {
+                Icon(painterResource(R.drawable.ic_refresh), contentDescription = null)
+                Spacer(Modifier.size(8.dp))
+                Text(stringResource(R.string.med_kit_sharing_invite_again))
+            }
         }
     }
 }
 
-/** Заголовок и список под ним: что уезжает и что остаётся. */
+/** Значок и слова рядом: цвет уточняет сказанное, а не заменяет его (PLAN H3). */
 @Composable
-private fun What(title: Int, list: Int) {
+private fun Marker(@DrawableRes icon: Int, text: String, tint: Color) {
+    Row(
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(8.dp)
+    ) {
+        Icon(painterResource(icon), contentDescription = null, tint = tint, modifier = Modifier.size(18.dp))
+        Text(text, style = MaterialTheme.typography.bodyMedium, color = tint)
+    }
+}
+
+/**
+ * Что уезжает и что остаётся — карточкой со значком: замок и земной шар говорят о судьбе сведений
+ * раньше, чем человек дочитает заголовок. Пункты идут **строками**, а не одним абзацем: список
+ * читают глазами по одному, а абзац перечитывают целиком.
+ */
+@Composable
+private fun What(@DrawableRes icon: Int, title: Int, items: Int, tint: Color) {
     ElevatedCard(Modifier.fillMaxWidth()) {
         Column(
             modifier = Modifier.padding(16.dp),
             verticalArrangement = Arrangement.spacedBy(8.dp)
         ) {
-            Text(stringResource(title), style = MaterialTheme.typography.titleMedium)
-            Text(stringResource(list), style = MaterialTheme.typography.bodyMedium)
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                Icon(painterResource(icon), contentDescription = null, tint = tint)
+                Text(stringResource(title), style = MaterialTheme.typography.titleMedium, color = tint)
+            }
+            for (item in stringArrayResource(items)) {
+                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    Text("•", style = MaterialTheme.typography.bodyMedium, color = tint)
+                    Text(item, style = MaterialTheme.typography.bodyMedium)
+                }
+            }
         }
     }
 }
 
-/** Предупреждение: значок и слова, цвет — уточнение, а не сообщение (PLAN H3). */
+/** Предупреждение — тот же значок и слова, только цветом беды (PLAN H3). */
 @Composable
-private fun Warning(text: String, @DrawableRes icon: Int = R.drawable.ic_warning) {
-    Row(
-        verticalAlignment = Alignment.Top,
-        horizontalArrangement = Arrangement.spacedBy(8.dp)
-    ) {
-        Icon(
-            painterResource(icon),
-            contentDescription = null,
-            tint = MaterialTheme.colorScheme.error,
-            modifier = Modifier.size(18.dp)
-        )
-        Text(text, style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.error)
-    }
-}
+private fun Warning(text: String) = Marker(R.drawable.ic_warning, text, MaterialTheme.colorScheme.error)
 
 /** Почему не вышло. Слова — свойство причины, экран их не выбирает. */
 @Composable
