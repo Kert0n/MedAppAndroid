@@ -124,10 +124,26 @@ class DayPageScreenTest {
         val missed = row("Пропущен", state = DayItemPresentationDTO.State.MISSED)
         show(page(items = listOf(waiting, missed)))
 
+        // Подтвердить можно и пропущенное: доза уехала вперёд (PLAN D6).
         compose.onAllNodesWithText("Принял").assertCountEquals(2)
+        // А отказаться — только от того, на что ещё не отвечали.
+        compose.onAllNodesWithText("Пропустил").assertCountEquals(1)
         compose.onAllNodesWithText("Принял").onFirst().performClick()
 
         assertEquals(listOf(waiting.intakeId), confirmed)
+    }
+
+    /**
+     * Пропущенный пункт **говорит о себе** и всё же принимает подтверждение: без слова рядом отказ
+     * выглядел бы так же, как молчание, и человек не узнал бы, что его услышали (найдено историей
+     * Анны).
+     */
+    @Test
+    fun aMissedRowSaysSoAndStillTakesAConfirmation() {
+        show(page(items = listOf(row("Пропущен", state = DayItemPresentationDTO.State.MISSED))))
+
+        compose.onNodeWithText("пропущен").assertIsDisplayed()
+        compose.onNodeWithText("Принял").assertIsDisplayed()
     }
 
     /**

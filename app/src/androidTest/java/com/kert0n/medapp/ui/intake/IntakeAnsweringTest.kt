@@ -165,7 +165,7 @@ class IntakeAnsweringTest {
             page.awaiting(PATIENTLY) { it.ready()?.items?.isNotEmpty() == true }
             model.confirm(intakeId)
             page.awaiting(PATIENTLY) { state ->
-                state.ready()?.items.orEmpty().none { it.canAnswer }
+                state.ready()?.items.orEmpty().none { it.canConfirm }
             }
         }
 
@@ -189,7 +189,7 @@ class IntakeAnsweringTest {
             page.awaiting(PATIENTLY) { it.ready()?.items?.isNotEmpty() == true }
             model.confirm(intakeId)
             model.confirm(intakeId)
-            page.awaiting(PATIENTLY) { state -> state.ready()?.items.orEmpty().none { it.canAnswer } }
+            page.awaiting(PATIENTLY) { state -> state.ready()?.items.orEmpty().none { it.canConfirm } }
         }
 
         assertEquals(tablets("18"), database.packageRepository().find(PACK)?.quantity)

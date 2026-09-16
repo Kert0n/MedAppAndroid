@@ -105,8 +105,11 @@ private fun Card(
                 Text(stringResource(R.string.intake_confirm))
             }
             // Отказ — решение, а не молчание: лечение считает эту дозу пропущенной (PLAN D6).
-            TextButton(onClick = onDecline, enabled = !state.isWriting, modifier = Modifier.fillMaxWidth()) {
-                Text(stringResource(R.string.intake_decline))
+            // От пропущенного отказываться уже нечем — оно и так пропущено.
+            if (state.canDecline) {
+                TextButton(onClick = onDecline, enabled = !state.isWriting, modifier = Modifier.fillMaxWidth()) {
+                    Text(stringResource(R.string.intake_decline))
+                }
             }
         }
         TextButton(onClick = onBack, modifier = Modifier.fillMaxWidth()) {

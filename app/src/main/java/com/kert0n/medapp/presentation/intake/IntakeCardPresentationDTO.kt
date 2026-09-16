@@ -60,6 +60,9 @@ data class IntakeCardUiState(
      */
     val canAnswer: Boolean
         get() = !isWriting && !isGone && (answer == null || answer == Answer.MISSED)
+
+    /** Отказаться можно от того, на что ещё не ответили: пропущенное уже пропущено. */
+    val canDecline: Boolean get() = canAnswer && answer == null
 }
 
 /**

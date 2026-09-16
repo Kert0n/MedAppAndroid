@@ -156,19 +156,23 @@ private fun DayRow(
         leadingContent = { Icon(painterResource(item.state.icon), contentDescription = null) },
         trailingContent = {
             val intakeId = item.intakeId
-            if (item.canAnswer && intakeId != null) {
-                // Ответа два, и оба — решения: «принял» и «не принял». Молчание ответом не
-                // считается, но и не спрашивается дважды (PLAN D6).
-                Row(verticalAlignment = Alignment.CenterVertically) {
+            // Ответа два, и оба — решения: «принял» и «не принял» (PLAN D6). Записанное стоит
+            // рядом: пропущенный пункт и говорит о себе, и принимает подтверждение.
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                if (item.tellsItsState) {
+                    Text(item.stateWords(), style = MaterialTheme.typography.labelLarge)
+                }
+                if (intakeId == null) return@Row
+                if (item.canDecline) {
                     TextButton(onClick = { onDecline(intakeId) }, enabled = !item.isAnswering) {
                         Text(stringResource(R.string.intake_decline))
                     }
+                }
+                if (item.canConfirm) {
                     FilledTonalButton(onClick = { onConfirm(intakeId) }, enabled = !item.isAnswering) {
                         Text(stringResource(R.string.intake_confirm))
                     }
                 }
-            } else {
-                Text(item.stateWords(), style = MaterialTheme.typography.labelLarge)
             }
         },
         modifier = Modifier.clickable(enabled = item.intakeId != null) { onOpen(item) }
