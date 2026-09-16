@@ -29,7 +29,6 @@ import com.kert0n.medapp.fixture.intakeRepository
 import com.kert0n.medapp.fixture.packageRepository
 import com.kert0n.medapp.fixture.schedule
 import com.kert0n.medapp.fixture.tablets
-import com.kert0n.medapp.platform.notifications.NotificationTargetExtras
 import com.kert0n.medapp.storage.database.MedAppDatabase
 import com.kert0n.medapp.storage.medkit.toStorageEntity as toMedKitStorageEntity
 import com.kert0n.medapp.storage.value.toStorageEntity
@@ -41,7 +40,6 @@ import java.time.LocalDate
 import javax.inject.Inject
 import kotlin.uuid.Uuid
 import kotlinx.coroutines.runBlocking
-import org.junit.Assert.assertEquals
 import org.junit.Before
 import org.junit.Rule
 import org.junit.Test
@@ -146,29 +144,6 @@ class NotificationRoutingTest {
         open(NotificationTarget.DayPlan(LocalDate.now(MOSCOW)))
         compose.waitUntil(WAIT) {
             compose.onAllNodesWithText("сегодня", substring = true).fetchSemanticsNodes().isNotEmpty()
-        }
-    }
-
-    /**
-     * «Принял» из шторки по **просроченной** коробке не пишет молча: карточка открывается и
-     * показывает вопрос, а записывает только ответ человека (PLAN D6, C1 «Принял из шторки»).
-     */
-    @Test
-    fun takingFromTheTrayAsksBeforeItWrites() {
-        val courseId = started(expiresOn = LocalDate.now(MOSCOW).minusDays(1))
-        val intakeId = runBlocking {
-            database.intakeRepository().ofCourse(courseId).filterIsInstance<CourseIntake>().minBy { it.slot.at }.id
-        }
-
-        open(NotificationTarget.Intake(intakeId), NotificationAction.TAKE)
-
-        compose.waitUntil(WAIT) {
-            compose.onAllNodesWithText("Прежде чем записать").fetchSemanticsNodes().isNotEmpty()
-        }
-        compose.onNodeWithText("Всё равно принял").assertIsDisplayed()
-        // До ответа не записано ничего: коробка целая.
-        runBlocking {
-            assertEquals(tablets("20"), database.packageRepository().find(PACK)?.quantity)
         }
     }
 }

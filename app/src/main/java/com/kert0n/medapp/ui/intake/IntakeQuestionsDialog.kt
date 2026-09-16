@@ -10,7 +10,6 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import com.kert0n.medapp.R
 import com.kert0n.medapp.presentation.intake.IntakeQuestionPresentationDTO
-import com.kert0n.medapp.ui.DAY
 import com.kert0n.medapp.ui.words
 
 /**
@@ -41,7 +40,6 @@ fun IntakeQuestionsDialog(
 
 @Composable
 private fun IntakeQuestionPresentationDTO.words(): String = when (this) {
-    is IntakeQuestionPresentationDTO.Expired -> stringResource(R.string.intake_question_expired, DAY.format(on))
     is IntakeQuestionPresentationDTO.TouchesReserved ->
         stringResource(R.string.intake_question_touches_reserved, free.words())
 }

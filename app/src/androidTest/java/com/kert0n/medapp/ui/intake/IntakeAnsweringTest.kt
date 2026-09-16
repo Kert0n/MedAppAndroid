@@ -48,7 +48,6 @@ import org.junit.After
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNotNull
-import org.junit.Assert.assertTrue
 import org.junit.Before
 import org.junit.Test
 import org.junit.runner.RunWith
@@ -202,11 +201,12 @@ class IntakeAnsweringTest {
     }
 
     /**
-     * Вопрос быстрый путь не проглатывает: просроченная коробка ничего не записывает, а ведёт на
-     * карточку пункта — отвечать на вопрос человек должен зная (PLAN D6).
+     * Быстрый ответ по просроченной коробке **пишет сразу**: вопроса нет, срок человеку показан
+     * (PLAN C1 «Просроченная пачка», поправка 2026-09-16). Отправляй его на карточку — и одним
+     * нажатием приём было бы не записать.
      */
     @Test
-    fun aQuestionWritesNothingAndSendsThePersonToTheCard() = runBlocking {
+    fun anExpiredBoxIsTakenFromTheDayAtOnce(): Unit = runBlocking {
         val courseId = started(expiresOn = LocalDate.of(2027, 3, 1))
         val intakeId = firstIntake(courseId).id
         val model = dayModel()
@@ -214,13 +214,10 @@ class IntakeAnsweringTest {
         watching(model.page(0)) { page ->
             page.awaiting(PATIENTLY) { it.ready()?.items?.isNotEmpty() == true }
             model.confirm(intakeId)
-            watching(model.asksAbout) { asked -> asked.awaiting(PATIENTLY) { it != null } }
+            page.awaiting(PATIENTLY) { state -> state.ready()?.items.orEmpty().none { it.canConfirm } }
         }
 
-        assertNotNull(model.asksAbout.value)
-        assertEquals(intakeId, model.asksAbout.value?.intakeId)
-        assertEquals(IntakeStatus.PLANNED, database.intakeRepository().find(intakeId)?.status)
-        assertEquals(tablets("20"), database.packageRepository().find(PACK)?.quantity)
+        assertEquals(IntakeStatus.TAKEN, database.intakeRepository().find(intakeId)?.status)
     }
 
     /**
@@ -243,29 +240,6 @@ class IntakeAnsweringTest {
         }
 
         assertEquals(tablets("19"), database.packageRepository().find(PACK)?.quantity)
-    }
-
-    /**
-     * Вопрос виден на карточке списком, и до ответа не записано ничего; «всё равно принял» —
-     * тот же вызов с подтверждением, и он пишет (PLAN D6).
-     */
-    @Test
-    fun theQuestionIsAskedOnTheCardAndAnsweringItWrites() = runBlocking {
-        val courseId = started(expiresOn = LocalDate.of(2027, 3, 1))
-        val intakeId = firstIntake(courseId).id
-        val model = cardModel(intakeId)
-
-        watching(model.state) { state ->
-            state.awaiting(PATIENTLY) { it.unit != null }
-            model.confirm()
-            val asked = state.awaiting(PATIENTLY) { it.questions.isNotEmpty() }
-            assertEquals(IntakeStatus.PLANNED, database.intakeRepository().find(intakeId)?.status)
-            assertTrue(asked.canAnswer)
-            model.confirm(acknowledged = true)
-            state.awaiting(PATIENTLY) { it.isDone }
-        }
-
-        assertEquals(IntakeStatus.TAKEN, database.intakeRepository().find(intakeId)?.status)
     }
 
     /**

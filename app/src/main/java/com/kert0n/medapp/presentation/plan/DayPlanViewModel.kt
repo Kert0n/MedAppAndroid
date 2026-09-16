@@ -99,9 +99,6 @@ class DayPlanViewModel @Inject constructor(
     /** По каким пунктам прямо сейчас идёт запись: второе нажатие по ним ничего не начинает. */
     private val answering = MutableStateFlow(emptySet<Uuid>())
 
-    /** Пункт, о котором сценарий спросил: отвечать на вопрос человек идёт на карточку (H3 №12). */
-    val asksAbout = MutableStateFlow<DayQuestion?>(null)
-
     /** Чем кончился ответ, если по самой странице этого не видно. */
     private val message = MutableStateFlow<DayMessage?>(null)
 
@@ -167,9 +164,6 @@ class DayPlanViewModel @Inject constructor(
      * Быстрый ответ: принято то, что **уже записано в пункте**, — плановая пачка, плановая доза — и
      * в момент «сейчас». Человек нажал одну кнопку и ничего не называл, поэтому и берётся
      * назначенное, а не собранное экраном (H3 №12).
-     *
-     * Вопрос сценария быстрый путь не проглатывает: на него человек отвечает зная, и путь ведёт к
-     * карточке пункта, где вопросы показаны (D6 «вопрос — не отказ и не успех»).
      */
     fun confirm(intakeId: Uuid) {
         if (intakeId in answering.value) return
@@ -233,7 +227,6 @@ class DayPlanViewModel @Inject constructor(
     private fun told(planned: Planned, outcome: IntakeConfirmation.Outcome) {
         when (outcome) {
             is IntakeConfirmation.Outcome.Confirmed -> Unit
-            is IntakeConfirmation.Outcome.Warned -> asksAbout.value = DayQuestion(planned.intakeId)
             is IntakeConfirmation.Outcome.Rejected -> message.value = DayMessage.Refused(outcome.reason)
             IntakeConfirmation.Outcome.Gone -> message.value = DayMessage.Gone
         }
@@ -252,11 +245,6 @@ class DayPlanViewModel @Inject constructor(
     /** Прочитанное сообщение человек уносит сам. */
     fun dismissMessage() {
         message.value = null
-    }
-
-    /** Вопрос показан — карточка открыта, и второй раз открывать её незачем. */
-    fun questionShown() {
-        asksAbout.value = null
     }
 
     /**
@@ -293,6 +281,3 @@ class DayPlanViewModel @Inject constructor(
     )
 }
 
-
-/** Пункт, о котором сценарий спросил: карточка открывается по нему одному. */
-data class DayQuestion(val intakeId: Uuid)

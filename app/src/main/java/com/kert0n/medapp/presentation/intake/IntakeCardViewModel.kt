@@ -9,7 +9,6 @@ import com.kert0n.medapp.domain.intake.IntakeStatus
 import com.kert0n.medapp.domain.value.Dose
 import com.kert0n.medapp.feature.intake.IntakeConfirmation
 import com.kert0n.medapp.feature.intake.IntakeDeclining
-import com.kert0n.medapp.feature.intake.IntakeWarning
 import com.kert0n.medapp.feature.time.Today
 import com.kert0n.medapp.presentation.ParsedInput
 import com.kert0n.medapp.presentation.value.QuantityPresentationDTO
@@ -100,18 +99,11 @@ class IntakeCardViewModel @AssistedInject constructor(
         typed.value = form
     }
 
-    fun dismissQuestions() {
-        writing.value = writing.value.copy(questions = emptyList())
-    }
-
     /**
      * Записать приём. Второе нажатие, пока идёт первое, ничего не начинает: сторожем служит само
      * состояние, а не расторопность пальца.
-     *
-     * [acknowledged] — ответ на вопросы сценария: тот же вызов, повторённый с подтверждением
-     * (PLAN D6). Своего решения карточка не принимает — вопрос задаёт сценарий, отвечает человек.
      */
-    fun confirm(acknowledged: Boolean = false) {
+    fun confirm() {
         // Сторож — у самой записи, а не у её отражения: состояние собрано `stateIn` и отстаёт от
         // записи на оборот, и второе нажатие успевало бы начать второй приём.
         if (writing.value.busy) return
@@ -131,7 +123,7 @@ class IntakeCardViewModel @AssistedInject constructor(
                 is ParsedInput.Rejected -> writing.value = Writing(error = IntakeCardError.Amount(parsed.error))
                 is ParsedInput.Parsed -> {
                     val at = moment(form, today.observe().first().zone)
-                    writing.value = told(confirmation.confirm(intakeId, pkg, Dose(parsed.value), at, acknowledged))
+                    writing.value = told(confirmation.confirm(intakeId, pkg, Dose(parsed.value), at))
                 }
             }
         }
@@ -181,14 +173,12 @@ class IntakeCardViewModel @AssistedInject constructor(
         is IntakeConfirmation.Outcome.Confirmed -> Writing(done = true)
         // Пункта больше нет: показывать нечего, и чтение скажет то же самое.
         IntakeConfirmation.Outcome.Gone -> Writing(done = true)
-        is IntakeConfirmation.Outcome.Warned -> Writing(questions = outcome.warnings)
         is IntakeConfirmation.Outcome.Rejected -> Writing(error = IntakeCardError.Rejected(outcome.reason))
     }
 
-    /** Что идёт прямо сейчас: запись, вопрос к человеку или отказ, который он ещё не прочёл. */
+    /** Что идёт прямо сейчас: запись или отказ, который человек ещё не прочёл. */
     private data class Writing(
         val busy: Boolean = false,
-        val questions: List<IntakeWarning> = emptyList(),
         val error: IntakeCardError? = null,
         val done: Boolean = false
     )
@@ -234,7 +224,6 @@ class IntakeCardViewModel @AssistedInject constructor(
                 IntakeStatus.CANCELLED -> IntakeCardUiState.Answer.CANCELLED
             },
             answeredAt = answer?.at?.atZone(zone)?.toLocalTime(),
-            questions = writing.questions.map { it.toPresentationDTO() },
             error = writing.error,
             isWriting = writing.busy,
             isDone = writing.done

@@ -121,25 +121,17 @@ class UnplannedIntakeViewModelTest {
     )
 
     /**
-     * Просроченная коробка **спрашивает**, а не отказывает: решение человека, но принимает он его
-     * зная (ТЗ 4.1.1.5.5, PLAN D6). Пока не ответил — не записано ничего; ответил «всё равно
-     * принял» — записано. Проглоти экран вопрос — и просроченное списалось бы молча.
+     * Просроченная коробка **не спрашивает**: срок человеку показан, а решать ему (PLAN C1
+     * «Просроченная пачка», поправка владельца 2026-09-16). Задай экран вопрос — и принять
+     * решённое пришлось бы дважды.
      */
     @Test
-    fun anExpiredBoxAsksBeforeTheIntakeIsWritten() {
+    fun anExpiredBoxIsRecordedWithoutAQuestion() {
         val model = viewModel(expiredPackages)
 
         watching(model.state) { state ->
             state.awaiting { !it.isLoading }
             model.record()
-            val asked = state.awaiting { it.questions.isNotEmpty() }
-            assertEquals(
-                listOf(IntakeQuestionPresentationDTO.Expired(LocalDate.of(2026, 9, 15))),
-                asked.questions
-            )
-            assertEquals(emptyList<IntakeOutcome>(), intakes.written)
-
-            model.record(acknowledged = true)
             state.awaiting { it.isRecorded }
         }
 

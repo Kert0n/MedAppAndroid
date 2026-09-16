@@ -1,5 +1,7 @@
 package com.kert0n.medapp.app.navigation
 
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.setValue
 import androidx.compose.animation.ContentTransform
 import androidx.compose.animation.EnterTransition
 import androidx.compose.animation.ExitTransition
@@ -12,13 +14,11 @@ import androidx.compose.material3.NavigationBarItem
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.getValue
 import androidx.compose.runtime.MutableState
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.ui.platform.LocalContext
 import androidx.lifecycle.compose.LifecycleResumeEffect
 import androidx.compose.runtime.saveable.rememberSaveable
-import androidx.compose.runtime.setValue
 import com.kert0n.medapp.presentation.course.CourseFormUiState
 import com.kert0n.medapp.presentation.course.CourseFormViewModel
 import com.kert0n.medapp.presentation.course.CourseCardViewModel
@@ -332,14 +332,6 @@ private fun screens(stacks: TabStacks, planMode: MutableState<PlanMode>) = entry
             days.refreshPermissions()
             onPauseOrDispose { }
         }
-        // Сценарий спросил — быстрый ответ ведёт на карточку пункта: отвечать на вопрос человек
-        // должен зная, а в строке для вопросов места нет (PLAN D6, H3 №12).
-        val question = days.asksAbout.collectAsStateWithLifecycle().value
-        LaunchedEffect(question) {
-            val asked = question ?: return@LaunchedEffect
-            days.questionShown()
-            stacks.go(Screen.IntakeCard(asked.intakeId))
-        }
         PlanScreen(
             mode = planMode.value,
             onMode = { planMode.value = it },
@@ -388,8 +380,6 @@ private fun screens(stacks: TabStacks, planMode: MutableState<PlanMode>) = entry
             onEdit = model::edit,
             onConfirm = { model.confirm() },
             onDecline = model::decline,
-            onAcknowledge = { model.confirm(acknowledged = true) },
-            onDismissQuestions = model::dismissQuestions,
             onBack = stacks::back
         )
     }

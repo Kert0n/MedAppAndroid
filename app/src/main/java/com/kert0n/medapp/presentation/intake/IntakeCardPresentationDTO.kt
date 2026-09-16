@@ -27,8 +27,7 @@ data class IntakeCardPresentationDTO(
  * Карточка пункта целиком.
  *
  * [answer] есть у отвеченного пункта: он уже история, и спрашивать по нему нечего — карточка
- * показывает, что записано, и действий не предлагает. [questions] — то, о чём сценарий спросил до
- * записи: пока на них не ответили, не записано ничего (D6).
+ * показывает, что записано, и действий не предлагает.
  */
 data class IntakeCardUiState(
     val isLoading: Boolean = false,
@@ -44,7 +43,6 @@ data class IntakeCardUiState(
     val form: IntakeCardPresentationDTO = IntakeCardPresentationDTO(),
     val answer: Answer? = null,
     val answeredAt: LocalTime? = null,
-    val questions: List<IntakeQuestionPresentationDTO> = emptyList(),
     val error: IntakeCardError? = null,
     val isWriting: Boolean = false,
     val isDone: Boolean = false
@@ -73,9 +71,6 @@ data class IntakeSourcePresentationDTO(val id: Uuid, val name: String)
 
 /** Вопрос сценария словами экрана: ответ на него — тот же приём, подтверждённый человеком. */
 sealed interface IntakeQuestionPresentationDTO {
-
-    /** Коробка просрочена на день приёма (ТЗ 4.1.1.5.5). */
-    data class Expired(val on: LocalDate) : IntakeQuestionPresentationDTO
 
     /** Приём заденет выделенное лечению или занятое соседями (PLAN D4). */
     data class TouchesReserved(val free: QuantityPresentationDTO) : IntakeQuestionPresentationDTO
