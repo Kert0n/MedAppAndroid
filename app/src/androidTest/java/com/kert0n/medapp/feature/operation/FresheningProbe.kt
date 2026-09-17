@@ -1,6 +1,11 @@
 package com.kert0n.medapp.feature.operation
 
 import com.kert0n.medapp.domain.medkit.MedKit
+import org.junit.Assert.assertTrue
+import kotlinx.coroutines.flow.first
+import com.kert0n.medapp.feature.packages.PackageAdding
+import com.kert0n.medapp.feature.intake.UnplannedIntakeRecording
+import com.kert0n.medapp.domain.value.Dose
 import com.kert0n.medapp.domain.value.DosageForm
 import com.kert0n.medapp.domain.value.Quantity
 import com.kert0n.medapp.domain.value.QuantityUnit
@@ -220,6 +225,44 @@ class FresheningProbe {
         assertEquals(before, requireNotNull(anna.packages.find(shared.box)).quantity)
     }
 
+    /**
+     * Очередь Анны не пуста: разовый приём трёх ещё не уехал, а Борис взял пять. Открытие коробки
+     * приносит подтверждённое сервером число, и её расход ложится поверх него **один раз**: у Анны
+     * двенадцать, а не пятнадцать и не девять. Когда очередь доедет, сервер скажет то же (PLAN E1).
+     */
+    @Test
+    fun anUnsentIntakeIsCountedOnceOverTheFreshNumber(): Unit = runBlocking {
+        val shared = sharedWithBoris()
+        val taken = anna.scenarios().unplannedIntakeRecording.record(shared.box, Dose(pills("3")), java.time.Instant.now())
+        assertTrue("приём не записан: $taken", taken is UnplannedIntakeRecording.Outcome.Recorded)
+        borisTakes(shared.box, "5")
+
+        anna.freshening.pack(shared.box)
+
+        assertAmount("12", anna.effective(shared.box))
+        anna.drain()
+        assertAmount("12", BigDecimal(success(anna.api.packageSnapshot(shared.box)).pack.amount))
+        assertAmount("12", anna.effective(shared.box))
+    }
+
+    /**
+     * Анна положила на общую полку новую коробку, и её создание ещё не уехало. Перечитанная полка
+     * этой коробки не называет — но и пропавшей её не объявляет: сервер о ней ещё не слышал, и
+     * очередь довезёт её своим порядком.
+     */
+    @Test
+    fun aBoxNotYetOnTheServerSurvivesTheShelfReread(): Unit = runBlocking {
+        val shared = sharedWithBoris()
+        val added = anna.scenarios().packageAdding.add(shared.shelf, pack(form = form).facts, pills("10"))
+        val fresh = (added as? PackageAdding.Outcome.Added)?.packageId ?: throw AssertionError("коробка не заведена: $added")
+
+        anna.freshening.medKit(shared.shelf)
+
+        assertNotNull(anna.packages.find(fresh))
+        anna.drain()
+        assertAmount("10", BigDecimal(success(anna.api.packageSnapshot(fresh)).pack.amount))
+    }
+
     /** Устройство Анны: те же части, что у приложения, и дверь перечитывания при связи. */
     private inner class Anna(val api: MedAppApi) {
         val database = inMemoryDatabase()
@@ -240,7 +283,9 @@ class FresheningProbe {
             FakeConnection(online = true),
             medKits,
             packages,
-            transactions
+            transactions,
+            clock,
+            kotlinx.coroutines.CoroutineScope(kotlinx.coroutines.SupervisorJob() + kotlinx.coroutines.Dispatchers.IO)
         )
 
         fun scenarios() = Scenarios(database, clock.instant())
@@ -289,6 +334,9 @@ class FresheningProbe {
                 .single { it.status == SyncOperationStatus.PENDING }.id
             database.queueStorage().take(operation, null, clock.instant())
         }
+
+        suspend fun effective(box: Uuid): BigDecimal =
+            requireNotNull(packages.observe(box).first()).availability.effective.amount
 
         suspend fun drain() {
             val report = worker.drain()
