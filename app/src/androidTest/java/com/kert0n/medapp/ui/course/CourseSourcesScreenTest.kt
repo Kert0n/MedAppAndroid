@@ -125,7 +125,8 @@ class CourseSourcesScreenTest {
         show(CourseSourcesUiState(sources = listOf(source())))
 
         compose.onNodeWithText("Нурофен").assertIsDisplayed()
-        compose.onNodeWithText("Домашняя · свободно 20 таблетка").assertIsDisplayed()
+        compose.onNodeWithText("Домашняя").assertIsDisplayed()
+        compose.onNodeWithText("свободно 20 таблетка").assertIsDisplayed()
         compose.onNodeWithText("выделено 3 приёма · 6 таблетка").assertIsDisplayed()
     }
 

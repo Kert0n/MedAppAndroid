@@ -142,7 +142,7 @@ class CoursesJourneyTest {
 
         // Стек пуст, и подключать пока нечего: доза и форма ещё не названы, сверять коробку не с чем.
         compose.onNodeWithText("Пачек пока нет — подключите первую.").assertIsDisplayed()
-        compose.onNodeWithText("Подключить ещё").performClick()
+        compose.onNodeWithText("Подключить ещё коробку").performClick()
         // Коробка на полке есть, но подключать её не к чему: доза и форма лечения не названы.
         // На 360×640 dp причина лежит второй строкой ниже сгиба — до неё долистывают.
         compose.onNodeWithText("Сначала укажите дозу и форму лечения.")
@@ -218,7 +218,7 @@ class CoursesJourneyTest {
         compose.onNodeWithText("Источники лечения").performScrollTo().performClick()
 
         // Источники открылись — значит, черновик записан.
-        compose.waitUntil(WAIT) { compose.onAllNodesWithText("Подключить ещё").fetchSemanticsNodes().isNotEmpty() }
+        compose.waitUntil(WAIT) { compose.onAllNodesWithText("Подключить ещё коробку").fetchSemanticsNodes().isNotEmpty() }
         compose.onNodeWithContentDescription("Назад").performClick()
 
         compose.onNodeWithText("Отмена").performClick()
