@@ -5,6 +5,7 @@ import com.kert0n.medapp.domain.scan.CodeFormat
 import com.kert0n.medapp.domain.scan.DataMatrixCode
 import com.kert0n.medapp.domain.scan.PackageCodes
 import com.kert0n.medapp.domain.scan.PackageSuggestion
+import com.kert0n.medapp.domain.scan.ScannedCategory
 import com.kert0n.medapp.domain.scan.ScannedCode
 import kotlinx.coroutines.test.runTest
 import org.junit.Assert.assertEquals
@@ -24,7 +25,7 @@ class PackageScanningTest {
         }
     }
 
-    private val suggestion = PackageSuggestion(name = "Ибупрофен", isMedicine = true)
+    private val suggestion = PackageSuggestion(name = "Ибупрофен", category = ScannedCategory.MEDICINE)
     private val text = "0104601234567890215ABCDE12345\u001d91EE11\u001d92dGVzdA=="
 
     @Test

@@ -11,6 +11,7 @@ import kotlinx.serialization.json.jsonPrimitive
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNull
 import org.junit.Test
+import java.time.LocalDate
 
 /** На устройстве CRPT-подсказка выбирает id только из встроенного production-снимка сервера. */
 class CrptFormDeviceTest {
@@ -27,7 +28,7 @@ class CrptFormDeviceTest {
     private fun suggestion(text: String) = json.decodeFromString(
         CrptCheckNetworkDTO.serializer(),
         """{"codeFounded":true,"category":"drugs","screen":{"items":[{"pharmacyData":{"form":"$text"}}]}}"""
-    ).toSuggestion(vocabulary)
+    ).toSuggestion(vocabulary, LocalDate.of(2026, 9, 17))
 
     @Test
     fun commonRareAndUnknownRegistryFormsKeepTheServerIdentityAndRawText() {

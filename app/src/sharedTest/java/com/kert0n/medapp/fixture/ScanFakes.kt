@@ -3,6 +3,7 @@ package com.kert0n.medapp.fixture
 import com.kert0n.medapp.domain.scan.DataMatrixCode
 import com.kert0n.medapp.domain.scan.PackageCodes
 import com.kert0n.medapp.domain.scan.PackageSuggestion
+import com.kert0n.medapp.domain.scan.ScannedCategory
 import kotlinx.coroutines.CompletableDeferred
 
 /**
@@ -43,7 +44,7 @@ class FakePackageCodes(
             name: String = "Цетрин",
             formText: String? = "таблетки, покрытые плёночной оболочкой",
             quantityText: String? = "20 таблеток в 2 блистерах",
-            isMedicine: Boolean = true
+            category: ScannedCategory = ScannedCategory.MEDICINE
         ) = PackageCodes.Lookup.Found(
             PackageSuggestion(
                 name = name,
@@ -53,7 +54,7 @@ class FakePackageCodes(
                 activeSubstance = "цетиризин",
                 dosageText = "10 мг",
                 quantityText = quantityText,
-                isMedicine = isMedicine
+                category = category
             )
         )
     }

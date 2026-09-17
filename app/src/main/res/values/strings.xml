@@ -602,6 +602,10 @@
     <string name="scanner_camera_absent">На этом устройстве нет камеры. Коробки заводятся вручную.</string>
     <string name="scanner_unsupported">Этот код не поддерживается: на упаковках лекарств стоит DataMatrix.</string>
     <string name="scanner_invitation">Это приглашение в аптечку.</string>
+    <string name="pack_scan_asking">Спрашиваем «Честный знак» о коде с упаковки…</string>
+    <string name="pack_category_medicine">Лекарства</string>
+    <string name="pack_category_supplement">БАД</string>
+    <string name="pack_category_antiseptic">Антисептики</string>
     <string name="med_kit_joining_scan">Отсканировать код</string>
     <string name="med_kit_joining_aim">Наведите на QR приглашения</string>
     <string name="med_kit_joining_camera_denied">Камера запрещена. Введите код руками или разрешите камеру в настройках приложения.</string>

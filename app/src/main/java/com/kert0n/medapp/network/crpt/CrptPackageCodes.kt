@@ -3,8 +3,11 @@ package com.kert0n.medapp.network.crpt
 import com.kert0n.medapp.domain.scan.DataMatrixCode
 import com.kert0n.medapp.domain.scan.PackageCodes
 import com.kert0n.medapp.domain.scan.PackageSuggestion
+import com.kert0n.medapp.domain.scan.ScannedCategory
 import com.kert0n.medapp.domain.value.Vocabulary
 import com.kert0n.medapp.network.value.VocabularyResolver
+import java.time.Clock
+import java.time.LocalDate
 import javax.inject.Inject
 
 /**
@@ -16,23 +19,33 @@ import javax.inject.Inject
  */
 class CrptPackageCodes @Inject constructor(
     private val api: CrptApi,
-    private val vocabulary: VocabularyResolver
+    private val vocabulary: VocabularyResolver,
+    private val clock: Clock
 ) : PackageCodes {
 
     override suspend fun lookup(code: DataMatrixCode): PackageCodes.Lookup = when (val check = api.check(code)) {
-        is CrptCheck.Body -> PackageCodes.Lookup.Found(check.dto.toSuggestion(vocabulary.snapshot()))
+        // Сегодня нужно, чтобы отсеять день продажи из будущего: коробку, ещё не проданную,
+        // человек в руках не держит. Время берётся часами, а не `LocalDate.now()` (PLAN H1).
+        is CrptCheck.Body ->
+            PackageCodes.Lookup.Found(check.dto.toSuggestion(vocabulary.snapshot(), LocalDate.now(clock)))
         CrptCheck.NotFound -> PackageCodes.Lookup.NotFound
         is CrptCheck.Unavailable -> PackageCodes.Lookup.Unavailable(check.reason)
     }
 }
 
 /**
- * Категории, которые «Честный знак» считает лекарствами и близким к ним (H5); остальное —
- * предупреждение «это не лекарство».
+ * Чем реестр считает товар. Три вида лекарственного он называет своими словами, и слова эти
+ * закрыты перечислением: «drugs» и «bio» — это лекарство и добавка, а не текст для человека (H5).
+ * Всё остальное — [ScannedCategory.OTHER], и это повод сказать «это не лекарство».
  */
-internal val MEDICINE_CATEGORIES = setOf("drugs", "bio", "antiseptic")
+internal fun categoryOf(named: String?): ScannedCategory = when (named?.trim()?.lowercase()) {
+    "drugs" -> ScannedCategory.MEDICINE
+    "bio" -> ScannedCategory.SUPPLEMENT
+    "antiseptic" -> ScannedCategory.ANTISEPTIC
+    else -> ScannedCategory.OTHER
+}
 
-internal fun CrptCheckNetworkDTO.toSuggestion(words: Vocabulary): PackageSuggestion {
+internal fun CrptCheckNetworkDTO.toSuggestion(words: Vocabulary, today: LocalDate): PackageSuggestion {
     val attributes = attributes
     val pharmacy = pharmacy
     val formText = pharmacy?.form.orNullIfBlank() ?: attributes[FORM_LABEL]
@@ -46,7 +59,8 @@ internal fun CrptCheckNetworkDTO.toSuggestion(words: Vocabulary): PackageSuggest
         activeSubstance = pharmacy?.activeSubstance.orNullIfBlank(),
         dosageText = pharmacy?.dosage.orNullIfBlank() ?: attributes[DOSAGE_LABEL],
         quantityText = pharmacy?.quantity.orNullIfBlank() ?: QUANTITY_LABELS.firstNotNullOfOrNull { attributes[it] },
-        isMedicine = category?.trim()?.lowercase() in MEDICINE_CATEGORIES
+        boughtOn = boughtOn(today),
+        category = categoryOf(category)
     )
 }
 
