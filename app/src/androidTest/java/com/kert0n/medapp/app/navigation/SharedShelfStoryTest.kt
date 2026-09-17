@@ -13,6 +13,7 @@ import androidx.compose.ui.test.onLast
 import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
+import androidx.compose.ui.test.performTextInput
 import androidx.compose.ui.text.AnnotatedString
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import androidx.test.platform.app.InstrumentationRegistry
@@ -136,6 +137,8 @@ class SharedShelfStoryTest {
         val code = marinaTakesTheCode()
         sergeyJoinsAndTakesTwo(code)
         marinaSeesTheNewNumber()
+        sergeyEmptiesTheBoxBehindHerBack()
+        marinaTakesWhatIsNoLongerThereAndIsRefused()
     }
 
     private fun marinaReadsThePriceAndMakesItShared() {
@@ -197,6 +200,37 @@ class SharedShelfStoryTest {
         compose.waitUntil(WAIT) { shownPart("8") }
     }
 
+    /** Сергей допивает коробку, пока Марина о ней не спрашивала: она думает, что там восемь. */
+    private fun sergeyEmptiesTheBoxBehindHerBack() = runBlocking {
+        val sergey = requireNotNull(ProbeAccounts.boris)
+        val seen = success(sergey.packageSnapshot(box))
+        val taken = sergey.synchronise(
+            box, Uuid.random(), PackageSyncNetworkDTO(consumed = "7", packageVersion = seen.pack.version)
+        )
+        check(taken is ApiResult.Success) { "Сергей не смог допить коробку: $taken" }
+    }
+
+    /**
+     * Марина принимает три таблетки из коробки, в которой их уже одна. Отказ здесь **заработан**:
+     * сервер отвергает её расход по остатку сам, а не по заказу проверки. Экран называет причину
+     * и ведёт к пересчёту — расхождение о числе лечится им (PLAN E3, REQ-045).
+     */
+    private fun marinaTakesWhatIsNoLongerThereAndIsRefused() {
+        openTheShelf()
+        compose.onNodeWithText("Ибупрофен Марины").performClick()
+        compose.waitUntil(WAIT) { shown("Сколько есть") }
+        compose.onNodeWithContentDescription("Принять").performClick()
+        compose.waitUntil(WAIT) { shown("Принять разово") }
+        compose.onNodeWithText("Сколько принял").performTextInput("3")
+        compose.onAllNodesWithText("Принять").onLast().performClick()
+        compose.waitUntil(WAIT) { !shown("Принять разово") }
+
+        refreshFromOptions()
+
+        compose.waitUntil(WAIT) { shown("На сервере осталось меньше, чем вы списали") }
+        compose.onNodeWithText("Пересчитать коробку").assertIsDisplayed()
+    }
+
     /** К местам — возвратами: панели мест в глубине нет, она у мест (PLAN H3 «Оболочка»). */
     private fun outToPlaces() {
         repeat(4) {
@@ -209,7 +243,11 @@ class SharedShelfStoryTest {
 
     private fun openTheShelf() {
         outToPlaces()
-        compose.onNodeWithText("Аптечки").performClick()
+        // «Аптечки» на экране бывает двумя узлами — подписью места и заголовком самого места,
+        // поэтому нажимается подпись внизу, а не первое совпадение.
+        if (!shown("Семейная Марины")) {
+            compose.onAllNodesWithText("Аптечки").onLast().performClick()
+        }
         compose.waitUntil(WAIT) { shown("Семейная Марины") }
         compose.onNodeWithText("Семейная Марины").performClick()
         compose.waitUntil(WAIT) { shown("Ибупрофен Марины") }
@@ -218,16 +256,18 @@ class SharedShelfStoryTest {
     /** Заход целиком — очередь и снимок: там, где об обмене и говорят (PLAN H3 №28). */
     private fun refreshFromOptions() {
         outToPlaces()
-        compose.onNodeWithText("Опции").performClick()
+        compose.onAllNodesWithText("Опции").onLast().performClick()
         compose.waitUntil(WAIT) { shown("Синхронизация") }
         compose.onAllNodesWithText("Синхронизация").onFirst().performClick()
         // «Обновить» — подпись значка, а не текст: у кнопки в верхней панели слов нет.
         compose.waitUntil(WAIT) { described("Обновить") }
         compose.onNodeWithContentDescription("Обновить").performClick()
+        // Ждём конца захода, а не пустой очереди: отвергнутая строка из неё и не должна уходить —
+        // она ждёт решения человека (PLAN C1 «Отказ разобран человеком»).
         try {
-            compose.waitUntil(WAIT) { shown("Всё доехало") }
+            compose.waitUntil(WAIT) { shownPart("Последний обмен в") }
         } catch (timeout: androidx.compose.ui.test.ComposeTimeoutException) {
-            throw AssertionError("очередь не опустела; на экране: ${screenTexts()}", timeout)
+            throw AssertionError("заход не кончился; на экране: ${screenTexts()}", timeout)
         }
     }
 
