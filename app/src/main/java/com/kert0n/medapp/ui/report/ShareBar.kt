@@ -22,6 +22,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.layout.Layout
 import androidx.compose.ui.semantics.clearAndSetSemantics
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import com.kert0n.medapp.R
@@ -50,7 +51,12 @@ fun ShareBar(
     val text = if (dimmed) MaterialTheme.colorScheme.onSurfaceVariant else MaterialTheme.colorScheme.onSurface
     val row = if (onClick == null) modifier else modifier.clickable(onClick = onClick)
     Column(
-        row.fillMaxWidth().defaultMinSize(minHeight = 48.dp).padding(vertical = 6.dp),
+        // Строка — **одна** единица чтения: подпись, число и пояснение читаются вместе, а не
+        // тремя отдельными кусками, и вместе с ними чтец называет нажатие, когда оно есть.
+        row.semantics(mergeDescendants = true) { }
+            .fillMaxWidth()
+            .defaultMinSize(minHeight = 48.dp)
+            .padding(vertical = 6.dp),
         verticalArrangement = Arrangement.spacedBy(4.dp)
     ) {
         Row(
