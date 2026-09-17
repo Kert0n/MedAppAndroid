@@ -18,8 +18,9 @@ import com.kert0n.medapp.ui.NavigationRow
  * строк: состояние синхронизации (№28) и экраны настроек (№27). Учётной записи среди строк нет
  * (PLAN C1).
  *
- * Строка говорит, есть ли о чём беспокоиться: очередь, которая чего-то ждёт, названа прямо здесь,
- * иначе человек узнавал бы о ней только из уведомления.
+ * Строка говорит, есть ли о чём беспокоиться: очередь, которая чего-то ждёт, и выключенное
+ * разрешение названы прямо здесь, иначе человек узнавал бы о них только из уведомления — или
+ * из его отсутствия.
  */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -27,6 +28,8 @@ fun OptionsScreen(
     outstanding: Int,
     onSyncStatus: () -> Unit,
     onSettings: () -> Unit,
+    permissionsTrouble: Boolean,
+    onPermissions: () -> Unit,
     modifier: Modifier = Modifier
 ) {
     Scaffold(
@@ -50,6 +53,16 @@ fun OptionsScreen(
                     text = stringResource(R.string.settings_row),
                     supporting = stringResource(R.string.settings_row_supporting),
                     onClick = onSettings
+                )
+            }
+            item {
+                NavigationRow(
+                    icon = if (permissionsTrouble) R.drawable.ic_warning else R.drawable.ic_verified_user,
+                    text = stringResource(R.string.permissions_row),
+                    supporting = stringResource(
+                        if (permissionsTrouble) R.string.permissions_row_attention else R.string.permissions_row_supporting
+                    ),
+                    onClick = onPermissions
                 )
             }
         }

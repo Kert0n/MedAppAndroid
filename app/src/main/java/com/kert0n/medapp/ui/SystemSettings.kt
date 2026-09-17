@@ -30,3 +30,13 @@ fun Context.openExactAlarmSettings() {
         .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
     startActivity(intent)
 }
+
+/**
+ * Страница приложения в системных настройках: разрешение на камеру система выдаёт диалогом,
+ * а отозванное чинится только там — своего экрана у камеры, в отличие от уведомлений, нет.
+ */
+fun Context.openAppDetailsSettings() {
+    val intent = Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS, Uri.fromParts("package", packageName, null))
+        .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+    startActivity(intent)
+}

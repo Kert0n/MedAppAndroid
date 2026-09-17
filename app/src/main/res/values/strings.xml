@@ -225,6 +225,9 @@
     <string name="sync_status_attention">Есть незакрытые операции</string>
     <string name="settings_row">Уведомления</string>
     <string name="settings_row_supporting">Пороги, время сводки, обмен с сервером</string>
+    <string name="permissions_row">Разрешения</string>
+    <string name="permissions_row_supporting">Уведомления, будильники, камера</string>
+    <string name="permissions_row_attention">Что-то выключено</string>
 
     <!-- Настройки (экран 27) -->
     <string name="settings_title">Настройки</string>
@@ -247,6 +250,18 @@
     <string name="settings_threshold_not_a_number">Дни — это число</string>
     <string name="settings_threshold_negative">Дней не бывает меньше нуля</string>
     <string name="settings_not_saved">Не удалось записать — прежние настройки действуют</string>
+
+    <!-- Разрешения (экран 27) -->
+    <string name="permissions_title">Разрешения</string>
+    <string name="permissions_notifications">Уведомления</string>
+    <string name="permissions_notifications_muted">Канал «Приёмы» заглушён — включить в настройках</string>
+    <string name="permissions_exact_alarms">Точные будильники</string>
+    <string name="permissions_exact_alarms_denied">Выключены — напоминания могут опаздывать</string>
+    <string name="permissions_camera">Камера</string>
+    <string name="permissions_granted">Разрешено</string>
+    <string name="permissions_denied">Выключено — исправить в настройках телефона</string>
+    <string name="permissions_absent">Нет на этом устройстве — коды вводятся вручную</string>
+    <string name="permissions_not_needed">Не требуется на этой версии Android</string>
     <string name="sync_refresh">Обновить</string>
     <string name="sync_running">Идёт обмен с сервером</string>
     <string name="sync_offline">Связи нет — очередь подождёт</string>

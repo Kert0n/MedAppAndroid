@@ -90,6 +90,10 @@ sealed interface Screen : NavKey {
     @Serializable
     data object Settings : Screen
 
+    /** Разрешения (PLAN H3 №27): состояние системы, данных не несёт. */
+    @Serializable
+    data object Permissions : Screen
+
     /**
      * Редактор лечения (PLAN H3 №15): без [courseId] — новый черновик, с ним — записанный
      * черновик или идущее лечение; что из двух, экран узнаёт у базы.

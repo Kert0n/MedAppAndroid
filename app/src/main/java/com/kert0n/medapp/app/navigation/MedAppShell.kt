@@ -66,9 +66,12 @@ import com.kert0n.medapp.presentation.medkit.MedKitSharingViewModel
 import com.kert0n.medapp.presentation.medkit.MedKitListViewModel
 import com.kert0n.medapp.presentation.pack.MedKitContentsViewModel
 import com.kert0n.medapp.presentation.operation.SyncStatusViewModel
+import com.kert0n.medapp.presentation.settings.PermissionsViewModel
 import com.kert0n.medapp.presentation.settings.SettingsUiState
 import com.kert0n.medapp.presentation.settings.SettingsViewModel
+import com.kert0n.medapp.ui.settings.PermissionsScreen
 import com.kert0n.medapp.ui.settings.SettingsScreen
+import com.kert0n.medapp.ui.openAppDetailsSettings
 import com.kert0n.medapp.presentation.pack.PackageCardViewModel
 import com.kert0n.medapp.presentation.pack.PackageFormViewModel
 import com.kert0n.medapp.presentation.pack.PackageRecountViewModel
@@ -555,10 +558,33 @@ private fun screens(stacks: TabStacks, planMode: MutableState<PlanMode>) = entry
     }
     entry(Screen.Options) {
         val model: SyncStatusViewModel = hiltViewModel()
+        val permissions: PermissionsViewModel = hiltViewModel()
+        // Разрешения меняют у системы: вернулся — спрашиваем заново (PLAN H3 №27).
+        LifecycleResumeEffect(permissions) {
+            permissions.refresh()
+            onPauseOrDispose { }
+        }
         OptionsScreen(
             outstanding = model.state.collectAsStateWithLifecycle().value.rows.size,
             onSyncStatus = { stacks.go(Screen.SyncStatus) },
-            onSettings = { stacks.go(Screen.Settings) }
+            onSettings = { stacks.go(Screen.Settings) },
+            permissionsTrouble = permissions.state.collectAsStateWithLifecycle().value.hasTrouble,
+            onPermissions = { stacks.go(Screen.Permissions) }
+        )
+    }
+    entry(Screen.Permissions) {
+        val model: PermissionsViewModel = hiltViewModel()
+        val context = LocalContext.current
+        LifecycleResumeEffect(model) {
+            model.refresh()
+            onPauseOrDispose { }
+        }
+        PermissionsScreen(
+            state = model.state.collectAsStateWithLifecycle().value,
+            onFixNotifications = context::openNotificationSettings,
+            onFixAlarms = context::openExactAlarmSettings,
+            onFixCamera = context::openAppDetailsSettings,
+            onBack = stacks::back
         )
     }
     entry(Screen.Settings) {
