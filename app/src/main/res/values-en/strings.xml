@@ -544,8 +544,12 @@
     <string name="course_finished">This treatment is already over.</string>
     <string name="course_sources">Sources</string>
     <string name="course_sources_open">Treatment sources</string>
-    <string name="course_sources_add">Attach more</string>
-    <string name="course_sources_unsaved">The change isn\'t saved: supply will be recalculated after “Save”.</string>
+    <string name="course_sources_add">Attach another box</string>
+    <string name="course_sources_supply">Supply</string>
+    <string name="course_sources_recorded">Saved</string>
+    <string name="course_sources_with_edit">With the change</string>
+    <string name="course_sources_by_composition">By composition</string>
+    <string name="course_sources_order">Taken from top to bottom</string>
     <string name="course_cancel_already_finished">The treatment is already over — nothing to cancel.</string>
     <string name="intake_unplanned_title">Take once</string>
     <string name="intake_free_of_total">%1$s of %2$s free</string>
@@ -601,6 +605,7 @@
         <item quantity="other">%d intakes needed</item>
     </plurals>
     <string name="course_source_doses">Intakes out of %1$d</string>
+    <string name="course_source_doses_of">of %1$d</string>
     <string name="course_source_no_limit">Set the dose and the number of intakes — then there will be something to allocate.</string>
     <string name="course_source_gives_nothing">Not even a whole dose is left here.</string>
     <string name="course_source_gives_nothing_for">Not even one dose (%1$s %2$s) is here: a dose is taken from a single box.</string>

@@ -182,9 +182,9 @@ class PrescriptionStoryTest {
     private fun sheAttachesTheBoxAndAllocatesDoses() {
         compose.onNodeWithText("Источники лечения").performScrollTo().performClick()
         compose.waitUntil(WAIT) {
-            compose.onAllNodesWithText("Подключить ещё").fetchSemanticsNodes().isNotEmpty()
+            compose.onAllNodesWithText("Подключить ещё коробку").fetchSemanticsNodes().isNotEmpty()
         }
-        compose.onNodeWithText("Подключить ещё").performClick()
+        compose.onNodeWithText("Подключить ещё коробку").performClick()
 
         compose.onNodeWithText("Сначала укажите дозу и форму лечения.").assertDoesNotExist()
         compose.onNodeWithText("Нурофен").performClick()
@@ -192,8 +192,8 @@ class PrescriptionStoryTest {
         compose.waitUntil(WAIT) {
             compose.onAllNodesWithText("выделено 0 приёмов", substring = true).fetchSemanticsNodes().isNotEmpty()
         }
-        // Предел строки виден подписью поля, а набирают в само поле: на экране оно одно.
-        compose.onNodeWithText("Приёмов из 10", useUnmergedTree = true).assertExists()
+        // Предел строки назван у поля — и чтецу целиком, — а набирают в само поле: на экране оно одно.
+        compose.onNodeWithContentDescription("Приёмов из 10").assertExists()
         compose.onNode(hasSetTextAction()).performTextReplacement("7")
         // Подвал уходит на время ввода: человек убирает клавиатуру, чтобы нажать.
         closeSoftKeyboard()

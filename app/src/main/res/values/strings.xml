@@ -567,8 +567,12 @@
     <string name="course_finished">Это лечение уже закончено.</string>
     <string name="course_sources">Источники</string>
     <string name="course_sources_open">Источники лечения</string>
-    <string name="course_sources_add">Подключить ещё</string>
-    <string name="course_sources_unsaved">Правка не записана: обеспечение пересчитается после «Сохранить».</string>
+    <string name="course_sources_add">Подключить ещё коробку</string>
+    <string name="course_sources_supply">Обеспечение</string>
+    <string name="course_sources_recorded">Записано</string>
+    <string name="course_sources_with_edit">С правкой</string>
+    <string name="course_sources_by_composition">По составу</string>
+    <string name="course_sources_order">Берётся сверху вниз</string>
     <string name="course_cancel_already_finished">Лечение уже закончилось — отменять нечего.</string>
     <string name="intake_unplanned_title">Принять разово</string>
     <string name="intake_free_of_total">Свободно %1$s из %2$s</string>
@@ -630,6 +634,7 @@
         <item quantity="other">нужно %d приёма</item>
     </plurals>
     <string name="course_source_doses">Приёмов из %1$d</string>
+    <string name="course_source_doses_of">из %1$d</string>
     <string name="course_source_no_limit">Укажите дозу и число приёмов — тогда будет что выделять.</string>
     <string name="course_source_gives_nothing">Целой дозы здесь уже не наберётся.</string>
     <string name="course_source_gives_nothing_for">Одной дозы (%1$s %2$s) здесь не наберётся: доза берётся из одной коробки.</string>

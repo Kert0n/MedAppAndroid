@@ -1,6 +1,7 @@
 package com.kert0n.medapp.tour
 
 import android.graphics.Bitmap
+import androidx.compose.ui.test.hasSetTextAction
 import androidx.compose.ui.test.hasText
 import androidx.compose.ui.test.junit4.v2.createAndroidComposeRule
 import androidx.compose.ui.test.onAllNodesWithContentDescription
@@ -332,7 +333,11 @@ class PlanTour : ScreenTour() {
         back()
         tap("Источники лечения")
         snap("16-course-sources/stack")
-        tap("Подключить ещё")
+        compose.onNode(hasSetTextAction()).performTextReplacement("8")
+        closeSoftKeyboard()
+        see("С правкой")
+        snap("16-course-sources/unsaved-edit")
+        tap("Подключить ещё коробку")
         snap("17-source-picking/cards")
         back()
         back()

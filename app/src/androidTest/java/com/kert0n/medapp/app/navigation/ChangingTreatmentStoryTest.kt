@@ -155,7 +155,7 @@ class ChangingTreatmentStoryTest {
     private fun heSpendsTheOpenedBoxFirst() {
         compose.onNodeWithText("Источники лечения").performScrollTo().performClick()
         compose.waitUntil(WAIT) {
-            compose.onAllNodesWithText("Подключить ещё").fetchSemanticsNodes().isNotEmpty()
+            compose.onAllNodesWithText("Подключить ещё коробку").fetchSemanticsNodes().isNotEmpty()
         }
 
         // Перестановка доступна и пальцем (перетаскиванием за ручку), и действием доступности;
@@ -166,7 +166,7 @@ class ChangingTreatmentStoryTest {
         compose.onNodeWithText("Сохранить").performClick()
 
         compose.waitUntil(WAIT) {
-            compose.onAllNodesWithText("Правка не записана", substring = true).fetchSemanticsNodes().isEmpty()
+            compose.onAllNodesWithText("С правкой").fetchSemanticsNodes().isEmpty()
         }
         // Записанный состав виден на самом экране, и порядок в нём — тот, что выбрал Пётр:
         // початая коробка стоит первой. Без этого шаг проходил бы и со сломанной перестановкой.
@@ -197,7 +197,7 @@ class ChangingTreatmentStoryTest {
     private fun heGivesTheOtherBoxAway() {
         compose.onNodeWithText("Источники лечения").performScrollTo().performClick()
         compose.waitUntil(WAIT) {
-            compose.onAllNodesWithText("Подключить ещё").fetchSemanticsNodes().isNotEmpty()
+            compose.onAllNodesWithText("Подключить ещё коробку").fetchSemanticsNodes().isNotEmpty()
         }
 
         compose.onAllNodesWithText("Отвязать")[0].performClick()
