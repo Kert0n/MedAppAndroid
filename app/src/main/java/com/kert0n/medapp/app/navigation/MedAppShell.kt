@@ -40,8 +40,10 @@ import com.kert0n.medapp.presentation.plan.DayPlanViewModel
 import com.kert0n.medapp.presentation.plan.MissedIntakesViewModel
 import com.kert0n.medapp.ui.plan.MissedIntakesPopup
 import com.kert0n.medapp.ui.intake.IntakeCardScreen
+import com.kert0n.medapp.ui.openAppSettings
 import com.kert0n.medapp.ui.openExactAlarmSettings
 import com.kert0n.medapp.ui.openNotificationSettings
+import com.kert0n.medapp.ui.rememberCameraPermissionRequest
 import com.kert0n.medapp.ui.rememberNotificationPermissionRequest
 import com.kert0n.medapp.ui.intake.IntakeHistoryScreen
 import com.kert0n.medapp.ui.notification.ExpiringTodayPopup
@@ -70,6 +72,8 @@ import com.kert0n.medapp.presentation.pack.PackageCardViewModel
 import com.kert0n.medapp.presentation.pack.PackageFormViewModel
 import com.kert0n.medapp.presentation.pack.PackageRecountViewModel
 import com.kert0n.medapp.presentation.pack.PackageTransferViewModel
+import com.kert0n.medapp.presentation.scan.ScannerCamera
+import com.kert0n.medapp.presentation.scan.ScannerViewModel
 import com.kert0n.medapp.ui.EmptyState
 import com.kert0n.medapp.ui.medkit.MedKitContentsScreen
 import com.kert0n.medapp.ui.medkit.MedKitFormScreen
@@ -82,6 +86,7 @@ import com.kert0n.medapp.ui.pack.PackageRecountScreen
 import com.kert0n.medapp.ui.pack.PackageTransferScreen
 import com.kert0n.medapp.ui.operation.OptionsScreen
 import com.kert0n.medapp.ui.operation.SyncStatusScreen
+import com.kert0n.medapp.ui.scan.ScannerScreen
 
 /**
  * Оболочка приложения: пять мест внизу и содержимое над ними. Где человек стоит и как глубоко —
@@ -110,6 +115,11 @@ fun MedAppShell(
     // него. Передай значением — список экранов пришлось бы собирать заново на каждую смену
     // режима, и `NavDisplay` показал бы прежний.
     val planMode = rememberSaveable { mutableStateOf(PlanMode.COURSES) }
+    // Прочитанный камерой ключ приглашения — **в памяти оболочки**, а не в маршруте: ключ секрет, а
+    // маршрут ложится в сохранённую стопку (PLAN G3). Поэтому и не `rememberSaveable`: пережить
+    // смерть процесса ключ не должен, как не переживает её ключ на экране 21. Живёт он ровно от
+    // сканера до вступления, которое его забирает.
+    val scanned = remember { mutableStateOf<String?>(null) }
     // Цель применяется **один раз**: иначе поворот экрана возвращал бы человека туда, откуда он
     // уже ушёл. Намерение опустошает окно, а эта проверка бережёт от повторного применения.
     LaunchedEffect(opening) {
@@ -138,7 +148,7 @@ fun MedAppShell(
         bottomBar = { if (stacks.screen in PLACES) Places(stacks) }
     ) { padding ->
         NavDisplay(
-            entries = stacks.entries(remember(stacks, planMode) { screens(stacks, planMode) }),
+            entries = stacks.entries(remember(stacks, planMode, scanned) { screens(stacks, planMode, scanned) }),
             onBack = stacks::back,
             modifier = Modifier.padding(padding).consumeWindowInsets(padding),
             transitionSpec = { SWITCH },
@@ -185,7 +195,11 @@ fun MedAppShell(
  * Состояние экрану даёт `hiltViewModel` здесь же, а аргумент приходит **значением из ключа**:
  * экран получает `state` и действия и больше ничего (PLAN H1).
  */
-private fun screens(stacks: TabStacks, planMode: MutableState<PlanMode>) = entryProvider<NavKey> {
+private fun screens(
+    stacks: TabStacks,
+    planMode: MutableState<PlanMode>,
+    scanned: MutableState<String?>
+) = entryProvider<NavKey> {
     entry(Screen.MedKits) {
         val model: MedKitListViewModel = hiltViewModel()
         MedKitListScreen(
@@ -254,11 +268,27 @@ private fun screens(stacks: TabStacks, planMode: MutableState<PlanMode>) = entry
                 stacks.go(Screen.MedKitContents(it))
             }
         }
+        // Пришли со сканера — код уже прочитан, и переписывать его человеку незачем. Ключ
+        // забирается один раз: иначе поворот экрана возвращал бы в поле то, что человек стёр.
+        LaunchedEffect(Unit) {
+            scanned.value?.let {
+                model.type(it)
+                scanned.value = null
+            }
+        }
+        // Разрешённая камера открывается сразу, неразрешённая сперва спрашивает: просьба стоит
+        // там, где человек нажал «Отсканировать», и объяснять её не нужно.
+        val askForCamera = rememberCameraPermissionRequest { granted ->
+            if (granted) model.scan() else model.cameraDenied()
+        }
         MedKitJoiningScreen(
             state = state,
             onType = model::type,
             onJoin = model::join,
-            onBack = stacks::back
+            onBack = stacks::back,
+            onScan = askForCamera,
+            onStopScanning = model::stopScanning,
+            onCode = model::seen
         )
     }
     entry<Screen.MedKitSharing> { key ->
@@ -281,7 +311,9 @@ private fun screens(stacks: TabStacks, planMode: MutableState<PlanMode>) = entry
         val model = hiltViewModel<PackageFormViewModel, PackageFormViewModel.Factory>(
             key = key.toString(),
             creationCallback = { factory ->
-                factory.create(PackageFormViewModel.Opened(key.medKitId, key.packageId))
+                factory.create(
+                    PackageFormViewModel.Opened(key.medKitId, key.packageId, key.scannedCode)
+                )
             }
         )
         val state = model.state.collectAsStateWithLifecycle().value
@@ -570,7 +602,45 @@ private fun screens(stacks: TabStacks, planMode: MutableState<PlanMode>) = entry
             onBack = stacks::back
         )
     }
-    for (place in Place.entries - Place.MED_KITS - Place.PLAN - Place.OPTIONS) {
+    entry(Screen.Scanner) {
+        val model: ScannerViewModel = hiltViewModel()
+        val state = model.state.collectAsStateWithLifecycle().value
+        // Разрешение меняет человек у системы: вернулся на место — спрашиваем заново, а прочитанный
+        // код забываем (PLAN H3 «Набор сканера»).
+        LifecycleResumeEffect(model) {
+            model.resumed()
+            onPauseOrDispose { }
+        }
+        val askForCamera = rememberCameraPermissionRequest { model.asked() }
+        // Просьба — в тот миг, когда она объяснима: человек открыл сканер, камера нужна сейчас.
+        // Один раз: спрошенное состояние — уже другое (`REFUSED`), и второй просьбы не будет.
+        LaunchedEffect(state.camera) {
+            if (state.camera == ScannerCamera.UNASKED) askForCamera()
+        }
+        // Код с коробки ведёт в форму: спрашивает о нём реестр она сама (PLAN C1).
+        LaunchedEffect(state.opening) {
+            val code = state.opening ?: return@LaunchedEffect
+            model.opened()
+            stacks.go(Screen.PackageForm(scannedCode = code))
+        }
+        // Приглашение ведёт на вступление — **молча и с готовым кодом**, как коробка ведёт в
+        // заполненную форму: человек навёл камеру, и переспрашивать его незачем (решение владельца
+        // 2026-09-17). Сам ключ едет памятью оболочки, а не ключом маршрута (G3).
+        LaunchedEffect(state.invitation) {
+            val key = state.invitation ?: return@LaunchedEffect
+            model.invitationOpened()
+            scanned.value = key
+            stacks.go(Screen.MedKitJoining)
+        }
+        val context = LocalContext.current
+        ScannerScreen(
+            state = state,
+            onCode = model::seen,
+            onAllow = askForCamera,
+            onOpenSettings = context::openAppSettings
+        )
+    }
+    for (place in Place.entries - Place.MED_KITS - Place.PLAN - Place.OPTIONS - Place.SCANNER) {
         entry(place.key) { NotReadyYet() }
     }
 }

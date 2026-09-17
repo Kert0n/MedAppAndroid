@@ -30,3 +30,14 @@ fun Context.openExactAlarmSettings() {
         .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
     startActivity(intent)
 }
+
+/**
+ * Разрешение, в котором отказали дважды, система больше не спрашивает: диалога не будет, и
+ * единственный путь — её собственный экран приложения. Приложение приводит человека туда, а не
+ * просит в третий раз впустую (PLAN H3 «Набор сканера»).
+ */
+fun Context.openAppSettings() {
+    val intent = Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS, Uri.fromParts("package", packageName, null))
+        .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+    startActivity(intent)
+}

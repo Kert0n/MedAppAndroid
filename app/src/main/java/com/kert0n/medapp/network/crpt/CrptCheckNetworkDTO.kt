@@ -17,6 +17,8 @@ data class CrptCheckNetworkDTO(
     val code: String? = null,
     val productName: String? = null,
     val expireDate: Long? = null,
+    /** Когда коробку продали: через реестр проходит кассовый чек, и для человека это день покупки. */
+    val receiptDate: Long? = null,
     val screen: CrptScreenNetworkDTO? = null
 ) {
     /** Аптечный блок — первый из экранных блоков, у которого он есть. */
