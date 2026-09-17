@@ -58,9 +58,11 @@ class PackageTransferViewModelTest {
 
     private fun viewModel(
         transactions: Transactions = DirectTransactions,
-        lying: Package = pack(id = PACK, quantity = tablets("20"))
+        lying: Package = pack(id = PACK, quantity = tablets("20")),
+        freshening: com.kert0n.medapp.feature.operation.Freshening = com.kert0n.medapp.fixture.offlineFreshening(medKits, stored, clock)
     ) = PackageTransferViewModel(
         relocation = PackageRelocation(stored, medKits, FakeCourses(), queue, transactions, clock),
+        freshening = freshening,
         packages = stored,
         medKits = medKits,
         today = Today(clock, QuietClock),
@@ -217,5 +219,30 @@ class PackageTransferViewModelTest {
 
         assertTrue(state.isGone)
         assertFalse(state.isDone)
+    }
+
+    /**
+     * Коробка общей полки при связи перечитывается, и пока сервер не ответил, перенос ждёт: чужие
+     * брони на ней решают, предупреждать ли (PLAN E4). Спрошено один раз.
+     */
+    @Test
+    fun aSharedBoxIsMovedOnlyAfterTheServerAnswers() {
+        // Коробка в базе до открытия экрана: перечитывают то, что открыли, а не то, что появится.
+        stored.lying(pack(id = PACK, quantity = tablets("20"), medKit = medKits.medKits.first { it.id == SHARED_KIT }.ref))
+        val server = com.kert0n.medapp.fixture.RereadingServer(clock)
+        server.hold()
+        val model = viewModel(
+            lying = pack(id = PACK, quantity = tablets("20"), medKit = com.kert0n.medapp.fixture.medKit(id = com.kert0n.medapp.fixture.SHARED_KIT, publication = com.kert0n.medapp.domain.medkit.MedKit.Publication.PUBLISHED, participantCount = 2).ref),
+            freshening = com.kert0n.medapp.fixture.onlineFreshening(server, medKits, stored, clock)
+        )
+
+        watching(model.state) { state ->
+            kotlinx.coroutines.withTimeout(5_000) { while (server.asked.isEmpty()) kotlinx.coroutines.delay(10) }
+            org.junit.Assert.assertFalse(state.value.isLoaded)
+            server.release()
+            state.awaiting { it.isLoaded }
+        }
+
+        assertEquals(1, server.asked.size)
     }
 }

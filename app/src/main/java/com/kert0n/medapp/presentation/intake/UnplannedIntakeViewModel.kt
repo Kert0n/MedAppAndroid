@@ -4,6 +4,7 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.kert0n.medapp.feature.intake.IntakeWarning
 import com.kert0n.medapp.feature.intake.UnplannedIntakeRecording
+import com.kert0n.medapp.feature.operation.Freshening
 import com.kert0n.medapp.presentation.ParsedInput
 import com.kert0n.medapp.presentation.value.QuantityPresentationDTO
 import com.kert0n.medapp.presentation.value.UnitPresentationDTO
@@ -39,6 +40,7 @@ class UnplannedIntakeViewModel @AssistedInject constructor(
     private val recording: UnplannedIntakeRecording,
     private val vocabulary: VocabularyStorageRepository,
     private val clock: Clock,
+    freshening: Freshening,
     packages: PackageStorageRepository,
     @Assisted private val packageId: Uuid
 ) : ViewModel() {
@@ -53,10 +55,26 @@ class UnplannedIntakeViewModel @AssistedInject constructor(
 
     private val recorded = MutableStateFlow(Recording())
 
+    /** Перечитывание коробки при открытии кончилось (PLAN E4). */
+    private val freshened = MutableStateFlow(false)
+
+    init {
+        viewModelScope.launch {
+            try {
+                freshening.pack(packageId)
+            } finally {
+                freshened.value = true
+            }
+        }
+    }
+
     private val pack = packages.observe(packageId)
 
-    val state: StateFlow<UnplannedIntakeUiState> = combine(pack, typed, recorded) { pack, typed, recorded ->
-        if (pack == null) UnplannedIntakeUiState(isGone = true)
+    val state: StateFlow<UnplannedIntakeUiState> = combine(pack, typed, recorded, freshened) { pack, typed, recorded, freshened ->
+        // Пока коробка общей полки перечитывается, лист ждёт: «свободно N из M» должно быть свежим,
+        // и «коробки нет» до ответа сервера не говорится (PLAN E4).
+        if (!freshened) UnplannedIntakeUiState(isLoading = true)
+        else if (pack == null) UnplannedIntakeUiState(isGone = true)
         else {
             val hint = pack.facts.defaultIntakeAmount?.quantity?.toPresentationDTO()
             UnplannedIntakeUiState(

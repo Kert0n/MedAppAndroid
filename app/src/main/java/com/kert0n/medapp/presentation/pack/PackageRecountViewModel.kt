@@ -3,6 +3,7 @@ package com.kert0n.medapp.presentation.pack
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.kert0n.medapp.domain.pack.PackageProjection
+import com.kert0n.medapp.feature.operation.Freshening
 import com.kert0n.medapp.feature.packages.PackageAdjusting
 import com.kert0n.medapp.presentation.ParsedInput
 import com.kert0n.medapp.presentation.value.QuantityPresentationDTO
@@ -30,10 +31,14 @@ import kotlinx.coroutines.launch
  *
  * «Выбросить» сюда не приходит: выбрасывают пачку с карточки, а не таблетки из учёта. Поэтому и
  * ноль не принимается: ноль — это «выбросить», и пересчётом коробку не кончают.
+ *
+ * Коробка общей полки при открытии перечитывается, и пока сервер не ответил, экран ждёт: «сейчас
+ * записано» должно быть свежим — от него считается разница (PLAN E4).
  */
 @HiltViewModel(assistedFactory = PackageRecountViewModel.Factory::class)
 class PackageRecountViewModel @AssistedInject constructor(
     private val adjusting: PackageAdjusting,
+    freshening: Freshening,
     private val vocabulary: VocabularyStorageRepository,
     packages: PackageStorageRepository,
     @Assisted private val packageId: Uuid
@@ -48,6 +53,19 @@ class PackageRecountViewModel @AssistedInject constructor(
 
     private val progress = MutableStateFlow(Progress())
 
+    /** Перечитывание коробки при открытии кончилось (PLAN E4). */
+    private val freshened = MutableStateFlow(false)
+
+    init {
+        viewModelScope.launch {
+            try {
+                freshening.pack(packageId)
+            } finally {
+                freshened.value = true
+            }
+        }
+    }
+
     /**
      * Коробка, как её прочитали, — доменной проекцией, а не строками экрана: от увиденного числа
      * отсчитывается разница, и собирать его обратно из строки значило бы разбирать то, что уже
@@ -60,12 +78,13 @@ class PackageRecountViewModel @AssistedInject constructor(
         viewModelScope.launch { packages.observe(packageId).collect { seen.value = Reading.Read(it) } }
     }
 
-    val state: StateFlow<PackageRecountUiState> = combine(seen, form, progress) { reading, form, progress ->
+    val state: StateFlow<PackageRecountUiState> = combine(seen, form, progress, freshened) { reading, form, progress, freshened ->
         val pack = (reading as? Reading.Read)?.pack
         PackageRecountUiState(
+            isFreshening = !freshened,
             pack = pack?.toPresentationDTO(),
             form = form,
-            isGone = reading is Reading.Read && pack == null,
+            isGone = freshened && reading is Reading.Read && pack == null,
             error = progress.error,
             isDone = progress.done
         )
@@ -127,6 +146,8 @@ class PackageRecountViewModel @AssistedInject constructor(
 
 /** Что показывает экран пересчёта. */
 data class PackageRecountUiState(
+    /** Коробка перечитывается у сервера: экран ждёт (PLAN E4). */
+    val isFreshening: Boolean = false,
     val pack: PackagePresentationDTO? = null,
     val form: PackageRecountPresentationDTO = PackageRecountPresentationDTO(),
     val isGone: Boolean = false,
@@ -134,5 +155,5 @@ data class PackageRecountUiState(
     /** Записано: экран уходит. */
     val isDone: Boolean = false
 ) {
-    val isLoading: Boolean get() = pack == null && !isGone
+    val isLoading: Boolean get() = isFreshening || (pack == null && !isGone)
 }
