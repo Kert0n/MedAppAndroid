@@ -3490,7 +3490,7 @@ com.kert0n.medapp                         есть · [B17] — появится
 │   ├─ notification/ — обязательства: ReminderStorageEntity, ReminderDao, ReminderRoomRepository
 │   │          и порт ReminderStorageRepository (каталог называет понятие, а не сервер)
 │   └─ database/ MedAppDatabase, converters, RoomTransactions
-├─ platform/   background/ (SyncWorker, WorkManagerSyncSchedule), connectivity/ (SyncTriggers),
+├─ platform/   background/ (SyncWorker, WorkManagerSyncSchedule), connectivity/ (SyncTriggers, SystemConnection — исполняет порт `Connection`),
 │              credentials/ (Keystore); notifications/ (каналы, SystemNotifier,
 │              AlarmManagerReminders — один будильник, ReminderWakeReceiver,
 │              NotificationActionReceiver, DailyWorker, BootAndTimeReceiver,
@@ -3498,6 +3498,7 @@ com.kert0n.medapp                         есть · [B17] — появится
 │              `settings`, исполняет SettingsStore и NotificationSettingsSource; DevicePermissions —
 │              состояние разрешений и камеры)
 ├─ feature/    сценарии — целое действие человека одной транзакцией: bootstrap/ (AppStart),
+│              connectivity/ (порт `Connection` — есть ли выход к серверу),
 │              medkits/ (MedKitKeeping, MedKitRemoval, MedKitPublishing, MedKitJoining,
 │              MedKitInvitation), packages/ (PackageAdding, PackageDescribing, PackageAdjusting,
 │              PackageRemoval, PackageRelocation), course/ (CourseClosing, CourseDrafting,
