@@ -65,7 +65,7 @@ fun FutureReport(
             for (group in report.groups) {
                 item(group.total.unit.id.toString()) {
                     Column {
-                        ReportGroupTitle(group.total.words())
+                        if (report.groups.size > 1 || group.rows.size > 1) ReportGroupTitle(group.total.words())
                         for (row in group.rows) {
                             ShareBar(
                                 label = row.title,

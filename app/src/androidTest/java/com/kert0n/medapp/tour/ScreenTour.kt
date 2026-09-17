@@ -413,6 +413,30 @@ class ScannerAndReportsTour : ScreenTour() {
     }
 }
 
+/** Отчёты: три вопроса личного кабинета и свой период (PLAN H3 «Набор аналитики»). */
+@HiltAndroidTest
+@RunWith(AndroidJUnit4::class)
+class ReportsTour : ScreenTour() {
+
+    @Test
+    fun reports() {
+        see("Без ответа за прошлые дни")
+        tap("Закрыть")
+        place("Отчёты")
+        see("По категориям")
+        snap("26-reports/summary")
+        tap("Расход")
+        see("если все приёмы состоятся")
+        snap("26-reports/future")
+        tap("Истрачено")
+        see("По лечениям")
+        snap("26-reports/spent")
+        tap("Год")
+        see("По лечениям")
+        snap("26-reports/spent-year")
+    }
+}
+
 /** Тёмная тема на самых плотных экранах. */
 @HiltAndroidTest
 @RunWith(AndroidJUnit4::class)

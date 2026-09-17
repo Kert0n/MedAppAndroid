@@ -62,12 +62,12 @@ fun SpentReport(
             }
             if (report.episodes.isNotEmpty()) {
                 item("episodes") {
-                    ReportSectionTitle(R.string.reports_spent_by_course, R.drawable.ic_medication)
+                    ReportSectionTitle(R.string.reports_spent_by_course, R.drawable.ic_event_repeat)
                 }
                 for (group in report.episodes) {
                     item("episodes-${group.total.unit.id}") {
                         Column {
-                            ReportGroupTitle(group.total.words())
+                            if (report.episodes.size > 1 || group.rows.size > 1) ReportGroupTitle(group.total.words())
                             for (row in group.rows) {
                                 ShareBar(
                                     label = row.title,
@@ -88,7 +88,7 @@ fun SpentReport(
                 for (group in report.boxes) {
                     item("boxes-${group.total.unit.id}") {
                         Column {
-                            ReportGroupTitle(group.total.words())
+                            if (report.boxes.size > 1 || group.rows.size > 1) ReportGroupTitle(group.total.words())
                             for (row in group.rows) {
                                 ShareBar(
                                     label = row.name,

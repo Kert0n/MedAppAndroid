@@ -1,12 +1,11 @@
 package com.kert0n.medapp.ui.report
 
-import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.ExperimentalLayoutApi
+import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.rememberScrollState
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.Icon
 import androidx.compose.material3.Text
@@ -34,7 +33,11 @@ import java.time.LocalDate
  * остаётся одним, а предел второго дня считается от первого. Период длиннее года не набирается
  * вовсе — такие дни не нажимаются (ТЗ 4.1.1.10.2); вперёд тоже нельзя: истраченное — события
  * прошлого, и будущих приёмов в нём не бывает.
+ *
+ * Чипы переносятся строкой по той же причине, что и у срока расхода: уехавший за край чип не
+ * виден вовсе.
  */
+@OptIn(ExperimentalLayoutApi::class)
 @Composable
 fun PeriodChips(
     preset: PeriodPreset?,
@@ -47,12 +50,10 @@ fun PeriodChips(
 ) {
     var picking by remember { mutableStateOf<LocalDate?>(null) }
     var pickingStart by remember { mutableStateOf(false) }
-    Row(
-        modifier
-            .fillMaxWidth()
-            .horizontalScroll(rememberScrollState())
-            .padding(horizontal = 16.dp, vertical = 8.dp),
-        horizontalArrangement = Arrangement.spacedBy(8.dp)
+    FlowRow(
+        modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 8.dp),
+        horizontalArrangement = Arrangement.spacedBy(8.dp),
+        verticalArrangement = Arrangement.spacedBy(4.dp)
     ) {
         for (entry in PeriodPreset.entries) {
             FilterChip(

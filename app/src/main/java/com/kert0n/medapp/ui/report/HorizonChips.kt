@@ -1,12 +1,11 @@
 package com.kert0n.medapp.ui.report
 
-import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.ExperimentalLayoutApi
+import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.rememberScrollState
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.Icon
 import androidx.compose.material3.Text
@@ -34,9 +33,10 @@ import java.time.LocalDate
  * открывая календарь снова. Дальше трёх месяцев в календаре не нажимается ни один день (ТЗ
  * 4.1.1.10.1) — предел показан там, где человек выбирает, а не отказом после выбора.
  *
- * Чипы прокручиваются вбок: на 360 dp и крупном шрифте пять слов в строку не умещаются, а
- * перенос строкой увёл бы сам отчёт под нижний край.
+ * Чипы **переносятся строкой**, а не уезжают за правый край: уехавший чип не виден вовсе, и
+ * человек не знает, что выбор там есть. На 360 dp и крупном шрифте они занимают две строки.
  */
+@OptIn(ExperimentalLayoutApi::class)
 @Composable
 fun HorizonChips(
     preset: HorizonPreset?,
@@ -47,12 +47,10 @@ fun HorizonChips(
     modifier: Modifier = Modifier
 ) {
     var picking by remember { mutableStateOf(false) }
-    Row(
-        modifier
-            .fillMaxWidth()
-            .horizontalScroll(rememberScrollState())
-            .padding(horizontal = 16.dp, vertical = 8.dp),
-        horizontalArrangement = Arrangement.spacedBy(8.dp)
+    FlowRow(
+        modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 8.dp),
+        horizontalArrangement = Arrangement.spacedBy(8.dp),
+        verticalArrangement = Arrangement.spacedBy(4.dp)
     ) {
         for (entry in HorizonPreset.entries) {
             FilterChip(
