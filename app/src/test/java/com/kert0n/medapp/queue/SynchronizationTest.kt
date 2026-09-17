@@ -132,9 +132,12 @@ class SynchronizationTest {
         val brief = synchronization.awaitBriefly(java.time.Duration.ofMillis(300))
 
         assertNull(brief)
+        // Следующий повод встаёт ждать идущий заход **до** ответа сервера: пришедший после конца
+        // захода начал бы свой, и проверка зависела бы от того, чей поток успел первым.
+        val next = async(start = kotlinx.coroutines.CoroutineStart.UNDISPATCHED) { synchronization.synchronize() }
         // Сервер ответил позже — заход дошёл до конца, и следующий повод получает его итог.
         gate.complete(Unit)
-        val later = synchronization.synchronize()
+        val later = next.await()
         assertEquals(listOf("очередь", "снимок"), calls.toList())
         assertEquals(now, later.finishedAt)
         scope.cancel()
