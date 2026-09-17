@@ -27,6 +27,7 @@ import com.kert0n.medapp.fixture.packageRepository
 import com.kert0n.medapp.fixture.storySetting
 import com.kert0n.medapp.network.medkit.MembershipPostNetworkDTO
 import com.kert0n.medapp.network.pack.PackageSyncNetworkDTO
+import com.kert0n.medapp.network.server.ApiFailure
 import com.kert0n.medapp.network.server.ApiResult
 import com.kert0n.medapp.network.value.toDosageForm
 import com.kert0n.medapp.network.value.toQuantityUnit
@@ -279,11 +280,18 @@ class UnsteadyConnectionStoryTest {
 
     // Что видно
 
-    /** Очередь довезла сама: сервер говорит то же, что человек видит. */
+    /**
+     * Очередь довезла сама: сервер говорит то же, что человек видит. Опрашивает клиент проверки, а не
+     * приложение: его первый запрос сразу после возвращения связи может не дойти, и это «ещё не
+     * видно», а не провал истории.
+     */
     private fun awaitServerAmount(expected: String) = runBlocking {
         val anna = requireNotNull(ProbeAccounts.anna)
         withTimeout(DELIVERY) {
-            while (BigDecimal(success(anna.packageSnapshot(box)).pack.amount).compareTo(BigDecimal(expected)) != 0) {
+            while (true) {
+                val seen = anna.packageSnapshot(box)
+                if (seen is ApiResult.Success && BigDecimal(seen.value.pack.amount).compareTo(BigDecimal(expected)) == 0) break
+                if (seen is ApiResult.Failure && seen.failure != ApiFailure.Unavailable) error("боевой сервер отказал: $seen")
                 kotlinx.coroutines.delay(500)
             }
         }
