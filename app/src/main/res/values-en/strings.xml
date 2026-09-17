@@ -651,4 +651,18 @@
         <item quantity="one">%d package has no price</item>
         <item quantity="other">%d packages have no price</item>
     </plurals>
+    <string name="reports_mode_summary">Stock</string>
+    <string name="reports_mode_future">Ahead</string>
+    <string name="reports_future_until">Until %s</string>
+    <string name="reports_future_note">if every intake happens</string>
+    <string name="reports_future_empty">No running treatments for this period</string>
+    <string name="reports_group_total">Total %s</string>
+    <string name="reports_preset_week">Week</string>
+    <string name="reports_preset_month">Month</string>
+    <string name="reports_preset_three_months">3 months</string>
+    <string name="reports_preset_own_date">Pick a date</string>
+    <plurals name="reports_doses">
+        <item quantity="one">%d dose</item>
+        <item quantity="other">%d doses</item>
+    </plurals>
 </resources>

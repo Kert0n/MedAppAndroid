@@ -93,6 +93,7 @@ import com.kert0n.medapp.ui.pack.PackageFormScreen
 import com.kert0n.medapp.ui.pack.PackageRecountScreen
 import com.kert0n.medapp.ui.pack.PackageTransferScreen
 import com.kert0n.medapp.ui.operation.OptionsScreen
+import com.kert0n.medapp.ui.report.ReportsMode
 import com.kert0n.medapp.ui.report.ReportsScreen
 import com.kert0n.medapp.ui.operation.SyncStatusScreen
 import com.kert0n.medapp.ui.scan.ScannerScreen
@@ -129,6 +130,9 @@ fun MedAppShell(
     // смерть процесса ключ не должен, как не переживает её ключ на экране 21. Живёт он ровно от
     // сканера до вступления, которое его забирает.
     val scanned = remember { mutableStateOf<String?>(null) }
+    // Какой из отчётов человек смотрит — часть места, а не состояние данных: он переживает уход в
+    // другое место и возвращение, как режим «Плана» (PLAN H3 «Набор аналитики»).
+    val reportsMode = rememberSaveable { mutableStateOf(ReportsMode.SUMMARY) }
     // Цель применяется **один раз**: иначе поворот экрана возвращал бы человека туда, откуда он
     // уже ушёл. Намерение опустошает окно, а эта проверка бережёт от повторного применения.
     LaunchedEffect(opening) {
@@ -157,7 +161,7 @@ fun MedAppShell(
         bottomBar = { if (stacks.screen in PLACES) Places(stacks) }
     ) { padding ->
         NavDisplay(
-            entries = stacks.entries(remember(stacks, planMode, scanned) { screens(stacks, planMode, scanned) }),
+            entries = stacks.entries(remember(stacks, planMode, scanned, reportsMode) { screens(stacks, planMode, scanned, reportsMode) }),
             onBack = stacks::back,
             modifier = Modifier.padding(padding).consumeWindowInsets(padding),
             transitionSpec = { SWITCH },
@@ -207,7 +211,8 @@ fun MedAppShell(
 private fun screens(
     stacks: TabStacks,
     planMode: MutableState<PlanMode>,
-    scanned: MutableState<String?>
+    scanned: MutableState<String?>,
+    reportsMode: MutableState<ReportsMode>
 ) = entryProvider<NavKey> {
     entry(Screen.MedKits) {
         val model: MedKitListViewModel = hiltViewModel()
@@ -695,7 +700,16 @@ private fun screens(
     }
     entry(Screen.Reports) {
         val model: ReportsViewModel = hiltViewModel()
-        ReportsScreen(state = model.state.collectAsStateWithLifecycle().value)
+        ReportsScreen(
+            state = model.state.collectAsStateWithLifecycle().value,
+            mode = reportsMode.value,
+            onMode = { reportsMode.value = it },
+            onHorizonPreset = model::choose,
+            onHorizonUntil = model::chooseUntil,
+            // Строка лечения ведёт на его карточку: запись эпизода вечна, и карточка умеет
+            // закончившееся лечение (PLAN C1).
+            onCourse = { stacks.go(Screen.CourseCard(it)) }
+        )
     }
 }
 

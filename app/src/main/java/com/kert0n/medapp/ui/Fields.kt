@@ -11,7 +11,9 @@ import androidx.compose.foundation.layout.defaultMinSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material3.DatePicker
+import androidx.compose.material3.DatePickerDefaults
 import androidx.compose.material3.DatePickerDialog
+import androidx.compose.material3.SelectableDates
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.ExposedDropdownMenuAnchorType
@@ -261,23 +263,62 @@ fun DateField(
         modifier = modifier.fillMaxWidth().defaultMinSize(minHeight = 48.dp)
     )
     if (!open) return
+    DayPicker(selected = value, onPick = { onPick(it) }, onDismiss = { open = false })
+}
+
+/**
+ * Календарь днём: один на все экраны, которые спрашивают дату, — поле срока годности, начало
+ * лечения, срок отчёта.
+ *
+ * [selectable] очерчивает, о каких днях вообще можно спросить: отчёту дальше трёх месяцев дня не
+ * полагается (H6), и такой день **не нажимается**, а не отвергается после выбора. Пределы
+ * принадлежат тому, кто спрашивает: у срока годности их нет вовсе — дата в прошлом принимается
+ * (ТЗ 4.1.2.3).
+ *
+ * Дни считаются в UTC не по небрежности: `DatePicker` работает числами без зоны, и перевод через
+ * зону человека сдвинул бы выбранное число на соседнее у тех, кто живёт восточнее Гринвича.
+ */
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+fun DayPicker(
+    selected: LocalDate?,
+    onPick: (LocalDate?) -> Unit,
+    onDismiss: () -> Unit,
+    selectable: SelectableDates = DatePickerDefaults.AllDates
+) {
     val picker = rememberDatePickerState(
-        initialSelectedDateMillis = value?.atStartOfDay(ZoneOffset.UTC)?.toInstant()?.toEpochMilli()
+        initialSelectedDateMillis = selected?.atStartOfDay(ZoneOffset.UTC)?.toInstant()?.toEpochMilli(),
+        selectableDates = selectable
     )
     DatePickerDialog(
-        onDismissRequest = { open = false },
+        onDismissRequest = onDismiss,
         confirmButton = {
             TextButton(
                 onClick = {
                     onPick(picker.selectedDateMillis?.let { Instant.ofEpochMilli(it).atZone(ZoneOffset.UTC).toLocalDate() })
-                    open = false
+                    onDismiss()
                 }
             ) { Text(stringResource(R.string.action_choose)) }
         },
         dismissButton = {
-            TextButton(onClick = { open = false }) { Text(stringResource(R.string.action_cancel)) }
+            TextButton(onClick = onDismiss) { Text(stringResource(R.string.action_cancel)) }
         }
     ) { DatePicker(picker) }
+}
+
+/**
+ * Дни от [from] по [to] включительно и только они. Год ограничивается тем же отрезком: иначе
+ * человек листает пустые страницы календаря, в которых нечего нажать.
+ */
+@OptIn(ExperimentalMaterial3Api::class)
+fun daysBetween(from: LocalDate, to: LocalDate): SelectableDates = object : SelectableDates {
+
+    override fun isSelectableDate(utcTimeMillis: Long): Boolean {
+        val day = Instant.ofEpochMilli(utcTimeMillis).atZone(ZoneOffset.UTC).toLocalDate()
+        return !day.isBefore(from) && !day.isAfter(to)
+    }
+
+    override fun isSelectableYear(year: Int): Boolean = year in from.year..to.year
 }
 
 /**

@@ -684,4 +684,20 @@
         <item quantity="many">У %d упаковок цена не указана</item>
         <item quantity="other">У %d упаковок цена не указана</item>
     </plurals>
+    <string name="reports_mode_summary">Сводка</string>
+    <string name="reports_mode_future">Расход</string>
+    <string name="reports_future_until">До %s</string>
+    <string name="reports_future_note">если все приёмы состоятся</string>
+    <string name="reports_future_empty">Идущих лечений на этот срок нет</string>
+    <string name="reports_group_total">Всего %s</string>
+    <string name="reports_preset_week">Неделя</string>
+    <string name="reports_preset_month">Месяц</string>
+    <string name="reports_preset_three_months">3 месяца</string>
+    <string name="reports_preset_own_date">Своя дата</string>
+    <plurals name="reports_doses">
+        <item quantity="one">%d доза</item>
+        <item quantity="few">%d дозы</item>
+        <item quantity="many">%d доз</item>
+        <item quantity="other">%d дозы</item>
+    </plurals>
 </resources>
