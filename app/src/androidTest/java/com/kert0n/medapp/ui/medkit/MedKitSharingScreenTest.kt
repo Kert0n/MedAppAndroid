@@ -93,7 +93,7 @@ class MedKitSharingScreenTest {
     fun theConfirmationNamesTheShelfAndOnlyThenDecides() {
         show(MedKitSharingUiState.Deciding("Домашняя", isAsking = true))
 
-        compose.onNodeWithText("Сделать «Домашняя» общей?").assertIsDisplayed()
+        compose.onNodeWithText("Сделать аптечку «Домашняя» общей?").assertIsDisplayed()
         // «Сделать общей» на экране два — под последствиями и в самом вопросе; решает второе.
         compose.onAllNodesWithText("Сделать общей").onLast().performClick()
 

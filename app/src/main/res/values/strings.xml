@@ -18,7 +18,7 @@
 
     <!-- Первичная настройка -->
     <string name="setup_key_lost">Ключ этого устройства больше не открывается, и учётная запись
-        недоступна. Локальные аптечки, курсы и история целы. Общие аптечки придётся подключить
+        недоступна. Местные аптечки, лечения и история целы. Общие аптечки придётся подключить
         заново по приглашению — но сначала нужно решить, заводить ли новую учётную запись.</string>
     <string name="setup_key_lost_stays">Останется</string>
     <string-array name="setup_key_lost_stays_items">
@@ -165,7 +165,7 @@
     <string name="pack_expires_on">Истекает %1$s</string>
 
     <!-- Уборка аптечки -->
-    <string name="med_kit_remove_title">Убрать «%1$s»?</string>
+    <string name="med_kit_remove_title">Убрать аптечку «%1$s»?</string>
     <string name="med_kit_remove_empty">В аптечке ничего не лежит — убрать её можно сразу.</string>
     <plurals name="med_kit_remove_contents">
         <item quantity="one">В аптечке %d упаковка. Решите, что с ней будет.</item>
@@ -207,12 +207,12 @@
     </string-array>
     <string name="med_kit_sharing_irreversible">Это необратимо: переданный доступ нельзя отозвать. Любой участник сможет удалить аптечку у всех.</string>
     <string name="med_kit_sharing_publish">Сделать общей</string>
-    <string name="med_kit_sharing_publish_title">Сделать «%1$s» общей?</string>
+    <string name="med_kit_sharing_publish_title">Сделать аптечку «%1$s» общей?</string>
     <string name="med_kit_sharing_on_its_way">Решение об аптечке уже едет серверу. Пригласить можно будет, когда оно доедет.</string>
     <string name="med_kit_sharing_shared">«%1$s» — общая аптечка. Позовите тех, с кем делите лекарства.</string>
     <string name="med_kit_sharing_invite">Пригласить</string>
     <string name="med_kit_sharing_invite_again">Обновить код</string>
-    <string name="med_kit_sharing_invite_title">Позвать в «%1$s»?</string>
+    <string name="med_kit_sharing_invite_title">Позвать в аптечку «%1$s»?</string>
     <string name="med_kit_sharing_invite_explained">Кто получит код, войдёт в аптечку и увидит все её лекарства. Прежний код перестанет работать.</string>
     <string name="med_kit_sharing_expires_around">Примерно до %1$s</string>
     <string name="med_kit_sharing_busy">Аптечка ждёт ответа сервера на другое решение — дождитесь его и повторите.</string>
@@ -399,7 +399,7 @@
     <string name="notice_intake_decision_title">Не записано: %1$s</string>
     <string name="notice_intake_decision_body">«Принял» не смог записать приём — откройте, чтобы решить, откуда взять дозу</string>
     <string name="notice_intake_missed_title">Пропущен приём: %1$s</string>
-    <string name="notice_intake_missed_body">Вчерашний приём %1$s остался без ответа</string>
+    <string name="notice_intake_missed_body">Вчерашний приём (%1$s) остался без ответа</string>
     <string name="notice_expiry_3d_title">Через три дня истекает срок: %1$s</string>
     <string name="notice_expiry_1d_title">Завтра истекает срок: %1$s</string>
     <string name="notice_expiry_today_title">Сегодня истекает срок: %1$s</string>
@@ -589,7 +589,7 @@
     <string name="course_source_move_down">Ниже</string>
     <string name="course_source_expired">Просрочена: годна до %1$s</string>
     <string name="course_source_expired_title">Коробка просрочена</string>
-    <string name="course_source_expired_body">Лечение будет брать из «%1$s» — она годна до %2$s. Решать вам; мы лишь предупреждаем.</string>
+    <string name="course_source_expired_body">Лечение будет брать из коробки «%1$s» — она годна до %2$s. Решать вам; мы лишь предупреждаем.</string>
     <string name="action_understood">Понятно</string>
     <string name="course_source_free">свободно %1$s %2$s</string>
     <string name="course_source_expires">годен до %1$s</string>
@@ -636,9 +636,9 @@
     <string name="course_source_fault_unit">Другая единица — снимите пачку или поправьте её сведения.</string>
     <string name="course_source_fault_form">Другая форма — снимите пачку или поправьте её сведения.</string>
     <string name="course_source_taken">Эта пачка занята другим лечением.</string>
-    <string name="course_source_taken_named">«%1$s» занята другим лечением.</string>
+    <string name="course_source_taken_named">Коробка «%1$s» занята другим лечением.</string>
     <string name="course_source_unusable">Эту пачку выбрасывают или её полки больше нет.</string>
-    <string name="course_source_unusable_named">«%1$s» выбрасывают или её полки больше нет.</string>
+    <string name="course_source_unusable_named">Коробку «%1$s» выбрасывают, или её полки больше нет.</string>
     <string name="course_picking">Подключить пачку</string>
     <string name="course_attach_already">Уже подключена к этому лечению.</string>
     <string name="course_attach_held">Занята другим лечением.</string>
