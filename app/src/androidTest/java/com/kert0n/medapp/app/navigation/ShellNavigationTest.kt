@@ -48,6 +48,9 @@ class ShellNavigationTest {
      */
     private fun place(name: String) = compose.onNode(isSelectable() and hasText(name))
 
+    /** Экран ждёт чтения из базы, и секунды по умолчанию на это не хватает — как и в историях. */
+    private val WAIT = 10_000L
+
     /**
      * Пять мест на месте, и человек стоит в первом: без этого правила приложение открывается
      * неизвестно где, а пропавшее место делает свои экраны недостижимыми (PLAN H3 «Оболочка»).
@@ -112,18 +115,22 @@ class ShellNavigationTest {
     }
 
     /**
-     * За местом, экрана у которого ещё нет, стоит общее «показывать нечего». Мест без экрана
-     * остаётся всё меньше: «Сканер» получил свой в U9, и проверка переехала на «Отчёты» — они
-     * ждут U10.
+     * **У каждого места есть свой экран.** Заглушки «этот экран ещё не готов» больше нет вовсе:
+     * «Сканер» получил свой экран в U9, «Отчёты» — в U10, и мест без экрана не осталось. Проверка
+     * стоит с той же стороны, с какой прежде стояла проверка заглушки: шестое место, заведённое
+     * без экрана, показало бы пустоту, и это было бы видно здесь.
      */
     @Test
-    fun aPlaceWithoutItsScreenSaysSo() {
+    fun everyPlaceShowsItsOwnScreen() {
         compose.setContent { MedAppTheme { MedAppShell() } }
 
-        place("Отчёты").performClick()
-
-        compose.waitUntil {
-            compose.onAllNodesWithText("Этот экран ещё не готов.").fetchSemanticsNodes().isNotEmpty()
+        for ((name, shown) in listOf(
+            "Отчёты" to "Упаковок пока нет",
+            "Опции" to "Синхронизация",
+            "Аптечки" to "Завести аптечку"
+        )) {
+            place(name).performClick()
+            compose.waitUntil(WAIT) { compose.onAllNodesWithText(shown).fetchSemanticsNodes().isNotEmpty() }
         }
     }
 }

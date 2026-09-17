@@ -32,21 +32,19 @@ import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import com.kert0n.medapp.R
-import com.kert0n.medapp.domain.attempt
 import com.kert0n.medapp.domain.pack.ExpiryDate
 import com.kert0n.medapp.domain.pack.PackageStatus
 import com.kert0n.medapp.presentation.pack.PackageCardUiState
 import com.kert0n.medapp.presentation.pack.PackagePresentationDTO
-import com.kert0n.medapp.presentation.value.MoneyPresentationDTO
 import com.kert0n.medapp.presentation.value.QuantityPresentationDTO
 import com.kert0n.medapp.presentation.value.toPresentationDTO
 import com.kert0n.medapp.ui.DAY
 import com.kert0n.medapp.ui.EmptyState
 import com.kert0n.medapp.ui.LoadingState
 import com.kert0n.medapp.ui.NavigationRow
+import com.kert0n.medapp.ui.text
 import com.kert0n.medapp.ui.theme.LocalAccents
 import java.time.LocalDate
-import java.util.Currency
 
 /**
  * Карточка упаковки (PLAN H3 №6). Сверху — то, ради чего её открывают: сколько есть. Ниже
@@ -349,7 +347,3 @@ private fun Note(text: String, color: Color = MaterialTheme.colorScheme.onSurfac
 @Composable
 private fun QuantityPresentationDTO.text(): String = stringResource(R.string.pack_left, amount, unit.name)
 
-/** Цена словами: сумма и знак валюты — по нему человек её и узнаёт; незнакомый код — сам код. */
-@Composable
-private fun MoneyPresentationDTO.text(): String =
-    stringResource(R.string.pack_price_value, amount, attempt { Currency.getInstance(currencyCode).symbol }.getOrDefault(currencyCode))

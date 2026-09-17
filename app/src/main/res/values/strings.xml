@@ -384,7 +384,6 @@
     </plurals>
 
     <!-- Экраны, которых ещё нет -->
-    <string name="screen_not_ready">Этот экран ещё не готов.</string>
     <!-- Уведомления: каналы -->
     <string name="channel_intakes">Приёмы</string>
     <string name="channel_expiry">Сроки годности</string>
@@ -672,4 +671,46 @@
     <string name="med_kit_joining_scan">Отсканировать код</string>
     <string name="med_kit_joining_aim">Наведите на QR приглашения</string>
     <string name="med_kit_joining_camera_denied">Камера запрещена. Введите код руками или разрешите камеру в настройках приложения.</string>
+    <!-- Отчёты (PLAN H3 «Набор аналитики») -->
+    <string name="reports_title">Отчёты</string>
+    <string name="reports_stock_empty">Упаковок пока нет</string>
+    <string name="reports_by_category">По категориям</string>
+    <string name="reports_by_form">По формам</string>
+    <string name="reports_not_specified">Не указано</string>
+    <string name="reports_total_price">Общая цена</string>
+    <plurals name="reports_unpriced">
+        <item quantity="one">У %d упаковки цена не указана</item>
+        <item quantity="few">У %d упаковок цена не указана</item>
+        <item quantity="many">У %d упаковок цена не указана</item>
+        <item quantity="other">У %d упаковок цена не указана</item>
+    </plurals>
+    <string name="reports_mode_summary">Сводка</string>
+    <string name="reports_mode_future">Расход</string>
+    <string name="reports_future_until">До %s</string>
+    <string name="reports_future_note">если все приёмы состоятся</string>
+    <string name="reports_future_empty">Идущих лечений на этот срок нет</string>
+    <string name="reports_group_total">Всего %s</string>
+    <string name="reports_preset_week">Неделя</string>
+    <string name="reports_preset_month">Месяц</string>
+    <string name="reports_preset_three_months">3 месяца</string>
+    <string name="reports_preset_own_date">Своя дата</string>
+    <plurals name="reports_doses">
+        <item quantity="one">%d доза</item>
+        <item quantity="few">%d дозы</item>
+        <item quantity="many">%d доз</item>
+        <item quantity="other">%d дозы</item>
+    </plurals>
+    <string name="reports_mode_spent">Истрачено</string>
+    <string name="reports_spent_period">С %1$s по %2$s</string>
+    <string name="reports_spent_by_course">По лечениям</string>
+    <string name="reports_spent_one_off">Разовые приёмы</string>
+    <string name="reports_spent_empty">За этот период приёмов не было</string>
+    <string name="reports_preset_year">Год</string>
+    <string name="reports_preset_own_period">Свой период</string>
+    <plurals name="reports_intakes">
+        <item quantity="one">%d приём</item>
+        <item quantity="few">%d приёма</item>
+        <item quantity="many">%d приёмов</item>
+        <item quantity="other">%d приёма</item>
+    </plurals>
 </resources>

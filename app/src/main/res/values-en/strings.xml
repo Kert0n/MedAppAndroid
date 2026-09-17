@@ -371,7 +371,6 @@
     </plurals>
 
     <!-- Screens that don't exist yet -->
-    <string name="screen_not_ready">This screen isn\'t ready yet.</string>
     <!-- Notifications: channels -->
     <string name="channel_intakes">Intakes</string>
     <string name="channel_expiry">Expiry dates</string>
@@ -641,4 +640,40 @@
     <string name="pack_scan_asking">Asking the Chestny Znak registry about the code…</string>
     <string name="pack_scan_not_found">The registry does not know this code — fill in the fields yourself.</string>
     <string name="pack_scan_unavailable">The registry did not answer: %1$s. Fill in the fields yourself.</string>
+    <!-- Reports -->
+    <string name="reports_title">Reports</string>
+    <string name="reports_stock_empty">No packages yet</string>
+    <string name="reports_by_category">By category</string>
+    <string name="reports_by_form">By form</string>
+    <string name="reports_not_specified">Not specified</string>
+    <string name="reports_total_price">Total price</string>
+    <plurals name="reports_unpriced">
+        <item quantity="one">%d package has no price</item>
+        <item quantity="other">%d packages have no price</item>
+    </plurals>
+    <string name="reports_mode_summary">Stock</string>
+    <string name="reports_mode_future">Ahead</string>
+    <string name="reports_future_until">Until %s</string>
+    <string name="reports_future_note">if every intake happens</string>
+    <string name="reports_future_empty">No running treatments for this period</string>
+    <string name="reports_group_total">Total %s</string>
+    <string name="reports_preset_week">Week</string>
+    <string name="reports_preset_month">Month</string>
+    <string name="reports_preset_three_months">3 months</string>
+    <string name="reports_preset_own_date">Pick a date</string>
+    <plurals name="reports_doses">
+        <item quantity="one">%d dose</item>
+        <item quantity="other">%d doses</item>
+    </plurals>
+    <string name="reports_mode_spent">Spent</string>
+    <string name="reports_spent_period">%1$s — %2$s</string>
+    <string name="reports_spent_by_course">By treatment</string>
+    <string name="reports_spent_one_off">One-off intakes</string>
+    <string name="reports_spent_empty">No intakes in this period</string>
+    <string name="reports_preset_year">Year</string>
+    <string name="reports_preset_own_period">Pick a period</string>
+    <plurals name="reports_intakes">
+        <item quantity="one">%d intake</item>
+        <item quantity="other">%d intakes</item>
+    </plurals>
 </resources>
