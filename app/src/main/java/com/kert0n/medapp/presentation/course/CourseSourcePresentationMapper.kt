@@ -33,7 +33,8 @@ fun CourseSource.toPresentationDTO(
     allocatedAmount = dose?.times(allocatedDoses)?.toPresentationDTO(),
     coveredDoses = covered?.coveredDoses?.count,
     maxDoses = maxDoses ?: (covered?.maxDoses ?: dose?.let { pack?.gives(it, fault) })?.count,
-    fault = fault
+    fault = fault,
+    status = pack?.status
 )
 
 /**

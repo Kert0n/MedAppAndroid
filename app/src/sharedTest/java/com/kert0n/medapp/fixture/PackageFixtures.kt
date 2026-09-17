@@ -12,6 +12,7 @@ import com.kert0n.medapp.domain.pack.PackageProjection
 import com.kert0n.medapp.domain.pack.PackageSharedFacts
 import com.kert0n.medapp.domain.value.DosageForm
 import com.kert0n.medapp.domain.value.Dose
+import com.kert0n.medapp.domain.pack.PackageStatus
 import com.kert0n.medapp.domain.value.Money
 import com.kert0n.medapp.domain.value.Quantity
 import java.time.Instant
@@ -113,9 +114,19 @@ fun packAvailability(
     quantity: Quantity = tablets("20"),
     claims: Claims? = null,
     expiresOn: ExpiryDate? = null,
-    myAllocation: Quantity = Quantity.zero(quantity.unit)
+    myAllocation: Quantity = Quantity.zero(quantity.unit),
+    status: PackageStatus = PackageStatus.ACTIVE
 ): PackageAvailability = PackageAvailability(
-    pkg = pack(id = id, quantity = quantity, claims = claims, expiresOn = expiresOn),
+    pkg = pack(id = id, quantity = quantity, claims = claims, expiresOn = expiresOn)
+        .let { box ->
+            val by = Uuid.random()
+            when (status) {
+                PackageStatus.ACTIVE -> box
+                PackageStatus.CHANGING -> box.markChanging(by)
+                PackageStatus.REMOVING -> box.markRemoving(by)
+                PackageStatus.LOST -> box.markLost(by)
+            }
+        },
     effective = quantity,
     myAllocation = myAllocation
 )

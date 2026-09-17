@@ -19,7 +19,13 @@ data class PackageAvailability(
     val expiresOn: ExpiryDate?,
     val effective: Quantity,
     val reservedByOthers: Quantity,
-    val myAllocation: Quantity
+    val myAllocation: Quantity,
+    /**
+     * Можно ли из неё брать. `false` — о судьбе коробки решение уже принято и ответа сервера ещё
+     * нет (`PackageStatus.allowsUse`): такая коробка выведена из оборота, и доступного мне в ней
+     * ноль, сколько бы в ней ни лежало (PLAN D4, E1).
+     */
+    val isUsable: Boolean
 ) {
 
     constructor(
@@ -32,7 +38,8 @@ data class PackageAvailability(
         effective = effective,
         reservedByOthers = pkg.claims?.let { Quantity(it.reservedByOthers, pkg.quantity.unit) }
             ?: Quantity.zero(pkg.quantity.unit),
-        myAllocation = myAllocation
+        myAllocation = myAllocation,
+        isUsable = pkg.status.allowsUse
     )
 
     init {
@@ -41,8 +48,12 @@ data class PackageAvailability(
         require(myAllocation.unit == unit) { "выделение измеряется единицей пачки" }
     }
 
-    /** Сколько могу взять я: вычитается только чужое, свою бронь я заявил сам. */
-    val availableToMe: Quantity get() = effective.minusOrZero(reservedByOthers)
+    /**
+     * Сколько могу взять я: вычитается только чужое, свою бронь я заявил сам. У коробки, чья
+     * судьба уже решена, — ноль: обещать из неё приёмы значит обещать то, чего `take` не даст.
+     */
+    val availableToMe: Quantity
+        get() = if (isUsable) effective.minusOrZero(reservedByOthers) else Quantity.zero(effective.unit)
 
     /**
      * Свободно любому: доступное мне без моего выделения. Считается не от суммы броней: моя

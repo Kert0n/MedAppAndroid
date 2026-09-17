@@ -17,6 +17,7 @@ import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performTextReplacement
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import com.kert0n.medapp.domain.course.CourseSource
+import com.kert0n.medapp.domain.pack.PackageStatus
 import com.kert0n.medapp.fixture.OTHER_PACK
 import com.kert0n.medapp.fixture.PACK
 import com.kert0n.medapp.fixture.TABLETS
@@ -77,7 +78,8 @@ class CourseSourcesScreenTest {
         name: String = "Нурофен",
         allocatedDoses: Int = 3,
         maxDoses: Int? = 7,
-        fault: CourseSource.Fault? = null
+        fault: CourseSource.Fault? = null,
+        status: PackageStatus = PackageStatus.ACTIVE
     ) = CourseSourcePresentationDTO(
         packageId = packageId,
         name = name,
@@ -88,8 +90,29 @@ class CourseSourcesScreenTest {
         allocatedAmount = QuantityPresentationDTO("6", TABLETS.toPresentationDTO()),
         coveredDoses = 3,
         maxDoses = maxDoses,
-        fault = fault
+        fault = fault,
+        status = status
     )
+
+    /**
+     * Решение о коробке принято, а сервер ещё не ответил: приёмы из неё пропали, и строка говорит
+     * почему. Без этого нехватка, взявшаяся из ниоткуда, читается как ошибка приложения
+     * (замечание владельца 2026-09-17, PLAN D4).
+     */
+    @Test
+    fun aBoxWhoseFateIsDecidedSaysSoInTheRow() {
+        show(CourseSourcesUiState(sources = listOf(source(status = PackageStatus.REMOVING))))
+
+        compose.onNodeWithText("Удаление в пути").assertIsDisplayed()
+    }
+
+    /** Из аптечки вышли — коробка не наша, и слова те же, что на её списке. */
+    @Test
+    fun aBoxOfAShelfWeLeftSaysSoInTheRow() {
+        show(CourseSourcesUiState(sources = listOf(source(status = PackageStatus.LOST))))
+
+        compose.onNodeWithText("Коробка не у нас").assertIsDisplayed()
+    }
 
     /** Строка говорит всё сразу: что за коробка, где лежит, сколько свободно и сколько выделено. */
     @Test

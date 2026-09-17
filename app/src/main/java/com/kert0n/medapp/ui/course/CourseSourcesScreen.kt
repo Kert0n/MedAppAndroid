@@ -58,6 +58,7 @@ import androidx.compose.ui.zIndex
 import com.kert0n.medapp.R
 import com.kert0n.medapp.ui.DAY
 import com.kert0n.medapp.domain.course.CourseSource
+import com.kert0n.medapp.domain.pack.PackageStatus
 import com.kert0n.medapp.presentation.course.CourseCoveragePresentationDTO
 import com.kert0n.medapp.presentation.course.CourseEstimatePresentationDTO
 import com.kert0n.medapp.presentation.course.CourseSourcePresentationDTO
@@ -247,6 +248,10 @@ private fun SourceRow(
         supportingContent = {
             Column {
                 Text(source.place(), style = MaterialTheme.typography.bodySmall)
+                // Коробка, о судьбе которой решение принято, ничего не обеспечивает ещё до ответа
+                // сервера (PLAN D4, E1). Приёмы из неё пропадают сразу, и человек должен прочитать
+                // почему — иначе нехватка выглядит ошибкой приложения.
+                source.leaving()?.let { Text(it, color = MaterialTheme.colorScheme.error) }
                 when (val fault = source.fault) {
                     null -> {
                         Text(source.allocation())
@@ -445,6 +450,17 @@ private fun CourseSourcePresentationDTO.place(): String = listOfNotNull(
     expiresOn?.let { stringResource(R.string.course_source_expires, it.toPresentationDTO().text) },
     availableToMe?.let { stringResource(R.string.course_source_free, it.amount, it.unit.name) }
 ).joinToString(" · ")
+
+/**
+ * Почему коробка сейчас ничего не даёт: решение о ней ещё едет серверу. Слова те же, что на
+ * списках коробок, — одна беда называется в приложении одинаково.
+ */
+@Composable
+private fun CourseSourcePresentationDTO.leaving(): String? = when (status) {
+    PackageStatus.REMOVING -> stringResource(R.string.pack_row_removal)
+    PackageStatus.LOST -> stringResource(R.string.pack_row_lost)
+    PackageStatus.ACTIVE, PackageStatus.CHANGING, null -> null
+}
 
 /** Сколько приёмов выделено — и сколько это в единицах коробки: то же число привычной мерой. */
 @Composable
