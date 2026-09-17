@@ -20,6 +20,19 @@
     <string name="setup_key_lost">Ключ этого устройства больше не открывается, и учётная запись
         недоступна. Локальные аптечки, курсы и история целы. Общие аптечки придётся подключить
         заново по приглашению — но сначала нужно решить, заводить ли новую учётную запись.</string>
+    <string name="setup_key_lost_stays">Останется</string>
+    <string-array name="setup_key_lost_stays_items">
+        <item>Местные аптечки и коробки</item>
+        <item>Лечения и история приёмов</item>
+    </string-array>
+    <string name="setup_key_lost_goes">Пропадёт</string>
+    <string-array name="setup_key_lost_goes_items">
+        <item>Общие аптечки — подключить заново по приглашению</item>
+        <item>Брони на общих полках останутся у других, снять их нечем</item>
+    </string-array>
+    <string name="setup_start_over">Начать с новой учётной записью</string>
+    <string name="setup_start_over_question">Начать заново?</string>
+    <string name="setup_start_over_warning">Старую учётную запись восстановить нечем. Общие аптечки пропадут, местные останутся.</string>
 
     <!-- Аптечки -->
     <string name="med_kit_arrived_name">Общая аптечка</string>

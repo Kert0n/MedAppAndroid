@@ -40,7 +40,6 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.FilterQuality
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.painterResource
-import androidx.compose.ui.res.stringArrayResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
@@ -53,6 +52,7 @@ import com.kert0n.medapp.presentation.medkit.MedKitSharingUiState
 import com.kert0n.medapp.ui.EmptyState
 import com.kert0n.medapp.ui.ErrorMessage
 import com.kert0n.medapp.ui.LoadingState
+import com.kert0n.medapp.ui.ConsequenceCard
 import com.kert0n.medapp.ui.NavigationRow
 import com.kert0n.medapp.ui.SecretOnScreen
 import com.kert0n.medapp.ui.TIME
@@ -121,13 +121,13 @@ private fun Deciding(
         modifier = modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(16.dp),
         verticalArrangement = Arrangement.spacedBy(16.dp)
     ) {
-        What(
+        ConsequenceCard(
             icon = R.drawable.ic_public,
             title = R.string.med_kit_sharing_becomes_shared,
             items = R.array.med_kit_sharing_becomes_shared_items,
             tint = MaterialTheme.colorScheme.tertiary
         )
-        What(
+        ConsequenceCard(
             icon = R.drawable.ic_lock,
             title = R.string.med_kit_sharing_stays_yours,
             items = R.array.med_kit_sharing_stays_yours_items,
@@ -292,35 +292,6 @@ private fun Marker(@DrawableRes icon: Int, text: String, tint: Color) {
     ) {
         Icon(painterResource(icon), contentDescription = null, tint = tint, modifier = Modifier.size(18.dp))
         Text(text, style = MaterialTheme.typography.bodyMedium, color = tint)
-    }
-}
-
-/**
- * Что уезжает и что остаётся — карточкой со значком: замок и земной шар говорят о судьбе сведений
- * раньше, чем человек дочитает заголовок. Пункты идут **строками**, а не одним абзацем: список
- * читают глазами по одному, а абзац перечитывают целиком.
- */
-@Composable
-private fun What(@DrawableRes icon: Int, title: Int, items: Int, tint: Color) {
-    ElevatedCard(Modifier.fillMaxWidth()) {
-        Column(
-            modifier = Modifier.padding(16.dp),
-            verticalArrangement = Arrangement.spacedBy(8.dp)
-        ) {
-            Row(
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(8.dp)
-            ) {
-                Icon(painterResource(icon), contentDescription = null, tint = tint)
-                Text(stringResource(title), style = MaterialTheme.typography.titleMedium, color = tint)
-            }
-            for (item in stringArrayResource(items)) {
-                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    Text("•", style = MaterialTheme.typography.bodyMedium, color = tint)
-                    Text(item, style = MaterialTheme.typography.bodyMedium)
-                }
-            }
-        }
     }
 }
 

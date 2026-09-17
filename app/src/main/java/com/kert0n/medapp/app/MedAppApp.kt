@@ -26,6 +26,6 @@ fun MedAppApp(
     val state by viewModel.state.collectAsStateWithLifecycle()
     when (state) {
         AppStartState.Ready -> MedAppShell(opening = opening, onOpened = onOpened)
-        else -> SetupScreen(state, onRetry = viewModel::retry)
+        else -> SetupScreen(state, onRetry = viewModel::retry, onStartOver = viewModel::startOver)
     }
 }
