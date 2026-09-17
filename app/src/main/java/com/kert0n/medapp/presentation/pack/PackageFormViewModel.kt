@@ -170,7 +170,9 @@ class PackageFormViewModel @AssistedInject constructor(
     private suspend fun ask(code: String) {
         val outcome = scanning.lookup(ScannedCode(CodeFormat.DATA_MATRIX, code))
         if (outcome is PackageScanning.Outcome.Suggested) {
-            form.value = outcome.suggestion.filling(form.value)
+            // Словарь нужен, чтобы узнать единицу, которую реестр назвал словом: свою клиент не
+            // заводит (PLAN D1). Снимок читается здесь же, как и перед записью формы.
+            form.value = outcome.suggestion.filling(form.value, vocabulary.snapshot())
         }
     }
 

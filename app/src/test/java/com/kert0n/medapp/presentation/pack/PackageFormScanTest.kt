@@ -84,7 +84,11 @@ class PackageFormScanTest {
         assertEquals(listOf(DataMatrixCode(text)), codes.asked)
     }
 
-    /** Что реестр знает — то и стоит в полях: человеку остаётся проверить и вписать остальное. */
+    /**
+     * Что реестр знает — то и стоит в полях, **всё**: название, производитель, страна, срок. Чему
+     * поля нет — то в описании его же словами, и ничего не теряется по дороге: иначе человек
+     * переписывает с коробки то, что приложение уже прочитало.
+     */
     @Test
     fun whatTheRegistryKnowsIsAlreadyInTheFields() {
         codes.answer = FakePackageCodes.found()
@@ -94,7 +98,26 @@ class PackageFormScanTest {
 
         assertEquals("Цетрин", state.form.name)
         assertEquals("Индия", state.form.country)
+        assertEquals("Dr. Reddy\u2019s", state.form.manufacturer)
+        assertEquals(
+            "таблетки, покрытые плёночной оболочкой, цетиризин, 10 мг, 20 таблеток в 2 блистерах",
+            state.form.description
+        )
+    }
+
+    /**
+     * Составное количество числом не становится: «20 таблеток в 2 блистерах» — два числа, и ни
+     * одно не остаток коробки. Прочитанное живьём «30 шт» становится (`ScanSuggestionMapperTest`).
+     */
+    @Test
+    fun aCompositeQuantityIsLeftToThePerson() {
+        codes.answer = FakePackageCodes.found()
+        val model = scanned()
+
+        val state = watching(model.state) { it.awaiting { seen -> seen.form.name.isNotBlank() } }
+
         assertEquals("", state.form.amount)
+        assertNull(state.form.unit)
     }
 
     /**

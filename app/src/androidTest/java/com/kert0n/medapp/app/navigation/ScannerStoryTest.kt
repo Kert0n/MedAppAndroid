@@ -107,10 +107,16 @@ class ScannerStoryTest {
         }
     }
 
-    /** Название и страну Артём не печатает: их сказал код. */
+    /**
+     * Название, страну и сказанное реестром словами Артём не печатает: это всё уже в полях, и
+     * описание среди них — иначе действующее вещество и дозировку он переписывал бы с коробки.
+     */
     private fun theFormAlreadyKnowsWhatTheRegistryKnows() {
         compose.waitUntil(WAIT) { compose.onAllNodesWithText("Цетрин").fetchSemanticsNodes().isNotEmpty() }
         compose.onNodeWithText("Индия").performScrollTo().assertIsDisplayed()
+        compose.onNodeWithText(
+            "таблетки, покрытые плёночной оболочкой, цетиризин, 10 мг, 20 таблеток в 2 блистерах"
+        ).performScrollTo().assertIsDisplayed()
     }
 
     /**
