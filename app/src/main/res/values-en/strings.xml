@@ -140,6 +140,7 @@
     <string name="contents_remove">Remove</string>
     <string name="contents_add">Add a package</string>
     <string name="contents_empty_here">Nothing here yet. Add a package — and it will appear in the list.</string>
+    <string name="contents_shelf_gone">You no longer have this kit.</string>
     <string name="contents_empty_everywhere">All kits are empty for now.</string>
     <string name="contents_nothing_found">Nothing found.</string>
     <string name="contents_reset">Reset</string>
@@ -222,6 +223,9 @@
     <string name="med_kit_joining_code_empty">Enter the code you were sent.</string>
     <string name="med_kit_joining_invalid">There is no such invitation. Ask for a new code.</string>
     <string name="med_kit_joining_already_member">You are already in this kit — it\'s in the list.</string>
+    <string name="med_kit_joining_scan">Scan the code</string>
+    <string name="med_kit_joining_aim">Point at the invitation QR code</string>
+    <string name="med_kit_joining_camera_denied">The camera is not allowed. Type the code or allow the camera in the app settings.</string>
 
     <!-- Sync status (screen 28) and the Options place -->
     <string name="options_title">Options</string>
@@ -619,4 +623,17 @@
     <string name="course_picking_nothing_found">Nothing found. Try a different name.</string>
     <string name="course_picking_empty">No suitable packages: add a box on a shelf or set its form.</string>
     <string name="action_got_it">Got it</string>
+
+    <!-- Scanner -->
+    <string name="scanner_aim">Point at the code on the package</string>
+    <string name="scanner_preview">Camera image</string>
+    <string name="scanner_camera_denied">To read codes from packages, the app needs the camera. Without it, add packages on a kit.</string>
+    <string name="scanner_camera_allow">Allow the camera</string>
+    <string name="scanner_camera_refused">The camera is not allowed. You can allow it in the app settings.</string>
+    <string name="scanner_camera_settings">Open settings</string>
+    <string name="scanner_camera_absent">This device has no camera. Add packages on a kit — just as without a code.</string>
+    <string name="scanner_unsupported">This code is not supported: medicine packages carry a DataMatrix code.</string>
+    <string name="pack_scan_asking">Asking the Chestny Znak registry about the code…</string>
+    <string name="pack_scan_not_found">The registry does not know this code — fill in the fields yourself.</string>
+    <string name="pack_scan_unavailable">The registry did not answer: %1$s. Fill in the fields yourself.</string>
 </resources>

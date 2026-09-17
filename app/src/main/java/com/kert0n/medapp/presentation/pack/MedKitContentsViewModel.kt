@@ -63,6 +63,7 @@ class MedKitContentsViewModel @AssistedInject constructor(
 
     private val removing = MutableStateFlow(Removing())
 
+
     private val days = today.observe().map { it.date }
 
     /** Список вместе с днём, на который он посчитан: просрочка зависит от дня, а не от момента. */
@@ -271,4 +272,10 @@ data class MedKitContentsUiState(
 ) {
     /** Искал или сужал: «ничего не нашлось» — это не «здесь пусто». */
     val isNarrowed: Boolean get() = text.isNotBlank() || narrowing != null
+
+    /**
+     * Полки у нас больше нет: её убрали у всех или нас вывели (PLAN E6), и заход или список полок
+     * это записали, пока экран открыт. Заводить в неё нечего. Убрал её сам человек — это [isRemoved], и экран уходит.
+     */
+    val isShelfGone: Boolean get() = isLoaded && !isEverywhere && medKit == null && !isRemoved
 }

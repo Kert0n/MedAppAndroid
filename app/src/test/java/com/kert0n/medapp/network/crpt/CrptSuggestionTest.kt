@@ -17,6 +17,9 @@ import org.junit.Test
  */
 class CrptSuggestionTest {
 
+    /** Сегодня у проверки своё: день продажи из будущего в предложение не попадает. */
+    private val TODAY: LocalDate = LocalDate.of(2026, 9, 17)
+
     private val tablets = DosageForm(Uuid.parse("00000000-0000-4000-8000-000000000101"), "таблетки")
     private val other = DosageForm(Uuid.parse("00000000-0000-4000-8000-000000000102"), "другие")
     private val cream = DosageForm(Uuid.parse("00000000-0000-4000-8000-000000000103"), "крем")
@@ -30,7 +33,7 @@ class CrptSuggestionTest {
     /** Живой ответ 2026-09-14: полночь 31 марта по Москве — в UTC ещё 30-е, страна — фишкой карточки. */
     @Test
     fun aFoundMedicineFillsWhatTheAnswerNamesAndNothingElse() {
-        val suggestion = dto(CrptFixtures.found).toSuggestion(words)
+        val suggestion = dto(CrptFixtures.found).toSuggestion(words, TODAY)
 
         assertEquals("Цетрин", suggestion.name)
         assertEquals("таблетки покрытые пленочной оболочкой", suggestion.formText)
@@ -51,7 +54,7 @@ class CrptSuggestionTest {
      */
     @Test
     fun aCompoundDosageStaysTextAndFewerBlocksAreNotAnError() {
-        val suggestion = dto(CrptFixtures.lozenge).toSuggestion(words)
+        val suggestion = dto(CrptFixtures.lozenge).toSuggestion(words, TODAY)
 
         assertEquals("Доритрицин", suggestion.name)
         assertEquals(tablets, suggestion.form)
@@ -64,7 +67,7 @@ class CrptSuggestionTest {
     /** Категория вне лекарств — предупреждение; форма при этом подставляется, если словарь её знает. */
     @Test
     fun aCosmeticIsNotAMedicine() {
-        val suggestion = dto(CrptFixtures.cosmetics).toSuggestion(words)
+        val suggestion = dto(CrptFixtures.cosmetics).toSuggestion(words, TODAY)
 
         assertFalse(suggestion.isMedicine)
         assertEquals("Крем для рук", suggestion.name)
@@ -76,23 +79,23 @@ class CrptSuggestionTest {
     /** Редкий известный вид — «другие»; незнакомое слово остаётся только текстом. */
     @Test
     fun anUnknownFormStaysEmptyWithItsTextAndASimilarOneIsGuessed() {
-        val unknown = dto("""{"codeFounded": true, "category": "drugs", "screen": {"items": [{"pharmacyData": {"form": "пластырь"}}]}}""").toSuggestion(words)
+        val unknown = dto("""{"codeFounded": true, "category": "drugs", "screen": {"items": [{"pharmacyData": {"form": "пластырь"}}]}}""").toSuggestion(words, TODAY)
         assertEquals(other, unknown.form)
         assertEquals("пластырь", unknown.formText)
 
-        val trulyUnknown = dto("""{"codeFounded": true, "category": "drugs", "screen": {"items": [{"pharmacyData": {"form": "неведомая форма"}}]}}""").toSuggestion(words)
+        val trulyUnknown = dto("""{"codeFounded": true, "category": "drugs", "screen": {"items": [{"pharmacyData": {"form": "неведомая форма"}}]}}""").toSuggestion(words, TODAY)
         assertNull(trulyUnknown.form)
         assertEquals("неведомая форма", trulyUnknown.formText)
 
         val withoutPlainTablets = Vocabulary(emptyList(), listOf(other, cream))
         val other = dto("""{"codeFounded": true, "category": "drugs", "screen": {"items": [{"attrList": [{"label": "Форма выпуска", "value": "Таблетки"}]}]}}""")
-        assertNull(other.toSuggestion(withoutPlainTablets).form)
+        assertNull(other.toSuggestion(withoutPlainTablets, TODAY).form)
     }
 
     /** Без аптечного блока и атрибутов — только имя: остальное не придумывается. */
     @Test
     fun aBareAnswerSuggestsOnlyTheName() {
-        val suggestion = dto("""{"codeFounded": true, "category": "bio", "productName": "Омега-3"}""").toSuggestion(words)
+        val suggestion = dto("""{"codeFounded": true, "category": "bio", "productName": "Омега-3"}""").toSuggestion(words, TODAY)
 
         assertEquals("Омега-3", suggestion.name)
         assertNull(suggestion.form)
@@ -102,4 +105,28 @@ class CrptSuggestionTest {
         assertNull(suggestion.quantityText)
         assertTrue(suggestion.isMedicine)
     }
+
+    /**
+     * `receiptDate` — момент, когда коробку продали, и в московских сутках это день покупки:
+     * «Товар продан 15 ноября 2025» у живого ответа. Считать его в UTC значило бы сдвинуть день
+     * назад — та же беда, что у срока годности.
+     */
+    @Test
+    fun theDayItWasSoldIsReadInMoscowDays() {
+        val suggestion = dto(CrptFixtures.found).toSuggestion(words, LocalDate.of(2026, 9, 17))
+
+        assertEquals(LocalDate.of(2025, 11, 15), suggestion.boughtOn)
+    }
+
+    /**
+     * День продажи из будущего покупкой не бывает: коробку, ещё не проданную, человек в руках не
+     * держит, и такая дата в форме — чужая выдумка, которую он не заметит.
+     */
+    @Test
+    fun aSaleInTheFutureIsNotAPurchase() {
+        val suggestion = dto(CrptFixtures.found).toSuggestion(words, LocalDate.of(2025, 1, 1))
+
+        assertNull(suggestion.boughtOn)
+    }
+
 }

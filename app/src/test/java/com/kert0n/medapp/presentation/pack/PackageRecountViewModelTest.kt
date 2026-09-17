@@ -44,8 +44,13 @@ class PackageRecountViewModelTest {
 
     private val queue = QueueService(DirectTransactions, FakeQueue())
 
-    private fun viewModel(transactions: Transactions = DirectTransactions) = PackageRecountViewModel(
+    private fun viewModel(
+        transactions: Transactions = DirectTransactions,
+        freshening: com.kert0n.medapp.feature.operation.Freshening =
+            com.kert0n.medapp.fixture.offlineFreshening(stored, clock)
+    ) = PackageRecountViewModel(
         adjusting = PackageAdjusting(stored, FakeFollowing(), queue, transactions, clock),
+        freshening = freshening,
         vocabulary = FakeVocabulary(),
         packages = stored,
         packageId = PACK
@@ -191,5 +196,26 @@ class PackageRecountViewModelTest {
         assertEquals(PackageRecountError.Busy, state.error)
         assertFalse(state.isDone)
         assertEquals(tablets("20"), stored.packages.single().quantity)
+    }
+
+    /**
+     * Коробка общей полки при связи перечитывается, и пока сервер не ответил, пересчёт ждёт:
+     * «сейчас записано» должно быть свежим — от него считается разница (PLAN E4). Спрошено один раз.
+     */
+    @Test
+    fun aSharedBoxIsRecountedOnlyAfterTheServerAnswers() {
+        stored.lying(pack(id = PACK, quantity = tablets("20"), medKit = com.kert0n.medapp.fixture.medKit(id = com.kert0n.medapp.fixture.SHARED_KIT, publication = com.kert0n.medapp.domain.medkit.MedKit.Publication.PUBLISHED, participantCount = 2).ref))
+        val server = com.kert0n.medapp.fixture.RereadingServer(clock)
+        server.hold()
+        val model = viewModel(freshening = com.kert0n.medapp.fixture.onlineFreshening(server, stored, clock))
+
+        watching(model.state) { state ->
+            state.awaiting { it.pack != null }
+            org.junit.Assert.assertTrue(state.value.isLoading)
+            server.release()
+            state.awaiting { !it.isLoading }
+        }
+
+        assertEquals(listOf("/v1/drugs/$PACK"), server.asked)
     }
 }

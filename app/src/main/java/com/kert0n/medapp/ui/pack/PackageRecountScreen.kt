@@ -65,7 +65,7 @@ fun PackageRecountScreen(
         val pack = state.pack
         when {
             state.isGone -> EmptyState(text = stringResource(R.string.pack_gone), modifier = Modifier.padding(padding))
-            pack == null -> LoadingState(Modifier.padding(padding))
+            state.isLoading || pack == null -> LoadingState(Modifier.padding(padding))
             else -> Form(
                 modifier = Modifier.padding(padding),
                 actions = {

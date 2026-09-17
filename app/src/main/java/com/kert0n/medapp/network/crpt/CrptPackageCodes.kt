@@ -5,6 +5,8 @@ import com.kert0n.medapp.domain.scan.PackageCodes
 import com.kert0n.medapp.domain.scan.PackageSuggestion
 import com.kert0n.medapp.domain.value.Vocabulary
 import com.kert0n.medapp.network.value.VocabularyResolver
+import java.time.Clock
+import java.time.LocalDate
 import javax.inject.Inject
 
 /**
@@ -16,11 +18,19 @@ import javax.inject.Inject
  */
 class CrptPackageCodes @Inject constructor(
     private val api: CrptApi,
-    private val vocabulary: VocabularyResolver
+    private val vocabulary: VocabularyResolver,
+    private val clock: Clock
 ) : PackageCodes {
 
     override suspend fun lookup(code: DataMatrixCode): PackageCodes.Lookup = when (val check = api.check(code)) {
-        is CrptCheck.Body -> PackageCodes.Lookup.Found(check.dto.toSuggestion(vocabulary.snapshot()))
+        // Сегодня нужно, чтобы отсеять день продажи из будущего: коробку, ещё не проданную,
+        // человек в руках не держит. Время берётся часами, а не `LocalDate.now()` (PLAN H1), и
+        // день считается **в московских сутках** — тех же, в которых реестр называет дату продажи.
+        // Часы устройства стоят в своей зоне, и под полночь «сегодня» у них другое число: честная
+        // покупка сегодняшнего московского дня оказалась бы будущей и пропала (разбор #55).
+        is CrptCheck.Body -> PackageCodes.Lookup.Found(
+            check.dto.toSuggestion(vocabulary.snapshot(), LocalDate.now(clock.withZone(CRPT_ZONE)))
+        )
         CrptCheck.NotFound -> PackageCodes.Lookup.NotFound
         is CrptCheck.Unavailable -> PackageCodes.Lookup.Unavailable(check.reason)
     }
@@ -32,7 +42,7 @@ class CrptPackageCodes @Inject constructor(
  */
 internal val MEDICINE_CATEGORIES = setOf("drugs", "bio", "antiseptic")
 
-internal fun CrptCheckNetworkDTO.toSuggestion(words: Vocabulary): PackageSuggestion {
+internal fun CrptCheckNetworkDTO.toSuggestion(words: Vocabulary, today: LocalDate): PackageSuggestion {
     val attributes = attributes
     val pharmacy = pharmacy
     val formText = pharmacy?.form.orNullIfBlank() ?: attributes[FORM_LABEL]
@@ -46,6 +56,7 @@ internal fun CrptCheckNetworkDTO.toSuggestion(words: Vocabulary): PackageSuggest
         activeSubstance = pharmacy?.activeSubstance.orNullIfBlank(),
         dosageText = pharmacy?.dosage.orNullIfBlank() ?: attributes[DOSAGE_LABEL],
         quantityText = pharmacy?.quantity.orNullIfBlank() ?: QUANTITY_LABELS.firstNotNullOfOrNull { attributes[it] },
+        boughtOn = boughtOn(today),
         isMedicine = category?.trim()?.lowercase() in MEDICINE_CATEGORIES
     )
 }

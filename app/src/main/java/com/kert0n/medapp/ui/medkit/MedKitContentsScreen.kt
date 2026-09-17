@@ -128,7 +128,7 @@ fun MedKitContentsScreen(
         floatingActionButton = {
             // На экране всех лекарств класть некуда: у коробки одно место, и выбрать его здесь
             // не из чего. У пустой полки кнопка одна — та, что в самом рассказе.
-            if (state.isLoaded && !state.isEverywhere && !state.isAreaEmpty) {
+            if (state.isLoaded && !state.isEverywhere && !state.isAreaEmpty && !state.isShelfGone) {
                 FloatingActionButton(onClick = onAdd) {
                     Icon(
                         painterResource(R.drawable.ic_add),
@@ -142,6 +142,8 @@ fun MedKitContentsScreen(
             when {
                 // Первое чтение базы ещё не пришло: говорить «пусто» рано — это была бы неправда.
                 !state.isLoaded -> LoadingState()
+                // Полки нет — ни поиска, ни «завести»: класть некуда, и сказано это словами.
+                state.isShelfGone -> EmptyState(stringResource(R.string.contents_shelf_gone))
                 // Искать и сужать нечего: ни поля, ни чипов — они бы обещали содержимое.
                 state.isAreaEmpty && !state.isNarrowed -> if (state.isEverywhere) {
                     EmptyState(stringResource(R.string.contents_empty_everywhere))
