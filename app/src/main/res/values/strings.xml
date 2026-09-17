@@ -244,7 +244,7 @@
     <string name="sync_about_intake">Приём</string>
     <string name="sync_about_claim">Выделение лечению</string>
     <string name="sync_about_med_kit">Решение об аптечке</string>
-    <string name="sync_about_unknown">Изменение</string>
+    <string name="sync_about_unknown">Неизвестная операция</string>
     <string name="sync_reason_invalid">Сервер не принял данные</string>
     <string name="sync_reason_not_enough">На сервере осталось меньше, чем вы списали</string>
     <string name="sync_reason_unit_changed">У коробки сменилась единица измерения</string>

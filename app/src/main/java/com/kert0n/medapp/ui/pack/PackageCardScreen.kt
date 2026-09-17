@@ -27,6 +27,7 @@ import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
@@ -43,6 +44,7 @@ import com.kert0n.medapp.ui.DAY
 import com.kert0n.medapp.ui.EmptyState
 import com.kert0n.medapp.ui.LoadingState
 import com.kert0n.medapp.ui.NavigationRow
+import com.kert0n.medapp.ui.theme.LocalAccents
 import java.time.LocalDate
 import java.util.Currency
 
@@ -219,10 +221,10 @@ private fun HowMuchIsThere(
             )
         }
         // О пометках говорит сама коробка: они переживают закрытие карточки, а отказ — нет.
-        if (pack.hasUnconfirmedChanges) Note(stringResource(R.string.pack_unconfirmed))
+        if (pack.hasUnconfirmedChanges) Note(stringResource(R.string.pack_unconfirmed), LocalAccents.current.pending)
         when (pack.status) {
-            PackageStatus.REMOVING -> Note(stringResource(R.string.pack_removal_on_the_way))
-            PackageStatus.LOST -> Note(stringResource(R.string.pack_lost))
+            PackageStatus.REMOVING -> Note(stringResource(R.string.pack_removal_on_the_way), LocalAccents.current.pending)
+            PackageStatus.LOST -> Note(stringResource(R.string.pack_lost), LocalAccents.current.pending)
             PackageStatus.ACTIVE, PackageStatus.CHANGING -> Unit
         }
         if (isBusy) {
@@ -335,8 +337,8 @@ private fun Fact(label: String, value: String, modifier: Modifier = Modifier) {
 
 /** Пометка коробки: не отказ и не беда, просто состояние, о котором стоит знать. */
 @Composable
-private fun Note(text: String) {
-    Text(text, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+private fun Note(text: String, color: Color = MaterialTheme.colorScheme.onSurfaceVariant) {
+    Text(text, style = MaterialTheme.typography.bodySmall, color = color)
 }
 
 /** Количество словами: число и единица, как их показывают везде в приложении. */

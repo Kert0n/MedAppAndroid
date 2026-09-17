@@ -10,20 +10,24 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.ElevatedCard
 import androidx.compose.material3.Icon
+import androidx.compose.material3.LocalContentColor
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.text.style.TextDecoration
 import androidx.compose.ui.unit.dp
 import com.kert0n.medapp.R
 import com.kert0n.medapp.domain.pack.ExpiryDate
 import com.kert0n.medapp.domain.pack.PackageStatus
 import com.kert0n.medapp.presentation.pack.PackagePresentationDTO
 import com.kert0n.medapp.presentation.value.toPresentationDTO
+import com.kert0n.medapp.ui.theme.LocalAccents
 import java.time.LocalDate
 
 /**
@@ -47,20 +51,38 @@ fun PackageCard(
     placeName: String? = null
 ) {
     val expired = pkg.expiresOn?.isExpiredOn(today) == true
+    // Три состояния — три цвета, и у каждого своё дело (решение владельца 2026-09-17):
+    // красный — просрочка («не пей»), янтарный — решение в пути («подожди»), призрак — коробки
+    // здесь больше нет. Цвет ни в одном из них не единственный: рядом значок и слова.
+    val withdrawn = !pkg.status.allowsUse
+    val pending = !withdrawn && (pkg.hasUnconfirmedChanges || pkg.status == PackageStatus.CHANGING)
+    val accents = LocalAccents.current
     ElevatedCard(
-        onClick = onOpen,
-        colors = if (expired) {
-            CardDefaults.elevatedCardColors(
+        // **Призрак не нажимается.** Выброшенная коробка — состояние конечное, и открыть её
+        // карточку значило бы предложить человеку действия над тем, чего уже нет.
+        onClick = if (withdrawn) ({}) else onOpen,
+        enabled = !withdrawn,
+        colors = when {
+            expired -> CardDefaults.elevatedCardColors(
                 containerColor = MaterialTheme.colorScheme.errorContainer,
                 contentColor = MaterialTheme.colorScheme.onErrorContainer
             )
-        } else {
-            CardDefaults.elevatedCardColors()
+            pending -> CardDefaults.elevatedCardColors(
+                containerColor = accents.pendingContainer,
+                contentColor = accents.onPendingContainer
+            )
+            else -> CardDefaults.elevatedCardColors()
         },
-        modifier = modifier.fillMaxWidth()
+        modifier = modifier.fillMaxWidth().alpha(if (withdrawn) GHOST else 1f)
     ) {
         Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
-            Text(pkg.name, style = MaterialTheme.typography.titleMedium)
+            Text(
+                pkg.name,
+                style = MaterialTheme.typography.titleMedium,
+                // Зачёркнутое имя говорит то же, что и полупрозрачность, — словами формы, а не
+                // одним лишь цветом: человеку, не различающему оттенки, видно и так.
+                textDecoration = if (withdrawn) TextDecoration.LineThrough else null
+            )
 
             Text(
                 stringResource(R.string.pack_left, pkg.quantity.amount, pkg.quantity.unit.name),
@@ -75,22 +97,26 @@ fun PackageCard(
             // человек ищет коробку в списке и должен понимать, почему число у неё оценочное
             // (PLAN E1, H3 «Набор общей полки»).
             when (pkg.status) {
+                // Внутри погашенной карточки цвет содержимого уже её: свой сделал бы надпись
+                // нечитаемой на этой подложке.
+                // Внутри залитой карточки цвет содержимого уже её: свой сделал бы надпись
+                // нечитаемой на этой подложке.
                 PackageStatus.REMOVING -> Marker(
-                    icon = R.drawable.ic_cloud_upload,
+                    icon = R.drawable.ic_delete,
                     text = stringResource(R.string.pack_row_removal),
-                    color = if (expired) MaterialTheme.colorScheme.onErrorContainer else MaterialTheme.colorScheme.tertiary
+                    color = LocalContentColor.current
                 )
                 PackageStatus.LOST -> Marker(
                     icon = R.drawable.ic_warning,
                     text = stringResource(R.string.pack_row_lost),
-                    color = if (expired) MaterialTheme.colorScheme.onErrorContainer else MaterialTheme.colorScheme.error
+                    color = LocalContentColor.current
                 )
                 PackageStatus.ACTIVE, PackageStatus.CHANGING ->
                     if (pkg.hasUnconfirmedChanges) {
                         Marker(
                             icon = R.drawable.ic_cloud_upload,
                             text = stringResource(R.string.pack_row_unconfirmed),
-                            color = if (expired) MaterialTheme.colorScheme.onErrorContainer else MaterialTheme.colorScheme.tertiary
+                            color = if (expired) MaterialTheme.colorScheme.onErrorContainer else accents.pending
                         )
                     }
             }
@@ -129,3 +155,6 @@ internal fun Marker(@DrawableRes icon: Int, text: String, color: Color) {
         Text(text, style = MaterialTheme.typography.bodyMedium, color = color)
     }
 }
+
+/** Насколько гаснет коробка, которой здесь больше нет: видно, что была, но не разглядывают. */
+private const val GHOST = 0.55f

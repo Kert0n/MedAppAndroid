@@ -22,6 +22,7 @@ import androidx.compose.ui.unit.dp
 import com.kert0n.medapp.R
 import com.kert0n.medapp.domain.medkit.MedKitStatus
 import com.kert0n.medapp.presentation.medkit.MedKitPresentationDTO
+import com.kert0n.medapp.ui.theme.LocalAccents
 
 /**
  * Аптечка строкой списка (PLAN H3 №2). Первым — не название, а **что внутри**: список нужен
@@ -71,12 +72,12 @@ fun MedKitCard(medKit: MedKitPresentationDTO, onOpen: () -> Unit, modifier: Modi
                 MedKitStatus.PUBLISHING -> Marker(
                     icon = R.drawable.ic_cloud_upload,
                     text = stringResource(R.string.med_kit_publishing),
-                    color = MaterialTheme.colorScheme.tertiary
+                    color = LocalAccents.current.pending
                 )
                 MedKitStatus.REMOVING -> Marker(
-                    icon = R.drawable.ic_cloud_upload,
+                    icon = R.drawable.ic_delete,
                     text = stringResource(R.string.med_kit_removing),
-                    color = MaterialTheme.colorScheme.tertiary
+                    color = LocalAccents.current.pending
                 )
                 MedKitStatus.ACTIVE -> Unit
             }

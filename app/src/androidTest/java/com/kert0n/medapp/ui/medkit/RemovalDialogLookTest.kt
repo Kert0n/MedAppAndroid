@@ -8,6 +8,7 @@ import androidx.compose.ui.test.isDialog
 import androidx.compose.ui.test.junit4.v2.createComposeRule
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
+import androidx.compose.ui.test.performScrollTo
 import androidx.compose.ui.unit.Density
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import com.kert0n.medapp.domain.medkit.MedKit
@@ -109,6 +110,11 @@ class RemovalDialogLookTest {
                             id = HOME_KIT, name = "Семейная",
                             publication = MedKit.Publication.PUBLISHED, participantCount = 3
                         ).projection(MedKitContents(packages = 4, expired = 0)).toPresentationDTO(),
+                        // Все три судьбы разом — самый длинный разговор об уборке: его и сторожим.
+                        others = listOf(
+                            medKit(id = kotlin.uuid.Uuid.random(), name = "Дача")
+                                .projection(MedKitContents(packages = 0, expired = 0)).toPresentationDTO()
+                        ),
                         isLoaded = true,
                         removing = RemovalStep.ASKING,
                         affectedCourses = listOf("Спина", "Колено")
@@ -122,7 +128,17 @@ class RemovalDialogLookTest {
         }
 
         compose.onNodeWithText("Источники потеряют: Спина, Колено. Сами лечения останутся.").assertIsDisplayed()
-        compose.onNodeWithText("Аптечка останется у других, а вам её лекарства будут недоступны").assertIsDisplayed()
+        // Три судьбы плюс последствия — самый длинный разговор об уборке. Каждая должна
+        // **дочитываться**: обрезанная подпись у последней и была бедой на снимке владельца.
+        val dialog = compose.onNode(isDialog()).getUnclippedBoundsInRoot()
+        for (fate in listOf("Убрать вместе с лекарствами", "Перенести и убрать", "Выйти и оставить остальным")) {
+            compose.onNodeWithText(fate).performScrollTo()
+            val bounds = compose.onNodeWithText(fate).getUnclippedBoundsInRoot()
+            assertTrue("«$fate» вылезла за диалог", bounds.bottom <= dialog.bottom)
+        }
+        compose.onNodeWithText("Аптечка останется у других, а вам её лекарства будут недоступны")
+            .performScrollTo()
+            .assertIsDisplayed()
         compose.onNodeWithText("Выйти и оставить остальным").performClick()
 
         assertEquals(1, left)

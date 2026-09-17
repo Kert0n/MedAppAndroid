@@ -32,6 +32,7 @@ import com.kert0n.medapp.ui.theme.MedAppTheme
 import java.time.LocalDate
 import kotlin.uuid.Uuid
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertNull
 import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
@@ -339,5 +340,32 @@ class MedKitContentsScreenTest {
         )
 
         compose.onNodeWithText("Изменение в пути").assertIsDisplayed()
+    }
+
+    /**
+     * Выброшенная коробка — состояние конечное: она видна призраком, но **не нажимается**. Открыть
+     * её карточку значило бы предложить человеку действия над тем, чего уже нет (решение владельца
+     * 2026-09-17).
+     *
+     * Красная проверка: оставить строку нажимаемой — человек открывает карточку удалённой коробки
+     * и пробует из неё принять.
+     */
+    @Test
+    fun aGhostBoxDoesNotOpen() {
+        show(
+            MedKitContentsUiState(
+                medKit = medKit(id = HOME_KIT, name = "Домашняя")
+                    .projection(MedKitContents(packages = 1, expired = 0)).toPresentationDTO(),
+                packages = listOf(
+                    pack(id = PACK, name = "Цетрин").markRemoving(Uuid.random()).projected().toPresentationDTO()
+                ),
+                today = today,
+                isLoaded = true
+            )
+        )
+
+        compose.onNodeWithText("Цетрин").performClick()
+
+        assertNull(opened)
     }
 }
