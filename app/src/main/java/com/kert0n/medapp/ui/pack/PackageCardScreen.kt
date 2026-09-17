@@ -88,7 +88,7 @@ fun PackageCardScreen(
                     }
                 },
                 actions = {
-                    if (pack != null) {
+                    if (pack != null && !state.isLoading) {
                         IconButton(onClick = onEdit) {
                             Icon(
                                 painterResource(R.drawable.ic_edit),
@@ -108,7 +108,7 @@ fun PackageCardScreen(
         floatingActionButton = {
             // Принять — самое частое, что человек делает с коробкой: Material 3 отводит для
             // такого плавающую кнопку, и она не делит ширину ни с кем (решение владельца).
-            if (pack != null) {
+            if (pack != null && !state.isLoading) {
                 // Подпись у значка, а не только у слова: плавающая кнопка Material 3 слов внутрь
                 // своего узла не пускает, и экранный чтец назвал бы её просто «кнопка».
                 ExtendedFloatingActionButton(
@@ -126,7 +126,7 @@ fun PackageCardScreen(
     ) { padding ->
         when {
             state.isGone -> EmptyState(text = stringResource(R.string.pack_gone), modifier = Modifier.padding(padding))
-            pack == null -> LoadingState(Modifier.padding(padding))
+            state.isLoading || pack == null -> LoadingState(Modifier.padding(padding))
             // Порядок — от срочного к справочному (решение владельца 2026-09-17): сколько есть,
             // до каких пор годно, где лежит, и только потом что это за лекарство. Описание из
             // справочника занимает целый экран, и стоя вторым, оно отодвигало срок и место за

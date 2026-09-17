@@ -131,6 +131,7 @@
     <string name="contents_edit">Править</string>
     <string name="contents_remove">Убрать</string>
     <string name="contents_add">Завести упаковку</string>
+    <string name="contents_shelf_gone">Этой аптечки у вас больше нет.</string>
     <string name="contents_empty_here">Здесь пока ничего нет. Заведите упаковку — и она появится в списке.</string>
     <string name="contents_empty_everywhere">Во всех аптечках пока пусто.</string>
     <string name="contents_nothing_found">Ничего не нашлось.</string>
