@@ -8,6 +8,8 @@ import androidx.datastore.preferences.preferencesDataStoreFile
 import com.kert0n.medapp.domain.notification.NotificationSettingsSource
 import com.kert0n.medapp.feature.settings.SettingsStore
 import com.kert0n.medapp.platform.settings.AndroidDevicePermissions
+import com.kert0n.medapp.platform.settings.AppCompatAppLanguages
+import com.kert0n.medapp.platform.settings.AppLanguages
 import com.kert0n.medapp.platform.settings.DataStoreSettings
 import com.kert0n.medapp.platform.settings.DevicePermissions
 import com.kert0n.medapp.platform.settings.StoredNotificationSettings
@@ -55,4 +57,8 @@ object SettingsModule {
     @Provides
     @Singleton
     fun permissions(implementation: AndroidDevicePermissions): DevicePermissions = implementation
+
+    @Provides
+    @Singleton
+    fun languages(implementation: AppCompatAppLanguages): AppLanguages = implementation
 }

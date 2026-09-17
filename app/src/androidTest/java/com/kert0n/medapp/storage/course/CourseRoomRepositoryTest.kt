@@ -10,7 +10,9 @@ import com.kert0n.medapp.domain.value.Doses
 import com.kert0n.medapp.domain.value.doses
 import com.kert0n.medapp.feature.course.CourseDrafting
 import com.kert0n.medapp.feature.course.SourceEditing
+import com.kert0n.medapp.feature.medkits.MedKitRemoval
 import com.kert0n.medapp.feature.packages.PackageAdjusting
+import com.kert0n.medapp.feature.packages.PackageRemoval
 import com.kert0n.medapp.fixture.OTHER_PACK
 import com.kert0n.medapp.fixture.PACK
 import com.kert0n.medapp.fixture.SHARED_KIT
@@ -120,6 +122,68 @@ class CourseRoomRepositoryTest {
         val slots = requireNotNull(database.courseRepository().findPlan(id)).schedule.let { it.next(it.beginning, 10) }
         assertEquals(slots[8].at, found.firstUncoveredAt)
         assertEquals(found, database.courseRepository().observeCoverages().first().getValue(id))
+    }
+
+    /**
+     * Коробку с общей полки выбросили офлайн: команда стоит в очереди, коробка помечена и **из
+     * оборота выведена** (PLAN D4, E1). Обеспечение узнаёт об этом сразу, не дожидаясь ответа
+     * сервера: брать из неё нельзя (`take` отвечает `PACKAGE_UNUSABLE`), значит и обещать из неё
+     * приёмы нельзя. Источником она при этом остаётся — отказ полки вернёт её вместе с выделением.
+     *
+     * Здесь число обнулила бы и сама очередь: у команды `Delete` есть своя свёртка остатка. А вот
+     * в двух случаях ниже команды по коробке нет вовсе, и без правила «помеченная не в обороте»
+     * лечение обещало бы приёмы из коробки, которой у человека уже нет.
+     */
+    @Test
+    fun aBoxThrownAwayOfflineStopsCoveringAtOnce() = runTest {
+        val id = treated()
+        val before = coverageOf(id)
+        assertEquals(6.doses, before.perSource[0].coveredDoses)
+
+        assertEquals(PackageRemoval.Outcome.MARKED, scenarios.packageRemoval.remove(PACK))
+
+        assertCoveredOnlyByTheSecondBox(id)
+        // Источник на месте: отказ полки вернёт коробку, и выделение должно её дождаться.
+        val sources = requireNotNull(database.courseRepository().findPlan(id)).sources.map { it.pkg.id }
+        assertEquals(listOf(PACK, OTHER_PACK), sources)
+    }
+
+    /**
+     * Общую полку выбросили целиком офлайн. Команда уехала **по полке**, а не по коробкам: их
+     * остаток свёртка очереди не трогает вовсе, и единственное, что о них известно, — пометка
+     * `REMOVING`. Обеспечение обязано читать её.
+     *
+     * Красная проверка: обеспечение по остатку помеченной коробки — человек видит «хватает до
+     * конца лечения» из аптечки, которую он только что убрал, и узнаёт правду на приёме отказом.
+     */
+    @Test
+    fun aShelfThrownAwayOfflineStopsCoveringAtOnce() = runTest {
+        val id = treated()
+
+        assertEquals(MedKitRemoval.Outcome.MARKED, scenarios.medKitRemoval.remove(SHARED_KIT, MedKitRemoval.Fate.ThrowAway))
+
+        val after = coverageOf(id)
+        assertEquals("обе коробки были на этой полке", 0.doses, after.coveredDoses)
+    }
+
+    /**
+     * Из общей полки вышли офлайн: коробки остаются остальным, а у нас помечены `LOST` — до
+     * ответа сервера они ещё видны, но уже не наши. Обещать из них приёмы нельзя ровно так же.
+     */
+    @Test
+    fun leavingTheShelfOfflineStopsCoveringAtOnce() = runTest {
+        val id = treated()
+
+        assertEquals(MedKitRemoval.Outcome.MARKED, scenarios.medKitRemoval.remove(SHARED_KIT, MedKitRemoval.Fate.LeaveToOthers))
+
+        assertEquals("коробки оставлены остальным", 0.doses, coverageOf(id).coveredDoses)
+    }
+
+    private suspend fun assertCoveredOnlyByTheSecondBox(id: Uuid) {
+        val after = coverageOf(id)
+        assertEquals("выброшенная коробка больше ничего не обеспечивает", 0.doses, after.perSource[0].coveredDoses)
+        assertEquals("остальное обеспечение прежнее", 2.doses, after.perSource[1].coveredDoses)
+        assertEquals("нехватка названа сразу", 2.doses, after.coveredDoses)
     }
 
     /** Приём, чужой расход снимком и правка источников меняют обеспечение — каждый по-своему. */

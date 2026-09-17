@@ -1,5 +1,6 @@
 package com.kert0n.medapp.platform.notifications
 
+import com.kert0n.medapp.fixture.FakeAppLanguages
 import android.app.NotificationManager
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import androidx.test.platform.app.InstrumentationRegistry
@@ -25,7 +26,7 @@ class NotificationChannelsTest {
 
     private val context = InstrumentationRegistry.getInstrumentation().targetContext
     private val manager = context.getSystemService(NotificationManager::class.java)
-    private val channels = NotificationChannels(context)
+    private val channels = NotificationChannels(context, FakeAppLanguages())
 
     /** Канал только этой проверки: с нашими он не пересекается ни именем, ни судьбой. */
     private val mine = "test-muted-channel"

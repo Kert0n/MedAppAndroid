@@ -3,6 +3,7 @@ package com.kert0n.medapp.presentation.course
 import com.kert0n.medapp.domain.course.CourseRejected
 import com.kert0n.medapp.domain.course.CourseSource
 import com.kert0n.medapp.domain.pack.ExpiryDate
+import com.kert0n.medapp.domain.pack.PackageStatus
 import com.kert0n.medapp.presentation.value.QuantityPresentationDTO
 import java.time.LocalDate
 import kotlin.uuid.Uuid
@@ -14,7 +15,9 @@ import kotlin.uuid.Uuid
  *
  * [coveredDoses] и [maxDoses] приходят из обеспечения, а его у черновика нет (D5): там они
  * пусты, и потолок ползунка считается по тому, сколько даёт коробка. [fault] — источник
- * отключён: выделять ему нечего, и строка это говорит.
+ * отключён: выделять ему нечего, и строка это говорит. [status] — решение о самой коробке, ещё
+ * не подтверждённое сервером: помеченная выведена из оборота и ничего не обеспечивает (E1), и
+ * строка обязана сказать, почему её приёмы вдруг пропали.
  */
 data class CourseSourcePresentationDTO(
     val packageId: Uuid,
@@ -27,7 +30,9 @@ data class CourseSourcePresentationDTO(
     val allocatedAmount: QuantityPresentationDTO?,
     val coveredDoses: Int?,
     val maxDoses: Int?,
-    val fault: CourseSource.Fault?
+    val fault: CourseSource.Fault?,
+    /** `null` — коробки уже нет: о чём предупреждать, тогда неизвестно. */
+    val status: PackageStatus?
 )
 
 /**

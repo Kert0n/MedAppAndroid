@@ -9,6 +9,7 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FloatingActionButton
 import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
@@ -38,13 +39,28 @@ fun MedKitListScreen(
     state: ScreenState<List<MedKitPresentationDTO>>,
     onOpen: (Uuid) -> Unit,
     onAdd: () -> Unit,
+    onJoin: () -> Unit,
     onSearch: () -> Unit,
     modifier: Modifier = Modifier
 ) {
     val medKits = (state as? ScreenState.Ready)?.value
     Scaffold(
         modifier = modifier.fillMaxSize(),
-        topBar = { TopAppBar(title = { Text(stringResource(R.string.med_kits_title)) }) },
+        topBar = {
+            TopAppBar(
+                title = { Text(stringResource(R.string.med_kits_title)) },
+                // «Присоединиться» стоит и при пустом списке: человек, которого позвали, своей
+                // аптечки может не иметь вовсе, и заводить её ему незачем.
+                actions = {
+                    IconButton(onClick = onJoin) {
+                        Icon(
+                            painterResource(R.drawable.ic_group_add),
+                            contentDescription = stringResource(R.string.med_kit_joining_menu)
+                        )
+                    }
+                }
+            )
+        },
         floatingActionButton = {
             // У пустого списка кнопка одна — та, что в самом рассказе: две кнопки «завести»
             // рядом человеку выбирать не из чего.

@@ -1,5 +1,12 @@
 package com.kert0n.medapp.ui.course
 
+import com.kert0n.medapp.ui.NavigationRow
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.material3.HorizontalDivider
+import androidx.compose.material3.ElevatedCard
+import androidx.compose.material3.CardDefaults
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.gestures.detectDragGesturesAfterLongPress
 import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
@@ -20,10 +27,7 @@ import androidx.compose.material3.Button
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
-import androidx.compose.material3.ListItem
-import androidx.compose.material3.ListItemDefaults
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Slider
@@ -58,6 +62,7 @@ import androidx.compose.ui.zIndex
 import com.kert0n.medapp.R
 import com.kert0n.medapp.ui.DAY
 import com.kert0n.medapp.domain.course.CourseSource
+import com.kert0n.medapp.domain.pack.PackageStatus
 import com.kert0n.medapp.presentation.course.CourseCoveragePresentationDTO
 import com.kert0n.medapp.presentation.course.CourseEstimatePresentationDTO
 import com.kert0n.medapp.presentation.course.CourseSourcePresentationDTO
@@ -158,6 +163,15 @@ private fun Sources(
     val count = state.sources.size
     Column(modifier.fillMaxSize()) {
         LazyColumn(Modifier.weight(1f), contentPadding = PaddingValues(bottom = 8.dp)) {
+            // Первым — обеспечение: ради него сюда и приходят (PLAN H3 №16).
+            item(key = "supply") { Supply(state, Modifier.padding(horizontal = 16.dp, vertical = 8.dp)) }
+            item(key = "order") {
+                IconLine(
+                    R.drawable.ic_swap_vert,
+                    stringResource(R.string.course_sources_order),
+                    Modifier.padding(horizontal = 16.dp, vertical = 4.dp)
+                )
+            }
             itemsIndexed(state.sources, key = { _, source -> source.packageId }) { index, source ->
                 val held = dragging == index
                 SourceRow(
@@ -166,8 +180,8 @@ private fun Sources(
                     isFinished = state.isFinished,
                     onAllocate = onAllocate,
                     onDetach = { onDetach(source.packageId) },
-                    onMoveUp = { if (index > 0) onMove(index, index - 1) },
-                    onMoveDown = { if (index < count - 1) onMove(index, index + 1) },
+                    onMoveUp = if (index > 0) { { onMove(index, index - 1) } } else null,
+                    onMoveDown = if (index < count - 1) { { onMove(index, index + 1) } } else null,
                     held = held,
                     modifier = Modifier
                         .zIndex(if (held) 1f else 0f)
@@ -194,27 +208,20 @@ private fun Sources(
                     }
                 )
             }
-        }
-        // Что получится — считается на месте; записанное обеспечение знает ещё и день нехватки.
-        state.estimate?.let { Estimate(it, Modifier.padding(horizontal = 16.dp)) }
-        if (state.hasUnsavedChanges) {
-            Text(
-                stringResource(R.string.course_sources_unsaved),
-                style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                modifier = Modifier.padding(horizontal = 16.dp, vertical = 4.dp)
-            )
-        } else {
-            Coverage(state.coverage, isDraft = state.isDraft, modifier = Modifier.padding(horizontal = 16.dp))
+            // Подключить — строка в конце списка, а не вторая кнопка рядом с «Сохранить»: две кнопки
+            // разного веса подряд читались как выбор между ними.
+            if (!state.isFinished) {
+                item(key = "add") {
+                    NavigationRow(
+                        icon = R.drawable.ic_add,
+                        text = stringResource(R.string.course_sources_add),
+                        onClick = onAdd
+                    )
+                }
+            }
         }
         if (!state.isFinished) {
-            OutlinedButton(
-                onClick = onAdd,
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(horizontal = 16.dp, vertical = 4.dp)
-                    .defaultMinSize(minHeight = 48.dp)
-            ) { Text(stringResource(R.string.course_sources_add)) }
+            HorizontalDivider()
             Button(
                 onClick = onSave,
                 enabled = !state.isWriting,
@@ -227,6 +234,60 @@ private fun Sources(
     }
 }
 
+/**
+ * Обеспечение одной карточкой, и каждая строка подписана: «Записано» — чем лечение обеспечено
+ * сейчас, «С правкой» — что даст собранный на экране состав. Вторая есть **только** пока правка не
+ * записана: два одинаковых числа без подписи человек не различит (PLAN H3 №16). У черновика
+ * записанного нет — есть «По составу».
+ */
+@Composable
+private fun Supply(state: CourseSourcesUiState, modifier: Modifier = Modifier) {
+    ElevatedCard(modifier.fillMaxWidth()) {
+        Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+            IconLine(R.drawable.ic_medication, stringResource(R.string.course_sources_supply), emphasis = true)
+            if (!state.isDraft || state.coverage != null) {
+                Labeled(R.drawable.ic_check_circle, stringResource(R.string.course_sources_recorded)) {
+                    Coverage(state.coverage, isDraft = state.isDraft)
+                }
+            } else {
+                Coverage(null, isDraft = true)
+            }
+            val estimate = state.estimate
+            if (estimate != null && (state.hasUnsavedChanges || state.coverage == null)) {
+                Labeled(
+                    R.drawable.ic_edit_note,
+                    stringResource(if (state.hasUnsavedChanges) R.string.course_sources_with_edit else R.string.course_sources_by_composition)
+                ) { Estimate(estimate) }
+            }
+        }
+    }
+}
+
+/** Подпись со значком и под ней то, что она подписывает. */
+@Composable
+private fun Labeled(icon: Int, label: String, content: @Composable () -> Unit) {
+    Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+        IconLine(icon, label, style = MaterialTheme.typography.labelLarge)
+        Box(Modifier.padding(start = 24.dp)) { content() }
+    }
+}
+
+/** Значок и слова одной строкой: значок уточняет, слова говорят. */
+@Composable
+private fun IconLine(
+    icon: Int,
+    text: String,
+    modifier: Modifier = Modifier,
+    emphasis: Boolean = false,
+    style: androidx.compose.ui.text.TextStyle = if (emphasis) MaterialTheme.typography.titleMedium else MaterialTheme.typography.bodyMedium,
+    color: androidx.compose.ui.graphics.Color = if (emphasis) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant
+) {
+    Row(modifier, verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+        Icon(painterResource(icon), contentDescription = null, tint = color, modifier = Modifier.size(16.dp))
+        Text(text, style = style, color = color)
+    }
+}
+
 @Composable
 private fun SourceRow(
     source: CourseSourcePresentationDTO,
@@ -234,52 +295,77 @@ private fun SourceRow(
     isFinished: Boolean,
     onAllocate: (Uuid, Int) -> Unit,
     onDetach: () -> Unit,
-    onMoveUp: () -> Unit,
-    onMoveDown: () -> Unit,
+    /** `null` — двигать некуда: действия нет, и чтец не докладывает об успехе, которого не было. */
+    onMoveUp: (() -> Unit)?,
+    onMoveDown: (() -> Unit)?,
     held: Boolean,
     modifier: Modifier,
     handleModifier: Modifier
 ) {
     val up = stringResource(R.string.course_source_move_up)
     val down = stringResource(R.string.course_source_move_down)
-    ListItem(
-        headlineContent = { Text(source.name) },
-        supportingContent = {
-            Column {
-                Text(source.place(), style = MaterialTheme.typography.bodySmall)
-                when (val fault = source.fault) {
-                    null -> {
-                        Text(source.allocation())
-                        Allocation(source, dose = dose, enabled = !isFinished, onAllocate = onAllocate)
-                    }
-                    else -> Text(fault.words(), color = MaterialTheme.colorScheme.error)
-                }
-            }
-        },
-        leadingContent = {
-            Icon(
-                painterResource(R.drawable.ic_drag_handle),
-                contentDescription = stringResource(R.string.course_source_handle, source.name),
-                modifier = handleModifier
-            )
-        },
-        trailingContent = {
-            if (!isFinished) {
-                TextButton(onClick = onDetach) { Text(stringResource(R.string.course_source_detach)) }
-            }
-        },
-        // Поднятая строка видна тенью, а отключённый источник — приглушён: он ничего не даёт.
-        tonalElevation = if (held) 8.dp else ListItemDefaults.Elevation,
+    ElevatedCard(
         modifier = modifier
             .fillMaxWidth()
-            .alpha(if (source.fault == null) 1f else 0.6f)
+            .padding(horizontal = 16.dp, vertical = 6.dp)
+            // Приглушена и отключённая коробка, и уходящая: обе ничего не дают.
+            .alpha(if (source.fault == null && source.leaving == null) 1f else 0.6f)
             .semantics {
-                customActions = listOf(
-                    CustomAccessibilityAction(up) { onMoveUp(); true },
-                    CustomAccessibilityAction(down) { onMoveDown(); true }
+                customActions = listOfNotNull(
+                    onMoveUp?.let { move -> CustomAccessibilityAction(up) { move(); true } },
+                    onMoveDown?.let { move -> CustomAccessibilityAction(down) { move(); true } }
                 )
+            },
+        // Поднятая карточка видна тенью.
+        elevation = CardDefaults.elevatedCardElevation(defaultElevation = if (held) 8.dp else 1.dp)
+    ) {
+        Column(Modifier.padding(top = 4.dp, bottom = 12.dp)) {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Icon(
+                    painterResource(R.drawable.ic_drag_handle),
+                    contentDescription = stringResource(R.string.course_source_handle, source.name),
+                    modifier = handleModifier.padding(12.dp)
+                )
+                Text(source.name, style = MaterialTheme.typography.titleMedium, modifier = Modifier.weight(1f))
+                if (!isFinished) {
+                    IconButton(onClick = onDetach) {
+                        Icon(painterResource(R.drawable.ic_link_off), contentDescription = stringResource(R.string.course_source_detach))
+                    }
+                } else {
+                    Spacer(Modifier.width(16.dp))
+                }
             }
-    )
+            Column(Modifier.padding(start = 48.dp, end = 16.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                source.place()?.let { IconLine(R.drawable.ic_home_storage, it) }
+                // «Свободно 0» у уходящей коробки сказало бы, что она пустая; пустой она не стала —
+                // её просто не будет у человека. Об этом говорит строка причины.
+                source.availableToMe?.takeIf { source.leaving == null }?.let {
+                    Text(
+                        stringResource(R.string.course_source_free, it.amount, it.unit.name),
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                }
+                // Коробка, о судьбе которой решение принято, ничего не обеспечивает ещё до ответа
+                // сервера (PLAN D4, E1). Приёмы из неё пропадают сразу, и человек читает почему —
+                // иначе нехватка выглядит ошибкой приложения. Выделение при этом только
+                // называется: двигать его у коробки, которой вот-вот не станет, некуда, а вернёт
+                // её отказ полки вместе с прежним числом.
+                val leaving = source.leaving()
+                when {
+                    leaving != null -> {
+                        Text(leaving, color = MaterialTheme.colorScheme.error)
+                        Text(source.allocation())
+                    }
+                    source.fault != null -> Text(source.fault.words(), color = MaterialTheme.colorScheme.error)
+                    else -> {
+                        Allocation(source, dose = dose, enabled = !isFinished, onAllocate = onAllocate)
+                        Text(source.allocation(), style = MaterialTheme.typography.bodyMedium)
+                    }
+                }
+            }
+        }
+    }
 }
 
 /**
@@ -327,7 +413,8 @@ private fun Estimate(estimate: CourseEstimatePresentationDTO, modifier: Modifier
 internal fun Coverage(
     coverage: CourseCoveragePresentationDTO?,
     isDraft: Boolean,
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier,
+    onShortage: ((ShortagePresentationDTO) -> Unit)? = null
 ) {
     if (coverage == null) {
         if (isDraft) {
@@ -359,9 +446,8 @@ internal fun Coverage(
             stringResource(R.string.course_coverage_covered, required, coverage.coveredDoses),
             style = MaterialTheme.typography.bodyMedium
         )
-        Shortage(
-            ShortagePresentationDTO(coverage.missingDoses, coverage.firstUncoveredOn)
-        )
+        val shortage = ShortagePresentationDTO(coverage.missingDoses, coverage.firstUncoveredOn)
+        Shortage(shortage, onClick = onShortage?.let { { it(shortage) } })
     }
 }
 
@@ -400,6 +486,7 @@ private fun Allocation(
     // поле держать незачем: оно уезжает с каждой цифрой, а зажатое под предел приходит обратно.
     var held by remember(source.packageId) { mutableStateOf<Int?>(null) }
     val shown = held ?: source.allocatedDoses
+    val doses = stringResource(R.string.course_source_doses, limit)
     val commit = {
         held?.let { onAllocate(source.packageId, it) }
         held = null
@@ -425,26 +512,43 @@ private fun Allocation(
                 // лечения на тысячу приёмов это тысяча, а не сто (разбор #47).
                 onAllocate(source.packageId, typed.filter(Char::isDigit).toIntOrNull() ?: 0)
             },
-            label = { Text(stringResource(R.string.course_source_doses, limit)) },
+            // Не всплывающая подпись, а приставка: подпись над рамкой ломалась на узком экране и
+            // наезжала на строку выделения. Для экранного чтеца поле названо целиком.
+            suffix = { Text(stringResource(R.string.course_source_doses_of, limit)) },
             singleLine = true,
             enabled = enabled,
             keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number, imeAction = ImeAction.Done),
             keyboardActions = KeyboardActions(onDone = { commit() }),
             modifier = Modifier
-                .width(112.dp)
+                .width(120.dp)
+                .semantics { contentDescription = doses }
                 // Ушёл из поля — значит, дописал: число уезжает так же, как отпущенный ползунок.
                 .onFocusChanged { if (!it.isFocused && held != null) commit() }
         )
     }
 }
 
-/** Где коробка лежит и сколько в ней моего: полка, срок, свободное — одной строкой. */
+/** Где коробка лежит и до каких пор годна — одной строкой; `null` — сказать нечего. */
 @Composable
-private fun CourseSourcePresentationDTO.place(): String = listOfNotNull(
+private fun CourseSourcePresentationDTO.place(): String? = listOfNotNull(
     medKitName,
-    expiresOn?.let { stringResource(R.string.course_source_expires, it.toPresentationDTO().text) },
-    availableToMe?.let { stringResource(R.string.course_source_free, it.amount, it.unit.name) }
-).joinToString(" · ")
+    expiresOn?.let { stringResource(R.string.course_source_expires, it.toPresentationDTO().text) }
+).joinToString(" · ").ifEmpty { null }
+
+/**
+ * Почему коробка сейчас ничего не даёт: решение о ней ещё едет серверу. Слова те же, что на
+ * списках коробок, — одна беда называется в приложении одинаково.
+ */
+@Composable
+private fun CourseSourcePresentationDTO.leaving(): String? = leaving?.let { stringResource(it) }
+
+/** Та же беда теми же словами, что на списках коробок: пометка одна, и название у неё одно. */
+private val CourseSourcePresentationDTO.leaving: Int?
+    get() = when (status) {
+        PackageStatus.REMOVING -> R.string.pack_row_removal
+        PackageStatus.LOST -> R.string.pack_row_lost
+        PackageStatus.ACTIVE, PackageStatus.CHANGING, null -> null
+    }
 
 /** Сколько приёмов выделено — и сколько это в единицах коробки: то же число привычной мерой. */
 @Composable

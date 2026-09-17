@@ -3,24 +3,23 @@ package com.kert0n.medapp.ui.pack
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
-import com.kert0n.medapp.ui.NavigationRow
-import androidx.compose.material3.OutlinedButton
-import androidx.compose.material3.ExtendedFloatingActionButton
-import androidx.compose.foundation.layout.width
-import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.layout.defaultMinSize
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.defaultMinSize
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.ElevatedCard
 import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.ExtendedFloatingActionButton
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
@@ -28,11 +27,11 @@ import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import com.kert0n.medapp.R
-import com.kert0n.medapp.ui.DAY
 import com.kert0n.medapp.domain.attempt
 import com.kert0n.medapp.domain.pack.ExpiryDate
 import com.kert0n.medapp.domain.pack.PackageStatus
@@ -41,8 +40,11 @@ import com.kert0n.medapp.presentation.pack.PackagePresentationDTO
 import com.kert0n.medapp.presentation.value.MoneyPresentationDTO
 import com.kert0n.medapp.presentation.value.QuantityPresentationDTO
 import com.kert0n.medapp.presentation.value.toPresentationDTO
+import com.kert0n.medapp.ui.DAY
 import com.kert0n.medapp.ui.EmptyState
 import com.kert0n.medapp.ui.LoadingState
+import com.kert0n.medapp.ui.NavigationRow
+import com.kert0n.medapp.ui.theme.LocalAccents
 import java.time.LocalDate
 import java.util.Currency
 
@@ -86,7 +88,7 @@ fun PackageCardScreen(
                     }
                 },
                 actions = {
-                    if (pack != null) {
+                    if (pack != null && !state.isLoading) {
                         IconButton(onClick = onEdit) {
                             Icon(
                                 painterResource(R.drawable.ic_edit),
@@ -106,7 +108,7 @@ fun PackageCardScreen(
         floatingActionButton = {
             // Принять — самое частое, что человек делает с коробкой: Material 3 отводит для
             // такого плавающую кнопку, и она не делит ширину ни с кем (решение владельца).
-            if (pack != null) {
+            if (pack != null && !state.isLoading) {
                 // Подпись у значка, а не только у слова: плавающая кнопка Material 3 слов внутрь
                 // своего узла не пускает, и экранный чтец назвал бы её просто «кнопка».
                 ExtendedFloatingActionButton(
@@ -124,19 +126,37 @@ fun PackageCardScreen(
     ) { padding ->
         when {
             state.isGone -> EmptyState(text = stringResource(R.string.pack_gone), modifier = Modifier.padding(padding))
-            pack == null -> LoadingState(Modifier.padding(padding))
+            state.isLoading || pack == null -> LoadingState(Modifier.padding(padding))
+            // Порядок — от срочного к справочному (решение владельца 2026-09-17): сколько есть,
+            // до каких пор годно, где лежит, и только потом что это за лекарство. Описание из
+            // справочника занимает целый экран, и стоя вторым, оно отодвигало срок и место за
+            // край — человек листал инструкцию, чтобы узнать, куда идти.
             else -> Column(
                 Modifier
                     .padding(padding)
                     .fillMaxSize()
                     .verticalScroll(rememberScrollState())
-                    .padding(16.dp),
+                    // Снизу больше: плавающая кнопка «Принять» висит над содержимым, и последнее,
+                    // что в нём есть, оказывается под ней. Порядок секций беду уже снял — действия
+                    // ушли из хвоста, — но отступ держит её снятой и для будущего хвоста.
+                    .padding(start = 16.dp, top = 16.dp, end = 16.dp, bottom = 88.dp),
                 verticalArrangement = Arrangement.spacedBy(12.dp)
             ) {
                 HowMuchIsThere(pack, state.holdingCourseTitle, state.isBusy, onTake, onRecount, onHistory)
-                WhatItIs(pack)
+                // Отказ сервера о числе виден там, где о числе и говорят, и ведёт туда, чем он
+                // лечится: спор в том, сколько в коробке на самом деле (PLAN E3, REQ-045).
+                if (state.isRefusedByServer) {
+                    NavigationRow(
+                        icon = R.drawable.ic_sync_problem,
+                        text = stringResource(R.string.pack_refused_by_server),
+                        supporting = stringResource(R.string.pack_refused_by_server_explained),
+                        onClick = onRecount,
+                        color = MaterialTheme.colorScheme.error
+                    )
+                }
                 DatesAndPrice(pack, state.today, state.lastUsedOn)
                 WhereItLies(pack, state.medKitName, onTransfer)
+                WhatItIs(pack)
             }
         }
     }
@@ -201,10 +221,14 @@ private fun HowMuchIsThere(
             )
         }
         // О пометках говорит сама коробка: они переживают закрытие карточки, а отказ — нет.
-        if (pack.hasUnconfirmedChanges) Note(stringResource(R.string.pack_unconfirmed))
+        // Условие то же, что у пометки в списке (`PackageCard`): перенос или правка сведений, не
+        // тронувшие числа, — тоже решение в пути, и карточка говорит о нём словами.
+        if (pack.hasUnconfirmedChanges || pack.status == PackageStatus.CHANGING) {
+            Note(stringResource(R.string.pack_unconfirmed), LocalAccents.current.pending)
+        }
         when (pack.status) {
-            PackageStatus.REMOVING -> Note(stringResource(R.string.pack_removal_on_the_way))
-            PackageStatus.LOST -> Note(stringResource(R.string.pack_lost))
+            PackageStatus.REMOVING -> Note(stringResource(R.string.pack_removal_on_the_way), LocalAccents.current.pending)
+            PackageStatus.LOST -> Note(stringResource(R.string.pack_lost), LocalAccents.current.pending)
             PackageStatus.ACTIVE, PackageStatus.CHANGING -> Unit
         }
         if (isBusy) {
@@ -317,8 +341,8 @@ private fun Fact(label: String, value: String, modifier: Modifier = Modifier) {
 
 /** Пометка коробки: не отказ и не беда, просто состояние, о котором стоит знать. */
 @Composable
-private fun Note(text: String) {
-    Text(text, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+private fun Note(text: String, color: Color = MaterialTheme.colorScheme.onSurfaceVariant) {
+    Text(text, style = MaterialTheme.typography.bodySmall, color = color)
 }
 
 /** Количество словами: число и единица, как их показывают везде в приложении. */

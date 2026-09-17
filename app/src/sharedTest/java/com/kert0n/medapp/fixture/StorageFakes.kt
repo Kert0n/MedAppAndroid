@@ -1,9 +1,21 @@
 package com.kert0n.medapp.fixture
 
 import com.kert0n.medapp.domain.course.Course
+import com.kert0n.medapp.domain.course.CourseCompletion
+import com.kert0n.medapp.domain.course.CourseCoverage
+import com.kert0n.medapp.domain.course.CourseDraft
+import com.kert0n.medapp.domain.course.CourseDraftProjection
+import com.kert0n.medapp.domain.course.CourseProjection
+import com.kert0n.medapp.domain.course.CourseRecord
+import com.kert0n.medapp.domain.course.CourseRecordProjection
+import com.kert0n.medapp.domain.course.CoverageReduction
+import com.kert0n.medapp.domain.course.PackageFollowing
+import com.kert0n.medapp.domain.course.Revision
+import com.kert0n.medapp.domain.intake.CourseIntake
 import com.kert0n.medapp.domain.medkit.MedKit
 import com.kert0n.medapp.domain.medkit.MedKitContents
 import com.kert0n.medapp.domain.medkit.MedKitProjection
+import com.kert0n.medapp.domain.medkit.MedKitRef
 import com.kert0n.medapp.domain.medkit.MedKitStatus
 import com.kert0n.medapp.domain.pack.Availability
 import com.kert0n.medapp.domain.pack.Claims
@@ -15,32 +27,22 @@ import com.kert0n.medapp.domain.pack.PackageFacts
 import com.kert0n.medapp.domain.pack.PackageProjection
 import com.kert0n.medapp.domain.pack.PackageRef
 import com.kert0n.medapp.domain.pack.PackageStatus
+import com.kert0n.medapp.domain.report.CourseInProgress
 import com.kert0n.medapp.domain.value.DosageForm
 import com.kert0n.medapp.domain.value.QuantityUnit
 import com.kert0n.medapp.domain.value.Vocabulary
 import com.kert0n.medapp.network.pack.PackageSnapshot
 import com.kert0n.medapp.network.pack.PackageSyncState
-import com.kert0n.medapp.domain.course.PackageFollowing
-import com.kert0n.medapp.domain.medkit.MedKitRef
-import com.kert0n.medapp.queue.QueuedCommand
-import com.kert0n.medapp.queue.QueueStorage
 import com.kert0n.medapp.network.server.RawResponse
+import com.kert0n.medapp.queue.QueueStorage
+import com.kert0n.medapp.queue.QueuedCommand
 import com.kert0n.medapp.queue.Settlement
 import com.kert0n.medapp.queue.StoredSyncOperation
+import com.kert0n.medapp.queue.SyncCommand
 import com.kert0n.medapp.queue.SyncOperation
+import com.kert0n.medapp.queue.SyncOperationStatus
 import com.kert0n.medapp.queue.Take
 import com.kert0n.medapp.queue.Transactions
-import com.kert0n.medapp.domain.course.CourseCompletion
-import com.kert0n.medapp.domain.course.CourseCoverage
-import com.kert0n.medapp.domain.course.CourseDraft
-import com.kert0n.medapp.domain.course.CourseDraftProjection
-import com.kert0n.medapp.domain.course.CourseProjection
-import com.kert0n.medapp.domain.course.CourseRecord
-import com.kert0n.medapp.domain.course.CourseRecordProjection
-import com.kert0n.medapp.domain.course.CoverageReduction
-import com.kert0n.medapp.domain.course.Revision
-import com.kert0n.medapp.domain.intake.CourseIntake
-import com.kert0n.medapp.domain.report.CourseInProgress
 import com.kert0n.medapp.storage.course.CourseReallocation
 import com.kert0n.medapp.storage.course.CourseStorageRepository
 import com.kert0n.medapp.storage.medkit.MedKitStorageRepository
@@ -48,6 +50,8 @@ import com.kert0n.medapp.storage.pack.PackageAdjustment
 import com.kert0n.medapp.storage.pack.PackageQuery
 import com.kert0n.medapp.storage.pack.PackageStorageRepository
 import com.kert0n.medapp.storage.pack.SnapshotApplied
+import com.kert0n.medapp.storage.server.OutstandingOperation
+import com.kert0n.medapp.storage.server.SyncOperationStorageRepository
 import com.kert0n.medapp.storage.value.VocabularyStorageRepository
 import java.time.Instant
 import java.time.LocalDate
@@ -379,7 +383,11 @@ class FakeCourses : CourseStorageRepository {
 
     override suspend fun discardDraft(id: Uuid): Boolean = noCourses()
 
-    override fun observeRecords(): Flow<List<CourseRecordProjection>> = noCourses()
+    /**
+     * Записи эпизодов отдаются те, что в подделку положили: экран учёта спрашивает их, чтобы
+     * назвать лечения, которые потеряют источники вместе с полкой (PLAN U2 строка 23).
+     */
+    override fun observeRecords(): Flow<List<CourseRecordProjection>> = MutableStateFlow(records.values.toList())
 
     override fun observeRecord(id: Uuid): Flow<CourseRecordProjection?> = MutableStateFlow(records[id])
 
@@ -402,4 +410,39 @@ class FakeCourses : CourseStorageRepository {
     override suspend fun close(closing: CourseCompletion.Closing): Unit = noCourses()
 
     private fun noCourses(): Nothing = error("курсы проверяются на себе, а не на экране учёта")
+}
+
+/**
+ * Очередь глазами экрана: отдаёт то, что в неё положили, и молчит обо всём остальном — остальное
+ * спрашивают у самой очереди, а не у экрана. Незаданное падает сразу, а не отвечает пустым
+ * (разбор #51 «Заглушки портов падают сразу»).
+ */
+class FakeSyncOperations(troubles: List<OutstandingOperation> = emptyList()) : SyncOperationStorageRepository {
+
+    val troubles = MutableStateFlow(troubles)
+
+    override fun observeTroubles(): Flow<List<OutstandingOperation>> = this.troubles
+
+    override suspend fun enqueue(
+        id: Uuid,
+        command: SyncCommand,
+        at: Instant,
+        groupId: Uuid?,
+        dependsOn: Set<Uuid>
+    ): SyncOperation = error("очередь ставит свои проверки, а не экран")
+
+    override suspend fun find(id: Uuid): SyncOperation? = error("очередь ставит свои проверки, а не экран")
+
+    override suspend fun withStatus(status: SyncOperationStatus): List<SyncOperation> =
+        error("очередь ставит свои проверки, а не экран")
+
+    override fun observeOutstanding(): Flow<List<StoredSyncOperation>> =
+        error("экран читает форму для себя, а не строки очереди")
+
+    override suspend fun unreadable(): List<StoredSyncOperation.Unreadable> =
+        error("очередь ставит свои проверки, а не экран")
+
+    override suspend fun stored(id: Uuid): StoredSyncOperation? = error("очередь ставит свои проверки, а не экран")
+
+    override suspend fun dismiss(id: Uuid, at: Instant): Boolean = error("разбор проверяется на своём сценарии")
 }

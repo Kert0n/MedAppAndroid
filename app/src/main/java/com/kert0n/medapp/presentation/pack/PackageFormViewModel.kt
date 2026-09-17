@@ -2,8 +2,11 @@ package com.kert0n.medapp.presentation.pack
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.kert0n.medapp.domain.scan.CodeFormat
+import com.kert0n.medapp.domain.scan.ScannedCode
 import com.kert0n.medapp.feature.packages.PackageAdding
 import com.kert0n.medapp.feature.packages.PackageDescribing
+import com.kert0n.medapp.feature.scan.PackageScanning
 import com.kert0n.medapp.feature.template.TemplateSearching
 import com.kert0n.medapp.feature.time.Today
 import com.kert0n.medapp.domain.Unavailability
@@ -53,6 +56,12 @@ import kotlinx.coroutines.launch
  * остановился на [SUGGESTION_PAUSE], а не на каждую букву; новая буква отменяет прежний запрос
  * вместе с его ответом, поэтому под нынешним текстом нет списка к старому — оба правила держит
  * одно `flatMapLatest`. Ответ справочника в форму не пишет ничего: пишет только выбор строки.
+ *
+ * **Форма, открытая сканером, спрашивает реестр сама и ровно один раз** (PLAN C1 «Результат
+ * сканирования — заполненная форма»): сканер ничего не показывает от себя, он предзаполняет этот
+ * экран. Предложение — не идентификатор и в маршрут не едет; едет код коробки, а спрашивает о нём
+ * тот, кто заполняет поля. Ответ ложится в **пустые** поля: пока он шёл по сети, человек уже мог
+ * начать печатать.
  */
 @OptIn(ExperimentalCoroutinesApi::class)
 @HiltViewModel(assistedFactory = PackageFormViewModel.Factory::class)
@@ -60,6 +69,7 @@ class PackageFormViewModel @AssistedInject constructor(
     private val adding: PackageAdding,
     private val describing: PackageDescribing,
     private val searching: TemplateSearching,
+    private val scanning: PackageScanning,
     private val packages: PackageStorageRepository,
     private val vocabulary: VocabularyStorageRepository,
     medKits: MedKitStorageRepository,
@@ -67,8 +77,15 @@ class PackageFormViewModel @AssistedInject constructor(
     @Assisted private val opened: Opened
 ) : ViewModel() {
 
-    /** Откуда экран открыт: с полки (тогда она подставлена) или у названной коробки. */
-    data class Opened(val medKitId: Uuid? = null, val packageId: Uuid? = null)
+    /**
+     * Откуда экран открыт: с полки (тогда она подставлена), у названной коробки или из сканера — и
+     * тогда [scannedCode] несёт код с упаковки, о котором форма спросит реестр.
+     */
+    data class Opened(
+        val medKitId: Uuid? = null,
+        val packageId: Uuid? = null,
+        val scannedCode: String? = null
+    )
 
     @AssistedFactory
     interface Factory {
@@ -83,6 +100,21 @@ class PackageFormViewModel @AssistedInject constructor(
 
     /** Что человек печатает в названии. Выбор карточки сюда не пишет — иначе её имя тут же искалось бы заново. */
     private val typed = MutableStateFlow("")
+
+    /**
+     * Идёт ли разговор с реестром. Пока идёт, полей не видно вовсе: пустую форму, которая через
+     * секунду заполнится сама, человек успевает прочитать как «ничего не нашлось» и начинает
+     * печатать поверх — а на плохой связи сидит и смотрит на неё (замечание владельца 2026-09-17).
+     */
+    private val asking = MutableStateFlow(opened.scannedCode?.isNotEmpty() == true)
+
+    /**
+     * Чем кончился разговор с реестром, если кончился ничем. Молчаливая пустая форма после трёх
+     * секунд ожидания — это исход, проглоченный экраном: человек не знает, не нашёлся ли код, не
+     * дошёл ли запрос и не зря ли он ждал (PLAN U1 «каждый исход сценария показан»).
+     */
+    private val silence = MutableStateFlow<PackageScanSilence?>(null)
+
 
     private val suggestions: Flow<Suggestions> =
         if (opened.packageId != null) flowOf<Suggestions>(Suggestions.None) else typed
@@ -119,7 +151,12 @@ class PackageFormViewModel @AssistedInject constructor(
         )
     }
 
-    val state: StateFlow<PackageFormUiState> = combine(form, progress, stored, choices, suggestions) { form, progress, stored, choices, suggestions ->
+    /** Два ответа извне — справочника и реестра — идут вместе: складывать больше пяти потоков нечем. */
+    private val answers = combine(suggestions, asking, silence) { suggestions, asking, silence ->
+        Answers(suggestions, asking, silence)
+    }
+
+    val state: StateFlow<PackageFormUiState> = combine(form, progress, stored, choices, answers) { form, progress, stored, choices, answers ->
         PackageFormUiState(
             form = form,
             isEditing = opened.packageId != null,
@@ -130,16 +167,51 @@ class PackageFormViewModel @AssistedInject constructor(
             error = progress.error,
             isSaving = progress.isSaving,
             saved = progress.saved,
-            suggestions = suggestions
+            suggestions = answers.suggestions,
+            isAsking = answers.asking,
+            silence = answers.silence
         )
     }.stateIn(
         viewModelScope,
         SharingStarted.WhileSubscribed(5_000),
-        PackageFormUiState(form = form.value, isEditing = opened.packageId != null)
+        PackageFormUiState(
+            form = form.value,
+            isEditing = opened.packageId != null,
+            isAsking = asking.value
+        )
     )
 
     init {
         opened.packageId?.let { packageId -> viewModelScope.launch { open(packageId) } }
+        opened.scannedCode?.takeIf { it.isNotEmpty() }
+            ?.let { code -> viewModelScope.launch { ask(code) } }
+    }
+
+    /**
+     * Спросить реестр о коде с упаковки и заполнить **пустые** поля тем, что он знает. Ничего не
+     * знает или не отвечает — форма остаётся обычной пустой формой: сканер это короткий путь, и
+     * когда он не сработал, человек печатает сам (PLAN H5). Правка коробки сюда не заходит — кода
+     * у неё нет.
+     */
+    private suspend fun ask(code: String) {
+        try {
+            when (val outcome = scanning.lookup(ScannedCode(CodeFormat.DATA_MATRIX, code))) {
+                is PackageScanning.Outcome.Suggested ->
+                    // Словарь нужен, чтобы узнать единицу, которую реестр назвал словом: свою
+                    // клиент не заводит (PLAN D1). Снимок читается здесь же, как перед записью.
+                    form.value = outcome.suggestion.filling(form.value, vocabulary.snapshot())
+                PackageScanning.Outcome.NotFound -> silence.value = PackageScanSilence.NotFound
+                // Код сюда приходит только DataMatrix'ом: сказать о нём нечего, кроме того же,
+                // что и о незнакомом коде, — заполнять форму нечем.
+                PackageScanning.Outcome.Unsupported -> silence.value = PackageScanSilence.NotFound
+                is PackageScanning.Outcome.Unavailable ->
+                    silence.value = PackageScanSilence.Unavailable(outcome.reason)
+            }
+        } finally {
+            // Разговор кончился любым исходом — показываем форму. В `finally`, потому что отмена
+            // тоже исход: оставленный признак запер бы экран в ожидании навсегда.
+            asking.value = false
+        }
     }
 
     fun edit(edited: PackageFormPresentationDTO) {
@@ -221,6 +293,12 @@ class PackageFormViewModel @AssistedInject constructor(
         progress.value = Progress(error = error)
     }
 
+    private class Answers(
+        val suggestions: Suggestions,
+        val asking: Boolean,
+        val silence: PackageScanSilence?
+    )
+
     private class Choices(
         val medKits: List<MedKitPresentationDTO>,
         val units: List<UnitPresentationDTO>,
@@ -252,8 +330,24 @@ data class PackageFormUiState(
     val error: PackageFormError? = null,
     val isSaving: Boolean = false,
     val saved: Uuid? = null,
-    val suggestions: Suggestions = Suggestions.None
+    val suggestions: Suggestions = Suggestions.None,
+    /** Идёт разговор с реестром: полей ещё нет, и показывать их пустыми нельзя. */
+    val isAsking: Boolean = false,
+    /** Реестр ничего не дал, и сказано почему; `null` — дал или не спрашивали. */
+    val silence: PackageScanSilence? = null
 )
+
+/**
+ * Почему поля остались пустыми после скана. Случая два, и человек делает в них разное: код,
+ * которого реестр не знает, он заполнит руками и сейчас; до реестра, который не ответил, можно
+ * добраться позже — но коробку всё равно заводят руками, и потому оба случая ведут в ту же форму.
+ */
+sealed interface PackageScanSilence {
+
+    data object NotFound : PackageScanSilence
+
+    data class Unavailable(val reason: Unavailability) : PackageScanSilence
+}
 
 /**
  * Что справочник ответил на напечатанное (PLAN H3 №7). Случаи различает экран: ничего не

@@ -10,6 +10,7 @@ import com.kert0n.medapp.presentation.medkit.MedKitPresentationDTO
 import com.kert0n.medapp.presentation.medkit.toPresentationDTO
 import com.kert0n.medapp.presentation.value.FormPresentationDTO
 import com.kert0n.medapp.presentation.value.toPresentationDTO
+import com.kert0n.medapp.storage.course.CourseStorageRepository
 import com.kert0n.medapp.storage.medkit.MedKitStorageRepository
 import com.kert0n.medapp.storage.pack.PackageQuery
 import com.kert0n.medapp.storage.pack.PackageStorageRepository
@@ -48,6 +49,7 @@ class MedKitContentsViewModel @AssistedInject constructor(
     private val removal: MedKitRemoval,
     packages: PackageStorageRepository,
     medKits: MedKitStorageRepository,
+    courses: CourseStorageRepository,
     today: Today,
     @Assisted private val medKitId: Uuid?
 ) : ViewModel() {
@@ -61,6 +63,7 @@ class MedKitContentsViewModel @AssistedInject constructor(
 
     private val removing = MutableStateFlow(Removing())
 
+
     private val days = today.observe().map { it.date }
 
     /** Список вместе с днём, на который он посчитан: просрочка зависит от дня, а не от момента. */
@@ -72,9 +75,20 @@ class MedKitContentsViewModel @AssistedInject constructor(
 
     private val places = days.flatMapLatest { medKits.observeAll(it) }
 
+    /**
+     * Лечения, которые потеряют источники, если полку убрать: их держат коробки **этой** полки.
+     * Своего чтения для этого не нужно — у проекции коробки уже есть держащее лечение, а имя ему
+     * даёт запись эпизода (PLAN U2 строка 23).
+     */
+    private val records = courses.observeRecords()
+
+    /** Уборка вместе с тем, что она заденет: типизированный `combine` дальше пяти потоков не идёт. */
+    private val removalAsked = combine(removing, records) { removing, records -> removing to records }
+
     val state: StateFlow<MedKitContentsUiState> =
-        combine(shown, area, places, query, removing) { (today, shown), area, places, query, removing ->
+        combine(shown, area, places, query, removalAsked) { (today, shown), area, places, query, (removing, records) ->
             val here = places.firstOrNull { it.id == medKitId }
+            val held = area.mapNotNull { it.holdingCourseId }.toSet()
             MedKitContentsUiState(
                 medKit = here?.toPresentationDTO(),
                 isEverywhere = medKitId == null,
@@ -93,7 +107,8 @@ class MedKitContentsViewModel @AssistedInject constructor(
                 isLoaded = true,
                 removing = removing.step,
                 removalRefusal = removing.refusal,
-                isRemoved = removing.removed
+                isRemoved = removing.removed,
+                affectedCourses = records.filter { it.isOpen && it.id in held }.map { it.title }
             )
         }
             // Сборка состояния на тысяче коробок стоит около 90 мс (J1) — на главном потоке это
@@ -146,12 +161,23 @@ class MedKitContentsViewModel @AssistedInject constructor(
      * начинается: признак работы ставится до обращения к сценарию.
      */
     fun remove(transferTo: Uuid? = null) {
+        decide(transferTo?.let(MedKitRemoval.Fate::MoveTo) ?: MedKitRemoval.Fate.ThrowAway)
+    }
+
+    /**
+     * Выйти и оставить полку остальным (PLAN E6): коробки живут у них, у нас они потеряны.
+     * Лечения при этом остаются — теряются только источники с этой полки (C1 «Курсы при выходе»).
+     */
+    fun leave() {
+        decide(MedKitRemoval.Fate.LeaveToOthers)
+    }
+
+    private fun decide(fate: MedKitRemoval.Fate) {
         val medKitId = medKitId ?: return
         val now = removing.value
         if (now.step == null || now.working) return
         removing.value = now.copy(working = true)
         viewModelScope.launch {
-            val fate = transferTo?.let(MedKitRemoval.Fate::MoveTo) ?: MedKitRemoval.Fate.ThrowAway
             removing.value = when (removal.remove(medKitId, fate)) {
                 MedKitRemoval.Outcome.REMOVED, MedKitRemoval.Outcome.MARKED,
                 MedKitRemoval.Outcome.MED_KIT_GONE -> Removing(removed = true)
@@ -240,8 +266,16 @@ data class MedKitContentsUiState(
     val isLoaded: Boolean = false,
     val removing: RemovalStep? = null,
     val removalRefusal: RemovalRefusal? = null,
-    val isRemoved: Boolean = false
+    val isRemoved: Boolean = false,
+    /** Лечения, которые потеряют источники вместе с полкой. Сами лечения остаются (PLAN C1). */
+    val affectedCourses: List<String> = emptyList()
 ) {
     /** Искал или сужал: «ничего не нашлось» — это не «здесь пусто». */
     val isNarrowed: Boolean get() = text.isNotBlank() || narrowing != null
+
+    /**
+     * Полки у нас больше нет: её убрали у всех или нас вывели (PLAN E6), и заход или список полок
+     * это записали, пока экран открыт. Заводить в неё нечего. Убрал её сам человек — это [isRemoved], и экран уходит.
+     */
+    val isShelfGone: Boolean get() = isLoaded && !isEverywhere && medKit == null && !isRemoved
 }

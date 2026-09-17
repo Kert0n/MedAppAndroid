@@ -1,22 +1,25 @@
 package com.kert0n.medapp.ui.course
 
 import androidx.compose.ui.test.assertIsDisplayed
-import androidx.compose.ui.test.assertIsNotEnabled
 import androidx.compose.ui.test.assertIsEnabled
+import androidx.compose.ui.test.assertIsNotEnabled
 import androidx.compose.ui.test.junit4.v2.createComposeRule
+import androidx.compose.ui.test.onAllNodesWithText
+import androidx.compose.ui.test.onFirst
 import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
+import androidx.compose.ui.test.performScrollTo
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import com.kert0n.medapp.domain.course.Revision
 import com.kert0n.medapp.domain.intake.IntakeStatus
+import com.kert0n.medapp.fixture.TABLETS
 import com.kert0n.medapp.presentation.course.CourseCardUiState
 import com.kert0n.medapp.presentation.course.CourseCoveragePresentationDTO
 import com.kert0n.medapp.presentation.course.CourseItemPresentationDTO
 import com.kert0n.medapp.presentation.course.CoursePresentationDTO
 import com.kert0n.medapp.presentation.course.CoverageReductionPresentationDTO
 import com.kert0n.medapp.presentation.course.SchedulePresentationDTO
-import com.kert0n.medapp.fixture.TABLETS
 import com.kert0n.medapp.presentation.value.QuantityPresentationDTO
 import com.kert0n.medapp.presentation.value.toPresentationDTO
 import com.kert0n.medapp.ui.theme.MedAppTheme
@@ -45,6 +48,9 @@ class CourseCardScreenTest {
     private val counted = mutableListOf<Pair<Int, Revision?>>()
     private var confirmed = 0
     private var edited = 0
+    private var sources = 0
+    private var attached = 0
+    private var added = 0
 
     private fun show(state: CourseCardUiState) {
         compose.setContent {
@@ -52,7 +58,9 @@ class CourseCardScreenTest {
                 CourseCardScreen(
                     state = state,
                     onEdit = { edited++ },
-                    onSources = {},
+                    onSources = { sources++ },
+                    onAttachSource = { attached++ },
+                    onAddPackage = { added++ },
                     onHistory = {},
                     onAskOffPlan = { askedOffPlan++ },
                     onCountOffPlan = { total, revision -> counted += total to revision },
@@ -154,7 +162,7 @@ class CourseCardScreenTest {
             )
         )
 
-        compose.onNodeWithText("Было 12 приёмов, стало 7").assertIsDisplayed()
+        compose.onNodeWithText("Приёмы: было 12, стало 7").assertIsDisplayed()
         compose.onNodeWithText("15.03.2027 · Нурофен").assertIsDisplayed()
     }
 
@@ -255,5 +263,68 @@ class CourseCardScreenTest {
 
         compose.onNodeWithContentDescription("На один больше").assertIsNotEnabled()
         compose.onNodeWithContentDescription("На один меньше").assertIsEnabled()
+    }
+
+    /**
+     * Нехватка не просто названа: по ней нажимают и попадают к тому, чем её лечить — подключить
+     * коробку, переставить выделения, завести купленную. Расписание и доза при этом не трогаются:
+     * их назначил врач (PLAN C1 «Нехватка»).
+     *
+     * Красная проверка: оставить нехватку подписью — человек читает «не хватает 19 приёмов
+     * с 11.09» и не знает, что с этим делать.
+     */
+    @Test
+    fun aShortageLeadsToWhatCuresIt() {
+        show(
+            CourseCardUiState(
+                course = course(),
+                isRunning = true,
+                coverage = CourseCoveragePresentationDTO(
+                    requiredDoses = 28,
+                    coveredDoses = 9,
+                    missingDoses = 19,
+                    coveredUntilOn = null,
+                    firstUncoveredOn = LocalDate.parse("2026-09-11")
+                )
+            )
+        )
+
+        compose.onNodeWithText("Не хватает 19 приёмов", substring = true).performClick()
+        compose.onNodeWithText("Что можно сделать").assertIsDisplayed()
+        compose.onNodeWithText("Подключить ещё коробку").performClick()
+
+        assertEquals(1, attached)
+    }
+
+    /**
+     * Чужой расход сокращает **обеспечение**, а не лечение: карточка показывает меньшее число
+     * обеспеченных приёмов и день, с которого их нет, — а доза и расписание остаются теми, что
+     * назначил врач (PLAN C1 «Нехватка», REQ-045).
+     *
+     * Красная проверка: сократить лечение до возможного — приложение переписывает назначение за
+     * врача, и человек об этом даже не узнаёт.
+     */
+    @Test
+    fun someoneElsesTakingShrinksTheCoverageAndNotTheTreatment() {
+        show(
+            CourseCardUiState(
+                course = course(),
+                isRunning = true,
+                coverage = CourseCoveragePresentationDTO(
+                    requiredDoses = 28,
+                    coveredDoses = 9,
+                    missingDoses = 19,
+                    coveredUntilOn = null,
+                    firstUncoveredOn = LocalDate.parse("2026-09-11")
+                )
+            )
+        )
+
+        compose.onNodeWithText("обеспечено 9", substring = true).assertIsDisplayed()
+        compose.onNodeWithText("Не хватает 19 приёмов", substring = true).assertIsDisplayed()
+        compose.onNodeWithText("11.09.2026", substring = true).assertIsDisplayed()
+        // Назначение прежнее: заметка врача и расписание на месте, их никто не переписывал.
+        compose.onNodeWithText("по 2 после еды").assertIsDisplayed()
+        compose.onAllNodesWithText("09:00", substring = true).onFirst().assertIsDisplayed()
     }
 }

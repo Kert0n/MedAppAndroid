@@ -1,0 +1,177 @@
+package com.kert0n.medapp.ui.scan
+
+import androidx.annotation.OptIn
+import androidx.camera.core.ExperimentalGetImage
+import androidx.camera.core.ImageAnalysis
+import androidx.camera.core.ImageProxy
+import androidx.camera.view.CameraController
+import androidx.camera.view.LifecycleCameraController
+import androidx.camera.view.PreviewView
+import androidx.compose.foundation.border
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Surface
+import androidx.compose.material3.Text
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
+import androidx.compose.runtime.State
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberUpdatedState
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.unit.dp
+import androidx.compose.ui.viewinterop.AndroidView
+import androidx.core.content.ContextCompat
+import androidx.lifecycle.compose.LocalLifecycleOwner
+import com.google.mlkit.vision.barcode.BarcodeScanner
+import com.google.mlkit.vision.barcode.BarcodeScanning
+import com.google.mlkit.vision.barcode.common.Barcode
+import com.google.mlkit.vision.common.InputImage
+import com.kert0n.medapp.R
+import com.kert0n.medapp.domain.scan.CodeFormat
+import com.kert0n.medapp.domain.scan.ScannedCode
+
+/**
+ * Живая картинка камеры, которая называет увиденные коды (PLAN H3 «Набор сканера»).
+ *
+ * **Камера открывается и закрывается по жизненному циклу владельца**, а не по нажатиям: ушёл
+ * человек с места — картинка гаснет и объектив освобождается, вернулся — включается снова.
+ * Камера одна на устройство, и оставленная включённой она не даётся ни другому приложению, ни
+ * второму входу в этот же экран.
+ *
+ * **Формат называет распознаватель**, а не длина строки ([codeFormat]): DataMatrix «Честного
+ * знака» и QR приглашения различаются символикой. Распознаются при этом **все** форматы, а не
+ * только два нужных: увиденный EAN-13 надо назвать словами, а не промолчать о нём, — иначе
+ * человек будет держать коробку перед телефоном и гадать, что не так.
+ *
+ * Текст берётся `rawValue`, а не `displayValue`: в DataMatrix между полями стоят разделители GS,
+ * и «читаемый» вид срезал бы значащие знаки, а код уходит в реестр байт в байт (PLAN H5).
+ */
+@Composable
+fun CodeScannerView(onCode: (ScannedCode) -> Unit, modifier: Modifier = Modifier) {
+    val context = LocalContext.current
+    val owner = LocalLifecycleOwner.current
+    // Свежее действие в уже привязанном распознавателе: пересобирать его на каждую перерисовку
+    // значило бы гасить и зажигать камеру.
+    val heard = rememberUpdatedState(onCode)
+    val controller = remember(context) { LifecycleCameraController(context) }
+    DisposableEffect(controller, owner) {
+        val scanner = BarcodeScanning.getClient()
+        // Снимков и записи видео у сканера нет — только разбор кадров: лишние способы съёмки
+        // занимают память и греют телефон впустую.
+        controller.setEnabledUseCases(CameraController.IMAGE_ANALYSIS)
+        controller.setImageAnalysisAnalyzer(ContextCompat.getMainExecutor(context), CodeReader(scanner, heard))
+        controller.bindToLifecycle(owner)
+        onDispose {
+            controller.clearImageAnalysisAnalyzer()
+            controller.unbind()
+            scanner.close()
+        }
+    }
+    AndroidView(
+        factory = { made -> PreviewView(made).also { it.controller = controller } },
+        modifier = modifier
+    )
+}
+
+/**
+ * Разбор кадра. Сам разбор идёт внутри ML Kit на своём потоке, и главный поток тратится только
+ * на то, чтобы отдать ему кадр; кадр закрывается в любом исходе — не закрытый останавливает
+ * поток кадров целиком.
+ */
+private class CodeReader(
+    private val scanner: BarcodeScanner,
+    private val onCode: State<(ScannedCode) -> Unit>
+) : ImageAnalysis.Analyzer {
+
+    @OptIn(markerClass = [ExperimentalGetImage::class])
+    override fun analyze(image: ImageProxy) {
+        val frame = image.image
+        if (frame == null) {
+            image.close()
+            return
+        }
+        scanner.process(InputImage.fromMediaImage(frame, image.imageInfo.rotationDegrees))
+            .addOnSuccessListener { found -> found.firstNotNullOfOrNull { it.scanned() }?.let(onCode.value) }
+            .addOnCompleteListener { image.close() }
+    }
+}
+
+/**
+ * Код, как его прочитал распознаватель. Пустой код кодом не является: показывать и спрашивать о
+ * нём нечего.
+ *
+ * **Ведущий разделитель снимается, внутренние остаются.** Первым знаком GS1-код несёт признак
+ * FNC1, и ML Kit отдаёт его обычным `U+001D` в начале строки (снимок настоящей коробки,
+ * 2026-09-17). Тот же признак сетевая граница дописывает текстом `{FNC1}` (PLAN H5), и оставь мы
+ * его здесь — в реестр уехал бы код с удвоенным началом. Разделители **между полями** это
+ * значащие знаки, и они остаются на месте: правило «код не разбирается» их и защищает.
+ */
+fun Barcode.scanned(): ScannedCode? =
+    rawValue?.removePrefix(FNC1)?.takeIf { it.isNotEmpty() }?.let { ScannedCode(codeFormat(format), it) }
+
+/** Признак GS1 в начале кода — каким его отдаёт распознаватель. */
+private const val FNC1 = "\u001D"
+
+/** Что за код перед камерой — словами домена. Всё, кроме двух знакомых форматов, — чужое. */
+fun codeFormat(format: Int): CodeFormat = when (format) {
+    Barcode.FORMAT_DATA_MATRIX -> CodeFormat.DATA_MATRIX
+    Barcode.FORMAT_QR_CODE -> CodeFormat.QR
+    else -> CodeFormat.OTHER
+}
+
+/**
+ * Картинка камеры и рамка, куда наводить. Одна на всех, кто читает коды: сканер и вступление
+ * в аптечку показывают одно и то же — расходиться рамке и подсказке незачем.
+ *
+ * Рамка не обрезает разбор — распознаватель смотрит весь
+ * кадр, — она говорит человеку, куда наводить, и на неё же он целится по привычке. [hint] называет
+ * **что** искать: на сканере это код с упаковки, на вступлении в аптечку — QR приглашения.
+ */
+@Composable
+fun CodeViewfinder(
+    onCode: (ScannedCode) -> Unit,
+    modifier: Modifier = Modifier,
+    hint: String = stringResource(R.string.scanner_aim)
+) {
+    val description = stringResource(R.string.scanner_preview)
+    Box(
+        modifier = modifier.fillMaxSize().semantics { contentDescription = description },
+        contentAlignment = Alignment.Center
+    ) {
+        CodeScannerView(onCode, Modifier.fillMaxSize())
+        Column(
+            horizontalAlignment = Alignment.CenterHorizontally,
+            verticalArrangement = Arrangement.spacedBy(20.dp)
+        ) {
+            Box(
+                Modifier
+                    .size(220.dp)
+                    .border(3.dp, MaterialTheme.colorScheme.primaryContainer, MaterialTheme.shapes.large)
+            )
+            // Подпись лежит на подложке: поверх живой картинки любой цвет текста то читается, то
+            // нет — это зависит от того, что человек навёл.
+            Surface(
+                color = MaterialTheme.colorScheme.surface,
+                shape = MaterialTheme.shapes.large
+            ) {
+                Text(
+                    hint,
+                    style = MaterialTheme.typography.bodyLarge,
+                    textAlign = TextAlign.Center,
+                    modifier = Modifier.padding(horizontal = 16.dp, vertical = 10.dp)
+                )
+            }
+        }
+    }
+}

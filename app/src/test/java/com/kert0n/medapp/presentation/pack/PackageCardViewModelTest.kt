@@ -11,6 +11,7 @@ import com.kert0n.medapp.fixture.FakeCourses
 import com.kert0n.medapp.fixture.FakeMedKits
 import com.kert0n.medapp.fixture.FakePackages
 import com.kert0n.medapp.fixture.FakeQueue
+import com.kert0n.medapp.fixture.FakeSyncOperations
 import com.kert0n.medapp.fixture.HOME_KIT
 import com.kert0n.medapp.fixture.HeldPackages
 import com.kert0n.medapp.fixture.HeldTransactions
@@ -39,6 +40,7 @@ import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Rule
+import com.kert0n.medapp.fixture.offlineFreshening
 import org.junit.Test
 
 /**
@@ -76,14 +78,19 @@ class PackageCardViewModelTest {
 
     private val queue = QueueService(DirectTransactions, FakeQueue())
 
+    private val operations = FakeSyncOperations()
+
     private fun viewModel(
         packages: PackageStorageRepository = stored,
-        transactions: Transactions = DirectTransactions
+        transactions: Transactions = DirectTransactions,
+        freshening: com.kert0n.medapp.feature.operation.Freshening = offlineFreshening(packages, clock)
     ) = PackageCardViewModel(
         removal = PackageRemoval(packages, queue, transactions, clock),
+        freshening = freshening,
         packages = packages,
         medKits = medKits,
         courses = courses,
+        operations = operations,
         today = Today(clock, QuietClock),
         packageId = PACK
     )
@@ -107,6 +114,41 @@ class PackageCardViewModelTest {
             held.door.release()
             state.awaiting { it.pack != null }
         }
+    }
+
+    /**
+     * Коробка общей полки при связи перечитывается, и пока сервер не ответил, карточка ждёт — хотя
+     * в базе коробка уже есть: число, по которому решают, должно быть свежим (PLAN E4). Прежнее
+     * число из базы до ответа не показывается вовсе, и спрошено ровно один раз.
+     */
+    @Test
+    fun aSharedBoxWaitsForTheServerOnce() {
+        stored.lying(pack(id = PACK, medKit = medKit(id = SHARED_KIT, publication = MedKit.Publication.PUBLISHED, participantCount = 2).ref))
+        val server = com.kert0n.medapp.fixture.RereadingServer(clock)
+        server.hold()
+        val model = viewModel(freshening = com.kert0n.medapp.fixture.onlineFreshening(server, stored, clock))
+
+        watching(model.state) { state ->
+            state.awaiting { it.isFreshening }
+            assertTrue(state.value.isLoading)
+            assertEquals(null, state.value.pack)
+            assertFalse(state.value.isGone)
+            server.release()
+            state.awaiting { !it.isLoading }
+        }
+
+        assertEquals(listOf("/v1/drugs/$PACK"), server.asked)
+    }
+
+    /** Без связи — и у местной коробки — карточка не ждёт сервера: показывает базу сразу. */
+    @Test
+    fun withoutConnectionTheCardShowsTheBaseAtOnce() {
+        stored.lying(pack(id = PACK, medKit = medKit(id = SHARED_KIT, publication = MedKit.Publication.PUBLISHED, participantCount = 2).ref))
+        val model = viewModel()
+
+        val state = watching(model.state) { state -> state.awaiting { it.pack != null } }
+
+        assertFalse(state.isLoading)
     }
 
     /** Коробки не стало, пока карточка открыта: человек читает об этом, а экран не уходит сам. */

@@ -1,21 +1,20 @@
 package com.kert0n.medapp.platform.connectivity
 
 import com.kert0n.medapp.domain.attempt
-import android.content.Context
-import android.net.ConnectivityManager
-import android.net.Network
 import androidx.lifecycle.DefaultLifecycleObserver
 import androidx.lifecycle.LifecycleOwner
 import androidx.lifecycle.ProcessLifecycleOwner
 import com.kert0n.medapp.di.ApplicationScope
+import com.kert0n.medapp.feature.connectivity.Connection
+import com.kert0n.medapp.feature.connectivity.returns
 import com.kert0n.medapp.feature.notification.DailyRound
 import com.kert0n.medapp.feature.notification.ReminderOutbox
 import com.kert0n.medapp.queue.Synchronization
-import dagger.hilt.android.qualifiers.ApplicationContext
 import java.util.concurrent.atomic.AtomicBoolean
 import javax.inject.Inject
 import javax.inject.Singleton
 import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.CoroutineStart
 import kotlinx.coroutines.launch
 
 /**
@@ -29,7 +28,7 @@ import kotlinx.coroutines.launch
  */
 @Singleton
 class SyncTriggers @Inject constructor(
-    @ApplicationContext private val context: Context,
+    private val connection: Connection,
     private val synchronization: Synchronization,
     private val daily: DailyRound,
     private val reminders: ReminderOutbox,
@@ -55,18 +54,10 @@ class SyncTriggers @Inject constructor(
                 synchronization.request()
             }
         })
-        val connectivity = context.getSystemService(ConnectivityManager::class.java)
-        // Связь, которая была при регистрации, поводом не считается: вход в приложение уже позвал
+        // Связь, которая была при подписке, поводом не считается: вход в приложение уже позвал
         // заход. Повод — связь, появившаяся после потери.
-        val offline = AtomicBoolean(connectivity.activeNetwork == null)
-        connectivity.registerDefaultNetworkCallback(object : ConnectivityManager.NetworkCallback() {
-            override fun onAvailable(network: Network) {
-                if (offline.compareAndSet(true, false)) synchronization.request()
-            }
-
-            override fun onLost(network: Network) {
-                offline.set(true)
-            }
-        })
+        // Подписка ставится до возврата из `start`: связь, вернувшаяся между стартом и первым
+        // значением, иначе сошла бы за «была при подписке», и повод потерялся бы.
+        scope.launch(start = CoroutineStart.UNDISPATCHED) { connection.returns().collect { synchronization.request() } }
     }
 }

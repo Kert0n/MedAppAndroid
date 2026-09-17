@@ -35,6 +35,7 @@ import com.kert0n.medapp.storage.value.toStorageEntity
 import com.kert0n.medapp.ui.theme.MedAppTheme
 import dagger.hilt.android.testing.HiltAndroidRule
 import dagger.hilt.android.testing.HiltAndroidTest
+import java.time.ZoneId
 import java.time.Instant
 import java.time.LocalDate
 import java.time.LocalTime
@@ -71,6 +72,13 @@ class DayOfIntakesStoryTest {
     /** Ожидание с запасом: история ждёт состояния из базы, и секунды по умолчанию на это не хватает. */
     private val WAIT = 5_000L
 
+    /**
+     * Зона у завязки и у приложения **одна**: приложение живёт на часах устройства, и день оно
+     * считает по ним. Разойдись они — коробка со сроком «сегодня» досталась бы приложению
+     * вчерашней (замечание разбора #54).
+     */
+    private val zone: ZoneId = ZoneId.systemDefault()
+
     @Before
     fun setUp() {
         hilt.inject()
@@ -101,7 +109,7 @@ class DayOfIntakesStoryTest {
      * по-разному.
      */
     private fun herTreatmentIsAlreadyRunning() = runBlocking {
-        val scenarios = Scenarios(database, Instant.now())
+        val scenarios = Scenarios(database, Instant.now(), ZoneId.systemDefault())
         val created = scenarios.courseDrafting.create("Цетрин")
         val written = scenarios.courseDrafting.edit(
             created.id, created.revision,
@@ -110,7 +118,7 @@ class DayOfIntakesStoryTest {
                 CourseDrafting.Edit.SetForm(TABLET_FORM),
                 CourseDrafting.Edit.SetSchedule(
                     schedule(
-                        start = LocalDate.now(MOSCOW),
+                        start = LocalDate.now(zone),
                         times = listOf(LocalTime.of(9, 0), LocalTime.of(21, 0))
                     )
                 ),

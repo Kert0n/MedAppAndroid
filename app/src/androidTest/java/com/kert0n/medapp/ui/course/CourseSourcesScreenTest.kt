@@ -6,6 +6,7 @@ import androidx.compose.ui.test.SemanticsMatcher
 import androidx.compose.ui.test.assertCountEquals
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.hasAnyAncestor
+import androidx.compose.ui.test.hasAnyDescendant
 import androidx.compose.ui.test.hasSetTextAction
 import androidx.compose.ui.test.hasText
 import androidx.compose.ui.test.isDialog
@@ -17,6 +18,7 @@ import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performTextReplacement
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import com.kert0n.medapp.domain.course.CourseSource
+import com.kert0n.medapp.domain.pack.PackageStatus
 import com.kert0n.medapp.fixture.OTHER_PACK
 import com.kert0n.medapp.fixture.PACK
 import com.kert0n.medapp.fixture.TABLETS
@@ -77,7 +79,8 @@ class CourseSourcesScreenTest {
         name: String = "Нурофен",
         allocatedDoses: Int = 3,
         maxDoses: Int? = 7,
-        fault: CourseSource.Fault? = null
+        fault: CourseSource.Fault? = null,
+        status: PackageStatus = PackageStatus.ACTIVE
     ) = CourseSourcePresentationDTO(
         packageId = packageId,
         name = name,
@@ -88,8 +91,34 @@ class CourseSourcesScreenTest {
         allocatedAmount = QuantityPresentationDTO("6", TABLETS.toPresentationDTO()),
         coveredDoses = 3,
         maxDoses = maxDoses,
-        fault = fault
+        fault = fault,
+        status = status
     )
+
+    /**
+     * Решение о коробке принято, а сервер ещё не ответил: приёмы из неё пропали, и строка говорит
+     * почему. Без этого нехватка, взявшаяся из ниоткуда, читается как ошибка приложения
+     * (замечание владельца 2026-09-17, PLAN D4).
+     */
+    @Test
+    fun aBoxWhoseFateIsDecidedSaysSoInTheRow() {
+        show(CourseSourcesUiState(sources = listOf(source(status = PackageStatus.REMOVING))))
+
+        compose.onNodeWithText("Удаление в пути").assertIsDisplayed()
+        // Выделение только названо: двигать его у коробки, которой вот-вот не станет, некуда.
+        compose.onNode(slider).assertDoesNotExist()
+        // «Свободно 0» сказало бы, что коробка пустая; пустой она не стала.
+        compose.onNodeWithText("свободно", substring = true).assertDoesNotExist()
+        compose.onNodeWithText("выделено 3 приёма", substring = true).assertIsDisplayed()
+    }
+
+    /** Из аптечки вышли — коробка не наша, и слова те же, что на её списке. */
+    @Test
+    fun aBoxOfAShelfWeLeftSaysSoInTheRow() {
+        show(CourseSourcesUiState(sources = listOf(source(status = PackageStatus.LOST))))
+
+        compose.onNodeWithText("Коробка не у нас").assertIsDisplayed()
+    }
 
     /** Строка говорит всё сразу: что за коробка, где лежит, сколько свободно и сколько выделено. */
     @Test
@@ -97,7 +126,8 @@ class CourseSourcesScreenTest {
         show(CourseSourcesUiState(sources = listOf(source())))
 
         compose.onNodeWithText("Нурофен").assertIsDisplayed()
-        compose.onNodeWithText("Домашняя · свободно 20 таблетка").assertIsDisplayed()
+        compose.onNodeWithText("Домашняя").assertIsDisplayed()
+        compose.onNodeWithText("свободно 20 таблетка").assertIsDisplayed()
         compose.onNodeWithText("выделено 3 приёма · 6 таблетка").assertIsDisplayed()
     }
 
@@ -146,7 +176,7 @@ class CourseSourcesScreenTest {
     fun detachingAsksBeforeItDoesAnything() {
         show(CourseSourcesUiState(sources = listOf(source())))
 
-        compose.onNodeWithText("Отвязать").performClick()
+        compose.onNodeWithContentDescription("Отвязать").performClick()
 
         assertEquals(PACK, detached)
         assertEquals(0, confirmed)
@@ -198,13 +228,29 @@ class CourseSourcesScreenTest {
         compose.onNodeWithContentDescription("Переставить: Ибупрофен").assertIsDisplayed()
     }
 
+    /**
+     * Чтецу предложены только те перестановки, что возможны: у верхней коробки «Выше» ничего не
+     * сдвинуло бы, а чтец всё равно доложил бы об успехе, и человек решил бы, что порядок поменялся.
+     */
+    @Test
+    fun onlyPossibleMovesAreOfferedToAScreenReader() {
+        show(CourseSourcesUiState(sources = listOf(source(), source(OTHER_PACK, "Ибупрофен"))))
+
+        assertEquals(listOf("Ниже"), movesOf("Нурофен"))
+        assertEquals(listOf("Выше"), movesOf("Ибупрофен"))
+    }
+
+    private fun movesOf(name: String): List<String> =
+        compose.onNode(hasAnyDescendant(hasText(name)) and SemanticsMatcher.keyIsDefined(SemanticsActions.CustomActions))
+            .fetchSemanticsNode().config[SemanticsActions.CustomActions].map { it.label }
+
     /** Пусто — это не отказ: сказано, что делать, и кнопка одна. */
     @Test
     fun anEmptyStackInvitesToAttachTheFirstBox() {
         show(CourseSourcesUiState())
 
         compose.onNodeWithText("Пачек пока нет — подключите первую.").assertIsDisplayed()
-        compose.onNodeWithText("Подключить ещё").performClick()
+        compose.onNodeWithText("Подключить ещё коробку").performClick()
         assertEquals(1, added)
     }
 
@@ -213,8 +259,8 @@ class CourseSourcesScreenTest {
     fun aFinishedCourseOffersNoActions() {
         show(CourseSourcesUiState(sources = listOf(source()), isFinished = true))
 
-        compose.onNodeWithText("Отвязать").assertDoesNotExist()
-        compose.onNodeWithText("Подключить ещё").assertDoesNotExist()
+        compose.onNodeWithContentDescription("Отвязать").assertDoesNotExist()
+        compose.onNodeWithText("Подключить ещё коробку").assertDoesNotExist()
     }
 
     /**
@@ -258,8 +304,7 @@ class CourseSourcesScreenTest {
 
         compose.onNodeWithText("нужно 10 приёмов · обеспечено 3").assertIsDisplayed()
         compose.onNodeWithText("Не хватает 7 приёмов").assertIsDisplayed()
-        compose.onNodeWithText("Правка не записана: обеспечение пересчитается после «Сохранить».")
-            .assertIsDisplayed()
+        compose.onNodeWithText("С правкой").assertIsDisplayed()
     }
 
     /** «Сохранить» уносит собранный состав одним решением. */

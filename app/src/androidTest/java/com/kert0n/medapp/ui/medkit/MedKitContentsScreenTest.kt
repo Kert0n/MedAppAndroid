@@ -32,6 +32,7 @@ import com.kert0n.medapp.ui.theme.MedAppTheme
 import java.time.LocalDate
 import kotlin.uuid.Uuid
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertNull
 import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
@@ -48,6 +49,7 @@ class MedKitContentsScreenTest {
     val compose = createComposeRule()
 
     private var reset = 0
+    private var left = 0
     private var added = 0
     private var opened: Uuid? = null
     private var ordered: Ordering? = null
@@ -73,10 +75,12 @@ class MedKitContentsScreenTest {
                     onOpen = { opened = it },
                     onAdd = { added++ },
                     onEdit = {},
+                    onShare = {},
                     onAskToRemove = {},
                     onPickTarget = {},
                     onDismissRemoval = {},
                     onRemove = {},
+                    onLeave = { left++ },
                     onBack = {}
                 )
             }
@@ -118,6 +122,23 @@ class MedKitContentsScreenTest {
 
         compose.onNodeWithContentDescription("Загрузка").assertIsDisplayed()
         compose.onNodeWithText("Здесь пока ничего нет. Заведите упаковку — и она появится в списке.").assertDoesNotExist()
+    }
+
+    /**
+     * Полки у нас больше нет — её убрали у всех или нас из неё вывели, и перечитывание при открытии
+     * это записало (PLAN E4). Заводить в неё нечего: ни «Завести упаковку», ни плавающей кнопки, ни
+     * меню полки — только слова.
+     *
+     * Красная проверка: полка, которой нет, читалась пустой полкой и звала завести в неё коробку.
+     */
+    @Test
+    fun aShelfThatIsNoLongerOursOffersNothingToAdd() {
+        show(MedKitContentsUiState(isEverywhere = false, isAreaEmpty = true, today = today, isLoaded = true))
+
+        compose.onNodeWithText("Завести упаковку").assertDoesNotExist()
+        compose.onNodeWithContentDescription("Завести упаковку").assertDoesNotExist()
+        compose.onNodeWithContentDescription("Что сделать с аптечкой").assertDoesNotExist()
+        compose.onNodeWithText("Этой аптечки у вас больше нет.").assertIsDisplayed()
     }
 
     /**
@@ -213,6 +234,7 @@ class MedKitContentsScreenTest {
         compose.onNodeWithContentDescription("Завести упаковку").assertDoesNotExist()
     }
 
+    /** Внутри полки её имя на строках не повторяется: человек знает, куда пришёл, а повтор съедает строку. */
     @Test
     fun insideAShelfItsNameIsNotRepeatedOnEveryRow() {
         show(contents())
@@ -260,6 +282,7 @@ class MedKitContentsScreenTest {
         compose.onNodeWithContentDescription("Что сделать с аптечкой").assertDoesNotExist()
     }
 
+    /** У названной полки есть «Править» и «Убрать»: без меню их негде найти. */
     @Test
     fun aNamedShelfOffersToEditAndToRemove() {
         show(contents())
@@ -278,7 +301,7 @@ class MedKitContentsScreenTest {
     fun removingAFullShelfNamesItsBoxesAndBothFates() {
         show(contents(packages = listOf(row(PACK, "Нурофен"), row(OTHER_PACK, "Аспирин")), removing = RemovalStep.ASKING))
 
-        compose.onNodeWithText("Убрать «Домашняя»?").assertIsDisplayed()
+        compose.onNodeWithText("Убрать аптечку «Домашняя»?").assertIsDisplayed()
         compose.onNodeWithText("В аптечке 2 упаковки. Решите, что с ними будет.").assertIsDisplayed()
         compose.onNodeWithText("Перенести и убрать").assertIsDisplayed()
         compose.onNodeWithText("Убрать вместе с лекарствами").assertIsDisplayed()
@@ -312,5 +335,82 @@ class MedKitContentsScreenTest {
         compose.onNodeWithText("Перенести и убрать").assertIsNotEnabled()
         compose.onNodeWithText("Дача").performClick()
         compose.onNodeWithText("Перенести и убрать").assertIsEnabled()
+    }
+
+    /**
+     * Решение, которое ещё едет серверу, видно **там, где вещь**: человек ищет коробку в списке и
+     * должен понимать, почему число у неё оценочное (PLAN E1).
+     *
+     * Красная проверка: держать пометку только в карточке — из списка не видно, что с коробкой
+     * что-то происходит, и человек считает показанное число окончательным.
+     */
+    @Test
+    fun aDecisionOnItsWayIsMarkedInTheListToo() {
+        show(
+            MedKitContentsUiState(
+                medKit = medKit(id = HOME_KIT, name = "Домашняя")
+                    .projection(MedKitContents(packages = 1, expired = 0)).toPresentationDTO(),
+                packages = listOf(
+                    pack(id = PACK, name = "Нурофен").projected(hasUnconfirmedChanges = true).toPresentationDTO()
+                ),
+                today = today,
+                isLoaded = true
+            )
+        )
+
+        compose.onNodeWithText("Изменение в пути").assertIsDisplayed()
+    }
+
+    /**
+     * Не всякое решение в пути меняет число: правка сведений и перенос его не трогают, и
+     * `hasUnconfirmedChanges` у такой коробки пуст. Пометка нужна ей ровно так же — иначе
+     * янтарная подложка остаётся единственным знаком, а цвет один ничего не говорит человеку,
+     * который его не различает (разбор CodeRabbit, PLAN H3 «Дизайн»).
+     */
+    @Test
+    fun aChangeThatDoesNotTouchTheNumberIsMarkedAllTheSame() {
+        show(
+            MedKitContentsUiState(
+                medKit = medKit(id = HOME_KIT, name = "Домашняя")
+                    .projection(MedKitContents(packages = 1, expired = 0)).toPresentationDTO(),
+                packages = listOf(
+                    pack(id = PACK, name = "Нурофен").markChanging(Uuid.random()).projected().toPresentationDTO()
+                ),
+                today = today,
+                isLoaded = true
+            )
+        )
+
+        compose.onNodeWithText("Изменение в пути").assertIsDisplayed()
+    }
+
+    /**
+     * Выброшенная коробка — состояние конечное: она видна призраком, но **не нажимается**. Открыть
+     * её карточку значило бы предложить человеку действия над тем, чего уже нет (решение владельца
+     * 2026-09-17).
+     *
+     * Красная проверка: оставить строку нажимаемой — человек открывает карточку удалённой коробки
+     * и пробует из неё принять.
+     */
+    @Test
+    fun aGhostBoxDoesNotOpen() {
+        show(
+            MedKitContentsUiState(
+                medKit = medKit(id = HOME_KIT, name = "Домашняя")
+                    .projection(MedKitContents(packages = 1, expired = 0)).toPresentationDTO(),
+                packages = listOf(
+                    pack(id = PACK, name = "Цетрин").markRemoving(Uuid.random()).projected().toPresentationDTO()
+                ),
+                today = today,
+                isLoaded = true
+            )
+        )
+
+        // Спрашивается само состояние, а не только исход нажатия: погашенная карточка может
+        // сохранить действие в семантике, и тогда «не открылось» ничего бы не доказывало
+        // (разбор CodeRabbit).
+        compose.onNodeWithText("Цетрин").assertIsNotEnabled().performClick()
+
+        assertNull(opened)
     }
 }

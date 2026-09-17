@@ -19,6 +19,8 @@ import kotlin.uuid.Uuid
  * упирались в 429. Пропуск живёт 10 минут; истёкший клиент перевыпускает сам, по 401.
  *
  * `null` у [anna]/[boris] и непустой [skipReason] — пробы не включены (`-Pprobe`) или учётки не заведены.
+ * Третья учётка спрошена отдельным [thirdSkipReason]: истории двух людей ей ничего не должны и без
+ * неё идут как шли.
  */
 object ProbeAccounts {
 
@@ -50,17 +52,26 @@ object ProbeAccounts {
     /** Учётка B — гость в `ContractProbe`, Борис в сценариях двух людей. */
     val borisAccount: AccountCredentials? by lazy { credentials("B") }
 
+    /** Учётка C — третий человек: нужна там, где полок две, а людей трое. */
+    val viktorAccount: AccountCredentials? by lazy { credentials("C") }
+
     val skipReason: String? get() = when {
         baseUrl == null -> "пробы боевого сервера включаются только -Pprobe"
         annaAccount == null || borisAccount == null -> "пробные пользователи не заведены: scripts/register-probe-users.sh"
         else -> null
     }
 
+    /** Почему история троих идёт не здесь: `null` — идёт. */
+    val thirdSkipReason: String? get() = skipReason
+        ?: "третий пробный пользователь не заведён: scripts/register-probe-users.sh".takeIf { viktorAccount == null }
+
     val anna: MedAppApi? by lazy { annaAccount?.let { api(it) } }
 
     val boris: MedAppApi? by lazy { borisAccount?.let { api(it) } }
 
     /** Без учётки: пропуска не просит, и лимит выдачи не тратит. */
+    val viktor: MedAppApi? by lazy { viktorAccount?.let { api(it) } }
+
     val anonymous: MedAppApi? by lazy { baseUrl?.let { MedAppApi(medAppHttpClient(OkHttp.create(), it, tokens = null)) } }
 
     private fun api(account: AccountCredentials): MedAppApi? =

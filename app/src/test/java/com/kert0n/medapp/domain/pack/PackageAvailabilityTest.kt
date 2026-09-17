@@ -5,6 +5,7 @@ import com.kert0n.medapp.fixture.pack
 import com.kert0n.medapp.fixture.tablets
 import java.math.BigDecimal
 import java.time.LocalDate
+import kotlin.uuid.Uuid
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNotEquals
@@ -120,6 +121,34 @@ class PackageAvailabilityTest {
         )
         assertEquals(tablets("0"), over.availableToMe)
         assertEquals(tablets("0"), over.freeForAnyone)
+    }
+
+    /**
+     * Коробка, о судьбе которой решение уже принято, из оборота выведена (PLAN D4, E1): взять из
+     * неё нельзя — `take` отвечает `PACKAGE_UNUSABLE`, — значит и доступного мне в ней ноль.
+     *
+     * Красная проверка: считать доступное по остатку — лечение обещает таблетки из коробки,
+     * которую человек уже выбросил, а отказ он получает только на приёме.
+     */
+    @Test
+    fun aBoxWhoseFateIsDecidedGivesMeNothing() {
+        val leaving = PackageAvailability(
+            pkg = pack(quantity = tablets("20")).markRemoving(Uuid.random()),
+            effective = tablets("20")
+        )
+        assertEquals("сколько её есть — правда до самого ответа", tablets("20"), leaving.effective)
+        assertEquals(tablets("0"), leaving.availableToMe)
+        assertEquals(tablets("0"), leaving.freeForAnyone)
+    }
+
+    /** Изменение в пути ничему не мешает: оно уже записано, и коробкой пользуются (PLAN E1). */
+    @Test
+    fun aBoxWithAChangeOnTheWayIsStillMine() {
+        val changing = PackageAvailability(
+            pkg = pack(quantity = tablets("20")).markChanging(Uuid.random()),
+            effective = tablets("20")
+        )
+        assertEquals(tablets("20"), changing.availableToMe)
     }
 
     @Test

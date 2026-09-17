@@ -1,5 +1,6 @@
 #!/usr/bin/env bash
-# Заводит и восстанавливает двух пробных пользователей ContractProbe на сервере из local.properties.
+# Заводит и восстанавливает трёх пробных пользователей проб на сервере из local.properties.
+# Двое ходят в ContractProbe и в истории двух людей, третий — в истории, где полок две, а людей трое.
 #
 # Учётные данные придумывает клиент (PLAN B1): логин и пароль дописываются в local.properties
 # ДО запроса, поэтому потерянный ответ ничего не теряет — повтор идёт теми же данными. Если сервер
@@ -38,7 +39,7 @@ register() {
         curl -sS -o /dev/null -w '%{http_code}' -X POST "$base/v1/auth/register" --config -
 }
 
-for user in A B; do
+for user in A B C; do
     login=$(prop "MEDAPP_PROBE_${user}_LOGIN")
     password=$(prop "MEDAPP_PROBE_${user}_KEY")
     if [ -z "$login" ] || [ -z "$password" ]; then

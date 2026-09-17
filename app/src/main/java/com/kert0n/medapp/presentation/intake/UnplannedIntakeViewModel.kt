@@ -4,6 +4,7 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.kert0n.medapp.feature.intake.IntakeWarning
 import com.kert0n.medapp.feature.intake.UnplannedIntakeRecording
+import com.kert0n.medapp.feature.operation.Freshening
 import com.kert0n.medapp.presentation.ParsedInput
 import com.kert0n.medapp.presentation.value.QuantityPresentationDTO
 import com.kert0n.medapp.presentation.value.UnitPresentationDTO
@@ -22,6 +23,8 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
+import com.kert0n.medapp.presentation.Fresh
+import com.kert0n.medapp.presentation.readAfter
 
 /**
  * Разовый приём из коробки (PLAN H3 №10, D6). Человек выпил таблетку просто так — вне всякого
@@ -39,6 +42,7 @@ class UnplannedIntakeViewModel @AssistedInject constructor(
     private val recording: UnplannedIntakeRecording,
     private val vocabulary: VocabularyStorageRepository,
     private val clock: Clock,
+    freshening: Freshening,
     packages: PackageStorageRepository,
     @Assisted private val packageId: Uuid
 ) : ViewModel() {
@@ -53,10 +57,15 @@ class UnplannedIntakeViewModel @AssistedInject constructor(
 
     private val recorded = MutableStateFlow(Recording())
 
-    private val pack = packages.observe(packageId)
+    /** Коробка, прочитанная после перечитывания (PLAN E4): до него — ожидание. */
+    private val fresh = viewModelScope.readAfter({ freshening.pack(packageId) }) { packages.observe(packageId) }
 
-    val state: StateFlow<UnplannedIntakeUiState> = combine(pack, typed, recorded) { pack, typed, recorded ->
-        if (pack == null) UnplannedIntakeUiState(isGone = true)
+    val state: StateFlow<UnplannedIntakeUiState> = combine(fresh, typed, recorded) { fresh, typed, recorded ->
+        val pack = (fresh as? Fresh.Read)?.value
+        // Пока коробка общей полки перечитывается, лист ждёт: «свободно N из M» должно быть свежим,
+        // и «коробки нет» до ответа сервера не говорится (PLAN E4).
+        if (fresh is Fresh.Waiting) UnplannedIntakeUiState(isLoading = true)
+        else if (pack == null) UnplannedIntakeUiState(isGone = true)
         else {
             val hint = pack.facts.defaultIntakeAmount?.quantity?.toPresentationDTO()
             UnplannedIntakeUiState(

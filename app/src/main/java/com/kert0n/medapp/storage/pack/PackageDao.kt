@@ -6,26 +6,27 @@ import androidx.room.OnConflictStrategy
 import androidx.room.Query
 import androidx.room.Transaction
 import androidx.room.Upsert
+import com.kert0n.medapp.domain.course.PackageFollowing
 import com.kert0n.medapp.domain.pack.Package
 import com.kert0n.medapp.domain.pack.PackageAvailability
 import com.kert0n.medapp.domain.pack.PackageEnding
 import com.kert0n.medapp.domain.pack.PackageProjection
+import com.kert0n.medapp.domain.pack.PackageStatus
 import com.kert0n.medapp.domain.value.Quantity
-import com.kert0n.medapp.queue.PackageQueueState
-import com.kert0n.medapp.queue.StoredSyncOperation
-import com.kert0n.medapp.queue.pack.PackageSyncCommand
-import com.kert0n.medapp.storage.database.chunkedForQuery
-import com.kert0n.medapp.storage.intake.IntakeDao
-import com.kert0n.medapp.storage.server.SyncOperationDao
-import com.kert0n.medapp.storage.server.SyncOperationStorageRow
 import com.kert0n.medapp.domain.value.Vocabulary
 import com.kert0n.medapp.network.pack.PackageSnapshot
 import com.kert0n.medapp.network.pack.PackageSyncState
-import com.kert0n.medapp.domain.course.PackageFollowing
+import com.kert0n.medapp.queue.PackageQueueState
+import com.kert0n.medapp.queue.StoredSyncOperation
+import com.kert0n.medapp.queue.pack.PackageSyncCommand
 import com.kert0n.medapp.storage.course.CourseDao
+import com.kert0n.medapp.storage.database.chunkedForQuery
+import com.kert0n.medapp.storage.intake.IntakeDao
+import com.kert0n.medapp.storage.server.NamedThing
+import com.kert0n.medapp.storage.server.SyncOperationDao
+import com.kert0n.medapp.storage.server.SyncOperationStorageRow
 import java.time.Instant
 import java.time.LocalDate
-import com.kert0n.medapp.domain.pack.PackageStatus
 import kotlin.uuid.Uuid
 import kotlinx.coroutines.flow.Flow
 
@@ -37,6 +38,9 @@ interface PackageDao {
     @Query("SELECT * FROM packages")
     suspend fun all(): List<PackageStorageRow>
 
+    /** Как называются эти вещи: строке очереди нужно имя, а не вся коробка (PLAN H3 №28). */
+    @Query("SELECT id, name FROM packages WHERE id IN (:ids)")
+    suspend fun namesOf(ids: Collection<Uuid>): List<NamedThing>
 
     @Transaction
     @Query("SELECT * FROM packages WHERE id = :id")

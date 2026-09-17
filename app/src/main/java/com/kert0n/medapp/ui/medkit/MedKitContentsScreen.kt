@@ -1,5 +1,7 @@
 package com.kert0n.medapp.ui.medkit
 
+import androidx.annotation.DrawableRes
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -13,6 +15,7 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.selection.selectable
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
@@ -21,6 +24,8 @@ import androidx.compose.material3.FilterChip
 import androidx.compose.material3.FloatingActionButton
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
+import androidx.compose.material3.ListItem
+import androidx.compose.material3.ListItemDefaults
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.RadioButton
@@ -36,12 +41,13 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import com.kert0n.medapp.R
-import com.kert0n.medapp.ui.SearchField
+import com.kert0n.medapp.domain.medkit.MedKit
 import com.kert0n.medapp.presentation.medkit.MedKitPresentationDTO
 import com.kert0n.medapp.presentation.pack.MedKitContentsUiState
 import com.kert0n.medapp.presentation.pack.Narrowing
@@ -50,6 +56,8 @@ import com.kert0n.medapp.presentation.pack.RemovalRefusal
 import com.kert0n.medapp.presentation.pack.RemovalStep
 import com.kert0n.medapp.ui.EmptyState
 import com.kert0n.medapp.ui.LoadingState
+import com.kert0n.medapp.ui.NavigationRow
+import com.kert0n.medapp.ui.SearchField
 import com.kert0n.medapp.ui.pack.PackageCard
 import kotlin.uuid.Uuid
 
@@ -74,10 +82,12 @@ fun MedKitContentsScreen(
     onOpen: (Uuid) -> Unit,
     onAdd: () -> Unit,
     onEdit: () -> Unit,
+    onShare: () -> Unit,
     onAskToRemove: () -> Unit,
     onPickTarget: () -> Unit,
     onDismissRemoval: () -> Unit,
     onRemove: (Uuid?) -> Unit,
+    onLeave: () -> Unit,
     onBack: () -> Unit,
     modifier: Modifier = Modifier
 ) {
@@ -102,13 +112,23 @@ fun MedKitContentsScreen(
                     }
                 },
                 // Меню полки — только у названной: у «всех лекарств» править и убирать нечего.
-                actions = { state.medKit?.let { ShelfMenu(onEdit = onEdit, onRemove = onAskToRemove) } }
+                actions = {
+                    state.medKit?.let {
+                        // «Поделиться» или «Пригласить» — по тому же признаку, по которому решает
+                        // сам экран: уехала ли полка. Участники тут ни при чём — в опубликованную
+                        // полку зовут и тогда, когда в ней пока один человек.
+                        ShelfMenu(
+                            isShared = it.publication == MedKit.Publication.PUBLISHED,
+                            onEdit = onEdit, onShare = onShare, onRemove = onAskToRemove
+                        )
+                    }
+                }
             )
         },
         floatingActionButton = {
             // На экране всех лекарств класть некуда: у коробки одно место, и выбрать его здесь
             // не из чего. У пустой полки кнопка одна — та, что в самом рассказе.
-            if (state.isLoaded && !state.isEverywhere && !state.isAreaEmpty) {
+            if (state.isLoaded && !state.isEverywhere && !state.isAreaEmpty && !state.isShelfGone) {
                 FloatingActionButton(onClick = onAdd) {
                     Icon(
                         painterResource(R.drawable.ic_add),
@@ -122,6 +142,8 @@ fun MedKitContentsScreen(
             when {
                 // Первое чтение базы ещё не пришло: говорить «пусто» рано — это была бы неправда.
                 !state.isLoaded -> LoadingState()
+                // Полки нет — ни поиска, ни «завести»: класть некуда, и сказано это словами.
+                state.isShelfGone -> EmptyState(stringResource(R.string.contents_shelf_gone))
                 // Искать и сужать нечего: ни поля, ни чипов — они бы обещали содержимое.
                 state.isAreaEmpty && !state.isNarrowed -> if (state.isEverywhere) {
                     EmptyState(stringResource(R.string.contents_empty_everywhere))
@@ -138,7 +160,7 @@ fun MedKitContentsScreen(
     }
 
     if (state.removing != null) {
-        RemovalDialog(state, onPickTarget, onDismissRemoval, onRemove)
+        RemovalDialog(state, onPickTarget, onDismissRemoval, onRemove, onLeave)
     }
 }
 
@@ -300,9 +322,12 @@ private fun <T> Choice(
     }
 }
 
-/** Меню полки: править и убрать. Больше с полкой сделать нечего. */
+/**
+ * Меню полки: править, поделиться и убрать. У общей полки «поделиться» уже случилось — там зовут,
+ * и пункт называется тем, что человек сделает (PLAN H3 №20).
+ */
 @Composable
-private fun ShelfMenu(onEdit: () -> Unit, onRemove: () -> Unit) {
+private fun ShelfMenu(isShared: Boolean, onEdit: () -> Unit, onShare: () -> Unit, onRemove: () -> Unit) {
     var open by remember { mutableStateOf(false) }
     IconButton(onClick = { open = true }) {
         Icon(
@@ -319,6 +344,19 @@ private fun ShelfMenu(onEdit: () -> Unit, onRemove: () -> Unit) {
             }
         )
         DropdownMenuItem(
+            text = {
+                Text(
+                    stringResource(
+                        if (isShared) R.string.med_kit_sharing_invite_menu else R.string.med_kit_sharing_menu
+                    )
+                )
+            },
+            onClick = {
+                open = false
+                onShare()
+            }
+        )
+        DropdownMenuItem(
             text = { Text(stringResource(R.string.contents_remove)) },
             onClick = {
                 open = false
@@ -330,16 +368,24 @@ private fun ShelfMenu(onEdit: () -> Unit, onRemove: () -> Unit) {
 
 /**
  * Уборка полки — **разговор, а не кнопка** (PLAN H3 №4). Пустая спрашивается одним
- * подтверждением; непустая называет, сколько в ней коробок, и обе судьбы названы своими
- * последствиями: «Убрать вместе с лекарствами» и «Перенести и убрать». Слова «удалить» здесь
- * нет — человек убирает полку, а не строку в базе.
+ * подтверждением; непустая называет, сколько в ней коробок, и каждая судьба стоит строкой:
+ * значок, что произойдёт, и **последствие** под ним. Слова «удалить» здесь нет — человек убирает
+ * полку, а не строку в базе.
+ *
+ * **Судьбы — строки списка, а не кнопки**, и это два замечания владельца разом. Текстовой кнопкой
+ * выбор читался набором заголовков, и нажать на него человек не догадывался (2026-09-16, оттуда
+ * же `NavigationRow`). Колонка кнопок в слоте `AlertDialog` — это один ряд без прокрутки, и на
+ * крупном шрифте нижнее действие обрезалось вместе с «Отменой» (2026-09-17). А последствие выбора
+ * жило только в плане: человек выбирал между двумя похожими фразами, не зная, чем они
+ * различаются.
  */
 @Composable
 private fun RemovalDialog(
     state: MedKitContentsUiState,
     onPickTarget: () -> Unit,
     onDismiss: () -> Unit,
-    onRemove: (Uuid?) -> Unit
+    onRemove: (Uuid?) -> Unit,
+    onLeave: () -> Unit
 ) {
     val medKit = state.medKit ?: return
     if (state.removing == RemovalStep.PICKING_TARGET) {
@@ -349,9 +395,13 @@ private fun RemovalDialog(
     val count = medKit.contents.packages
     AlertDialog(
         onDismissRequest = onDismiss,
+        icon = { Icon(painterResource(R.drawable.ic_delete), contentDescription = null) },
         title = { Text(stringResource(R.string.med_kit_remove_title, medKit.name)) },
         text = {
-            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+            Column(
+                modifier = Modifier.verticalScroll(rememberScrollState()),
+                verticalArrangement = Arrangement.spacedBy(4.dp)
+            ) {
                 Text(
                     if (count == 0) {
                         stringResource(R.string.med_kit_remove_empty)
@@ -363,30 +413,82 @@ private fun RemovalDialog(
                 if (count > 0 && state.others.isEmpty()) {
                     Text(stringResource(R.string.med_kit_remove_nowhere))
                 }
+                // Лечения не отменяются никогда: теряются только источники с этой полки, а
+                // история остаётся (PLAN C1 «Курсы при выходе»). Сказать это нужно **до**
+                // решения — после него человек уже ничего не выбирает.
+                if (state.affectedCourses.isNotEmpty()) {
+                    Text(
+                        stringResource(
+                            R.string.med_kit_remove_affects_courses,
+                            state.affectedCourses.joinToString(", ")
+                        ),
+                        color = MaterialTheme.colorScheme.tertiary
+                    )
+                }
                 state.removalRefusal?.let {
                     Text(stringResource(it.text), color = MaterialTheme.colorScheme.error)
                 }
-            }
-        },
-        confirmButton = {
-            TextButton(onClick = { onRemove(null) }) {
-                Text(
-                    stringResource(
+                // Действие на месте — строка без стрелки: оно никуда не уводит. Перенос уводит к
+                // выбору полки, и стрелка у него честная.
+                Fate(
+                    icon = R.drawable.ic_delete,
+                    text = stringResource(
                         if (count == 0) R.string.contents_remove else R.string.med_kit_remove_throw_away
-                    )
+                    ),
+                    supporting = stringResource(
+                        if (count == 0) R.string.med_kit_remove_empty_consequence
+                        else R.string.med_kit_remove_throw_away_consequence
+                    ),
+                    color = MaterialTheme.colorScheme.error,
+                    onClick = { onRemove(null) }
                 )
+                if (count > 0 && state.others.isNotEmpty()) {
+                    NavigationRow(
+                        icon = R.drawable.ic_drive_file_move,
+                        text = stringResource(R.string.med_kit_remove_move),
+                        supporting = stringResource(R.string.med_kit_remove_move_consequence),
+                        onClick = onPickTarget
+                    )
+                }
+                // Выйти можно только из общей: из местной выходить некуда — остальных нет (E6).
+                if (medKit.isShared) {
+                    Fate(
+                        icon = R.drawable.ic_logout,
+                        text = stringResource(R.string.med_kit_leave),
+                        supporting = stringResource(R.string.med_kit_leave_consequence),
+                        color = MaterialTheme.colorScheme.onSurface,
+                        onClick = onLeave
+                    )
+                }
             }
         },
-        dismissButton = {
-            Column {
-                if (count > 0 && state.others.isNotEmpty()) {
-                    TextButton(onClick = onPickTarget) {
-                        Text(stringResource(R.string.med_kit_remove_move))
-                    }
-                }
-                TextButton(onClick = onDismiss) { Text(stringResource(R.string.action_cancel)) }
-            }
+        // Кнопкой остаётся одна «Отмена»: она и есть «ничего не делать», и ряд из неё одной не
+        // разъезжается ни при каком шрифте.
+        confirmButton = {
+            TextButton(onClick = onDismiss) { Text(stringResource(R.string.action_cancel)) }
         }
+    )
+}
+
+/**
+ * Судьба коробок, которая случится **здесь**: значок, что произойдёт, и последствие под ним.
+ * Стрелки нет — строка не уводит, и стрелка ей соврала бы (`NavigationRow`). Нажимается строка
+ * целиком, и на крупном шрифте она переносится, а не обрезается.
+ */
+@Composable
+private fun Fate(
+    @DrawableRes icon: Int,
+    text: String,
+    supporting: String,
+    color: Color,
+    onClick: () -> Unit
+) {
+    ListItem(
+        headlineContent = { Text(text, color = color) },
+        supportingContent = { Text(supporting) },
+        leadingContent = { Icon(painterResource(icon), contentDescription = null, tint = color) },
+        colors = ListItemDefaults.colors(containerColor = Color.Transparent),
+        modifier = Modifier.fillMaxWidth().clickable(onClick = onClick)
     )
 }
 

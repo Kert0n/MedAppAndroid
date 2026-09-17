@@ -29,6 +29,7 @@ import com.kert0n.medapp.storage.value.toStorageEntity
 import com.kert0n.medapp.ui.theme.MedAppTheme
 import dagger.hilt.android.testing.HiltAndroidRule
 import dagger.hilt.android.testing.HiltAndroidTest
+import java.time.ZoneId
 import java.time.Instant
 import java.time.LocalDate
 import javax.inject.Inject
@@ -62,6 +63,13 @@ class ExpiringTodayOverPlacesTest {
 
     private val WAIT = 5_000L
 
+    /**
+     * Зона у завязки и у приложения **одна**: приложение живёт на часах устройства, и день оно
+     * считает по ним. Разойдись они — коробка со сроком «сегодня» досталась бы приложению
+     * вчерашней (замечание разбора #54).
+     */
+    private val zone: ZoneId = ZoneId.systemDefault()
+
     @Before
     fun setUp() {
         allowNotifications()
@@ -73,9 +81,9 @@ class ExpiringTodayOverPlacesTest {
             )
             database.medKits().insertIfMissing(medKit(id = HOME_KIT).toMedKitStorageEntity())
             database.packageRepository().add(
-                pack(id = PACK, name = "Нурофен", quantity = tablets("10"), form = TABLET_FORM, expiresOn = ExpiryDate(LocalDate.now(MOSCOW)))
+                pack(id = PACK, name = "Нурофен", quantity = tablets("10"), form = TABLET_FORM, expiresOn = ExpiryDate(LocalDate.now(zone)))
             )
-            Scenarios(database, Instant.now()).reminderPromising.promise(
+            Scenarios(database, Instant.now(), ZoneId.systemDefault()).reminderPromising.promise(
                 listOf(
                     Reminder(
                         key = NotificationKey(NotificationKind.EXPIRY_TODAY, PACK.toString()),

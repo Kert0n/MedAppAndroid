@@ -5,13 +5,14 @@ import androidx.room.Insert
 import androidx.room.OnConflictStrategy
 import androidx.room.Query
 import androidx.room.Upsert
-import java.time.Instant
-import java.time.LocalDate
-import com.kert0n.medapp.domain.value.Vocabulary
 import com.kert0n.medapp.domain.course.PackageFollowing
+import com.kert0n.medapp.domain.value.Vocabulary
 import com.kert0n.medapp.storage.course.CourseDao
 import com.kert0n.medapp.storage.pack.PackageDao
 import com.kert0n.medapp.storage.pack.end
+import com.kert0n.medapp.storage.server.NamedThing
+import java.time.Instant
+import java.time.LocalDate
 import kotlin.uuid.Uuid
 import kotlinx.coroutines.flow.Flow
 
@@ -33,6 +34,10 @@ interface MedKitDao {
             "WHERE id = :id"
     )
     suspend fun applyServerParticipants(id: Uuid, participantCount: Long, syncedAt: Instant)
+
+    /** Как называются эти вещи: строке очереди нужно имя, а не вся коробка (PLAN H3 №28). */
+    @Query("SELECT id, name FROM med_kits WHERE id IN (:ids)")
+    suspend fun namesOf(ids: Collection<Uuid>): List<NamedThing>
 
     @Query("SELECT * FROM med_kits WHERE id = :id")
     fun observe(id: Uuid): Flow<MedKitStorageEntity?>

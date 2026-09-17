@@ -2,6 +2,7 @@ package com.kert0n.medapp.presentation.pack
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.kert0n.medapp.feature.operation.Freshening
 import com.kert0n.medapp.feature.packages.PackageRelocation
 import com.kert0n.medapp.feature.time.Today
 import com.kert0n.medapp.presentation.medkit.MedKitPresentationDTO
@@ -21,6 +22,8 @@ import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.flatMapLatest
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
+import com.kert0n.medapp.presentation.Fresh
+import com.kert0n.medapp.presentation.readAfter
 
 /**
  * Перенос упаковки на другую полку (PLAN H3 №11). Перенос двигает место, а не остаток: из
@@ -29,11 +32,15 @@ import kotlinx.coroutines.launch
  * Нынешняя полка среди мест не предлагается: класть коробку туда, где она уже лежит, нечем.
  * Общие полки предлагаются наравне с местными — аптечки доступны всегда, а что при этом едет
  * серверу, решает сценарий (C3, E6).
+ *
+ * Коробка общей полки при открытии перечитывается, и пока сервер не ответил, экран ждёт: чужие
+ * брони на ней решают, предупреждать ли о переносе (PLAN E4).
  */
 @OptIn(ExperimentalCoroutinesApi::class)
 @HiltViewModel(assistedFactory = PackageTransferViewModel.Factory::class)
 class PackageTransferViewModel @AssistedInject constructor(
     private val relocation: PackageRelocation,
+    freshening: Freshening,
     packages: PackageStorageRepository,
     medKits: MedKitStorageRepository,
     today: Today,
@@ -49,19 +56,27 @@ class PackageTransferViewModel @AssistedInject constructor(
 
     private val progress = MutableStateFlow(Progress())
 
+    /** Коробка, прочитанная после перечитывания (PLAN E4): её чужие брони решают предупреждение. */
+    private val fresh = viewModelScope.readAfter({ freshening.pack(packageId) }) { packages.observe(packageId) }
+
     val state: StateFlow<PackageTransferUiState> = combine(
-        packages.observe(packageId),
+        fresh,
         today.observe().flatMapLatest { medKits.observeAll(it.date) },
         chosen,
         progress
-    ) { pack, kits, chosen, progress ->
+    ) { fresh, kits, chosen, progress ->
+        val pack = (fresh as? Fresh.Read)?.value
         PackageTransferUiState(
             places = kits.filter { it.id != pack?.medKit?.id }.map { it.toPresentationDTO() },
             chosen = chosen,
+            // Перенос может лишить другого участника доступа: сервер сохранит его бронь, только
+            // если он видит целевую полку, а видит ли — знает он, а не мы (PLAN E6). Поэтому
+            // предупреждение общее и стоит **до** подтверждения, а не после.
+            hasClaimsOfOthers = pack?.availability?.reservedByOthers?.isZero == false,
             isGone = pack == null,
             refusal = progress.refusal,
             isDone = progress.done,
-            isLoaded = true
+            isLoaded = fresh is Fresh.Read
         )
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), PackageTransferUiState())
 
@@ -129,6 +144,8 @@ enum class PackageTransferRefusal {
 data class PackageTransferUiState(
     val places: List<MedKitPresentationDTO> = emptyList(),
     val chosen: Uuid? = null,
+    /** На коробку заявили другие: перенос может отнять у них бронь (PLAN E6). */
+    val hasClaimsOfOthers: Boolean = false,
     val isGone: Boolean = false,
     val refusal: PackageTransferRefusal? = null,
     val isDone: Boolean = false,

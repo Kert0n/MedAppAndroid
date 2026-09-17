@@ -9,6 +9,7 @@ import com.kert0n.medapp.domain.intake.IntakeStatus
 import com.kert0n.medapp.domain.value.Dose
 import com.kert0n.medapp.feature.intake.IntakeConfirmation
 import com.kert0n.medapp.feature.intake.IntakeDeclining
+import com.kert0n.medapp.feature.operation.Freshening
 import com.kert0n.medapp.feature.time.Today
 import com.kert0n.medapp.presentation.ParsedInput
 import com.kert0n.medapp.presentation.value.QuantityPresentationDTO
@@ -35,6 +36,8 @@ import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
+import com.kert0n.medapp.presentation.Fresh
+import com.kert0n.medapp.presentation.readAfter
 
 /**
  * Карточка пункта плана (PLAN H3 №18): тот же ответ, что и в строке дня, но набранный руками —
@@ -45,12 +48,16 @@ import kotlinx.coroutines.launch
  *
  * Записывает [IntakeConfirmation] — тот же сценарий, что и быстрый ответ: одно человеческое
  * действие живёт в одном месте, сколькими бы дорогами к нему ни приходили (PLAN F5).
+ *
+ * Коробки-источники лечения при открытии перечитываются — когда план прочитан и известно, какие
+ * они, — и пока сервер не ответил, карточка ждёт: выбирают пачку по свежему числу (PLAN E4).
  */
 @OptIn(kotlinx.coroutines.ExperimentalCoroutinesApi::class)
 @HiltViewModel(assistedFactory = IntakeCardViewModel.Factory::class)
 class IntakeCardViewModel @AssistedInject constructor(
     private val confirmation: IntakeConfirmation,
     private val declining: IntakeDeclining,
+    freshening: Freshening,
     private val vocabulary: VocabularyStorageRepository,
     private val today: Today,
     private val clock: Clock,
@@ -83,16 +90,34 @@ class IntakeCardViewModel @AssistedInject constructor(
             }
         }
 
+    /** Пункт с источниками, прочитанный после перечитывания их коробок (PLAN E4). */
+    private val fresh = viewModelScope.readAfter({
+        val sources = episode.first().second?.second.orEmpty()
+        freshening.packs(sources.mapTo(HashSet()) { it.pkg.id })
+    }) { episode }
+
+    /**
+     * Пока ждём, лечение и время видны из базы — ждёт только выбор пачки и дозы; после — всё
+     * прочитанное после ответа.
+     */
+    private val shown = combine(episode, fresh) { live, fresh ->
+        when (fresh) {
+            Fresh.Waiting -> live to false
+            is Fresh.Read -> fresh.value to true
+        }
+    }
+
     val state: StateFlow<IntakeCardUiState> = combine(
-        episode,
+        shown,
         today.observe(),
         typed,
         writing
-    ) { (intake, episode), day, typed, writing ->
+    ) { (read, freshened), day, typed, writing ->
+        val (intake, episode) = read
         val title = episode?.first
         // Пункта нет — расписание перестроили, пока карточку держали открытой: показывать нечего.
         if (intake == null || title == null) IntakeCardUiState(isGone = true)
-        else intake.card(title, episode.second.orEmpty(), day.zone, typed, writing)
+        else intake.card(title, episode.second.orEmpty(), day.zone, typed, writing).copy(isLoading = !freshened)
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), IntakeCardUiState(isLoading = true))
 
     fun edit(form: IntakeCardPresentationDTO) {

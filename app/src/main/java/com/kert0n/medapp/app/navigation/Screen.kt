@@ -51,9 +51,18 @@ sealed interface Screen : NavKey {
     /**
      * Заведение и правка упаковки — тоже один экран (PLAN H3 №7, №8): [packageId] назван —
      * правка, не назван — заведение, и тогда [medKitId] говорит, откуда человек пришёл.
+     *
+     * [scannedCode] — код DataMatrix с упаковки, если форму открыл сканер. В маршрут едет **код**,
+     * а не то, что о нём рассказал реестр: код — это идентификатор коробки, и он переживает смерть
+     * процесса так же честно, как любой другой, а предложение к тому времени было бы устаревшей
+     * копией чужого ответа (PLAN C1 «Результат сканирования — заполненная форма»).
      */
     @Serializable
-    data class PackageForm(val medKitId: Uuid? = null, val packageId: Uuid? = null) : Screen
+    data class PackageForm(
+        val medKitId: Uuid? = null,
+        val packageId: Uuid? = null,
+        val scannedCode: String? = null
+    ) : Screen
 
     /** Карточка упаковки (PLAN H3 №6): сколько есть, что это, где лежит — и что с ней сделать. */
     @Serializable
@@ -66,6 +75,37 @@ sealed interface Screen : NavKey {
     /** Перенос на другую полку (PLAN H3 №11): выбор места, куда положить коробку. */
     @Serializable
     data class PackageTransfer(val packageId: Uuid) : Screen
+
+    /**
+     * Поделиться аптечкой (PLAN H3 №20): местную сделать общей, в общую позвать. Ключ приглашения
+     * сюда не едет и ехать не может — он секрет, а ключ маршрута ложится в сохранённую стопку
+     * (PLAN G3, C1 «Ключ приглашения не бывает маршрутом»).
+     */
+    @Serializable
+    data class MedKitSharing(val medKitId: Uuid) : Screen
+
+    /**
+     * Присоединиться к чужой аптечке (PLAN H3 №22). Данных не несёт: код человек вводит сам, а
+     * ключ приглашения в маршрут не едет ни при каких условиях (PLAN G3).
+     */
+    @Serializable
+    data object MedKitJoining : Screen
+
+    /** Состояние синхронизации (PLAN H3 №28): данных не несёт — очередь одна. */
+    @Serializable
+    data object SyncStatus : Screen
+
+    /** Настройки уведомлений и обмена (PLAN H3 №27): данных не несут — набор один. */
+    @Serializable
+    data object Settings : Screen
+
+    /** Разрешения (PLAN H3 №27): состояние системы, данных не несёт. */
+    @Serializable
+    data object Permissions : Screen
+
+    /** Язык (PLAN H3 №27): выбор хранит система, данных не несёт. */
+    @Serializable
+    data object Language : Screen
 
     /**
      * Редактор лечения (PLAN H3 №15): без [courseId] — новый черновик, с ним — записанный

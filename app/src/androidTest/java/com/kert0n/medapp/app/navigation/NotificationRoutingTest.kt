@@ -33,6 +33,7 @@ import com.kert0n.medapp.storage.value.toStorageEntity
 import com.kert0n.medapp.ui.theme.MedAppTheme
 import dagger.hilt.android.testing.HiltAndroidRule
 import dagger.hilt.android.testing.HiltAndroidTest
+import java.time.ZoneId
 import java.time.Instant
 import java.time.LocalDate
 import javax.inject.Inject
@@ -61,6 +62,13 @@ class NotificationRoutingTest {
     lateinit var database: MedAppDatabase
 
     private val WAIT = 5_000L
+
+    /**
+     * Зона у завязки и у приложения **одна**: приложение живёт на часах устройства, и день оно
+     * считает по ним. Разойдись они — коробка со сроком «сегодня» досталась бы приложению
+     * вчерашней (замечание разбора #54).
+     */
+    private val zone: ZoneId = ZoneId.systemDefault()
 
     @Before
     fun setUp() {
@@ -92,14 +100,14 @@ class NotificationRoutingTest {
                 pack(id = PACK, name = "Нурофен", quantity = tablets("20"), form = TABLET_FORM, expiresOn = ExpiryDate(it)).facts
             )
         }
-        val scenarios = Scenarios(database, Instant.now())
+        val scenarios = Scenarios(database, Instant.now(), ZoneId.systemDefault())
         val created = scenarios.courseDrafting.create("Нурофен")
         val saved = scenarios.courseDrafting.edit(
             created.id, created.revision,
             listOf(
                 CourseDrafting.Edit.SetDose(dose("2")),
                 CourseDrafting.Edit.SetForm(TABLET_FORM),
-                CourseDrafting.Edit.SetSchedule(schedule(start = LocalDate.now(MOSCOW))),
+                CourseDrafting.Edit.SetSchedule(schedule(start = LocalDate.now(zone))),
                 CourseDrafting.Edit.SetTotalDoses(Doses(4)),
                 CourseDrafting.Edit.Attach(PACK, Doses(4))
             )
@@ -139,7 +147,7 @@ class NotificationRoutingTest {
     fun theDigestOpensTheDayItself() {
         started()
 
-        open(NotificationTarget.DayPlan(LocalDate.now(MOSCOW)))
+        open(NotificationTarget.DayPlan(LocalDate.now(zone)))
         compose.waitUntil(WAIT) {
             compose.onAllNodesWithText("сегодня", substring = true).fetchSemanticsNodes().isNotEmpty()
         }

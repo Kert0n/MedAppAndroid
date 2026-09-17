@@ -23,13 +23,22 @@
         android:fullBackupContent="@xml/full_backup_content"
         android:icon="@mipmap/ic_launcher"
         android:label="@string/app_name"
+        android:localeConfig="@xml/locales_config"
         android:roundIcon="@mipmap/ic_launcher_round"
         android:supportsRtl="true"
         android:theme="@style/Theme.MedApp">
+        <!--
+            Клавиатуру окно отдаёт форме, а не двигает собой. Без объявления система выбирает
+            режим сама и панорамирует окно: форма поднимает поля своим imePadding, а окно сверх
+            того уезжает вверх — верхняя панель прячется под строку состояния, а снизу остаётся
+            пустой прямоугольник тем больше, чем ниже было поле (находка владельца 2026-09-17).
+            adjustResize отдаёт высоту клавиатуры insets'ами, и подъём остаётся один.
+        -->
         <activity
             android:name=".app.MainActivity"
             android:exported="true"
-            android:theme="@style/Theme.MedApp">
+            android:theme="@style/Theme.MedApp"
+            android:windowSoftInputMode="adjustResize">
             <intent-filter>
                 <action android:name="android.intent.action.MAIN" />
 
@@ -56,6 +65,20 @@
                 <action android:name="android.app.action.SCHEDULE_EXACT_ALARM_PERMISSION_STATE_CHANGED" />
             </intent-filter>
         </receiver>
+
+        <!--
+            Язык приложения объявлен (localeConfig) и выбирается человеком в настройках (№27).
+            До Android 13 выбор хранит AppCompat в своём файле и применяет при создании окна;
+            эта служба — его метка «хранить», сама она не запускается (PLAN C1).
+        -->
+        <service
+            android:name="androidx.appcompat.app.AppLocalesMetadataHolderService"
+            android:enabled="false"
+            android:exported="false">
+            <meta-data
+                android:name="autoStoreLocales"
+                android:value="true" />
+        </service>
 
         <!-- WorkManager собирает фоновые задачи графом (MedApp), а не своим инициализатором. -->
         <provider

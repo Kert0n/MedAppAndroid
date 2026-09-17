@@ -1,0 +1,644 @@
+<resources xmlns:tools="http://schemas.android.com/tools" tools:locale="en">
+    <string name="app_name">MedApp</string>
+
+    <!-- Common screen states -->
+    <string name="state_loading">Loading</string>
+    <string name="action_retry">Retry</string>
+    <string name="failure_no_connection">No connection to the server. Check your network.</string>
+    <string name="failure_server_unavailable">The server is not responding. Try again later.</string>
+    <string name="failure_not_authorized">The server did not accept this device\'s account.</string>
+    <string name="failure_device_storage">Could not save data on this device.</string>
+
+    <!-- Bottom navigation: labels of up to seven letters (PLAN H3) -->
+    <string name="tab_med_kits">Kits</string>
+    <string name="tab_plan">Plan</string>
+    <string name="tab_scanner">Scan</string>
+    <string name="tab_reports">Reports</string>
+    <string name="tab_options">Options</string>
+
+    <!-- First-time setup -->
+    <string name="setup_key_lost">This device\'s key no longer opens, and the account is unavailable.
+        Local kits, treatments and history are intact. Shared kits will have to be joined again by
+        invitation — but first decide whether to start a new account.</string>
+    <string name="setup_key_lost_stays">Stays</string>
+    <string-array name="setup_key_lost_stays_items">
+        <item>Local kits and boxes</item>
+        <item>Treatments and intake history</item>
+    </string-array>
+    <string name="setup_key_lost_goes">Goes away</string>
+    <string-array name="setup_key_lost_goes_items">
+        <item>Shared kits — join again by invitation</item>
+        <item>Claims on shared shelves stay with others; nothing can release them</item>
+    </string-array>
+    <string name="setup_start_over">Start with a new account</string>
+    <string name="setup_start_over_question">Start over?</string>
+    <string name="setup_start_over_warning">The old account cannot be recovered. Shared kits will be lost, local ones will stay.</string>
+
+    <!-- Kits -->
+    <string name="med_kit_arrived_name">Shared kit</string>
+    <string name="med_kits_title">Kits</string>
+    <string name="med_kits_add">Add a kit</string>
+    <string name="med_kits_empty">No kits yet. Add the first one — that\'s where the medicines go.</string>
+    <string name="med_kit_empty">Empty for now</string>
+    <string name="med_kit_shared">Shared · %1$s</string>
+    <string name="search_medicines_everywhere">Find a medicine in all kits</string>
+
+    <!-- Kit: create and edit -->
+    <string name="med_kit_new">New kit</string>
+    <string name="med_kit_edit">Edit kit</string>
+    <string name="med_kit_name">Name</string>
+    <string name="med_kit_location">Storage place (optional)</string>
+    <string name="med_kit_name_empty">A name is needed: without it the kit can\'t be told from the others.</string>
+    <plurals name="med_kit_name_too_long">
+        <item quantity="one">The name is longer than %1$d character.</item>
+        <item quantity="other">The name is longer than %1$d characters.</item>
+    </plurals>
+    <plurals name="med_kit_location_too_long">
+        <item quantity="one">The storage place is longer than %1$d character.</item>
+        <item quantity="other">The storage place is longer than %1$d characters.</item>
+    </plurals>
+    <string name="med_kit_busy">The kit is waiting for the server\'s answer on another decision — the change can\'t be saved yet.</string>
+    <string name="med_kit_gone">This kit no longer exists.</string>
+
+    <!-- Actions shared by the whole set -->
+    <string name="action_save">Save</string>
+    <string name="action_cancel">Cancel</string>
+    <string name="action_back">Back</string>
+    <string name="action_close">Close</string>
+    <string name="action_choose">Choose</string>
+    <string name="action_pick_date">Pick a date</string>
+    <string name="action_clear_date">Clear the date</string>
+    <string name="action_pick_time">Pick a time</string>
+    <string name="field_required">required</string>
+
+    <!-- Package: add and edit -->
+    <string name="pack_new">New package</string>
+    <string name="pack_edit">Edit package</string>
+    <string name="pack_med_kit">Kit</string>
+    <string name="pack_med_kit_unknown">Kit not found</string>
+    <string name="pack_no_med_kits">Add a kit first — packages are put into one.</string>
+    <string name="pack_name">Name</string>
+    <string name="pack_amount">Quantity</string>
+    <string name="pack_recount">Recount</string>
+    <string name="pack_unit">Unit</string>
+    <string name="pack_no_units">The unit vocabulary is empty — the app needs a connection to the server.</string>
+    <string name="pack_form">Dosage form</string>
+    <string name="pack_no_forms">The form vocabulary is empty — the app needs a connection to the server.</string>
+    <string name="pack_expiry">Expiry date</string>
+    <string name="pack_expiry_hint">As printed on the package: 03.2027 or 31.03.2027</string>
+    <string name="pack_category">Category</string>
+    <string name="pack_manufacturer">Manufacturer</string>
+    <string name="pack_country">Country</string>
+    <string name="pack_description">Description</string>
+    <string name="pack_hint">Suggested dose</string>
+    <string name="pack_note">Note</string>
+    <string name="pack_price">Price</string>
+    <string name="pack_purchased_on">Purchased</string>
+    <string name="pack_opened_on">Opened</string>
+    <string name="pack_left">%1$s %2$s</string>
+
+    <!-- Package: refusals -->
+    <string name="pack_med_kit_missing">Choose a kit: a package lies in one particular place.</string>
+    <string name="pack_med_kit_gone">This kit no longer exists — choose another.</string>
+    <string name="pack_med_kit_busy">The kit is waiting for the server\'s answer on another decision — it\'s too early to put anything in it.</string>
+    <string name="pack_name_empty">A name is needed: without it the package can\'t be found by search or by eye.</string>
+    <string name="pack_unit_missing">Choose a unit: without it the quantity measures nothing.</string>
+    <string name="pack_amount_is_zero">There\'s no point adding an empty package — say how much is in it.</string>
+    <string name="pack_hint_is_zero">There is no such thing as a zero dose.</string>
+    <string name="pack_form_clear_unsupported">A shared package\'s dosage form can\'t be cleared — only replaced with another.</string>
+    <string name="pack_unknown_in_vocabulary">This value is not in the vocabulary — choose another.</string>
+    <string name="pack_gone">This package no longer exists.</string>
+    <string name="pack_suggestions_searching">Searching the catalogue…</string>
+    <string name="pack_suggestions_none">Nothing found in the catalogue.</string>
+    <string name="pack_suggestions_unavailable">No suggestions: %1$s</string>
+    <string name="pack_busy">The package is waiting for the server\'s answer on another decision — the change can\'t be saved yet.</string>
+    <plurals name="pack_too_long">
+        <item quantity="one">The field is longer than %1$d character.</item>
+        <item quantity="other">The field is longer than %1$d characters.</item>
+    </plurals>
+    <string name="quantity_empty">A quantity is needed.</string>
+    <string name="quantity_too_long">The quantity is too long.</string>
+    <string name="quantity_not_a_number">A quantity is a number: “20” or “0.5”.</string>
+    <string name="quantity_too_precise">Too many digits after the point.</string>
+    <string name="quantity_too_big">There is no such quantity.</string>
+    <string name="expiry_empty">The expiry date is empty.</string>
+    <string name="expiry_unknown_shape">The date as printed on the package: 03.2027 or 31.03.2027.</string>
+    <string name="expiry_impossible">There is no such date.</string>
+    <string name="price_empty">The price is empty.</string>
+    <string name="price_too_long">The price is too long.</string>
+    <string name="price_not_a_number">A price is a number: “320” or “320.50”.</string>
+    <string name="price_unknown_currency">Unknown currency.</string>
+    <string name="price_too_big">There is no such price.</string>
+
+    <!-- Kit contents and all medicines -->
+    <string name="contents_everywhere_title">All medicines</string>
+    <string name="contents_search_here">Search this kit</string>
+    <string name="contents_search_everywhere">Search all kits</string>
+    <string name="action_clear_search">Clear search</string>
+    <string name="contents_menu">What to do with the kit</string>
+    <string name="contents_edit">Edit</string>
+    <string name="contents_remove">Remove</string>
+    <string name="contents_add">Add a package</string>
+    <string name="contents_empty_here">Nothing here yet. Add a package — and it will appear in the list.</string>
+    <string name="contents_shelf_gone">You no longer have this kit.</string>
+    <string name="contents_empty_everywhere">All kits are empty for now.</string>
+    <string name="contents_nothing_found">Nothing found.</string>
+    <string name="contents_reset">Reset</string>
+    <string name="narrow_expired">Expired</string>
+    <string name="narrow_expiring_soon">Expiring soon</string>
+    <string name="narrow_on_course">On a treatment</string>
+    <string name="narrow_has_free">Has free</string>
+    <string name="narrow_category">Category</string>
+    <string name="narrow_form">Form</string>
+    <string name="order_label">Sort: %1$s</string>
+    <string name="order_name">by name</string>
+    <string name="order_expiry">by expiry</string>
+    <string name="order_added_at">by date added</string>
+    <string name="order_quantity">by quantity</string>
+    <string name="pack_expired_on">Expired %1$s</string>
+    <string name="pack_expires_on">Expires %1$s</string>
+
+    <!-- Removing a kit -->
+    <string name="med_kit_remove_title">Remove “%1$s”?</string>
+    <string name="med_kit_remove_empty">There\'s nothing in the kit — it can be removed right away.</string>
+    <plurals name="med_kit_remove_contents">
+        <item quantity="one">The kit has %d package. Decide what happens to it.</item>
+        <item quantity="other">The kit has %d packages. Decide what happens to them.</item>
+    </plurals>
+    <string name="med_kit_remove_nowhere">Nowhere to move to: there is no other kit.</string>
+    <string name="med_kit_remove_throw_away">Remove together with the medicines</string>
+    <string name="med_kit_remove_move">Move and remove</string>
+    <string name="med_kit_remove_throw_away_consequence">The kit and everything in it will disappear</string>
+    <string name="med_kit_remove_move_consequence">Choose where to move the medicines</string>
+    <string name="med_kit_remove_empty_consequence">Nothing to remove — the kit is empty</string>
+    <string name="med_kit_remove_affects_courses">These may lose their sources: %1$s. The treatments themselves will stay.</string>
+    <string name="med_kit_leave">Leave it to the others</string>
+    <string name="med_kit_leave_consequence">The kit will stay with the others, and its medicines will be unavailable to you</string>
+    <string name="med_kit_remove_target_title">Where to move the medicines?</string>
+    <string name="med_kit_removal_busy">The kit is waiting for the server\'s answer on another decision — it can\'t be removed yet.</string>
+    <string name="med_kit_removal_target_gone">That kit no longer exists — choose another.</string>
+    <string name="med_kit_removal_target_busy">That kit is waiting for the server\'s answer — it\'s too early to move anything into it.</string>
+    <string name="med_kit_removal_contents_busy">One of the packages is waiting for the server\'s answer — wait for it and try again.</string>
+    <string name="med_kit_removal_not_shared">This kit is yours alone — there is no one to leave it to.</string>
+
+    <!-- Share a kit (screen 20) -->
+    <string name="med_kit_sharing">Share</string>
+    <string name="med_kit_sharing_menu">Share the kit</string>
+    <string name="med_kit_sharing_invite_menu">Invite</string>
+    <string name="med_kit_sharing_becomes_shared">Becomes shared</string>
+    <string-array name="med_kit_sharing_becomes_shared_items">
+        <item>Package name, quantity and unit</item>
+        <item>Form and category</item>
+        <item>Manufacturer, country, description</item>
+    </string-array>
+    <string name="med_kit_sharing_stays_yours">Stays with you</string>
+    <string-array name="med_kit_sharing_stays_yours_items">
+        <item>Expiry date and single dose</item>
+        <item>Note, price, purchase and opening dates</item>
+        <item>Kit name and storage place</item>
+    </string-array>
+    <string name="med_kit_sharing_irreversible">This cannot be undone: access once given cannot be revoked. Any member can delete the kit for everyone.</string>
+    <string name="med_kit_sharing_publish">Make shared</string>
+    <string name="med_kit_sharing_publish_title">Make “%1$s” shared?</string>
+    <string name="med_kit_sharing_on_its_way">The decision about the kit is on its way to the server. Inviting will be possible once it arrives.</string>
+    <string name="med_kit_sharing_shared">“%1$s” is a shared kit. Invite those you share medicines with.</string>
+    <string name="med_kit_sharing_invite">Invite</string>
+    <string name="med_kit_sharing_invite_again">Refresh the code</string>
+    <string name="med_kit_sharing_invite_title">Invite to “%1$s”?</string>
+    <string name="med_kit_sharing_invite_explained">Whoever gets the code will join the kit and see all its medicines. The previous code will stop working.</string>
+    <string name="med_kit_sharing_expires_around">Until about %1$s</string>
+    <string name="med_kit_sharing_busy">The kit is waiting for the server\'s answer on another decision — wait for it and try again.</string>
+    <string name="med_kit_sharing_not_shared">This kit is yours alone: make it shared first.</string>
+    <string name="med_kit_sharing_show_full_screen">Show full screen</string>
+    <string name="med_kit_sharing_qr">Invitation code as a pattern</string>
+    <string name="med_kit_sharing_clipboard_label">Kit invitation code</string>
+    <string name="med_kit_sharing_copied">Code copied — you can forward it</string>
+    <string name="med_kit_sharing_copy">Copy the code</string>
+
+    <!-- Join (screen 22) -->
+    <string name="med_kit_joining_menu">Join a kit</string>
+    <string name="med_kit_joining_explained">Ask for a code from someone who already uses the kit. You will see all its medicines.</string>
+    <string name="med_kit_joining_code">Invitation code</string>
+    <string name="med_kit_joining_join">Join</string>
+    <string name="med_kit_joining_code_empty">Enter the code you were sent.</string>
+    <string name="med_kit_joining_invalid">There is no such invitation. Ask for a new code.</string>
+    <string name="med_kit_joining_already_member">You are already in this kit — it\'s in the list.</string>
+    <string name="med_kit_joining_scan">Scan the code</string>
+    <string name="med_kit_joining_aim">Point at the invitation QR code</string>
+    <string name="med_kit_joining_camera_denied">The camera is not allowed. Type the code or allow the camera in the app settings.</string>
+
+    <!-- Sync status (screen 28) and the Options place -->
+    <string name="options_title">Options</string>
+    <string name="sync_status">Sync</string>
+    <string name="sync_status_supporting">What reached the server and what is still waiting</string>
+    <string name="sync_status_attention">There are unresolved operations</string>
+    <string name="settings_row">Notifications</string>
+    <string name="settings_row_supporting">Thresholds, digest time, server sync</string>
+    <string name="permissions_row">Permissions</string>
+    <string name="permissions_row_supporting">Notifications, alarms, camera</string>
+    <string name="permissions_row_attention">Something is off</string>
+    <string name="language_row">Language</string>
+
+    <!-- Settings (screen 27) -->
+    <string name="settings_title">Settings</string>
+    <string name="settings_intake_reminders">Intake reminders</string>
+    <string name="settings_snooze_minutes">Snooze for, min</string>
+    <string name="settings_section_expiry">Expiry and supply</string>
+    <string name="settings_expiry_source_reminders">Remind about source expiry</string>
+    <string name="settings_threshold_days">Warn about shortage, days ahead</string>
+    <string name="settings_section_digest">Daily digest</string>
+    <string name="settings_digest">Send a digest for the day</string>
+    <string name="settings_digest_at">Digest time</string>
+    <string name="settings_section_remote">Shared kits</string>
+    <string name="settings_remote_change">Tell me about others\' changes</string>
+    <string name="settings_section_sync">Server sync</string>
+    <string name="settings_sync_interval">Check for others\' changes every</string>
+    <string name="settings_interval_minutes">%1$d min</string>
+    <string name="settings_interval_hours">%1$d h</string>
+    <string name="settings_snooze_not_a_number">Minutes are a number</string>
+    <string name="settings_snooze_not_forward">Snoozing only goes forward</string>
+    <string name="settings_threshold_not_a_number">Days are a number</string>
+    <string name="settings_threshold_negative">Days can\'t be less than zero</string>
+    <string name="settings_not_saved">Could not save — the previous settings stay in effect</string>
+
+    <!-- Permissions (screen 27) -->
+    <string name="permissions_title">Permissions</string>
+    <string name="permissions_notifications">Notifications</string>
+    <string name="permissions_notifications_muted">The “Intakes” channel is muted — turn it on in settings</string>
+    <string name="permissions_exact_alarms">Exact alarms</string>
+    <string name="permissions_exact_alarms_denied">Off — reminders may be late</string>
+    <string name="permissions_camera">Camera</string>
+    <string name="permissions_granted">Allowed</string>
+    <string name="permissions_denied">Off — fix in the phone\'s settings</string>
+    <string name="permissions_absent">Not on this device — packages are added on a kit</string>
+    <string name="permissions_not_needed">Not needed on this version of Android</string>
+
+    <!-- Language (screen 27). Language names are in their own language and are not translated. -->
+    <string name="language_title">Language</string>
+    <string name="language_system">Same as system</string>
+    <string name="sync_refresh">Refresh</string>
+    <string name="sync_running">Syncing with the server</string>
+    <string name="sync_offline">No connection — the queue will wait</string>
+    <string name="sync_refreshed_at">Last sync at %1$s</string>
+    <string name="sync_never">No sync yet</string>
+    <string name="sync_all_delivered">Everything got through</string>
+    <string name="sync_recount">Recount the box</string>
+    <string name="sync_dismiss">Resolved</string>
+    <string name="sync_dismiss_gone">This row is already gone — the server sync closed it.</string>
+    <string name="sync_dismiss_not_awaiting">Nothing to resolve here: the row is waiting to be sent or has already been applied.</string>
+    <string name="sync_waiting">Will be sent when there is a connection</string>
+    <string name="sync_retry_at">Will retry at %1$s</string>
+    <string name="sync_refused">The server refused</string>
+    <string name="sync_unreadable">This row cannot be read</string>
+    <string name="sync_about_named">%1$s: “%2$s”</string>
+    <string name="sync_about_package_created">New package</string>
+    <string name="sync_about_package_changed">Package change</string>
+    <string name="sync_about_package_moved">Package move</string>
+    <string name="sync_about_package_removed">Package removal</string>
+    <string name="sync_about_intake">Intake</string>
+    <string name="sync_about_claim">Allocation to a treatment</string>
+    <string name="sync_about_med_kit">Decision about a kit</string>
+    <string name="sync_about_unknown">Unknown operation</string>
+    <string name="sync_reason_invalid">The server did not accept the data</string>
+    <string name="sync_reason_not_enough">The server has less left than you took</string>
+    <string name="sync_reason_unit_changed">The box\'s unit of measure has changed</string>
+    <string name="sync_reason_stale">The box was changed before you</string>
+    <string name="sync_reason_conflict">The box was changed before you</string>
+    <string name="sync_reason_superseded">Cancelled together with what it depended on</string>
+
+    <!-- Package card -->
+    <string name="pack_title">Package</string>
+    <string name="pack_how_much">How much there is</string>
+    <string name="pack_available_to_me">Available to me</string>
+    <string name="pack_free_for_anyone">Free for anyone</string>
+    <string name="pack_reserved_by_others">%1$s claimed by others</string>
+    <string name="pack_held_by_course">Held by treatment “%1$s”</string>
+    <string name="pack_unconfirmed">The change hasn\'t reached the shared kit yet.</string>
+    <string name="pack_removal_on_the_way">Removal on its way: the shared kit hasn\'t answered yet.</string>
+    <string name="pack_lost">You left this kit — the box is waiting for the server\'s answer.</string>
+    <!-- The same marks as list rows: short, because a row is not a card -->
+    <string name="pack_row_unconfirmed">Change on its way</string>
+    <string name="pack_row_removal">Removal on its way</string>
+    <string name="pack_row_lost">Box not with us</string>
+    <string name="pack_refused_by_server">The server rejected the change</string>
+    <string name="pack_refused_by_server_explained">Recount the box — there is a dispute about how much is really in it</string>
+    <string name="med_kit_publishing">Publishing</string>
+    <string name="med_kit_removing">Removing</string>
+    <string name="pack_what_it_is">What it is</string>
+    <string name="pack_dates">Dates and price</string>
+    <string name="pack_expiry_unknown">Expiry not specified</string>
+    <string name="pack_expires_until">Good until %1$s</string>
+    <string name="pack_last_used">Last taken from</string>
+    <string name="pack_price_value">%1$s %2$s</string>
+    <string name="pack_where">Where it is</string>
+    <string name="pack_action_edit">Edit details</string>
+    <string name="pack_action_remove">Throw away</string>
+    <string name="pack_action_transfer">Move</string>
+    <string name="pack_remove_title">Throw the package away?</string>
+    <string name="pack_remove_explained">The package will be gone. Intakes from it will stay in history.</string>
+    <string name="pack_remove_busy">The package is waiting for the server\'s answer on another decision — it can\'t be thrown away yet.</string>
+
+    <!-- Recount -->
+    <string name="recount_now">Recorded now: %1$s %2$s</string>
+    <string name="recount_seen">Counted and saw</string>
+    <string name="recount_explained">Name what you see in total — the subtraction is done by the app.</string>
+    <string name="recount_record">Record</string>
+    <string name="recount_zero">Zero means throwing the package away: do that from its card.</string>
+    <string name="recount_busy">The package is waiting for the server\'s answer on another decision — the recount can\'t be saved yet.</string>
+
+    <!-- Moving a package -->
+    <string name="transfer_title">Where to move</string>
+    <string name="transfer_shared">Shared kit</string>
+    <string name="transfer_claims_of_others">Others have claimed this box too. Whoever can\'t see the chosen kit will lose their claim.</string>
+    <string name="transfer_nowhere">Nowhere to move to: there is no other kit yet. Add a second one — and there will be somewhere to put the box.</string>
+    <string name="transfer_busy">The package is waiting for the server\'s answer on another decision — it can\'t be moved yet.</string>
+    <string name="transfer_origin_busy">The kit it\'s being taken from is waiting for the server\'s answer on its own decision.</string>
+    <string name="transfer_target_gone">The chosen kit no longer exists — choose another.</string>
+    <string name="transfer_target_busy">The chosen kit is waiting for the server\'s answer — it\'s too early to put anything in it.</string>
+
+    <!-- Counts: “1 package”, “12 packages” -->
+    <plurals name="packages_count">
+        <item quantity="one">%d package</item>
+        <item quantity="other">%d packages</item>
+    </plurals>
+    <plurals name="packages_expired">
+        <item quantity="one">%d expired</item>
+        <item quantity="other">%d expired</item>
+    </plurals>
+    <plurals name="participants_count">
+        <item quantity="one">%d member</item>
+        <item quantity="other">%d members</item>
+    </plurals>
+
+    <!-- Screens that don't exist yet -->
+    <string name="screen_not_ready">This screen isn\'t ready yet.</string>
+    <!-- Notifications: channels -->
+    <string name="channel_intakes">Intakes</string>
+    <string name="channel_expiry">Expiry dates</string>
+    <string name="channel_coverage">Running out of medicine</string>
+    <string name="channel_digest">Daily digest</string>
+    <string name="channel_sync">Sync</string>
+
+    <!-- Notifications: texts -->
+    <string name="notice_intake_due_title">Time to take: %1$s</string>
+    <string name="notice_intake_due_body">%1$s from box “%2$s”</string>
+    <string name="notice_intake_due_unsupplied">%1$s — there is no box for this intake</string>
+    <string name="notice_intake_decision_title">Not recorded: %1$s</string>
+    <string name="notice_intake_decision_body">“Taken” could not record the intake — open to decide where to take the dose from</string>
+    <string name="notice_intake_missed_title">Missed intake: %1$s</string>
+    <string name="notice_intake_missed_body">Yesterday\'s intake of %1$s was left unanswered</string>
+    <string name="notice_expiry_3d_title">Expires in three days: %1$s</string>
+    <string name="notice_expiry_1d_title">Expires tomorrow: %1$s</string>
+    <string name="notice_expiry_today_title">Expires today: %1$s</string>
+    <string name="notice_expiry_body">Good until %1$s</string>
+    <string name="notice_coverage_short_title">Less medicine than before: %1$s</string>
+    <string name="notice_coverage_3d_title">Medicine running out soon: %1$s</string>
+    <string name="notice_coverage_end_title">Medicine running out: %1$s</string>
+    <string name="notice_coverage_body_until">Enough doses until %1$s</string>
+    <string name="notice_coverage_body_none">Not a single supplied intake</string>
+    <string name="notice_digest_title">Daily digest</string>
+    <string name="notice_digest_body">What to take and what to check %1$s</string>
+    <string name="notice_sync_attention_title">Your decision is needed</string>
+    <string name="notice_sync_attention_body">Some changes are waiting for your decision — open the sync status</string>
+
+    <!-- Notifications: actions -->
+    <string name="action_take">Taken</string>
+    <string name="action_skip">Skip</string>
+    <string name="action_snooze">Snooze</string>
+    <!-- The Plan place and treatments (H3 “Treatments set”) -->
+    <string name="plan_title">Plan</string>
+    <string name="plan_mode_day">Day</string>
+    <string name="plan_mode_courses">Treatments</string>
+    <string name="plan_day_empty">Nothing scheduled for this day</string>
+    <string name="plan_day_today">today</string>
+    <string name="plan_day_tomorrow">tomorrow</string>
+    <string name="plan_day_also">Also on this day</string>
+    <string name="missed_title">Unanswered from past days</string>
+    <string name="missed_hint">Mark what you took. Close this — and they stay missed.</string>
+    <string name="missed_close">Close</string>
+    <string name="expiry_today_title">Expires today</string>
+    <string name="expiry_today_close">Close</string>
+    <string name="expiry_today_until">good until %1$s</string>
+    <string name="plan_notifications_off">Reminders don\'t arrive</string>
+    <string name="plan_notifications_off_hint">Notifications are off — turn them on in settings</string>
+    <string name="plan_intakes_muted">Intake reminders are off</string>
+    <string name="plan_intakes_muted_hint">The “Intakes” channel is muted — turn it on in settings</string>
+    <string name="plan_alarms_inexact">Reminders may be late</string>
+    <string name="plan_alarms_inexact_hint">Exact alarm timing is off — allow it in settings</string>
+    <string name="intake_state_planned">waiting</string>
+    <string name="intake_state_taken">taken at %1$s</string>
+    <string name="intake_state_missed">missed</string>
+    <string name="intake_state_cancelled">cancelled</string>
+    <string name="intake_state_expected">expected</string>
+    <string name="intake_state_one_off">one-off at %1$s</string>
+    <string name="intake_card_title">Intake</string>
+    <string name="intake_history_title">Intake history</string>
+    <string name="intake_history_empty">Nothing has been taken from here yet</string>
+    <string name="intake_history_no_amount">dose not recorded</string>
+    <string name="intake_history_of_package">Intakes from this box</string>
+    <string name="intake_history_of_course">Full history</string>
+    <string name="course_off_plan_action">Intakes outside the schedule</string>
+    <string name="course_off_plan_beyond">More than the treatment has left: %1$s can be counted.</string>
+    <string name="course_off_plan_explained">These intakes count towards the treatment, but don\'t touch the box and don\'t go into history.</string>
+    <string name="course_off_plan_less">One fewer</string>
+    <string name="course_off_plan_more">One more</string>
+    <plurals name="course_off_plan_count">
+        <item quantity="one">%1$d intake</item>
+        <item quantity="other">%1$d intakes</item>
+    </plurals>
+    <string name="course_off_plan_title">Intakes outside the schedule</string>
+    <string name="intake_card_gone">This intake no longer exists</string>
+    <string name="intake_already_answered">This intake has already been answered.</string>
+    <string name="intake_planned">Scheduled for %1$s at %2$s: %3$s</string>
+    <string name="intake_from_package">From box: %1$s</string>
+    <string name="intake_source">From which box</string>
+    <string name="intake_no_sources">The treatment has no boxes attached</string>
+    <string name="intake_amount">How much was taken</string>
+    <string name="intake_taken_on">On which day</string>
+    <string name="intake_taken_at">At what time</string>
+    <string name="intake_pick_time">Pick a time</string>
+    <!-- The same words in the day row and on the card: a person gives one answer wherever they give it. -->
+    <string name="intake_confirm">Taken</string>
+    <string name="intake_questions_title">Before recording</string>
+    <string name="intake_confirm_anyway">Taken anyway</string>
+    <string name="intake_question_touches_reserved">The intake will touch what is held: %1$s free</string>
+    <string name="intake_decline">Skipped</string>
+    <string name="courses_empty">No treatments yet.</string>
+    <string name="courses_empty_hint">Write down a prescription — even a single note.</string>
+    <string name="courses_add">Add a treatment</string>
+    <string name="courses_running">Running</string>
+    <string name="courses_drafts">Drafts</string>
+    <string name="courses_finished">Finished</string>
+    <string name="course_completed_on">Completed %1$s</string>
+    <string name="course_cancelled_on">Cancelled %1$s</string>
+    <string name="course_draft">Draft</string>
+    <string name="course_prescription_missing">Prescription not recorded</string>
+    <plurals name="course_times_a_day">
+        <item quantity="one">%1$d time a day</item>
+        <item quantity="other">%1$d times a day</item>
+    </plurals>
+    <string name="course_days_daily">daily</string>
+    <string name="course_days_range">%1$s–%2$s</string>
+    <plurals name="course_shortage">
+        <item quantity="one">%1$d intake short</item>
+        <item quantity="other">%1$d intakes short</item>
+    </plurals>
+    <string name="course_shortage_from">%1$s from %2$s</string>
+    <string name="course_shortage_what_to_do">What can be done</string>
+    <string name="course_shortage_attach">Attach another box</string>
+    <string name="course_shortage_attach_explained">From those that suit this treatment</string>
+    <string name="course_shortage_reallocate">Change allocations</string>
+    <string name="course_shortage_reallocate_explained">Rearrange how much is taken from each box</string>
+    <string name="course_shortage_buy">Add a box you bought</string>
+    <string name="course_shortage_buy_explained">Add a package and attach it to the treatment</string>
+    <string name="course_new">New treatment</string>
+    <string name="course_edit">Treatment draft</string>
+    <string name="course_title">Name</string>
+    <string name="course_note">Note (optional)</string>
+    <string name="course_title_empty">A name is needed: without it the treatment can\'t be told from the others.</string>
+    <plurals name="course_title_too_long">
+        <item quantity="one">The name is longer than %1$d character.</item>
+        <item quantity="other">The name is longer than %1$d characters.</item>
+    </plurals>
+    <plurals name="course_note_too_long">
+        <item quantity="one">The note is longer than %1$d character.</item>
+        <item quantity="other">The note is longer than %1$d characters.</item>
+    </plurals>
+    <string name="course_stale">The draft was changed from another screen — open it again.</string>
+    <string name="course_gone">This draft no longer exists.</string>
+    <string name="course_discard">Delete the draft</string>
+    <string name="course_discard_title">Delete the draft?</string>
+    <string name="course_discard_explained">The recorded prescription and note will be lost. It held no packages.</string>
+    <string name="course_leave_title">Keep the draft?</string>
+    <string name="course_leave_explained">To attach sources, the treatment was saved as a draft. The prescription and note can be finished later.</string>
+    <string name="course_leave_keep">Keep</string>
+    <string name="course_leave_discard">Delete</string>
+    <string name="action_more">More</string>
+    <string name="course_dose">Dose</string>
+    <string name="course_unit">Dose unit</string>
+    <string name="course_form">Dosage form</string>
+    <string name="course_start">From which day</string>
+    <string name="course_days">Days of the week</string>
+    <string name="course_times">Intake times</string>
+    <string name="course_add_time">Add a time</string>
+    <string name="course_remove_time">Remove %1$s</string>
+    <string name="course_total_doses">Total intakes</string>
+    <string name="course_expected_end">Last intake — %1$s</string>
+    <string name="course_unit_missing">The dose needs a unit: choose one from the vocabulary.</string>
+    <string name="course_dose_is_zero">A zero dose is not a dose: say how much to take at a time.</string>
+    <string name="course_form_unknown">This form is no longer in the vocabulary — choose another.</string>
+    <string name="course_start_missing">The schedule needs a first day.</string>
+    <string name="course_days_empty">Mark at least one day of the week.</string>
+    <string name="course_times_empty">Add at least one intake time.</string>
+    <string name="course_total_doses_invalid">The number of intakes is a whole number greater than zero.</string>
+    <string name="course_rejected_schedule_missing">To start, set a schedule.</string>
+    <string name="course_rejected_dose_missing">To start, set a dose.</string>
+    <string name="course_rejected_form_missing">To start, set a dosage form.</string>
+    <string name="course_rejected_total_doses_missing">To start, say how many intakes in total.</string>
+    <string name="course_rejected_unit_mismatch">The attached packages use a different unit — detach them first.</string>
+    <string name="course_rejected_form_mismatch">The attached packages have a different form — detach them first.</string>
+    <string name="course_rejected_schedule_in_past">A new schedule can\'t start before today.</string>
+    <string name="course_rejected_already_attached">This package is already attached.</string>
+    <string name="course_rejected_package_unusable">This package is being thrown away or its shelf is gone — it can\'t be a source.</string>
+    <string name="course_missing">This treatment no longer exists.</string>
+    <string name="course_finished">This treatment is already over.</string>
+    <string name="course_sources">Sources</string>
+    <string name="course_sources_open">Treatment sources</string>
+    <string name="course_sources_add">Attach another box</string>
+    <string name="course_sources_supply">Supply</string>
+    <string name="course_sources_recorded">Saved</string>
+    <string name="course_sources_with_edit">With the change</string>
+    <string name="course_sources_by_composition">By composition</string>
+    <string name="course_sources_order">Taken from top to bottom</string>
+    <string name="course_cancel_already_finished">The treatment is already over — nothing to cancel.</string>
+    <string name="intake_unplanned_title">Take once</string>
+    <string name="intake_free_of_total">%1$s of %2$s free</string>
+    <string name="intake_taken_amount">How much was taken</string>
+    <string name="intake_record">Take</string>
+    <string name="intake_not_enough">The box doesn\'t have that much.</string>
+    <string name="intake_package_unusable">This box no longer exists.</string>
+    <string name="intake_unit_mismatch">The box is counted in a different unit.</string>
+    <string name="intake_episode_closed">The treatment is over: its plan no longer accepts answers.</string>
+    <string name="intake_not_a_source">This box is not among the treatment\'s sources — record the intake as one-off.</string>
+    <string name="course_sources_stale">The sources were edited from another screen — the list was reread, try again.</string>
+    <string name="course_sources_empty">No packages yet — attach the first one.</string>
+    <string name="course_source_detach">Detach</string>
+    <string name="course_source_detach_title">Detach the package?</string>
+    <string name="course_source_detach_explained">The treatment will stay, but this box will stop supplying it and its claim will be released.</string>
+    <string name="course_source_handle">Reorder: %1$s</string>
+    <string name="course_source_move_up">Up</string>
+    <string name="course_source_move_down">Down</string>
+    <string name="course_source_expired">Expired: good until %1$s</string>
+    <string name="course_source_expired_title">The box has expired</string>
+    <string name="course_source_expired_body">The treatment will take from “%1$s” — it was good until %2$s. It\'s your call; we only warn.</string>
+    <string name="action_understood">Got it</string>
+    <string name="course_source_free">%1$s %2$s free</string>
+    <string name="course_source_expires">good until %1$s</string>
+    <plurals name="course_source_allocated">
+        <item quantity="one">%d intake allocated</item>
+        <item quantity="other">%d intakes allocated</item>
+    </plurals>
+    <plurals name="course_source_beyond_limit">
+        <item quantity="one">This package only yields %d intake.</item>
+        <item quantity="other">This package only yields %d intakes.</item>
+    </plurals>
+    <string name="course_change">Change of treatment</string>
+    <string name="course_start_treatment">Start the treatment</string>
+    <string name="course_card">Treatment</string>
+    <string name="course_edit_action">Change</string>
+    <string name="course_cancel_action">Cancel the treatment</string>
+    <string name="course_cancel_title">Cancel the treatment?</string>
+    <string name="course_cancel_explained">Future intakes will go, packages will be released. What was taken and missed stays in history.</string>
+    <string name="course_reductions">Supply was reduced</string>
+    <string name="course_reduction">Intakes: was %1$d, now %2$d</string>
+    <string name="course_items">Intakes</string>
+    <string name="course_item_planned">scheduled</string>
+    <string name="course_item_taken">taken</string>
+    <string name="course_item_taken_at">taken at %1$s</string>
+    <string name="course_item_missed">missed</string>
+    <string name="course_item_cancelled">cancelled</string>
+    <string name="course_coverage_after_start">Supply is calculated once the treatment starts.</string>
+    <string name="course_coverage_covered">%1$s · supplied %2$d</string>
+    <string name="course_coverage_until">%1$s · supplied until %2$s</string>
+    <plurals name="course_coverage_required">
+        <item quantity="one">%d intake needed</item>
+        <item quantity="other">%d intakes needed</item>
+    </plurals>
+    <string name="course_source_doses">Intakes out of %1$d</string>
+    <string name="course_source_doses_of">of %1$d</string>
+    <string name="course_source_no_limit">Set the dose and the number of intakes — then there will be something to allocate.</string>
+    <string name="course_source_gives_nothing">Not even a whole dose is left here.</string>
+    <string name="course_source_gives_nothing_for">Not even one dose (%1$s %2$s) is here: a dose is taken from a single box.</string>
+    <string name="course_source_fault_unit">Different unit — detach the package or fix its details.</string>
+    <string name="course_source_fault_form">Different form — detach the package or fix its details.</string>
+    <string name="course_source_taken">This package is held by another treatment.</string>
+    <string name="course_source_taken_named">“%1$s” is held by another treatment.</string>
+    <string name="course_source_unusable">This package is being thrown away or its shelf is gone.</string>
+    <string name="course_source_unusable_named">“%1$s” is being thrown away or its shelf is gone.</string>
+    <string name="course_picking">Attach a package</string>
+    <string name="course_attach_already">Already attached to this treatment.</string>
+    <string name="course_attach_held">Held by another treatment.</string>
+    <string name="course_attach_held_named">Held by treatment “%1$s”.</string>
+    <string name="course_attach_needs_form">Set this package\'s dosage form to attach it to a treatment.</string>
+    <string name="course_attach_other_form">Different dosage form.</string>
+    <string name="course_attach_other_unit">Different unit of measure.</string>
+    <string name="course_attach_unusable">Thrown away or lost — waiting for an answer.</string>
+    <string name="course_attach_incomplete">Set the treatment\'s dose and form first.</string>
+    <string name="course_picking_search">Search by name</string>
+    <string name="course_picking_nothing_found">Nothing found. Try a different name.</string>
+    <string name="course_picking_empty">No suitable packages: add a box on a shelf or set its form.</string>
+    <string name="action_got_it">Got it</string>
+
+    <!-- Scanner -->
+    <string name="scanner_aim">Point at the code on the package</string>
+    <string name="scanner_preview">Camera image</string>
+    <string name="scanner_camera_denied">To read codes from packages, the app needs the camera. Without it, add packages on a kit.</string>
+    <string name="scanner_camera_allow">Allow the camera</string>
+    <string name="scanner_camera_refused">The camera is not allowed. You can allow it in the app settings.</string>
+    <string name="scanner_camera_settings">Open settings</string>
+    <string name="scanner_camera_absent">This device has no camera. Add packages on a kit — just as without a code.</string>
+    <string name="scanner_unsupported">This code is not supported: medicine packages carry a DataMatrix code.</string>
+    <string name="pack_scan_asking">Asking the Chestny Znak registry about the code…</string>
+    <string name="pack_scan_not_found">The registry does not know this code — fill in the fields yourself.</string>
+    <string name="pack_scan_unavailable">The registry did not answer: %1$s. Fill in the fields yourself.</string>
+</resources>

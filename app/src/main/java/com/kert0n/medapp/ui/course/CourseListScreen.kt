@@ -24,11 +24,11 @@ import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import com.kert0n.medapp.R
-import com.kert0n.medapp.ui.DAY
 import com.kert0n.medapp.presentation.ScreenState
 import com.kert0n.medapp.presentation.course.CourseListPresentationDTO
 import com.kert0n.medapp.presentation.course.CoursePresentationDTO
 import com.kert0n.medapp.presentation.course.ShortagePresentationDTO
+import com.kert0n.medapp.ui.DAY
 import com.kert0n.medapp.ui.EmptyState
 import com.kert0n.medapp.ui.LoadingState
 
@@ -109,11 +109,22 @@ private fun CourseRow(course: CoursePresentationDTO, onOpen: () -> Unit) {
 
 /** Нехватка — словами и значком: «не хватает 19 приёмов с 11.09.2026». */
 @Composable
-internal fun Shortage(shortage: ShortagePresentationDTO, modifier: Modifier = Modifier) {
+internal fun Shortage(
+    shortage: ShortagePresentationDTO,
+    modifier: Modifier = Modifier,
+    onClick: (() -> Unit)? = null
+) {
     val missing = pluralStringResource(R.plurals.course_shortage, shortage.missingDoses, shortage.missingDoses)
     val text = shortage.firstUncoveredOn?.let { stringResource(R.string.course_shortage_from, missing, it.format(DAY)) }
         ?: missing
-    Row(modifier, horizontalArrangement = Arrangement.spacedBy(4.dp), verticalAlignment = Alignment.CenterVertically) {
+    // Нехватка, по которой можно нажать, ведёт к тому, чем её лечить: строка, которая только
+    // называет беду, человеку не помогает (PLAN H3 «Набор общей полки»).
+    val clickable = onClick?.let { Modifier.clickable(onClick = it) } ?: Modifier
+    Row(
+        modifier.then(clickable),
+        horizontalArrangement = Arrangement.spacedBy(4.dp),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
         Icon(
             painterResource(R.drawable.ic_warning),
             contentDescription = null,

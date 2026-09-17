@@ -1,4 +1,4 @@
-<resources>
+<resources xmlns:tools="http://schemas.android.com/tools" tools:locale="ru">
     <string name="app_name">MedApp</string>
 
     <!-- Общие состояния экрана -->
@@ -18,8 +18,21 @@
 
     <!-- Первичная настройка -->
     <string name="setup_key_lost">Ключ этого устройства больше не открывается, и учётная запись
-        недоступна. Локальные аптечки, курсы и история целы. Общие аптечки придётся подключить
+        недоступна. Местные аптечки, лечения и история целы. Общие аптечки придётся подключить
         заново по приглашению — но сначала нужно решить, заводить ли новую учётную запись.</string>
+    <string name="setup_key_lost_stays">Останется</string>
+    <string-array name="setup_key_lost_stays_items">
+        <item>Местные аптечки и коробки</item>
+        <item>Лечения и история приёмов</item>
+    </string-array>
+    <string name="setup_key_lost_goes">Пропадёт</string>
+    <string-array name="setup_key_lost_goes_items">
+        <item>Общие аптечки — подключить заново по приглашению</item>
+        <item>Брони на общих полках останутся у других, снять их нечем</item>
+    </string-array>
+    <string name="setup_start_over">Начать с новой учётной записью</string>
+    <string name="setup_start_over_question">Начать заново?</string>
+    <string name="setup_start_over_warning">Старую учётную запись восстановить нечем. Общие аптечки пропадут, местные останутся.</string>
 
     <!-- Аптечки -->
     <string name="med_kit_arrived_name">Общая аптечка</string>
@@ -55,9 +68,11 @@
     <string name="action_save">Сохранить</string>
     <string name="action_cancel">Отмена</string>
     <string name="action_back">Назад</string>
+    <string name="action_close">Закрыть</string>
     <string name="action_choose">Выбрать</string>
     <string name="action_pick_date">Выбрать дату</string>
     <string name="action_clear_date">Убрать дату</string>
+    <string name="action_pick_time">Выбрать время</string>
     <string name="field_required">обязательно</string>
 
     <!-- Упаковка: заведение и правка -->
@@ -130,6 +145,7 @@
     <string name="contents_edit">Править</string>
     <string name="contents_remove">Убрать</string>
     <string name="contents_add">Завести упаковку</string>
+    <string name="contents_shelf_gone">Этой аптечки у вас больше нет.</string>
     <string name="contents_empty_here">Здесь пока ничего нет. Заведите упаковку — и она появится в списке.</string>
     <string name="contents_empty_everywhere">Во всех аптечках пока пусто.</string>
     <string name="contents_nothing_found">Ничего не нашлось.</string>
@@ -149,7 +165,7 @@
     <string name="pack_expires_on">Истекает %1$s</string>
 
     <!-- Уборка аптечки -->
-    <string name="med_kit_remove_title">Убрать «%1$s»?</string>
+    <string name="med_kit_remove_title">Убрать аптечку «%1$s»?</string>
     <string name="med_kit_remove_empty">В аптечке ничего не лежит — убрать её можно сразу.</string>
     <plurals name="med_kit_remove_contents">
         <item quantity="one">В аптечке %d упаковка. Решите, что с ней будет.</item>
@@ -160,12 +176,142 @@
     <string name="med_kit_remove_nowhere">Переносить некуда: другой аптечки нет.</string>
     <string name="med_kit_remove_throw_away">Убрать вместе с лекарствами</string>
     <string name="med_kit_remove_move">Перенести и убрать</string>
+    <string name="med_kit_remove_throw_away_consequence">Аптечка и всё, что в ней лежит, исчезнут</string>
+    <string name="med_kit_remove_move_consequence">Выберите, куда переложить лекарства</string>
+    <string name="med_kit_remove_empty_consequence">Убирать нечего — аптечка пуста</string>
+    <string name="med_kit_remove_affects_courses">Могут потерять источники: %1$s. Сами лечения останутся.</string>
+    <string name="med_kit_leave">Выйти и оставить остальным</string>
+    <string name="med_kit_leave_consequence">Аптечка останется у других, а вам её лекарства будут недоступны</string>
     <string name="med_kit_remove_target_title">Куда перенести лекарства?</string>
     <string name="med_kit_removal_busy">Аптечка ждёт ответа сервера на другое решение — убрать её пока нельзя.</string>
     <string name="med_kit_removal_target_gone">Той аптечки больше нет — выберите другую.</string>
     <string name="med_kit_removal_target_busy">Та аптечка ждёт ответа сервера — переносить в неё пока рано.</string>
     <string name="med_kit_removal_contents_busy">Одна из упаковок ждёт ответа сервера — дождитесь его и повторите.</string>
     <string name="med_kit_removal_not_shared">Эта аптечка только ваша — оставлять её некому.</string>
+
+    <!-- Поделиться аптечкой (экран 20) -->
+    <string name="med_kit_sharing">Поделиться</string>
+    <string name="med_kit_sharing_menu">Поделиться аптечкой</string>
+    <string name="med_kit_sharing_invite_menu">Пригласить</string>
+    <string name="med_kit_sharing_becomes_shared">Станет общим</string>
+    <string-array name="med_kit_sharing_becomes_shared_items">
+        <item>Название упаковки, количество и единица</item>
+        <item>Форма и категория</item>
+        <item>Производитель, страна, описание</item>
+    </string-array>
+    <string name="med_kit_sharing_stays_yours">Останется у вас</string>
+    <string-array name="med_kit_sharing_stays_yours_items">
+        <item>Срок годности и разовая доза</item>
+        <item>Заметка, цена, даты покупки и вскрытия</item>
+        <item>Название аптечки и место хранения</item>
+    </string-array>
+    <string name="med_kit_sharing_irreversible">Это необратимо: переданный доступ нельзя отозвать. Любой участник сможет удалить аптечку у всех.</string>
+    <string name="med_kit_sharing_publish">Сделать общей</string>
+    <string name="med_kit_sharing_publish_title">Сделать аптечку «%1$s» общей?</string>
+    <string name="med_kit_sharing_on_its_way">Решение об аптечке уже едет серверу. Пригласить можно будет, когда оно доедет.</string>
+    <string name="med_kit_sharing_shared">«%1$s» — общая аптечка. Позовите тех, с кем делите лекарства.</string>
+    <string name="med_kit_sharing_invite">Пригласить</string>
+    <string name="med_kit_sharing_invite_again">Обновить код</string>
+    <string name="med_kit_sharing_invite_title">Позвать в аптечку «%1$s»?</string>
+    <string name="med_kit_sharing_invite_explained">Кто получит код, войдёт в аптечку и увидит все её лекарства. Прежний код перестанет работать.</string>
+    <string name="med_kit_sharing_expires_around">Примерно до %1$s</string>
+    <string name="med_kit_sharing_busy">Аптечка ждёт ответа сервера на другое решение — дождитесь его и повторите.</string>
+    <string name="med_kit_sharing_not_shared">Эта аптечка только ваша: сначала сделайте её общей.</string>
+    <string name="med_kit_sharing_show_full_screen">Показать во весь экран</string>
+    <string name="med_kit_sharing_qr">Код приглашения узором</string>
+    <string name="med_kit_sharing_clipboard_label">Код приглашения в аптечку</string>
+    <string name="med_kit_sharing_copied">Код скопирован — его можно переслать</string>
+    <string name="med_kit_sharing_copy">Скопировать код</string>
+
+    <!-- Присоединиться (экран 22) -->
+    <string name="med_kit_joining_menu">Присоединиться к аптечке</string>
+    <string name="med_kit_joining_explained">Попросите код у того, кто уже пользуется аптечкой. Вы увидите все её лекарства.</string>
+    <string name="med_kit_joining_code">Код приглашения</string>
+    <string name="med_kit_joining_join">Присоединиться</string>
+    <string name="med_kit_joining_code_empty">Введите код, который вам прислали.</string>
+    <string name="med_kit_joining_invalid">Такого приглашения нет. Попросите новый код.</string>
+    <string name="med_kit_joining_already_member">Вы уже в этой аптечке — она есть в списке.</string>
+
+    <!-- Состояние синхронизации (экран 28) и место «Опции» -->
+    <string name="options_title">Опции</string>
+    <string name="sync_status">Синхронизация</string>
+    <string name="sync_status_supporting">Что уехало на сервер, а что ещё ждёт</string>
+    <string name="sync_status_attention">Есть незакрытые операции</string>
+    <string name="settings_row">Уведомления</string>
+    <string name="settings_row_supporting">Пороги, время сводки, обмен с сервером</string>
+    <string name="permissions_row">Разрешения</string>
+    <string name="permissions_row_supporting">Уведомления, будильники, камера</string>
+    <string name="permissions_row_attention">Что-то выключено</string>
+    <string name="language_row">Язык</string>
+
+    <!-- Настройки (экран 27) -->
+    <string name="settings_title">Настройки</string>
+    <string name="settings_intake_reminders">Напоминания о приёмах</string>
+    <string name="settings_snooze_minutes">Отложить на, мин</string>
+    <string name="settings_section_expiry">Сроки и обеспечение</string>
+    <string name="settings_expiry_source_reminders">Напоминать о сроках источников</string>
+    <string name="settings_threshold_days">Предупреждать о нехватке за, дней</string>
+    <string name="settings_section_digest">Сводка дня</string>
+    <string name="settings_digest">Присылать сводку на день</string>
+    <string name="settings_digest_at">Время сводки</string>
+    <string name="settings_section_remote">Общие аптечки</string>
+    <string name="settings_remote_change">Сообщать о чужих изменениях</string>
+    <string name="settings_section_sync">Обмен с сервером</string>
+    <string name="settings_sync_interval">Узнавать о чужих изменениях каждые</string>
+    <string name="settings_interval_minutes">%1$d мин</string>
+    <string name="settings_interval_hours">%1$d ч</string>
+    <string name="settings_snooze_not_a_number">Минуты — это число</string>
+    <string name="settings_snooze_not_forward">Отложить можно только вперёд</string>
+    <string name="settings_threshold_not_a_number">Дни — это число</string>
+    <string name="settings_threshold_negative">Дней не бывает меньше нуля</string>
+    <string name="settings_not_saved">Не удалось записать — прежние настройки действуют</string>
+
+    <!-- Разрешения (экран 27) -->
+    <string name="permissions_title">Разрешения</string>
+    <string name="permissions_notifications">Уведомления</string>
+    <string name="permissions_notifications_muted">Канал «Приёмы» заглушён — включить в настройках</string>
+    <string name="permissions_exact_alarms">Точные будильники</string>
+    <string name="permissions_exact_alarms_denied">Выключены — напоминания могут опаздывать</string>
+    <string name="permissions_camera">Камера</string>
+    <string name="permissions_granted">Разрешено</string>
+    <string name="permissions_denied">Выключено — исправить в настройках телефона</string>
+    <string name="permissions_absent">Нет на этом устройстве — коробки заводятся на полке</string>
+    <string name="permissions_not_needed">Не требуется на этой версии Android</string>
+
+    <!-- Язык (экран 27). Названия языков — на своём языке, не переводятся. -->
+    <string name="language_title">Язык</string>
+    <string name="language_system">Как в системе</string>
+    <string name="language_russian" translatable="false">Русский</string>
+    <string name="language_english" translatable="false">English</string>
+    <string name="sync_refresh">Обновить</string>
+    <string name="sync_running">Идёт обмен с сервером</string>
+    <string name="sync_offline">Связи нет — очередь подождёт</string>
+    <string name="sync_refreshed_at">Последний обмен в %1$s</string>
+    <string name="sync_never">Обмена ещё не было</string>
+    <string name="sync_all_delivered">Всё доехало</string>
+    <string name="sync_recount">Пересчитать коробку</string>
+    <string name="sync_dismiss">Разобрал</string>
+    <string name="sync_dismiss_gone">Этой строки уже нет — её закрыл обмен с сервером.</string>
+    <string name="sync_dismiss_not_awaiting">Здесь нечего разбирать: строка ждёт отправки или уже применена.</string>
+    <string name="sync_waiting">Отправится, когда будет связь</string>
+    <string name="sync_retry_at">Повторим в %1$s</string>
+    <string name="sync_refused">Сервер отказал</string>
+    <string name="sync_unreadable">Эту строку нечем прочитать</string>
+    <string name="sync_about_named">%1$s: «%2$s»</string>
+    <string name="sync_about_package_created">Новая упаковка</string>
+    <string name="sync_about_package_changed">Изменение упаковки</string>
+    <string name="sync_about_package_moved">Перенос упаковки</string>
+    <string name="sync_about_package_removed">Удаление упаковки</string>
+    <string name="sync_about_intake">Приём</string>
+    <string name="sync_about_claim">Выделение лечению</string>
+    <string name="sync_about_med_kit">Решение об аптечке</string>
+    <string name="sync_about_unknown">Неизвестная операция</string>
+    <string name="sync_reason_invalid">Сервер не принял данные</string>
+    <string name="sync_reason_not_enough">На сервере осталось меньше, чем вы списали</string>
+    <string name="sync_reason_unit_changed">У коробки сменилась единица измерения</string>
+    <string name="sync_reason_stale">Коробку изменили раньше вас</string>
+    <string name="sync_reason_conflict">Коробку изменили раньше вас</string>
+    <string name="sync_reason_superseded">Отменено вместе с тем, от чего зависело</string>
 
     <!-- Карточка упаковки -->
     <string name="pack_title">Упаковка</string>
@@ -177,6 +323,14 @@
     <string name="pack_unconfirmed">Изменение ещё не доехало до общей аптечки.</string>
     <string name="pack_removal_on_the_way">Удаление в пути: общая аптечка ещё не ответила.</string>
     <string name="pack_lost">Из этой аптечки вышли — коробка ждёт ответа сервера.</string>
+    <!-- Те же пометки строкой списка: коротко, потому что строка не карточка -->
+    <string name="pack_row_unconfirmed">Изменение в пути</string>
+    <string name="pack_row_removal">Удаление в пути</string>
+    <string name="pack_row_lost">Коробка не у нас</string>
+    <string name="pack_refused_by_server">Сервер отклонил изменение</string>
+    <string name="pack_refused_by_server_explained">Пересчитайте коробку — спор о том, сколько в ней на самом деле</string>
+    <string name="med_kit_publishing">Публикуется</string>
+    <string name="med_kit_removing">Убирается</string>
     <string name="pack_what_it_is">Что это</string>
     <string name="pack_dates">Сроки и цена</string>
     <string name="pack_expiry_unknown">Срок не указан</string>
@@ -202,6 +356,7 @@
     <!-- Перенос упаковки -->
     <string name="transfer_title">Куда перенести</string>
     <string name="transfer_shared">Общая аптечка</string>
+    <string name="transfer_claims_of_others">На эту коробку заявили и другие. Кто не видит выбранную аптечку — потеряет свою бронь.</string>
     <string name="transfer_nowhere">Переносить некуда: другой аптечки пока нет. Заведите вторую — и коробку будет куда положить.</string>
     <string name="transfer_busy">Упаковка ждёт ответа сервера на другое решение — перенести её пока нельзя.</string>
     <string name="transfer_origin_busy">Аптечка, из которой несут, ждёт ответа сервера на своё решение.</string>
@@ -244,7 +399,7 @@
     <string name="notice_intake_decision_title">Не записано: %1$s</string>
     <string name="notice_intake_decision_body">«Принял» не смог записать приём — откройте, чтобы решить, откуда взять дозу</string>
     <string name="notice_intake_missed_title">Пропущен приём: %1$s</string>
-    <string name="notice_intake_missed_body">Вчерашний приём %1$s остался без ответа</string>
+    <string name="notice_intake_missed_body">Вчерашний приём (%1$s) остался без ответа</string>
     <string name="notice_expiry_3d_title">Через три дня истекает срок: %1$s</string>
     <string name="notice_expiry_1d_title">Завтра истекает срок: %1$s</string>
     <string name="notice_expiry_today_title">Сегодня истекает срок: %1$s</string>
@@ -348,6 +503,13 @@
         <item quantity="other">Не хватает %1$d приёма</item>
     </plurals>
     <string name="course_shortage_from">%1$s с %2$s</string>
+    <string name="course_shortage_what_to_do">Что можно сделать</string>
+    <string name="course_shortage_attach">Подключить ещё коробку</string>
+    <string name="course_shortage_attach_explained">Из тех, что подходят этому лечению</string>
+    <string name="course_shortage_reallocate">Изменить выделения</string>
+    <string name="course_shortage_reallocate_explained">Переставить, сколько берётся из каждой коробки</string>
+    <string name="course_shortage_buy">Завести купленную коробку</string>
+    <string name="course_shortage_buy_explained">Добавить упаковку и подключить её к лечению</string>
     <string name="course_new">Новое лечение</string>
     <string name="course_edit">Черновик лечения</string>
     <string name="course_title">Название</string>
@@ -405,8 +567,12 @@
     <string name="course_finished">Это лечение уже закончено.</string>
     <string name="course_sources">Источники</string>
     <string name="course_sources_open">Источники лечения</string>
-    <string name="course_sources_add">Подключить ещё</string>
-    <string name="course_sources_unsaved">Правка не записана: обеспечение пересчитается после «Сохранить».</string>
+    <string name="course_sources_add">Подключить ещё коробку</string>
+    <string name="course_sources_supply">Обеспечение</string>
+    <string name="course_sources_recorded">Записано</string>
+    <string name="course_sources_with_edit">С правкой</string>
+    <string name="course_sources_by_composition">По составу</string>
+    <string name="course_sources_order">Берётся сверху вниз</string>
     <string name="course_cancel_already_finished">Лечение уже закончилось — отменять нечего.</string>
     <string name="intake_unplanned_title">Принять разово</string>
     <string name="intake_free_of_total">Свободно %1$s из %2$s</string>
@@ -427,7 +593,7 @@
     <string name="course_source_move_down">Ниже</string>
     <string name="course_source_expired">Просрочена: годна до %1$s</string>
     <string name="course_source_expired_title">Коробка просрочена</string>
-    <string name="course_source_expired_body">Лечение будет брать из «%1$s» — она годна до %2$s. Решать вам; мы лишь предупреждаем.</string>
+    <string name="course_source_expired_body">Лечение будет брать из коробки «%1$s» — она годна до %2$s. Решать вам; мы лишь предупреждаем.</string>
     <string name="action_understood">Понятно</string>
     <string name="course_source_free">свободно %1$s %2$s</string>
     <string name="course_source_expires">годен до %1$s</string>
@@ -451,7 +617,7 @@
     <string name="course_cancel_title">Отменить лечение?</string>
     <string name="course_cancel_explained">Будущие приёмы уйдут, пачки освободятся. Принятое и пропущенное останется в истории.</string>
     <string name="course_reductions">Обеспечение сокращалось</string>
-    <string name="course_reduction">Было %1$d приёмов, стало %2$d</string>
+    <string name="course_reduction">Приёмы: было %1$d, стало %2$d</string>
     <string name="course_items">Приёмы</string>
     <string name="course_item_planned">запланирован</string>
     <string name="course_item_taken">принят</string>
@@ -468,15 +634,16 @@
         <item quantity="other">нужно %d приёма</item>
     </plurals>
     <string name="course_source_doses">Приёмов из %1$d</string>
+    <string name="course_source_doses_of">из %1$d</string>
     <string name="course_source_no_limit">Укажите дозу и число приёмов — тогда будет что выделять.</string>
     <string name="course_source_gives_nothing">Целой дозы здесь уже не наберётся.</string>
     <string name="course_source_gives_nothing_for">Одной дозы (%1$s %2$s) здесь не наберётся: доза берётся из одной коробки.</string>
     <string name="course_source_fault_unit">Другая единица — снимите пачку или поправьте её сведения.</string>
     <string name="course_source_fault_form">Другая форма — снимите пачку или поправьте её сведения.</string>
     <string name="course_source_taken">Эта пачка занята другим лечением.</string>
-    <string name="course_source_taken_named">«%1$s» занята другим лечением.</string>
+    <string name="course_source_taken_named">Коробка «%1$s» занята другим лечением.</string>
     <string name="course_source_unusable">Эту пачку выбрасывают или её полки больше нет.</string>
-    <string name="course_source_unusable_named">«%1$s» выбрасывают или её полки больше нет.</string>
+    <string name="course_source_unusable_named">Коробку «%1$s» выбрасывают, или её полки больше нет.</string>
     <string name="course_picking">Подключить пачку</string>
     <string name="course_attach_already">Уже подключена к этому лечению.</string>
     <string name="course_attach_held">Занята другим лечением.</string>
@@ -490,4 +657,19 @@
     <string name="course_picking_nothing_found">Ничего не нашлось. Попробуйте другое название.</string>
     <string name="course_picking_empty">Подходящих пачек нет: заведите коробку на полке или укажите ей форму.</string>
     <string name="action_got_it">Понятно</string>
+    <!-- Сканер (PLAN H3 №24) -->
+    <string name="scanner_aim">Наведите на код с упаковки</string>
+    <string name="scanner_preview">Изображение с камеры</string>
+    <string name="scanner_camera_denied">Чтобы читать коды с упаковок, приложению нужна камера. Без неё коробки заводятся на полке.</string>
+    <string name="scanner_camera_allow">Разрешить камеру</string>
+    <string name="scanner_camera_refused">Камера запрещена. Разрешить её можно в настройках приложения.</string>
+    <string name="scanner_camera_settings">Открыть настройки</string>
+    <string name="scanner_camera_absent">На этом устройстве нет камеры. Заводите коробки на полке — там же, где и без кода.</string>
+    <string name="scanner_unsupported">Этот код не поддерживается: на упаковках лекарств стоит DataMatrix.</string>
+    <string name="pack_scan_asking">Спрашиваем «Честный знак» о коде с упаковки…</string>
+    <string name="pack_scan_not_found">Реестр не знает этого кода — заполните поля сами.</string>
+    <string name="pack_scan_unavailable">Реестр не ответил: %1$s. Заполните поля сами.</string>
+    <string name="med_kit_joining_scan">Отсканировать код</string>
+    <string name="med_kit_joining_aim">Наведите на QR приглашения</string>
+    <string name="med_kit_joining_camera_denied">Камера запрещена. Введите код руками или разрешите камеру в настройках приложения.</string>
 </resources>

@@ -38,6 +38,7 @@ import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.runBlocking
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Rule
@@ -74,6 +75,8 @@ class MedKitContentsViewModelTest {
 
     private val packages = Asked(stored)
 
+    private val courses = FakeCourses()
+
     private val medKits = FakeMedKits(
         medKit(id = HOME_KIT, name = "Домашняя"),
         medKit(id = SHARED_KIT, name = "Дача")
@@ -98,6 +101,7 @@ class MedKitContentsViewModelTest {
         removal = removal,
         packages = packages,
         medKits = medKits,
+        courses = courses,
         today = Today(clock, QuietClock),
         medKitId = medKitId
     )
@@ -306,5 +310,40 @@ class MedKitContentsViewModelTest {
         assertEquals(RemovalRefusal.TARGET_GONE, state.removalRefusal)
         assertEquals(RemovalStep.PICKING_TARGET, state.removing)
         assertTrue(medKits.medKits.any { it.id == HOME_KIT })
+    }
+
+    /**
+     * Из местной аптечки не выходят — её убирают: остальных у неё нет, и оставлять полку некому
+     * (PLAN E6). Отказ назван, а не проглочен.
+     */
+    @Test
+    fun onlyASharedShelfCanBeLeft() {
+        val model = viewModel(medKitId = SHARED_KIT)
+
+        watching(model.state) { state ->
+            state.awaiting { it.isLoaded }
+            model.askToRemove()
+            model.leave()
+            state.awaiting { it.isRemoved || it.removalRefusal != null }
+        }
+
+        assertEquals(RemovalRefusal.NOT_SHARED, model.state.value.removalRefusal)
+    }
+
+    /**
+     * Полку убрали у всех, пока экран открыт, — экран говорит, что её больше нет, а не зовёт завести
+     * в неё коробку.
+     */
+    @Test
+    fun aShelfThatVanishedIsSaidToBeGone() {
+        val model = viewModel(medKitId = SHARED_KIT)
+
+        val state = watching(model.state) { state ->
+            state.awaiting { it.isLoaded && it.medKit != null }
+            medKits.forget(SHARED_KIT)
+            state.awaiting { it.isShelfGone }
+        }
+
+        assertFalse(state.isRemoved)
     }
 }

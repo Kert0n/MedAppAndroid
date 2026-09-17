@@ -99,7 +99,9 @@ android {
                 Base64.getEncoder().encodeToString(secretOrNull("MEDAPP_CRPT_PROBE_CODES").orEmpty().toByteArray())
         }
         if (project.hasProperty("probe")) {
-            for (user in listOf("A", "B")) {
+            // Третья учётка — для историй, где полок две, а людей трое: кто целевую полку не
+            // видит, тот бронь и теряет (PLAN E6).
+            for (user in listOf("A", "B", "C")) {
                 testInstrumentationRunnerArguments["probeLogin$user"] =
                     secretOrNull("MEDAPP_PROBE_${user}_LOGIN").orEmpty()
                 testInstrumentationRunnerArguments["probeKey$user"] =
@@ -156,6 +158,26 @@ android {
     }
 
     /**
+     * Языки приложения — ровно те, что оно объявляет (`localeConfig`, `AppLanguage`): переводы
+     * библиотек на остальные языки в APK не едут, и системе не на что предлагать выбор, которого
+     * у приложения нет. Список держит `LanguageDeclarationTest`.
+     */
+    androidResources {
+        localeFilters += listOf("ru", "en")
+    }
+
+    /**
+     * Язык выбирают внутри приложения, поэтому оба перевода едут в каждой установке: сборка
+     * не режет их по языку устройства — иначе выбранный «English» на русском телефоне было бы
+     * нечем показать без докачки из магазина.
+     */
+    bundle {
+        language {
+            enableSplit = false
+        }
+    }
+
+    /**
      * Условная запись не молчит (PLAN C1): результат записи, помеченной `@CheckResult`, обязан быть
      * прочитан — «ноль строк незаконен» держит сборка, а не внимание.
      */
@@ -199,6 +221,9 @@ kotlin {
 
 dependencies {
     implementation(libs.androidx.core.ktx)
+    // Язык приложения до Android 13 хранит и применяет AppCompat (`setApplicationLocales`); на 13+
+    // он же делегирует системе (PLAN C1 «Язык хранит система»).
+    implementation(libs.androidx.appcompat)
     implementation(libs.androidx.lifecycle.runtime.ktx)
     implementation(libs.androidx.lifecycle.runtime.compose)
     implementation(libs.androidx.lifecycle.process)

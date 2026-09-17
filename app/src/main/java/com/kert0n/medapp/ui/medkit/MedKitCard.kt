@@ -1,5 +1,6 @@
 package com.kert0n.medapp.ui.medkit
 
+import androidx.annotation.DrawableRes
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -18,9 +19,10 @@ import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
-import androidx.annotation.DrawableRes
 import com.kert0n.medapp.R
+import com.kert0n.medapp.domain.medkit.MedKitStatus
 import com.kert0n.medapp.presentation.medkit.MedKitPresentationDTO
+import com.kert0n.medapp.ui.theme.LocalAccents
 
 /**
  * Аптечка строкой списка (PLAN H3 №2). Первым — не название, а **что внутри**: список нужен
@@ -62,6 +64,22 @@ fun MedKitCard(medKit: MedKitPresentationDTO, onOpen: () -> Unit, modifier: Modi
 
             medKit.location?.let {
                 Text(it, style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            }
+
+            // Решение о полке, которое ещё едет серверу, видно в списке: иначе человек жмёт
+            // «пригласить» и не понимает, почему нельзя (PLAN E5).
+            when (medKit.status) {
+                MedKitStatus.PUBLISHING -> Marker(
+                    icon = R.drawable.ic_cloud_upload,
+                    text = stringResource(R.string.med_kit_publishing),
+                    color = LocalAccents.current.pending
+                )
+                MedKitStatus.REMOVING -> Marker(
+                    icon = R.drawable.ic_delete,
+                    text = stringResource(R.string.med_kit_removing),
+                    color = LocalAccents.current.pending
+                )
+                MedKitStatus.ACTIVE -> Unit
             }
 
             if (medKit.isShared) {

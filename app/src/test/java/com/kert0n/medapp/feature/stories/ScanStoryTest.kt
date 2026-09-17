@@ -23,6 +23,9 @@ import io.ktor.http.HttpStatusCode
 import io.ktor.http.headersOf
 import java.time.LocalDate
 import kotlin.uuid.Uuid
+import java.time.Clock
+import java.time.Instant
+import java.time.ZoneId
 import kotlinx.coroutines.test.runTest
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNull
@@ -35,6 +38,9 @@ import org.junit.Test
  * **без запроса**; реестр отказал — недоступность с причиной. Камера и отказ в ней — U9.
  */
 class ScanStoryTest {
+
+    /** Часы истории: день продажи из ответа реестра меряется ими, а не системными (PLAN H1). */
+    private val CLOCK: Clock = Clock.fixed(Instant.parse("2026-09-17T09:00:00Z"), ZoneId.of("Europe/Moscow"))
 
     private val tablets = DosageForm(Uuid.parse("00000000-0000-4000-8000-000000000102"), "таблетки")
     private val words = Vocabulary(listOf(QuantityUnit(Uuid.parse("00000000-0000-4000-8000-000000000001"), "таблетка")), listOf(tablets))
@@ -53,7 +59,7 @@ class ScanStoryTest {
             respond(body, status, headersOf(HttpHeaders.ContentType, "application/json"))
         }, "https://crpt.test"))
         val medApp = MedAppApi(medAppHttpClient(MockEngine { respond("", HttpStatusCode.NoContent) }, "https://medapp.test"))
-        return PackageScanning(CrptPackageCodes(crpt, VocabularyResolver(Store(words), medApp)))
+        return PackageScanning(CrptPackageCodes(crpt, VocabularyResolver(Store(words), medApp), CLOCK))
     }
 
     private fun dataMatrix(text: String = CrptFixtures.SCANNED) = ScannedCode(CodeFormat.DATA_MATRIX, text)

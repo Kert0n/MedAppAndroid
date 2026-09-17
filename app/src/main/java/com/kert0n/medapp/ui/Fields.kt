@@ -22,6 +22,9 @@ import androidx.compose.material3.IconButton
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.rememberDatePickerState
+import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.TimePicker
+import androidx.compose.material3.rememberTimePickerState
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
@@ -48,6 +51,7 @@ import com.kert0n.medapp.presentation.value.MoneyPresentationError
 import com.kert0n.medapp.presentation.value.QuantityPresentationError
 import java.time.Instant
 import java.time.LocalDate
+import java.time.LocalTime
 import java.time.ZoneOffset
 
 /**
@@ -274,6 +278,59 @@ fun DateField(
             TextButton(onClick = { open = false }) { Text(stringResource(R.string.action_cancel)) }
         }
     ) { DatePicker(picker) }
+}
+
+/**
+ * Время, которое называют часами, — тем же устройством, что и [DateField]: поле остаётся
+ * `readOnly`, открывает его нажатие в любом месте, а значок называет действие экранному чтецу.
+ * Печатать время строкой незачем: выбранное уже время, и состояния «25:70» у него не бывает.
+ */
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+fun TimeField(
+    label: String,
+    value: LocalTime,
+    onPick: (LocalTime) -> Unit,
+    modifier: Modifier = Modifier,
+    enabled: Boolean = true
+) {
+    var open by remember { mutableStateOf(false) }
+    val presses = remember { MutableInteractionSource() }
+    LaunchedEffect(presses) {
+        presses.interactions.collect { if (it is PressInteraction.Release) open = true }
+    }
+    OutlinedTextField(
+        value = value.toString(),
+        onValueChange = {},
+        readOnly = true,
+        enabled = enabled,
+        label = { Text(label) },
+        trailingIcon = {
+            IconButton(onClick = { open = true }, enabled = enabled) {
+                Icon(
+                    painterResource(R.drawable.ic_schedule),
+                    contentDescription = stringResource(R.string.action_pick_time)
+                )
+            }
+        },
+        interactionSource = presses,
+        modifier = modifier.fillMaxWidth().defaultMinSize(minHeight = 48.dp)
+    )
+    if (!open) return
+    val picker = rememberTimePickerState(initialHour = value.hour, initialMinute = value.minute, is24Hour = true)
+    AlertDialog(
+        onDismissRequest = { open = false },
+        text = { TimePicker(state = picker) },
+        confirmButton = {
+            TextButton(
+                onClick = {
+                    onPick(LocalTime.of(picker.hour, picker.minute))
+                    open = false
+                }
+            ) { Text(stringResource(R.string.action_choose)) }
+        },
+        dismissButton = { TextButton(onClick = { open = false }) { Text(stringResource(R.string.action_cancel)) } }
+    )
 }
 
 /** Как дата выглядит в поле: так же, как её печатают от руки. */

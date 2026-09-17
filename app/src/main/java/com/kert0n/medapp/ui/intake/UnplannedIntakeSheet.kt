@@ -4,6 +4,7 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.defaultMinSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material3.Button
@@ -18,6 +19,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
+import com.kert0n.medapp.ui.LoadingState
 import com.kert0n.medapp.R
 import com.kert0n.medapp.domain.intake.IntakeRejected
 import com.kert0n.medapp.presentation.intake.UnplannedIntakeError
@@ -49,6 +51,12 @@ fun UnplannedIntakeSheet(
             verticalArrangement = Arrangement.spacedBy(16.dp)
         ) {
             Text(stringResource(R.string.intake_unplanned_title), style = MaterialTheme.typography.titleLarge)
+            // Пока коробка перечитывается, на месте полей — загрузка той же высоты: лист не прыгает,
+            // а набрать число по старому остатку нечем (PLAN E4).
+            if (state.isLoading) {
+                LoadingState(Modifier.fillMaxWidth().height(160.dp))
+                return@Column
+            }
             state.free?.let {
                 Text(
                     // Единица названа один раз: «свободно 11 из 15 таблеток» — обе половины об

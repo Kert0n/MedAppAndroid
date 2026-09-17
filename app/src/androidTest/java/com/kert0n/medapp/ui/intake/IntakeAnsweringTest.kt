@@ -92,9 +92,14 @@ class IntakeAnsweringTest {
         clock = clock
     ).also { opened += it }
 
-    private fun cardModel(intakeId: Uuid) = IntakeCardViewModel(
+    private fun cardModel(
+        intakeId: Uuid,
+        freshening: com.kert0n.medapp.feature.operation.Freshening =
+            com.kert0n.medapp.fixture.offlineFreshening(database.packageRepository(), clock)
+    ) = IntakeCardViewModel(
         confirmation = scenarios.intakeConfirmation,
         declining = scenarios.intakeDeclining,
+        freshening = freshening,
         vocabulary = VocabularyRoomRepository(database.vocabulary()),
         today = Today(clock, QuietClock),
         clock = clock,
@@ -336,4 +341,30 @@ class IntakeAnsweringTest {
         val PATIENTLY: Duration = 15.seconds
     }
 
+
+    /**
+     * Карточка пункта перечитывает коробки-источники своего лечения, как только знает, какие они, и
+     * пока сервер не ответил, ждёт: пачку выбирают по свежему числу (PLAN E4). Какой полки коробка
+     * и знает ли её сервер, здесь подменено: предмет проверки — ожидание карточки, а не полка.
+     */
+    @Test
+    fun theCardWaitsForItsSourcesFromTheServer() = runBlocking {
+        val intakeId = firstIntake(started()).id
+        val server = com.kert0n.medapp.fixture.RereadingServer(clock)
+        server.hold()
+        val known = object : com.kert0n.medapp.storage.pack.PackageStorageRepository by database.packageRepository() {
+            override suspend fun answersToServer(packageId: Uuid): Boolean = true
+        }
+        val model = cardModel(intakeId, com.kert0n.medapp.fixture.onlineFreshening(server, known, clock))
+
+        watching(model.state) { state ->
+            state.awaiting(PATIENTLY) { it.title.isNotEmpty() }
+            kotlinx.coroutines.withTimeout(5_000) { while (server.asked.isEmpty()) kotlinx.coroutines.delay(10) }
+            assertEquals(true, state.value.isLoading)
+            server.release()
+            state.awaiting(PATIENTLY) { !it.isLoading }
+        }
+
+        assertEquals(listOf("/v1/drugs/$PACK"), server.asked)
+    }
 }

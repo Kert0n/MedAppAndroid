@@ -1,9 +1,9 @@
 package com.kert0n.medapp.presentation.bootstrap
 
-import com.kert0n.medapp.feature.bootstrap.AppStart
-
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.kert0n.medapp.feature.account.AccountReplacement
+import com.kert0n.medapp.feature.bootstrap.AppStart
 import dagger.hilt.android.lifecycle.HiltViewModel
 import javax.inject.Inject
 import kotlinx.coroutines.Job
@@ -17,12 +17,19 @@ import kotlinx.coroutines.launch
  * нажатию человека; пока предыдущая попытка идёт, новая не начинается — иначе «повторить»,
  * нажатое трижды, завело бы три захода на регистрацию.
  *
+ * Утраченный ключ повтором не лечится — его лечит **решение** человека ([startOver]): начать с
+ * новой учётной записью, зная, что останется и что пропадёт (PLAN G2). Решение принимается только
+ * из состояния «ключ утрачен» и тем же сторожем, что и повтор: два нажатия — одна попытка.
+ *
  * Живёт в ViewModel, а не в `MedApp.onCreate`: у настройки есть повтор, и её исход человек видит
  * на экране, а не в логе. К тому же приложение под инструментами подменяется, и настройка из
  * `onCreate` была бы непроверяемой.
  */
 @HiltViewModel
-class AppStartViewModel @Inject constructor(private val start: AppStart) : ViewModel() {
+class AppStartViewModel @Inject constructor(
+    private val start: AppStart,
+    private val replacement: AccountReplacement
+) : ViewModel() {
 
     private val _state = MutableStateFlow<AppStartState>(AppStartState.Checking)
 
@@ -36,11 +43,19 @@ class AppStartViewModel @Inject constructor(private val start: AppStart) : ViewM
 
     fun retry() = begin()
 
-    private fun begin() {
+    /** Человек подтвердил: старую учётку не открыть, начинаем с новой (PLAN G2). */
+    fun startOver() {
+        if (_state.value != AppStartState.KeyLost) return
+        attempt(replacement::decide)
+    }
+
+    private fun begin() = attempt(start::begin)
+
+    private fun attempt(outcome: suspend () -> AppStart.Outcome) {
         if (attempt?.isActive == true) return
         attempt = viewModelScope.launch {
             _state.value = AppStartState.Checking
-            _state.value = start.begin().toAppStartState()
+            _state.value = outcome().toAppStartState()
         }
     }
 }

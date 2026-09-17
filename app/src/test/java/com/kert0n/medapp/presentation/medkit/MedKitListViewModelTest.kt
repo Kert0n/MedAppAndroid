@@ -30,7 +30,10 @@ class MedKitListViewModelTest {
 
     private val medKits = FakeMedKits(medKit(id = HOME_KIT, name = "Домашняя", location = "В ванной"))
 
-    private fun viewModel() = MedKitListViewModel(medKits, Today(clock, QuietClock))
+    private fun viewModel(
+        freshening: com.kert0n.medapp.feature.operation.Freshening =
+            com.kert0n.medapp.fixture.offlineFreshening(com.kert0n.medapp.fixture.FakePackages(), clock)
+    ) = MedKitListViewModel(freshening, medKits, Today(clock, QuietClock))
 
     /**
      * Пока база не ответила, экран ждёт, а не говорит «пусто».
@@ -55,5 +58,25 @@ class MedKitListViewModelTest {
         assertEquals("Домашняя", shelf.name)
         assertEquals("В ванной", shelf.location)
         assertEquals(MedKitContents(packages = 12, expired = 2), shelf.contents)
+    }
+
+    /**
+     * При связи список полок перечитывается, и пока сервер не ответил, экран ждёт: человек не должен
+     * выбрать полку, из которой его вывели (PLAN E4). Спрошен только список, а не содержимое.
+     */
+    @Test
+    fun theListWaitsForTheServerBeforeOfferingShelves() {
+        val server = com.kert0n.medapp.fixture.RereadingServer(clock)
+        server.hold()
+        val model = viewModel(com.kert0n.medapp.fixture.onlineFreshening(server, com.kert0n.medapp.fixture.FakePackages(), clock))
+
+        watching(model.state) { state ->
+            kotlinx.coroutines.withTimeout(5_000) { while (server.asked.isEmpty()) kotlinx.coroutines.delay(10) }
+            assertEquals(ScreenState.Loading, state.value)
+            server.release()
+            state.awaiting { it is ScreenState.Ready }
+        }
+
+        assertEquals(listOf("/v1/med-kits"), server.asked)
     }
 }

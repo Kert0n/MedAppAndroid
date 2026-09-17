@@ -31,6 +31,7 @@ class MedKitListScreenTest {
     private var opened: Uuid? = null
     private var added = 0
     private var searched = 0
+    private var joinOffered = 0
 
     private fun shelf(
         id: Uuid = HOME_KIT,
@@ -50,6 +51,7 @@ class MedKitListScreenTest {
                     state = state,
                     onOpen = { opened = it },
                     onAdd = { added++ },
+                    onJoin = { joinOffered++ },
                     onSearch = { searched++ }
                 )
             }
@@ -127,5 +129,21 @@ class MedKitListScreenTest {
         compose.onNodeWithText("Найти лекарство во всех аптечках").performClick()
 
         assertEquals(1, searched)
+    }
+
+    /**
+     * «Присоединиться» стоит и при пустом списке: человека позвали в чужую аптечку, своей у него
+     * нет, и заводить её ему незачем.
+     *
+     * Красная проверка: спрятать вход за непустым списком — позванному некуда нажать, и он заводит
+     * лишнюю аптечку, чтобы добраться до чужой.
+     */
+    @Test
+    fun joiningIsOfferedEvenWithNoShelvesOfOnesOwn() {
+        show(ScreenState.Ready(emptyList()))
+
+        compose.onNodeWithContentDescription("Присоединиться к аптечке").performClick()
+
+        assertEquals(1, joinOffered)
     }
 }

@@ -9,6 +9,7 @@ import androidx.compose.foundation.layout.defaultMinSize
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.selection.selectable
@@ -32,6 +33,7 @@ import com.kert0n.medapp.presentation.pack.PackageTransferRefusal
 import com.kert0n.medapp.presentation.pack.PackageTransferUiState
 import com.kert0n.medapp.ui.EmptyState
 import com.kert0n.medapp.ui.LoadingState
+import com.kert0n.medapp.ui.theme.LocalAccents
 import kotlin.uuid.Uuid
 
 /**
@@ -71,6 +73,27 @@ fun PackageTransferScreen(
             state.isGone -> EmptyState(text = stringResource(R.string.pack_gone), modifier = Modifier.padding(padding))
             state.places.isEmpty() -> EmptyState(text = stringResource(R.string.transfer_nowhere), modifier = Modifier.padding(padding))
             else -> Column(Modifier.padding(padding).fillMaxSize(), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                // Перенос может лишить другого участника доступа: сервер сохранит его бронь,
+                // только если он видит целевую полку (PLAN E6). Кто её видит, знает он, а не мы,
+                // поэтому предупреждение общее — и стоит **до** выбора, а не после переноса.
+                if (state.hasClaimsOfOthers) {
+                    Row(
+                        modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 8.dp),
+                        horizontalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
+                        Icon(
+                            painterResource(R.drawable.ic_warning),
+                            contentDescription = null,
+                            tint = LocalAccents.current.pending,
+                            modifier = Modifier.size(18.dp)
+                        )
+                        Text(
+                            stringResource(R.string.transfer_claims_of_others),
+                            style = MaterialTheme.typography.bodyMedium,
+                            color = LocalAccents.current.pending
+                        )
+                    }
+                }
                 LazyColumn(
                     modifier = Modifier.weight(1f),
                     contentPadding = PaddingValues(horizontal = 16.dp, vertical = 8.dp)

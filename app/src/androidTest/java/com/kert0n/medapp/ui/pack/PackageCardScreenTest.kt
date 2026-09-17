@@ -1,8 +1,10 @@
 package com.kert0n.medapp.ui.pack
 
 import androidx.compose.ui.test.assertIsDisplayed
+import androidx.compose.ui.test.getUnclippedBoundsInRoot
 import androidx.compose.ui.test.junit4.v2.createComposeRule
 import androidx.compose.ui.test.onNodeWithContentDescription
+import androidx.compose.ui.test.onAllNodesWithText
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performScrollTo
@@ -23,6 +25,7 @@ import com.kert0n.medapp.ui.theme.MedAppTheme
 import java.math.BigDecimal
 import java.time.LocalDate
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertTrue
 import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
@@ -50,9 +53,13 @@ class PackageCardScreenTest {
     private fun box(
         expiresOn: String? = null,
         manufacturer: String? = null,
+        description: String? = null,
         hasUnconfirmedChanges: Boolean = false
     ): PackagePresentationDTO =
-        pack(id = PACK, name = "Нурофен", expiresOn = expiresOn?.let(::expiry), manufacturer = manufacturer)
+        pack(
+            id = PACK, name = "Нурофен", expiresOn = expiresOn?.let(::expiry),
+            manufacturer = manufacturer, description = description
+        )
             .projected(hasUnconfirmedChanges = hasUnconfirmedChanges)
             .toPresentationDTO()
 
@@ -95,6 +102,20 @@ class PackageCardScreenTest {
         show(PackageCardUiState())
         compose.onNodeWithContentDescription("Загрузка").assertIsDisplayed()
         compose.onNodeWithText("Этой упаковки больше нет.").assertDoesNotExist()
+    }
+
+    /**
+     * Коробка в базе есть, но сервер ещё отвечает: карточка ждёт, и ни одно действие не нажать —
+     * иначе приняли бы или выбросили по числу, которое через миг сменится (PLAN E4).
+     */
+    @Test
+    fun whileTheServerAnswersTheCardWaitsWithNothingToPress() {
+        show(card().copy(isFreshening = true))
+
+        compose.onNodeWithContentDescription("Загрузка").assertIsDisplayed()
+        compose.onNodeWithText("Сколько есть").assertDoesNotExist()
+        compose.onNodeWithContentDescription("Выбросить").assertDoesNotExist()
+        compose.onNodeWithText("Принять").assertDoesNotExist()
     }
 
     @Test
@@ -153,9 +174,11 @@ class PackageCardScreenTest {
     fun whatIsFilledInIsShown() {
         show(card(pack = box(manufacturer = "Reckitt", expiresOn = "2027-03-31")))
 
-        compose.onNodeWithText("Что это").assertIsDisplayed()
-        compose.onNodeWithText("Reckitt").assertIsDisplayed()
+        // «Что это» теперь последнее: на узком экране до него долистывают, и это нормально —
+        // справочное не должно занимать первый экран (решение владельца 2026-09-17).
         compose.onNodeWithText("Годен до 03.2027").performScrollTo().assertIsDisplayed()
+        compose.onNodeWithText("Что это").performScrollTo().assertIsDisplayed()
+        compose.onNodeWithText("Reckitt").performScrollTo().assertIsDisplayed()
     }
 
     /** Цена со знакомой валютой — знаком, с незнакомым кодом — самим кодом, а не падением. */
@@ -249,5 +272,43 @@ class PackageCardScreenTest {
         compose.onNodeWithContentDescription("Принять").performClick()
 
         assertEquals(1, taken)
+    }
+
+    /**
+     * Первым — сколько есть, потом срок, потом место, и лишь затем что это за лекарство. Описание
+     * из справочника занимает целый экран: стоя вторым, оно отодвигало срок и место за край, и
+     * человек листал инструкцию, чтобы узнать, куда идти (замечание владельца 2026-09-17).
+     */
+    @Test
+    fun theUrgentComesBeforeTheReference() {
+        show(card(box(manufacturer = "Реккитт")))
+
+        val howMuch = compose.onNodeWithText("Сколько есть").getUnclippedBoundsInRoot()
+        val dates = compose.onNodeWithText("Сроки и цена").getUnclippedBoundsInRoot()
+        val where = compose.onNodeWithText("Где лежит").getUnclippedBoundsInRoot()
+        val what = compose.onNodeWithText("Что это").getUnclippedBoundsInRoot()
+
+        assertTrue("сроки идут после остатка", dates.top > howMuch.top)
+        assertTrue("место идёт после сроков", where.top > dates.top)
+        assertTrue("описание идёт последним", what.top > where.top)
+    }
+
+
+    /**
+     * Отказ сервера о числе виден там, где о числе и говорят, и ведёт туда, чем он лечится:
+     * спор в том, сколько в коробке на самом деле (PLAN E3, REQ-045). Пересчёт начинается с
+     * того числа, которое принёс снимок, — экран не придумывает своего.
+     *
+     * Красная проверка: промолчать об отказе — человек видит серверное число и не понимает, куда
+     * делась его правка.
+     */
+    @Test
+    fun aServerRefusalAboutTheNumberLeadsToRecounting() {
+        show(card().copy(isRefusedByServer = true))
+
+        compose.onNodeWithText("Сервер отклонил изменение").assertIsDisplayed()
+        compose.onNodeWithText("Пересчитайте коробку — спор о том, сколько в ней на самом деле").performClick()
+
+        assertEquals(1, recounted)
     }
 }

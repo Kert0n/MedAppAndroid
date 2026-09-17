@@ -31,6 +31,7 @@ import com.kert0n.medapp.storage.value.toStorageEntity
 import com.kert0n.medapp.ui.theme.MedAppTheme
 import dagger.hilt.android.testing.HiltAndroidRule
 import dagger.hilt.android.testing.HiltAndroidTest
+import java.time.ZoneId
 import java.time.Instant
 import java.time.LocalDate
 import java.time.LocalTime
@@ -69,6 +70,13 @@ class EntryPopupsTest {
     private val expiryTitle = "Сегодня истекает срок годности"
     private val missedTitle = "Без ответа за прошлые дни"
 
+    /**
+     * Зона у завязки и у приложения **одна**: приложение живёт на часах устройства, и день оно
+     * считает по ним. Разойдись они — коробка со сроком «сегодня» досталась бы приложению
+     * вчерашней (замечание разбора #54).
+     */
+    private val zone: ZoneId = ZoneId.systemDefault()
+
     @Before
     fun setUp() {
         allowNotifications()
@@ -81,11 +89,11 @@ class EntryPopupsTest {
             database.medKits().insertIfMissing(medKit(id = HOME_KIT).toMedKitStorageEntity())
             val packages = database.packageRepository()
             // Нурофен — источник лечения и истекает сегодня; Цетрин — просто истекает сегодня.
-            packages.add(pack(id = PACK, name = "Нурофен", quantity = tablets("20"), form = TABLET_FORM, expiresOn = ExpiryDate(LocalDate.now(MOSCOW))))
-            packages.add(pack(id = OTHER_PACK, name = "Цетрин", quantity = tablets("10"), form = TABLET_FORM, expiresOn = ExpiryDate(LocalDate.now(MOSCOW))))
+            packages.add(pack(id = PACK, name = "Нурофен", quantity = tablets("20"), form = TABLET_FORM, expiresOn = ExpiryDate(LocalDate.now(zone))))
+            packages.add(pack(id = OTHER_PACK, name = "Цетрин", quantity = tablets("10"), form = TABLET_FORM, expiresOn = ExpiryDate(LocalDate.now(zone))))
             startedYesterdayMorning()
             // Сегодняшний проход дня: вчерашнее стало пропуском, срок годности сверен.
-            Scenarios(database, Instant.now()).dailyRound.run()
+            Scenarios(database, Instant.now(), ZoneId.systemDefault()).dailyRound.run()
         }
         compose.setContent { MedAppTheme { MedAppShell() } }
     }
@@ -93,7 +101,7 @@ class EntryPopupsTest {
     private lateinit var courseId: kotlin.uuid.Uuid
 
     private suspend fun startedYesterdayMorning() {
-        val yesterday = LocalDate.now(MOSCOW).minusDays(1)
+        val yesterday = LocalDate.now(zone).minusDays(1)
         val started = Scenarios(database, yesterday.atTime(LocalTime.of(6, 0)).atZone(MOSCOW).toInstant())
         val created = started.courseDrafting.create("Амоксиклав")
         val saved = started.courseDrafting.edit(

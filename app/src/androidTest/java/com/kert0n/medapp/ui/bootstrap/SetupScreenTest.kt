@@ -3,7 +3,9 @@ package com.kert0n.medapp.ui.bootstrap
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.junit4.v2.createComposeRule
 import androidx.compose.ui.test.onNodeWithContentDescription
+import androidx.compose.ui.test.onAllNodesWithText
 import androidx.compose.ui.test.onNodeWithText
+import androidx.compose.ui.test.performScrollTo
 import androidx.compose.ui.test.performClick
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import com.kert0n.medapp.domain.Unavailability
@@ -24,10 +26,13 @@ class SetupScreenTest {
     @get:Rule
     val compose = createComposeRule()
 
+    private var startedOver = 0
+
     private fun show(state: AppStartState, onRetry: () -> Unit = {}) {
-        compose.setContent { MedAppTheme { SetupScreen(state, onRetry) } }
+        compose.setContent { MedAppTheme { SetupScreen(state, onRetry, onStartOver = { startedOver++ }) } }
     }
 
+    /** Пока проверка идёт, повторить нечего: второе нажатие начало бы вторую проверку поверх первой. */
     @Test
     fun whileCheckingThereIsNothingToPress() {
         show(AppStartState.Checking)
@@ -36,6 +41,7 @@ class SetupScreenTest {
         compose.onNodeWithText("Повторить").assertDoesNotExist()
     }
 
+    /** Отказ называет причину и даёт повторить: без этого первый запуск без связи — тупик без слов. */
     @Test
     fun aFailedSetupSaysWhyAndOffersRetry() {
         var retried = 0
@@ -59,5 +65,35 @@ class SetupScreenTest {
 
         compose.onNodeWithText("Ключ этого устройства", substring = true).assertIsDisplayed()
         compose.onNodeWithText("Повторить").assertDoesNotExist()
+    }
+
+    /** Что останется и что пропадёт — перечислено до кнопки (PLAN G2): решение принимают, зная цену. */
+    @Test
+    fun aLostKeyListsWhatStaysAndWhatGoes() {
+        show(AppStartState.KeyLost)
+
+        compose.onNodeWithText("Местные аптечки и коробки").assertIsDisplayed()
+        compose.onNodeWithText("Общие аптечки — подключить заново по приглашению").assertIsDisplayed()
+        compose.onNodeWithText("Начать с новой учётной записью").performScrollTo().assertIsDisplayed()
+    }
+
+    /**
+     * Сценарий зовётся **только после** подтверждения (PLAN H3, список опасных действий): кнопка
+     * открывает вопрос, а не заводит учётку; «Отмена» не зовёт ничего.
+     */
+    @Test
+    fun startingOverAsksBeforeCallingTheScenario() {
+        show(AppStartState.KeyLost)
+
+        compose.onNodeWithText("Начать с новой учётной записью").performScrollTo().performClick()
+        assertEquals(0, startedOver)
+        compose.onNodeWithText("Начать заново?").assertIsDisplayed()
+        compose.onNodeWithText("Отмена").performClick()
+        assertEquals(0, startedOver)
+
+        compose.onNodeWithText("Начать с новой учётной записью").performClick()
+        compose.onAllNodesWithText("Начать с новой учётной записью")[1].performClick()
+
+        assertEquals(1, startedOver)
     }
 }

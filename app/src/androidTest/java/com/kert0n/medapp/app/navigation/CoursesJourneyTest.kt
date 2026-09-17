@@ -29,6 +29,7 @@ import com.kert0n.medapp.fixture.pack
 import com.kert0n.medapp.fixture.packageRepository
 import com.kert0n.medapp.fixture.tablets
 import com.kert0n.medapp.storage.database.MedAppDatabase
+import java.time.ZoneId
 import java.time.Instant
 import java.time.LocalDate
 import com.kert0n.medapp.storage.medkit.toStorageEntity as toMedKitStorageEntity
@@ -68,6 +69,13 @@ class CoursesJourneyTest {
      * проверки, и секунды по умолчанию не хватает — прогон краснел не о коде, а о занятости машины.
      */
     private val WAIT = 5_000L
+
+    /**
+     * Зона у завязки и у приложения **одна**: приложение живёт на часах устройства, и день оно
+     * считает по ним. Разойдись они — коробка со сроком «сегодня» досталась бы приложению
+     * вчерашней (замечание разбора #54).
+     */
+    private val zone: ZoneId = ZoneId.systemDefault()
 
     @Before
     fun setUp() {
@@ -134,7 +142,7 @@ class CoursesJourneyTest {
 
         // Стек пуст, и подключать пока нечего: доза и форма ещё не названы, сверять коробку не с чем.
         compose.onNodeWithText("Пачек пока нет — подключите первую.").assertIsDisplayed()
-        compose.onNodeWithText("Подключить ещё").performClick()
+        compose.onNodeWithText("Подключить ещё коробку").performClick()
         // Коробка на полке есть, но подключать её не к чему: доза и форма лечения не названы.
         // На 360×640 dp причина лежит второй строкой ниже сгиба — до неё долистывают.
         compose.onNodeWithText("Сначала укажите дозу и форму лечения.")
@@ -150,7 +158,7 @@ class CoursesJourneyTest {
      */
     @Test
     fun aCourseWithoutABoxStartsAndSaysItIsNotCovered() {
-        val scenarios = Scenarios(database, Instant.now())
+        val scenarios = Scenarios(database, Instant.now(), ZoneId.systemDefault())
         runBlocking {
             val created = scenarios.courseDrafting.create("Нурофен")
             // Завязка отвечает за себя: не записалась — падаем здесь, а не ожиданием на экране.
@@ -159,7 +167,7 @@ class CoursesJourneyTest {
                 listOf(
                     CourseDrafting.Edit.SetDose(dose("2")),
                     CourseDrafting.Edit.SetForm(TABLET_FORM),
-                    CourseDrafting.Edit.SetSchedule(schedule(start = LocalDate.now(MOSCOW))),
+                    CourseDrafting.Edit.SetSchedule(schedule(start = LocalDate.now(zone))),
                     CourseDrafting.Edit.SetTotalDoses(Doses(4))
                 )
             )
@@ -210,7 +218,7 @@ class CoursesJourneyTest {
         compose.onNodeWithText("Источники лечения").performScrollTo().performClick()
 
         // Источники открылись — значит, черновик записан.
-        compose.waitUntil(WAIT) { compose.onAllNodesWithText("Подключить ещё").fetchSemanticsNodes().isNotEmpty() }
+        compose.waitUntil(WAIT) { compose.onAllNodesWithText("Подключить ещё коробку").fetchSemanticsNodes().isNotEmpty() }
         compose.onNodeWithContentDescription("Назад").performClick()
 
         compose.onNodeWithText("Отмена").performClick()

@@ -143,16 +143,23 @@ fun MedAppDatabase.queueService() = com.kert0n.medapp.queue.QueueService(transac
 /**
  * Сценарии над одной базой с остановленными часами [now]: удаление и перенос коробки, уборка
  * полки. Собираются вместе, потому что аптечка зовёт шаги коробки, и граф один.
+ *
+ * **[zone] — зона тех часов, на которых в этой проверке крутится приложение**, и по умолчанию она
+ * `UTC`, потому что проверка обычно даёт приложению свои часы в `UTC`. Завязка и приложение обязаны
+ * считать дни одинаково: разойдись они — «сегодня» у них окажется разным, и завязка, поставленная
+ * на сегодня, приложению достанется вчерашней. Проверка на **настоящих** часах устройства
+ * (`Instant.now()` и граф Hilt) называет `ZoneId.systemDefault()`.
  */
 class Scenarios(
     database: MedAppDatabase,
     val now: java.time.Instant,
+    val zone: java.time.ZoneId = java.time.ZoneOffset.UTC,
     val notifier: FakeNotifier = FakeNotifier(),
     val reminders: FakeReminders = FakeReminders(),
     val notificationSettings: FakeSettings = FakeSettings(),
     val freshness: FakeFreshness = FakeFreshness()
 ) {
-    private val clock = java.time.Clock.fixed(now, java.time.ZoneOffset.UTC)
+    private val clock = java.time.Clock.fixed(now, zone)
     val transactions = database.transactions()
     val reminderStore = com.kert0n.medapp.storage.notification.ReminderRoomRepository(database, database.reminders())
     val reminderWithdrawal = com.kert0n.medapp.feature.notification.ReminderWithdrawal(reminderStore, transactions)
