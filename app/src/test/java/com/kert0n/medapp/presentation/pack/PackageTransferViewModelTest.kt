@@ -2,6 +2,7 @@ package com.kert0n.medapp.presentation.pack
 
 import com.kert0n.medapp.domain.medkit.MedKit
 import com.kert0n.medapp.domain.medkit.MedKitStatus
+import com.kert0n.medapp.domain.pack.Claims
 import com.kert0n.medapp.domain.pack.Package
 import com.kert0n.medapp.feature.packages.PackageRelocation
 import com.kert0n.medapp.feature.time.Today
@@ -23,6 +24,7 @@ import com.kert0n.medapp.fixture.tablets
 import com.kert0n.medapp.fixture.watching
 import com.kert0n.medapp.queue.QueueService
 import com.kert0n.medapp.queue.Transactions
+import java.math.BigDecimal
 import java.time.Clock
 import java.time.Instant
 import java.time.ZoneId
@@ -79,6 +81,32 @@ class PackageTransferViewModelTest {
 
         assertEquals(listOf(SHARED_KIT), state.places.map { it.id })
         assertTrue(state.places.single().isShared)
+    }
+
+    /**
+     * Чужая бронь переживёт перенос, только если её хозяин видит целевую полку (PLAN E6), а видит
+     * ли — знает сервер. Поэтому экран предупреждает, как только на коробку заявил кто-то ещё.
+     *
+     * Красная проверка: считать бронь по `claims.total` — человек с единственной своей бронью
+     * получил бы пугало на пустом месте и перестал бы верить предупреждению.
+     */
+    @Test
+    fun aBoxOthersClaimIsMarkedAsSuch() {
+        val model = viewModel(lying = pack(claims = Claims(total = BigDecimal("8"), mine = BigDecimal("3"))))
+
+        val state = watching(model.state) { state -> state.awaiting { it.isLoaded } }
+
+        assertTrue(state.hasClaimsOfOthers)
+    }
+
+    /** Заявил только я — предупреждать не о чем. */
+    @Test
+    fun myOwnClaimIsNotSomeoneElses() {
+        val model = viewModel(lying = pack(claims = Claims(total = BigDecimal("3"), mine = BigDecimal("3"))))
+
+        val state = watching(model.state) { state -> state.awaiting { it.isLoaded } }
+
+        assertFalse(state.hasClaimsOfOthers)
     }
 
     /** Ничего не выбрано — ничего не записано: перенос «куда-нибудь» не бывает. */

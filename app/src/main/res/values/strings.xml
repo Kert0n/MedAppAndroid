@@ -295,6 +295,7 @@
     <!-- Перенос упаковки -->
     <string name="transfer_title">Куда перенести</string>
     <string name="transfer_shared">Общая аптечка</string>
+    <string name="transfer_claims_of_others">На эту коробку заявили и другие. Кто не видит выбранную аптечку — потеряет свою бронь.</string>
     <string name="transfer_nowhere">Переносить некуда: другой аптечки пока нет. Заведите вторую — и коробку будет куда положить.</string>
     <string name="transfer_busy">Упаковка ждёт ответа сервера на другое решение — перенести её пока нельзя.</string>
     <string name="transfer_origin_busy">Аптечка, из которой несут, ждёт ответа сервера на своё решение.</string>

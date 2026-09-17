@@ -58,6 +58,10 @@ class PackageTransferViewModel @AssistedInject constructor(
         PackageTransferUiState(
             places = kits.filter { it.id != pack?.medKit?.id }.map { it.toPresentationDTO() },
             chosen = chosen,
+            // Перенос может лишить другого участника доступа: сервер сохранит его бронь, только
+            // если он видит целевую полку, а видит ли — знает он, а не мы (PLAN E6). Поэтому
+            // предупреждение общее и стоит **до** подтверждения, а не после.
+            hasClaimsOfOthers = pack?.availability?.reservedByOthers?.isZero == false,
             isGone = pack == null,
             refusal = progress.refusal,
             isDone = progress.done,
@@ -129,6 +133,8 @@ enum class PackageTransferRefusal {
 data class PackageTransferUiState(
     val places: List<MedKitPresentationDTO> = emptyList(),
     val chosen: Uuid? = null,
+    /** На коробку заявили другие: перенос может отнять у них бронь (PLAN E6). */
+    val hasClaimsOfOthers: Boolean = false,
     val isGone: Boolean = false,
     val refusal: PackageTransferRefusal? = null,
     val isDone: Boolean = false,

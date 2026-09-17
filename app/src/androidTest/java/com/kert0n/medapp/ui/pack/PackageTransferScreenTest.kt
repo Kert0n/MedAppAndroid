@@ -116,6 +116,26 @@ class PackageTransferScreenTest {
         compose.onNodeWithText("Выбранная аптечка ждёт ответа сервера — класть в неё пока рано.").assertIsDisplayed()
     }
 
+    /**
+     * Чужая бронь переживёт перенос, только если её хозяин видит целевую полку, а видит ли —
+     * знает сервер, не мы (PLAN E6). Поэтому предупреждаем до выбора, а не после переноса.
+     */
+    @Test
+    fun aBoxOthersClaimWarnsBeforeTheChoice() {
+        show(transfer().copy(hasClaimsOfOthers = true))
+
+        compose.onNodeWithText("На эту коробку заявили и другие. Кто не видит выбранную аптечку — потеряет свою бронь.")
+            .assertIsDisplayed()
+    }
+
+    /** Ничьей брони нет — и пугать нечем. */
+    @Test
+    fun withoutClaimsOfOthersNothingIsSaid() {
+        show(transfer())
+
+        compose.onNodeWithText("заявили и другие", substring = true).assertDoesNotExist()
+    }
+
     @Test
     fun aGoneBoxIsSaidOutLoud() {
         show(PackageTransferUiState(isGone = true, isLoaded = true))
