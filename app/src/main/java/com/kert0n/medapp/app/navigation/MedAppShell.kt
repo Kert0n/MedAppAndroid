@@ -69,6 +69,7 @@ import com.kert0n.medapp.presentation.medkit.MedKitListViewModel
 import com.kert0n.medapp.presentation.pack.MedKitContentsViewModel
 import com.kert0n.medapp.presentation.operation.SyncStatusViewModel
 import com.kert0n.medapp.presentation.operation.OptionsViewModel
+import com.kert0n.medapp.presentation.report.ReportsViewModel
 import com.kert0n.medapp.presentation.settings.LanguageViewModel
 import com.kert0n.medapp.presentation.settings.PermissionsViewModel
 import com.kert0n.medapp.presentation.settings.SettingsUiState
@@ -82,7 +83,6 @@ import com.kert0n.medapp.presentation.pack.PackageRecountViewModel
 import com.kert0n.medapp.presentation.pack.PackageTransferViewModel
 import com.kert0n.medapp.presentation.scan.ScannerCamera
 import com.kert0n.medapp.presentation.scan.ScannerViewModel
-import com.kert0n.medapp.ui.EmptyState
 import com.kert0n.medapp.ui.medkit.MedKitContentsScreen
 import com.kert0n.medapp.ui.medkit.MedKitFormScreen
 import com.kert0n.medapp.ui.medkit.MedKitJoiningScreen
@@ -93,6 +93,7 @@ import com.kert0n.medapp.ui.pack.PackageFormScreen
 import com.kert0n.medapp.ui.pack.PackageRecountScreen
 import com.kert0n.medapp.ui.pack.PackageTransferScreen
 import com.kert0n.medapp.ui.operation.OptionsScreen
+import com.kert0n.medapp.ui.report.ReportsScreen
 import com.kert0n.medapp.ui.operation.SyncStatusScreen
 import com.kert0n.medapp.ui.scan.ScannerScreen
 
@@ -692,8 +693,9 @@ private fun screens(
             onOpenSettings = context::openAppSettings
         )
     }
-    for (place in Place.entries - Place.MED_KITS - Place.PLAN - Place.OPTIONS - Place.SCANNER) {
-        entry(place.key) { NotReadyYet() }
+    entry(Screen.Reports) {
+        val model: ReportsViewModel = hiltViewModel()
+        ReportsScreen(state = model.state.collectAsStateWithLifecycle().value)
     }
 }
 
@@ -734,8 +736,3 @@ private fun Places(stacks: TabStacks) {
     }
 }
 
-/** Заглушка места — с подложкой, как у настоящего экрана: сквозь неё не просвечивает соседнее. */
-@Composable
-private fun NotReadyYet() = Scaffold { padding ->
-    EmptyState(text = stringResource(R.string.screen_not_ready), modifier = Modifier.padding(padding))
-}

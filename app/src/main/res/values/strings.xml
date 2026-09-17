@@ -384,7 +384,6 @@
     </plurals>
 
     <!-- Экраны, которых ещё нет -->
-    <string name="screen_not_ready">Этот экран ещё не готов.</string>
     <!-- Уведомления: каналы -->
     <string name="channel_intakes">Приёмы</string>
     <string name="channel_expiry">Сроки годности</string>
@@ -672,4 +671,17 @@
     <string name="med_kit_joining_scan">Отсканировать код</string>
     <string name="med_kit_joining_aim">Наведите на QR приглашения</string>
     <string name="med_kit_joining_camera_denied">Камера запрещена. Введите код руками или разрешите камеру в настройках приложения.</string>
+    <!-- Отчёты (PLAN H3 «Набор аналитики») -->
+    <string name="reports_title">Отчёты</string>
+    <string name="reports_stock_empty">Упаковок пока нет</string>
+    <string name="reports_by_category">По категориям</string>
+    <string name="reports_by_form">По формам</string>
+    <string name="reports_not_specified">Не указано</string>
+    <string name="reports_total_price">Общая цена</string>
+    <plurals name="reports_unpriced">
+        <item quantity="one">У %d упаковки цена не указана</item>
+        <item quantity="few">У %d упаковок цена не указана</item>
+        <item quantity="many">У %d упаковок цена не указана</item>
+        <item quantity="other">У %d упаковок цена не указана</item>
+    </plurals>
 </resources>
