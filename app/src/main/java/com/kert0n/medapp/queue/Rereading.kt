@@ -2,79 +2,63 @@ package com.kert0n.medapp.queue
 
 import com.kert0n.medapp.domain.Unavailability
 import com.kert0n.medapp.network.account.asUnavailability
-import com.kert0n.medapp.network.pack.PackageSnapshot
 import com.kert0n.medapp.network.server.ApiFailure
 import com.kert0n.medapp.network.server.ApiResult
 import com.kert0n.medapp.network.server.MedAppApi
-import com.kert0n.medapp.network.value.VocabularyResolver
 import java.time.Clock
 import javax.inject.Inject
 import javax.inject.Singleton
 import kotlin.uuid.Uuid
 
 /**
- * Человек открыл вещь — вещь перечитывается (PLAN E4, решение владельца 2026-09-17). Заход
- * (`Synchronization`) отвечает на «что вообще изменилось» и спрашивает всё сразу; а тот, кто
- * смотрит на одну полку или одну коробку, неправильное число увидит **здесь**, и ради него не
- * нужно спрашивать про весь остальной дом: полка отвечает своим `GET /v1/med-kits/{id}`, коробка —
- * своим `GET /v1/drugs/{id}`.
+ * Человек открыл вещь, по которой решает, — вещь перечитывается (PLAN E4, решения владельца
+ * 2026-09-17). Заход (`Synchronization`) отвечает на «что вообще изменилось» и спрашивает всё
+ * сразу; а тот, кто смотрит на одну коробку, неправильное число увидит **здесь**, и ради него не
+ * нужно спрашивать про весь дом: коробка отвечает своим `GET /v1/drugs/{id}`.
+ *
+ * Содержимое полки перечитывание не трогает — его обновляет заход. Со списка полок читается только
+ * **сам список** (`GET /v1/med-kits`): в каких полках мы ещё есть и сколько в них людей, — чтобы
+ * человек не решал ничего о полке, из которой его вывели.
  *
  * Ложится ответ тем же путём, что снимок: разбор `PackageSnapshotResolver`, укладка
  * `SnapshotStorage.lay` — по версиям, не трогая коробку с запросом в полёте и не возвращая
- * убранное (E1, C0). Следование курса за коробкой достаётся ему оттуда же.
- *
- * **Утверждает оно только о том, о чём спрашивало.** Полка называет своё содержимое целиком, и
- * коробка, которой в ней не оказалось, у нас кончается; про чужие полки и их коробки перечитывание
- * не говорит ничего. Сказать «всего остального у нас больше нет» вправе один полный снимок (C0).
- *
- * Очередь не трогается вовсе: неотправленное уезжает своим порядком, и чужой ответ его не
- * отменяет.
+ * убранное (E1, C0). Очередь не трогается: неотправленное уезжает своим порядком и ложится поверх
+ * прочитанного.
  */
 @Singleton
 class Rereading @Inject constructor(
     private val api: MedAppApi,
     private val storage: SnapshotStorage,
     private val snapshots: PackageSnapshotResolver,
-    private val vocabulary: VocabularyResolver,
     private val clock: Clock
 ) {
 
-    /** Полка и всё, что на ней лежит. 404 — полки у нас больше нет: её убрали или нас вывели. */
-    suspend fun medKit(medKitId: Uuid): Outcome {
+    /**
+     * Список полок. Полка, которую сервер знал, а список не назвал, у нас кончается вместе с
+     * содержимым: её убрали у всех или нас вывели. Полку, которой у нас нет, список не приносит —
+     * без содержимого она была бы половиной полки; её приносит заход.
+     */
+    suspend fun medKits(): Outcome {
         val at = clock.instant()
         // Спрашивается до сети, как и у снимка: что человек сделает, пока ответ летит, ответ не знает.
         val knew = storage.serverKnows()
-        val ours = storage.packagesKnownOn(medKitId)
-        val read = when (val answer = api.medKit(medKitId)) {
+        val read = when (val answer = api.medKits()) {
             is ApiResult.Success -> answer.value
-            is ApiResult.Failure -> return when (answer.failure) {
-                ApiFailure.NotFound -> {
-                    storage.lay(gone(medKits = setOf(medKitId), packages = emptySet(), knew = knew), at)
-                    Outcome.Gone
-                }
-                else -> Outcome.Refused(answer.failure.asUnavailability())
-            }
+            is ApiResult.Failure -> return Outcome.Refused(answer.failure.asUnavailability())
         }
-        val words = vocabulary.session()
-        val resolved = ArrayList<PackageSnapshot>()
-        for (dto in read.packages) {
-            val resolution = snapshots.resolve(dto, at, words = words)
-            if (resolution is PackageSnapshotResolver.Resolution.Resolved) resolved += resolution.snapshot
-        }
+        val named = read.mapTo(HashSet()) { it.id }
         storage.lay(
             ServerSnapshot(
-                participants = mapOf(read.id to read.participantCount),
-                packages = resolved,
-                goneMedKits = emptySet(),
-                // Полка назвала своё содержимое целиком: чего в нём нет, того на ней больше нет.
-                // Коробка, которую не удалось разрешить, сервером названа и не пропала.
-                gonePackages = ours - read.packages.mapTo(HashSet()) { it.pack.id },
+                participants = read.filter { it.id in knew.heldMedKits }.associate { it.id to it.participantCount },
+                packages = emptyList(),
+                goneMedKits = knew.medKits - named,
+                gonePackages = emptySet(),
                 arrivedMedKits = emptySet(),
                 heldPackages = knew.heldPackages
             ),
             at
         )
-        return Outcome.Read(packages = resolved.mapTo(HashSet()) { it.pack.id })
+        return Outcome.Read
     }
 
     /** Одна коробка. 404 — её больше нет: выбросили, кончилась или унесли туда, где нас нет. */
@@ -85,17 +69,26 @@ class Rereading @Inject constructor(
             is ApiResult.Success -> answer.value
             is ApiResult.Failure -> return when (answer.failure) {
                 ApiFailure.NotFound -> {
-                    storage.lay(gone(medKits = emptySet(), packages = setOf(packageId), knew = knew), at)
+                    storage.lay(
+                        ServerSnapshot(
+                            participants = emptyMap(),
+                            packages = emptyList(),
+                            goneMedKits = emptySet(),
+                            gonePackages = setOf(packageId),
+                            arrivedMedKits = emptySet(),
+                            heldPackages = knew.heldPackages
+                        ),
+                        at
+                    )
                     Outcome.Gone
                 }
                 else -> Outcome.Refused(answer.failure.asUnavailability())
             }
         }
-        val resolution = snapshots.resolve(read, at)
         // Коробка на полке, которой у нас нет, — это не «пропала»: её переставили туда, где нас
         // нет, и отвечает за это полный снимок со своим утверждением о целом (E6).
-        val snapshot = (resolution as? PackageSnapshotResolver.Resolution.Resolved)?.snapshot
-            ?: return Outcome.Read(packages = emptySet())
+        val snapshot = (snapshots.resolve(read, at) as? PackageSnapshotResolver.Resolution.Resolved)?.snapshot
+            ?: return Outcome.Read
         storage.lay(
             ServerSnapshot(
                 participants = emptyMap(),
@@ -107,17 +100,8 @@ class Rereading @Inject constructor(
             ),
             at
         )
-        return Outcome.Read(packages = setOf(snapshot.pack.id))
+        return Outcome.Read
     }
-
-    private fun gone(medKits: Set<Uuid>, packages: Set<Uuid>, knew: ServerKnowledge) = ServerSnapshot(
-        participants = emptyMap(),
-        packages = emptyList(),
-        goneMedKits = medKits,
-        gonePackages = packages,
-        arrivedMedKits = emptySet(),
-        heldPackages = knew.heldPackages
-    )
 
     /**
      * Чем кончилось. Прочитали — свежее уже в базе, и экран увидит его сам; вещи больше нет —
@@ -126,12 +110,7 @@ class Rereading @Inject constructor(
      */
     sealed interface Outcome {
 
-        /**
-         * Прочитано, и [packages] — коробки, которые ответ назвал и которые легли: у полки — её
-         * содержимое, у коробки — она сама. Свежими после этого чтения стали они все (PLAN E4).
-         * Коробка, которую не удалось разрешить, сюда не входит: о ней ничего не легло.
-         */
-        data class Read(val packages: Set<Uuid>) : Outcome
+        data object Read : Outcome
 
         data object Gone : Outcome
 

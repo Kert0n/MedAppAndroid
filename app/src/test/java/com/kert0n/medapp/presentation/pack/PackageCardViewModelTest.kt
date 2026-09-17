@@ -83,7 +83,7 @@ class PackageCardViewModelTest {
     private fun viewModel(
         packages: PackageStorageRepository = stored,
         transactions: Transactions = DirectTransactions,
-        freshening: com.kert0n.medapp.feature.operation.Freshening = offlineFreshening(medKits, packages, clock)
+        freshening: com.kert0n.medapp.feature.operation.Freshening = offlineFreshening(packages, clock)
     ) = PackageCardViewModel(
         removal = PackageRemoval(packages, queue, transactions, clock),
         freshening = freshening,
@@ -126,7 +126,7 @@ class PackageCardViewModelTest {
         stored.lying(pack(id = PACK, medKit = medKit(id = SHARED_KIT, publication = MedKit.Publication.PUBLISHED, participantCount = 2).ref))
         val server = com.kert0n.medapp.fixture.RereadingServer(clock)
         server.hold()
-        val model = viewModel(freshening = com.kert0n.medapp.fixture.onlineFreshening(server, medKits, stored, clock))
+        val model = viewModel(freshening = com.kert0n.medapp.fixture.onlineFreshening(server, stored, clock))
 
         watching(model.state) { state ->
             state.awaiting { it.pack != null }

@@ -211,11 +211,11 @@ class HundredMedKitsTest {
         val today = Today(Clock.fixed(now, ZoneOffset.UTC), QuietClock)
         database.medKitRepository().observeAll(this@HundredMedKitsTest.today).first()
 
-        val contents = MedKitContentsViewModel(scenarios.medKitRemoval, com.kert0n.medapp.fixture.offlineFreshening(database.medKitRepository(), database.packageRepository()), database.packageRepository(), database.medKitRepository(), database.courseRepository(), today, medKitId = null)
+        val contents = MedKitContentsViewModel(scenarios.medKitRemoval, database.packageRepository(), database.medKitRepository(), database.courseRepository(), today, medKitId = null)
         val shown = timed("все лекарства на экране", Duration.ofMillis(600)) { contents.state.first { it.isLoaded } }
         assertEquals(1_000, shown.packages.size)
 
-        val card = PackageCardViewModel(scenarios.packageRemoval, com.kert0n.medapp.fixture.offlineFreshening(database.medKitRepository(), database.packageRepository()), database.packageRepository(), database.medKitRepository(), database.courseRepository(), database.queueRepository(), today, seed.packages.first())
+        val card = PackageCardViewModel(scenarios.packageRemoval, com.kert0n.medapp.fixture.offlineFreshening(database.packageRepository()), database.packageRepository(), database.medKitRepository(), database.courseRepository(), database.queueRepository(), today, seed.packages.first())
         val opened = timed("карточка коробки", Duration.ofMillis(300)) { card.state.first { !it.isLoading } }
         assertEquals("Полка 0", opened.medKitName)
     }

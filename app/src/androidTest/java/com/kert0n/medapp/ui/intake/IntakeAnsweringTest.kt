@@ -95,7 +95,7 @@ class IntakeAnsweringTest {
     private fun cardModel(
         intakeId: Uuid,
         freshening: com.kert0n.medapp.feature.operation.Freshening =
-            com.kert0n.medapp.fixture.offlineFreshening(com.kert0n.medapp.fixture.FakeMedKits(), database.packageRepository(), clock)
+            com.kert0n.medapp.fixture.offlineFreshening(database.packageRepository(), clock)
     ) = IntakeCardViewModel(
         confirmation = scenarios.intakeConfirmation,
         declining = scenarios.intakeDeclining,
@@ -355,7 +355,7 @@ class IntakeAnsweringTest {
         val known = object : com.kert0n.medapp.storage.pack.PackageStorageRepository by database.packageRepository() {
             override suspend fun answersToServer(packageId: Uuid): Boolean = true
         }
-        val model = cardModel(intakeId, com.kert0n.medapp.fixture.onlineFreshening(server, com.kert0n.medapp.fixture.FakeMedKits(), known, clock))
+        val model = cardModel(intakeId, com.kert0n.medapp.fixture.onlineFreshening(server, known, clock))
 
         watching(model.state) { state ->
             state.awaiting(PATIENTLY) { it.title.isNotEmpty() }

@@ -5,7 +5,6 @@ import com.kert0n.medapp.domain.attempt
 import com.kert0n.medapp.feature.connectivity.Connection
 import com.kert0n.medapp.queue.Rereading
 import com.kert0n.medapp.queue.Transactions
-import com.kert0n.medapp.storage.medkit.MedKitStorageRepository
 import com.kert0n.medapp.storage.pack.PackageStorageRepository
 import java.time.Clock
 import java.time.Duration
@@ -24,15 +23,15 @@ import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
 
 /**
- * Человек открыл общую вещь — она перечитывается, прежде чем он по ней решит (PLAN E4). Экран
+ * Человек открыл вещь, по которой решает, — она перечитывается, прежде чем он решит (PLAN E4):
+ * коробка на карточке и в решениях о ней, а на экране аптечек — сам список полок. Экран
  * ждёт возврата отсюда и показывает загрузку; что прочитано, приходит в него из базы само, поэтому
  * исхода дверь не возвращает: после неё экран делает одно и то же, как бы чтение ни кончилось.
  *
  * Спрашивается не всё. **Без связи** — ничего: ждать некого, и человек видит базу сразу. **Вещь,
  * которой сервер не знает**, — местная полка, коробка, ещё не доехавшая до сервера, — тоже нет:
  * её `GET` ответил бы 404, и вещь пропала бы на ровном месте. **Свежее** — прочитанное меньше
- * [FRESH_WITHIN] назад — тоже нет: путь «полка → коробка → приём» ждёт один раз, а не трижды. Ответ
- * полки освежает и все названные ею коробки.
+ * [FRESH_WITHIN] назад — тоже нет: путь «коробка → приём» ждёт один раз, а не дважды.
  *
  * Чтение одной вещи идёт одно: пришедший, пока оно идёт, ждёт его же. Идёт оно в области
  * приложения, а не экрана — ушедший с экрана перестаёт ждать, а чтение доживает, и его отметка
@@ -43,7 +42,6 @@ import kotlinx.coroutines.withContext
 class Freshening @Inject constructor(
     private val rereading: Rereading,
     private val connection: Connection,
-    private val medKits: MedKitStorageRepository,
     private val packages: PackageStorageRepository,
     private val transactions: Transactions,
     private val clock: Clock,
@@ -54,11 +52,13 @@ class Freshening @Inject constructor(
     private val readAt = HashMap<Thing, Instant>()
     private val reading = HashMap<Thing, Deferred<Unit>>()
 
-    /** Полка и её содержимое. */
-    suspend fun medKit(medKitId: Uuid) {
+    /**
+     * Список полок — без содержимого: в каких мы ещё есть. У человека с одними местными полками
+     * ответ пустой и ничего не меняет — отдельно спрашивать, есть ли общие, ради этого незачем.
+     */
+    suspend fun medKits() {
         if (!connection.online.value) return
-        if (transactions.run { medKits.find(medKitId)?.answersToServer } != true) return
-        read(Thing.Shelf(medKitId)) { rereading.medKit(medKitId) }
+        read(Thing.Shelves) { rereading.medKits() }
     }
 
     /** Одна коробка. */
@@ -92,19 +92,16 @@ class Freshening @Inject constructor(
         } finally {
             withContext(NonCancellable) {
                 guard.withLock {
-                    if (outcome is Rereading.Outcome.Read) {
-                        readAt[thing] = at
-                        for (box in outcome.packages) readAt[Thing.Box(box)] = at
-                    }
+                    if (outcome is Rereading.Outcome.Read) readAt[thing] = at
                     reading.remove(thing)
                 }
             }
         }
     }
 
-    /** Что перечитывают: полка и коробка — разные вещи, даже если номер совпал бы. */
+    /** Что перечитывают: список полок один, коробок много. */
     private sealed interface Thing {
-        data class Shelf(val id: Uuid) : Thing
+        data object Shelves : Thing
         data class Box(val id: Uuid) : Thing
     }
 

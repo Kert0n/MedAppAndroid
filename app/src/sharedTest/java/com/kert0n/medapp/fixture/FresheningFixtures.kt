@@ -1,7 +1,6 @@
 package com.kert0n.medapp.fixture
 
 import com.kert0n.medapp.feature.operation.Freshening
-import com.kert0n.medapp.storage.medkit.MedKitStorageRepository
 import com.kert0n.medapp.storage.pack.PackageStorageRepository
 import java.time.Clock
 import kotlinx.coroutines.CoroutineScope
@@ -13,13 +12,11 @@ import kotlinx.coroutines.Dispatchers
  */
 fun onlineFreshening(
     server: RereadingServer,
-    medKits: MedKitStorageRepository,
     packages: PackageStorageRepository,
     clock: Clock = Clock.systemUTC()
 ): Freshening = Freshening(
     server.rereading,
     FakeConnection(online = true),
-    medKits,
     packages,
     DirectTransactions,
     clock,
@@ -31,13 +28,11 @@ fun onlineFreshening(
  * перечитывание не предмет, — они видят экран таким, каким он был до него (PLAN E4).
  */
 fun offlineFreshening(
-    medKits: MedKitStorageRepository,
     packages: PackageStorageRepository,
     clock: Clock = Clock.systemUTC()
 ): Freshening = Freshening(
     RereadingServer(clock).rereading,
     FakeConnection(online = false),
-    medKits,
     packages,
     DirectTransactions,
     clock,

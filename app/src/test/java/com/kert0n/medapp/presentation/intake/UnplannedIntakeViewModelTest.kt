@@ -107,7 +107,7 @@ class UnplannedIntakeViewModelTest {
     private fun viewModel(
         packages: FakePackages = this.packages,
         freshening: com.kert0n.medapp.feature.operation.Freshening =
-            com.kert0n.medapp.fixture.offlineFreshening(com.kert0n.medapp.fixture.FakeMedKits(), packages, clock)
+            com.kert0n.medapp.fixture.offlineFreshening(packages, clock)
     ) = UnplannedIntakeViewModel(
         recording = UnplannedIntakeRecording(
             intakes = intakes,
@@ -262,7 +262,7 @@ class UnplannedIntakeViewModelTest {
         packages.lying(pack(id = PACK, quantity = tablets("20"), medKit = com.kert0n.medapp.fixture.medKit(id = com.kert0n.medapp.fixture.SHARED_KIT, publication = com.kert0n.medapp.domain.medkit.MedKit.Publication.PUBLISHED, participantCount = 2).ref))
         val server = com.kert0n.medapp.fixture.RereadingServer(clock)
         server.hold()
-        val model = viewModel(freshening = com.kert0n.medapp.fixture.onlineFreshening(server, com.kert0n.medapp.fixture.FakeMedKits(), packages, clock))
+        val model = viewModel(freshening = com.kert0n.medapp.fixture.onlineFreshening(server, packages, clock))
 
         watching(model.state) { state ->
             kotlinx.coroutines.withTimeout(5_000) { while (server.asked.isEmpty()) kotlinx.coroutines.delay(10) }

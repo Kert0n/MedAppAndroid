@@ -5,7 +5,6 @@ import androidx.lifecycle.viewModelScope
 import com.kert0n.medapp.domain.pack.ExpiryDate
 import com.kert0n.medapp.domain.pack.PackageProjection
 import com.kert0n.medapp.feature.medkits.MedKitRemoval
-import com.kert0n.medapp.feature.operation.Freshening
 import com.kert0n.medapp.feature.time.Today
 import com.kert0n.medapp.presentation.medkit.MedKitPresentationDTO
 import com.kert0n.medapp.presentation.medkit.toPresentationDTO
@@ -43,15 +42,11 @@ import kotlinx.coroutines.launch
  *
  * Чем сузить, предлагается по **всей области**, а не по тому, что уже нашлось: иначе выбранная
  * категория исчезла бы из списка, и вернуться к другой было бы нечем.
- *
- * Названная полка при открытии перечитывается, и пока ответ не пришёл, экран ждёт (PLAN E4): без
- * связи и у местной полки ждать нечего, и дверь возвращается сразу.
  */
 @OptIn(ExperimentalCoroutinesApi::class)
 @HiltViewModel(assistedFactory = MedKitContentsViewModel.Factory::class)
 class MedKitContentsViewModel @AssistedInject constructor(
     private val removal: MedKitRemoval,
-    freshening: Freshening,
     packages: PackageStorageRepository,
     medKits: MedKitStorageRepository,
     courses: CourseStorageRepository,
@@ -68,23 +63,6 @@ class MedKitContentsViewModel @AssistedInject constructor(
 
     private val removing = MutableStateFlow(Removing())
 
-    /** Перечитывание при открытии кончилось; у «всех лекарств» его нет вовсе. */
-    private val freshened = MutableStateFlow(medKitId == null)
-
-    init {
-        if (medKitId != null) {
-            viewModelScope.launch {
-                try {
-                    freshening.medKit(medKitId)
-                } finally {
-                    freshened.value = true
-                }
-            }
-        }
-    }
-
-    /** Запрос вместе с тем, дождались ли ответа сервера: типизированный `combine` дальше пяти потоков не идёт. */
-    private val asked = combine(query, freshened) { query, freshened -> query to freshened }
 
     private val days = today.observe().map { it.date }
 
@@ -108,7 +86,7 @@ class MedKitContentsViewModel @AssistedInject constructor(
     private val removalAsked = combine(removing, records) { removing, records -> removing to records }
 
     val state: StateFlow<MedKitContentsUiState> =
-        combine(shown, area, places, asked, removalAsked) { (today, shown), area, places, (query, freshened), (removing, records) ->
+        combine(shown, area, places, query, removalAsked) { (today, shown), area, places, query, (removing, records) ->
             val here = places.firstOrNull { it.id == medKitId }
             val held = area.mapNotNull { it.holdingCourseId }.toSet()
             MedKitContentsUiState(
@@ -126,7 +104,7 @@ class MedKitContentsViewModel @AssistedInject constructor(
                 narrowing = query.filter?.asNarrowing(area),
                 ordering = query.sort.asOrdering(),
                 today = today,
-                isLoaded = freshened,
+                isLoaded = true,
                 removing = removing.step,
                 removalRefusal = removing.refusal,
                 isRemoved = removing.removed,
@@ -296,8 +274,8 @@ data class MedKitContentsUiState(
     val isNarrowed: Boolean get() = text.isNotBlank() || narrowing != null
 
     /**
-     * Полки у нас больше нет: её убрали у всех или нас вывели (PLAN E6), и перечитывание при открытии
-     * это записало. Заводить в неё нечего. Убрал её сам человек — это [isRemoved], и экран уходит.
+     * Полки у нас больше нет: её убрали у всех или нас вывели (PLAN E6), и заход или список полок
+     * это записали, пока экран открыт. Заводить в неё нечего. Убрал её сам человек — это [isRemoved], и экран уходит.
      */
     val isShelfGone: Boolean get() = isLoaded && !isEverywhere && medKit == null && !isRemoved
 }

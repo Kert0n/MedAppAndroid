@@ -282,10 +282,6 @@ interface PackageDao {
     )
     suspend fun knownToServer(): List<Uuid>
 
-    /** Коробки одной полки — какие есть, без условий: что из них знает сервер, решает [knownToServer]. */
-    @Query("SELECT id FROM packages WHERE med_kit_id = :medKitId")
-    suspend fun idsOn(medKitId: Uuid): List<Uuid>
-
     /** Все живые коробки — чтобы снимок не вернул убранную, пока он летел (PLAN C0, E4). */
     @Query("SELECT id FROM packages")
     suspend fun held(): List<Uuid>

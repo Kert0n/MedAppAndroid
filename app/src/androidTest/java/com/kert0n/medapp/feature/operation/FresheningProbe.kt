@@ -3,7 +3,6 @@ package com.kert0n.medapp.feature.operation
 import com.kert0n.medapp.domain.medkit.MedKit
 import org.junit.Assert.assertTrue
 import kotlinx.coroutines.flow.first
-import com.kert0n.medapp.feature.packages.PackageAdding
 import com.kert0n.medapp.feature.intake.UnplannedIntakeRecording
 import com.kert0n.medapp.domain.value.Dose
 import com.kert0n.medapp.domain.value.DosageForm
@@ -63,6 +62,7 @@ import org.junit.Test
  * своего телефона, и ни одного его действия Анна не видит, пока не откроет вещь.
  *
  * Завязка одна: Анна публикует полку с коробкой на двадцать, Борис вступает по её приглашению.
+ * Перечитываются коробка и список полок; содержимое полки обновляет заход (решение владельца 2026-09-17).
  * Включается только `-Pprobe`; синтетические полки убираются за собой.
  */
 class FresheningProbe {
@@ -139,30 +139,18 @@ class FresheningProbe {
     }
 
     /**
-     * Анна открыла полку — у неё и новое число коробки, и двое участников: полка ответила своим
-     * содержимым целиком.
+     * Анна вошла на экран аптечек — список полок говорит, что Борис вступил: участников двое. Число
+     * коробки при этом прежнее: содержимое полок список не читает, его обновляет заход.
      */
     @Test
-    fun anOpenedShelfBringsItsBoxesAndItsPeople(): Unit = runBlocking {
+    fun theShelfListTellsWhoIsInButNotWhatIsInside(): Unit = runBlocking {
         val shared = sharedWithBoris()
         borisTakes(shared.box, "3")
 
-        anna.freshening.medKit(shared.shelf)
+        anna.freshening.medKits()
 
-        assertAmount("17", requireNotNull(anna.packages.find(shared.box)).quantity.amount)
         assertEquals(2L, requireNotNull(anna.database.medKits().find(shared.shelf)).toDomain().participantCount)
-    }
-
-    /** Борис выбросил коробку — у Анны, открывшей полку, её больше нет, а полка на месте. */
-    @Test
-    fun aBoxThrownAwayByTheNeighbourIsGoneFromTheOpenedShelf(): Unit = runBlocking {
-        val shared = sharedWithBoris()
-        success(boris.deletePackage(shared.box, success(boris.packageSnapshot(shared.box)).pack.version))
-
-        anna.freshening.medKit(shared.shelf)
-
-        assertNull(anna.packages.find(shared.box))
-        assertNotNull(anna.database.medKits().find(shared.shelf))
+        assertAmount("20", requireNotNull(anna.packages.find(shared.box)).quantity.amount)
     }
 
     /** Борис выбросил коробку — Анна открыла саму коробку, и её больше нет. */
@@ -176,13 +164,16 @@ class FresheningProbe {
         assertNull(anna.packages.find(shared.box))
     }
 
-    /** Борис удалил полку у всех — у Анны, открывшей её, полки нет, и коробки с ней. */
+    /**
+     * Борис удалил полку у всех — Анна вошла на экран аптечек, и полки у неё нет, и коробок с ней:
+     * решать о ней ей больше нечего.
+     */
     @Test
-    fun aShelfRemovedForEveryoneIsGoneWhenOpened(): Unit = runBlocking {
+    fun aShelfRemovedForEveryoneIsGoneFromTheList(): Unit = runBlocking {
         val shared = sharedWithBoris()
         success(boris.deleteMedKit(shared.shelf))
 
-        anna.freshening.medKit(shared.shelf)
+        anna.freshening.medKits()
 
         assertNull(anna.database.medKits().find(shared.shelf))
         assertNull(anna.packages.find(shared.box))
@@ -245,24 +236,6 @@ class FresheningProbe {
         assertAmount("12", anna.effective(shared.box))
     }
 
-    /**
-     * Анна положила на общую полку новую коробку, и её создание ещё не уехало. Перечитанная полка
-     * этой коробки не называет — но и пропавшей её не объявляет: сервер о ней ещё не слышал, и
-     * очередь довезёт её своим порядком.
-     */
-    @Test
-    fun aBoxNotYetOnTheServerSurvivesTheShelfReread(): Unit = runBlocking {
-        val shared = sharedWithBoris()
-        val added = anna.scenarios().packageAdding.add(shared.shelf, pack(form = form).facts, pills("10"))
-        val fresh = (added as? PackageAdding.Outcome.Added)?.packageId ?: throw AssertionError("коробка не заведена: $added")
-
-        anna.freshening.medKit(shared.shelf)
-
-        assertNotNull(anna.packages.find(fresh))
-        anna.drain()
-        assertAmount("10", BigDecimal(success(anna.api.packageSnapshot(fresh)).pack.amount))
-    }
-
     /** Устройство Анны: те же части, что у приложения, и дверь перечитывания при связи. */
     private inner class Anna(val api: MedAppApi) {
         val database = inMemoryDatabase()
@@ -279,9 +252,8 @@ class FresheningProbe {
         private val relocation = PackageRelocation(packages, medKits, database.courseRepository(), queue, transactions, clock)
         private val publishing = MedKitPublishing(medKits, packages, relocation, queue, transactions, clock)
         val freshening = Freshening(
-            Rereading(api, database.snapshotStorage(), snapshots, vocabulary, clock),
+            Rereading(api, database.snapshotStorage(), snapshots, clock),
             FakeConnection(online = true),
-            medKits,
             packages,
             transactions,
             clock,

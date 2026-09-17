@@ -94,7 +94,6 @@ class SnapshotApplierTest {
         var laid: ServerSnapshot? = null
         val snapshot get() = requireNotNull(laid) { "снимок не клали" }
         override suspend fun serverKnows(): ServerKnowledge = knew
-        override suspend fun packagesKnownOn(medKitId: Uuid): Set<Uuid> = emptySet()
         override suspend fun lay(snapshot: ServerSnapshot, at: Instant) {
             calls++
             laid = snapshot

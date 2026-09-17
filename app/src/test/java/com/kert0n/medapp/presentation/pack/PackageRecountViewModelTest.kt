@@ -47,7 +47,7 @@ class PackageRecountViewModelTest {
     private fun viewModel(
         transactions: Transactions = DirectTransactions,
         freshening: com.kert0n.medapp.feature.operation.Freshening =
-            com.kert0n.medapp.fixture.offlineFreshening(com.kert0n.medapp.fixture.FakeMedKits(), stored, clock)
+            com.kert0n.medapp.fixture.offlineFreshening(stored, clock)
     ) = PackageRecountViewModel(
         adjusting = PackageAdjusting(stored, FakeFollowing(), queue, transactions, clock),
         freshening = freshening,
@@ -207,7 +207,7 @@ class PackageRecountViewModelTest {
         stored.lying(pack(id = PACK, quantity = tablets("20"), medKit = com.kert0n.medapp.fixture.medKit(id = com.kert0n.medapp.fixture.SHARED_KIT, publication = com.kert0n.medapp.domain.medkit.MedKit.Publication.PUBLISHED, participantCount = 2).ref))
         val server = com.kert0n.medapp.fixture.RereadingServer(clock)
         server.hold()
-        val model = viewModel(freshening = com.kert0n.medapp.fixture.onlineFreshening(server, com.kert0n.medapp.fixture.FakeMedKits(), stored, clock))
+        val model = viewModel(freshening = com.kert0n.medapp.fixture.onlineFreshening(server, stored, clock))
 
         watching(model.state) { state ->
             state.awaiting { it.pack != null }

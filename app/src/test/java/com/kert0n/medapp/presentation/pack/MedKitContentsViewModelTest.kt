@@ -42,7 +42,6 @@ import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Rule
-import com.kert0n.medapp.fixture.offlineFreshening
 import org.junit.Test
 
 /**
@@ -97,11 +96,9 @@ class MedKitContentsViewModelTest {
 
     private fun viewModel(
         medKitId: Uuid? = HOME_KIT,
-        removal: MedKitRemoval = removal(),
-        freshening: com.kert0n.medapp.feature.operation.Freshening = offlineFreshening(medKits, packages, clock)
+        removal: MedKitRemoval = removal()
     ) = MedKitContentsViewModel(
         removal = removal,
-        freshening = freshening,
         packages = packages,
         medKits = medKits,
         courses = courses,
@@ -331,42 +328,6 @@ class MedKitContentsViewModelTest {
         }
 
         assertEquals(RemovalRefusal.NOT_SHARED, model.state.value.removalRefusal)
-    }
-
-    /**
-     * Общая полка при связи перечитывается, и пока сервер не ответил, экран ждёт (PLAN E4). Спрошено
-     * ровно один раз.
-     */
-    @Test
-    fun aSharedShelfWaitsForTheServerOnce() {
-        runBlocking { medKits.add(medKit(id = SHARED_KIT, name = "Дача", publication = com.kert0n.medapp.domain.medkit.MedKit.Publication.PUBLISHED, participantCount = 2)) }
-        val server = com.kert0n.medapp.fixture.RereadingServer(clock)
-        server.hold()
-        val model = viewModel(medKitId = SHARED_KIT, freshening = com.kert0n.medapp.fixture.onlineFreshening(server, medKits, packages, clock))
-
-        watching(model.state) { state ->
-            // База уже ответила — имя полки есть, — а сервер ещё нет: экран ждёт.
-            state.awaiting { it.medKit != null }
-            assertFalse(state.value.isLoaded)
-            server.release()
-            state.awaiting { it.isLoaded }
-        }
-
-        assertEquals(listOf("/v1/med-kits/$SHARED_KIT"), server.asked)
-    }
-
-    /** Местная полка и «все лекарства» сервера не ждут. */
-    @Test
-    fun aLocalShelfAndEverythingDoNotWait() {
-        val server = com.kert0n.medapp.fixture.RereadingServer(clock)
-        server.hold()
-
-        for (area in listOf(HOME_KIT, null)) {
-            val model = viewModel(medKitId = area, freshening = com.kert0n.medapp.fixture.onlineFreshening(server, medKits, packages, clock))
-            watching(model.state) { state -> state.awaiting { it.isLoaded } }
-        }
-
-        assertEquals(emptyList<String>(), server.asked)
     }
 
     /**

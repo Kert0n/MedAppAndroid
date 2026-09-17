@@ -3,7 +3,6 @@ package com.kert0n.medapp.feature.operation
 import com.kert0n.medapp.domain.medkit.MedKit
 import com.kert0n.medapp.fixture.DirectTransactions
 import com.kert0n.medapp.fixture.FakeConnection
-import com.kert0n.medapp.fixture.FakeMedKits
 import com.kert0n.medapp.fixture.FakePackages
 import com.kert0n.medapp.fixture.HOME_KIT
 import com.kert0n.medapp.fixture.OTHER_PACK
@@ -58,7 +57,6 @@ class FresheningTest {
     private val freshening = Freshening(
         server.rereading,
         connection,
-        FakeMedKits(shared, home),
         FakePackages(pack(id = PACK, medKit = shared.ref), pack(id = OTHER_PACK, medKit = home.ref)),
         DirectTransactions,
         clock,
@@ -73,12 +71,12 @@ class FresheningTest {
         while (!condition()) delay(10)
     }.also { check(condition()) { what } }
 
-    /** Общая полка при связи спрашивается одним запросом, и её ответ ложится. */
+    /** Список полок при связи спрашивается одним запросом, и его ответ ложится. */
     @Test
-    fun aSharedShelfIsAskedOnce() = runBlocking {
-        freshening.medKit(SHARED_KIT)
+    fun theShelfListIsAskedOnce() = runBlocking {
+        freshening.medKits()
 
-        assertEquals(listOf("/v1/med-kits/$SHARED_KIT"), server.asked)
+        assertEquals(listOf("/v1/med-kits"), server.asked)
         assertEquals(1, server.laid.size)
     }
 
@@ -95,16 +93,15 @@ class FresheningTest {
     fun withoutConnectionNothingIsAsked() = runBlocking {
         connection.online.value = false
 
-        freshening.medKit(SHARED_KIT)
+        freshening.medKits()
         freshening.pack(PACK)
 
         assertEquals(emptyList<String>(), server.asked)
     }
 
-    /** Местную полку и её коробку сервер не знает: их 404 выдал бы пропажу на ровном месте. */
+    /** Коробку местной полки и незаведённую сервер не знает: их 404 выдал бы пропажу на ровном месте. */
     @Test
     fun whatTheServerDoesNotKnowIsNotAsked() = runBlocking {
-        freshening.medKit(HOME_KIT)
         freshening.pack(OTHER_PACK)
         freshening.pack(kotlin.uuid.Uuid.random())
 
@@ -148,22 +145,13 @@ class FresheningTest {
         assertEquals(2, server.asked.size)
     }
 
-    /** Ответ полки назвал её коробки — открытая следом коробка не спрашивается. */
+    /** Список и коробка — разные вещи: прочитанный список коробку свежей не делает. */
     @Test
-    fun aShelfFreshensTheBoxesItNamed() = runBlocking {
-        freshening.medKit(SHARED_KIT)
+    fun theListDoesNotFreshenABox() = runBlocking {
+        freshening.medKits()
         freshening.pack(PACK)
 
-        assertEquals(listOf("/v1/med-kits/$SHARED_KIT"), server.asked)
-    }
-
-    /** Коробка, прочитанная сама, полку свежей не делает: о полке она не говорит. */
-    @Test
-    fun aBoxDoesNotFreshenItsShelf() = runBlocking {
-        freshening.pack(PACK)
-        freshening.medKit(SHARED_KIT)
-
-        assertEquals(listOf("/v1/drugs/$PACK", "/v1/med-kits/$SHARED_KIT"), server.asked)
+        assertEquals(listOf("/v1/med-kits", "/v1/drugs/$PACK"), server.asked)
     }
 
     /** Карточка и лист поверх неё спрашивают одну коробку разом — запрос один. */

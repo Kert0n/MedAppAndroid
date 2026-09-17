@@ -31,7 +31,7 @@ import kotlin.uuid.Uuid
 import kotlinx.coroutines.CompletableDeferred
 
 /**
- * Сервер для перечитывания одной вещи: общая полка [SHARED_KIT] и её коробки. Помнит, о чём его
+ * Сервер для перечитывания: список полок и коробки общей полки [SHARED_KIT]. Помнит, о чём его
  * спросили, и умеет **придержать ответ** ([hold]) — чтобы проверка увидела экран, ждущий ответа.
  * Что легло, он не кладёт в базу, а помнит ([laid]): как ответ ложится, проверяет укладка снимка.
  */
@@ -44,6 +44,12 @@ class RereadingServer(clock: Clock) {
 
     /** Коробки общей полки, которые сервер называет; остальные пути отвечают 404. */
     var boxes: Set<Uuid> = setOf(PACK)
+
+    /** Полки, в которых мы есть, по словам сервера. */
+    var shelves: Set<Uuid> = setOf(SHARED_KIT)
+
+    /** Полки, которые у нас лежат как общие, — что «сервер знал» до запроса. */
+    var ours: Set<Uuid> = setOf(SHARED_KIT)
 
     /** `false` — связь рвётся на самом запросе. */
     @Volatile
@@ -75,8 +81,8 @@ class RereadingServer(clock: Clock) {
                 gate?.await()
                 if (!reachable) throw java.io.IOException("нет связи")
                 val body = when {
-                    path == "/v1/med-kits/$SHARED_KIT" ->
-                        """{"id":"$SHARED_KIT","userCount":2,"drugs":[${boxes.joinToString(",") { drug(it) }}]}"""
+                    path == "/v1/med-kits" ->
+                        shelves.joinToString(",", "[", "]") { """{"id":"$it","userCount":2,"drugIds":[]}""" }
                     path.startsWith("/v1/drugs/") -> Uuid.parse(path.removePrefix("/v1/drugs/")).takeIf { it in boxes }?.let(::drug)
                     else -> null
                 } ?: return@MockEngine respond("", HttpStatusCode.NotFound)
@@ -106,8 +112,7 @@ class RereadingServer(clock: Clock) {
     }
 
     private val storage = object : SnapshotStorage {
-        override suspend fun serverKnows() = ServerKnowledge(setOf(SHARED_KIT), boxes, setOf(SHARED_KIT), boxes)
-        override suspend fun packagesKnownOn(medKitId: Uuid): Set<Uuid> = boxes
+        override suspend fun serverKnows() = ServerKnowledge(ours, boxes, ours, boxes)
         override suspend fun lay(snapshot: ServerSnapshot, at: Instant) {
             laid += snapshot
         }
@@ -115,5 +120,5 @@ class RereadingServer(clock: Clock) {
 
     private val vocabulary = VocabularyResolver(Words, api)
 
-    val rereading = Rereading(api, storage, PackageSnapshotResolver(vocabulary, Shelves), vocabulary, clock)
+    val rereading = Rereading(api, storage, PackageSnapshotResolver(vocabulary, Shelves), clock)
 }

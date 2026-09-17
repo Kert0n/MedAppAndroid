@@ -59,7 +59,7 @@ class PackageTransferViewModelTest {
     private fun viewModel(
         transactions: Transactions = DirectTransactions,
         lying: Package = pack(id = PACK, quantity = tablets("20")),
-        freshening: com.kert0n.medapp.feature.operation.Freshening = com.kert0n.medapp.fixture.offlineFreshening(medKits, stored, clock)
+        freshening: com.kert0n.medapp.feature.operation.Freshening = com.kert0n.medapp.fixture.offlineFreshening(stored, clock)
     ) = PackageTransferViewModel(
         relocation = PackageRelocation(stored, medKits, FakeCourses(), queue, transactions, clock),
         freshening = freshening,
@@ -233,7 +233,7 @@ class PackageTransferViewModelTest {
         server.hold()
         val model = viewModel(
             lying = pack(id = PACK, quantity = tablets("20"), medKit = com.kert0n.medapp.fixture.medKit(id = com.kert0n.medapp.fixture.SHARED_KIT, publication = com.kert0n.medapp.domain.medkit.MedKit.Publication.PUBLISHED, participantCount = 2).ref),
-            freshening = com.kert0n.medapp.fixture.onlineFreshening(server, medKits, stored, clock)
+            freshening = com.kert0n.medapp.fixture.onlineFreshening(server, stored, clock)
         )
 
         watching(model.state) { state ->
