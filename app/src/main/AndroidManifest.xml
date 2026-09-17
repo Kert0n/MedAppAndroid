@@ -26,10 +26,18 @@
         android:roundIcon="@mipmap/ic_launcher_round"
         android:supportsRtl="true"
         android:theme="@style/Theme.MedApp">
+        <!--
+            Клавиатуру окно отдаёт форме, а не двигает собой. Без объявления система выбирает
+            режим сама и панорамирует окно: форма поднимает поля своим imePadding, а окно сверх
+            того уезжает вверх — верхняя панель прячется под строку состояния, а снизу остаётся
+            пустой прямоугольник тем больше, чем ниже было поле (находка владельца 2026-09-17).
+            adjustResize отдаёт высоту клавиатуры insets'ами, и подъём остаётся один.
+        -->
         <activity
             android:name=".app.MainActivity"
             android:exported="true"
-            android:theme="@style/Theme.MedApp">
+            android:theme="@style/Theme.MedApp"
+            android:windowSoftInputMode="adjustResize">
             <intent-filter>
                 <action android:name="android.intent.action.MAIN" />
 
