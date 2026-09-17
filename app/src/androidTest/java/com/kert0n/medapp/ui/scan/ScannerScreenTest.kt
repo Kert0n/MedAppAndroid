@@ -7,7 +7,6 @@ import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import com.kert0n.medapp.presentation.scan.ScannerCamera
-import com.kert0n.medapp.presentation.scan.ScannerNotice
 import com.kert0n.medapp.presentation.scan.ScannerUiState
 import com.kert0n.medapp.ui.theme.MedAppTheme
 import org.junit.Assert.assertEquals
@@ -28,7 +27,6 @@ class ScannerScreenTest {
     @get:Rule
     val compose = createComposeRule()
 
-    private var joined = 0
     private var allowed = 0
     private var settings = 0
 
@@ -39,8 +37,7 @@ class ScannerScreenTest {
                     state = state,
                     onCode = {},
                     onAllow = { allowed++ },
-                    onOpenSettings = { settings++ },
-                    onJoin = { joined++ }
+                    onOpenSettings = { settings++ }
                 )
             }
         }
@@ -84,26 +81,16 @@ class ScannerScreenTest {
         assertEquals(1, settings)
     }
 
-    /** Чужой код назван словами: молчание неотличимо от сломанной камеры. */
+    /**
+     * Чужой код назван словами: молчание неотличимо от сломанной камеры. Это **единственное**, что
+     * сканер говорит от себя: узнанное он показывает не здесь, а на том экране, куда ведёт.
+     */
     @Test
     fun anAlienCodeIsNamedInWords() {
-        show(ScannerUiState(camera = ScannerCamera.ABSENT, notice = ScannerNotice.UNSUPPORTED))
+        show(ScannerUiState(camera = ScannerCamera.ABSENT, isUnsupported = true))
 
         compose.onNodeWithText("Этот код не поддерживается: на упаковках лекарств стоит DataMatrix.")
             .assertIsDisplayed()
     }
 
-    /**
-     * Приглашение сканер не принимает сам, а ведёт туда, где вступают: исходы вступления живут в
-     * одном месте, а ключ не едет в маршрут (PLAN G3, C1).
-     */
-    @Test
-    fun anInvitationLeadsToJoining() {
-        show(ScannerUiState(camera = ScannerCamera.ABSENT, notice = ScannerNotice.INVITATION))
-
-        compose.onNodeWithText("Это приглашение в аптечку.").assertIsDisplayed()
-        compose.onNodeWithText("Присоединиться").performClick()
-
-        assertEquals(1, joined)
-    }
 }

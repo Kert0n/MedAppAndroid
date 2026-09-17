@@ -12,11 +12,11 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 
 /**
- * Сканер (PLAN H3 №24). Экран узнаёт код и **ведёт дальше**, а сам ничего не спрашивает у реестра:
- * DataMatrix уезжает кодом в форму новой коробки, и спрашивает «Честный знак» уже она — тот, кто
- * показывает ответ (PLAN C1 «Результат сканирования — заполненная форма»). Приглашение сканер
- * называет и предлагает перейти на экран вступления; всё остальное — «код не поддерживается», и
- * запроса нет ни у кого.
+ * Сканер (PLAN H3 №24). Экран узнаёт код и **ведёт дальше молча**, а сам ничего не спрашивает и
+ * ничего не показывает от себя: DataMatrix уезжает кодом в форму новой коробки, приглашение —
+ * ключом на экран вступления, и оба открываются уже заполненными (решение владельца 2026-09-17).
+ * Спрашивает «Честный знак» та же форма, что показывает ответ (PLAN C1). Всё остальное — «код не
+ * поддерживается», и запроса нет ни у кого.
  *
  * **Один код — один переход.** Камера отдаёт тот же код десятками кадров в секунду, и без этого
  * правила форма открывалась бы стопкой. Прочитанное забывается при возвращении на место: человек
@@ -43,8 +43,13 @@ class ScannerViewModel @Inject constructor(
     fun resumed() {
         last = null
         // Сказанное о прежнем коде забывается вместе с ним: вернувшись от вступления, человек
-        // видел бы «это приглашение» о коде, которого сканер уже не помнит (разбор #55).
-        _state.value = _state.value.copy(camera = camera(), notice = null, opening = null)
+        // видел бы весть о коде, которого сканер уже не помнит (разбор #55).
+        _state.value = _state.value.copy(
+            camera = camera(),
+            isUnsupported = false,
+            opening = null,
+            invitation = null
+        )
     }
 
     /** Система ответила на просьбу о камере: спрошено — значит, второго диалога уже не будет. */
@@ -56,18 +61,23 @@ class ScannerViewModel @Inject constructor(
     /** Камера увидела код. */
     fun seen(code: ScannedCode) {
         val now = _state.value
-        if (now.opening != null || code.text.isEmpty() || code.text == last) return
+        if (now.opening != null || now.invitation != null || code.text.isEmpty() || code.text == last) return
         last = code.text
         _state.value = when (code.format) {
-            CodeFormat.DATA_MATRIX -> now.copy(opening = code.text, notice = null)
-            CodeFormat.QR -> now.copy(notice = ScannerNotice.INVITATION)
-            CodeFormat.OTHER -> now.copy(notice = ScannerNotice.UNSUPPORTED)
+            CodeFormat.DATA_MATRIX -> now.copy(opening = code.text, isUnsupported = false)
+            CodeFormat.QR -> now.copy(invitation = code.text, isUnsupported = false)
+            CodeFormat.OTHER -> now.copy(isUnsupported = true)
         }
     }
 
     /** Форма открыта: тот же код её второй раз не откроет — ни новым кадром, ни поворотом экрана. */
     fun opened() {
-        _state.value = _state.value.copy(opening = null, notice = null)
+        _state.value = _state.value.copy(opening = null, isUnsupported = false)
+    }
+
+    /** Вступление открыто с этим ключом: держать его дольше сканеру незачем (PLAN G3). */
+    fun invitationOpened() {
+        _state.value = _state.value.copy(invitation = null, isUnsupported = false)
     }
 
     private fun camera(): ScannerCamera = when (permissions.current().camera) {
@@ -83,8 +93,15 @@ class ScannerViewModel @Inject constructor(
  */
 data class ScannerUiState(
     val camera: ScannerCamera,
-    val notice: ScannerNotice? = null,
-    val opening: String? = null
+    /** Перед камерой чужой код: сказать о нём — единственное, что сканер делает от себя. */
+    val isUnsupported: Boolean = false,
+    val opening: String? = null,
+    /**
+     * Ключ приглашения, с которым открывается вступление. В состоянии, а не в маршруте: ключ —
+     * секрет, а маршрут ложится в сохранённую стопку (PLAN G3). Живёт он до первого открытия и
+     * умирает вместе с процессом — как и ключ на экране 21.
+     */
+    val invitation: String? = null
 )
 
 /**
@@ -96,8 +113,3 @@ data class ScannerUiState(
  */
 enum class ScannerCamera { READY, UNASKED, REFUSED, ABSENT }
 
-/**
- * Что сказать о прочитанном коде. Два случая, и человек делает в них разное: у приглашения есть
- * куда идти, у чужого кода — нечего делать, кроме как навести на другой.
- */
-enum class ScannerNotice { UNSUPPORTED, INVITATION }

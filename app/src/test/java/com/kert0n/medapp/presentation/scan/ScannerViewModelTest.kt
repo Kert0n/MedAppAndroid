@@ -6,7 +6,9 @@ import com.kert0n.medapp.platform.settings.CameraAccess
 import com.kert0n.medapp.platform.settings.DevicePermissions
 import com.kert0n.medapp.platform.settings.PermissionStates
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNull
+import org.junit.Assert.assertTrue
 import org.junit.Test
 
 /**
@@ -35,22 +37,35 @@ class ScannerViewModelTest {
 
         model.seen(ScannedCode(CodeFormat.OTHER, "4607004891014"))
 
-        assertEquals(ScannerNotice.UNSUPPORTED, model.state.value.notice)
+        assertTrue("чужой код назван", model.state.value.isUnsupported)
         assertNull("чужой код формы не открывает", model.state.value.opening)
     }
 
     /**
-     * Приглашение сканер называет, но не принимает: вступление живёт на своём экране со всеми
-     * своими исходами (PLAN C1 «Приглашение в сканере не вступает, а ведёт»).
+     * Приглашение ведёт на вступление **молча и с готовым ключом** — так же, как код с коробки
+     * ведёт в заполненную форму. Человек навёл камеру; переспрашивать его «это приглашение,
+     * перейти?» значило бы просить подтвердить уже сделанное (решение владельца 2026-09-17).
      */
     @Test
-    fun anInvitationIsNamedAndLeadsToJoining() {
+    fun anInvitationCarriesItsKeyToJoining() {
         val model = scanner()
 
         model.seen(ScannedCode(CodeFormat.QR, "K7F-2M9-QX4"))
 
-        assertEquals(ScannerNotice.INVITATION, model.state.value.notice)
+        assertEquals("K7F-2M9-QX4", model.state.value.invitation)
         assertNull("приглашение коробки не заводит", model.state.value.opening)
+    }
+
+    /** Ключ отдан один раз: второй кадр того же QR второго вступления не откроет. */
+    @Test
+    fun theSameInvitationIsHandedOverOnce() {
+        val model = scanner()
+        model.seen(ScannedCode(CodeFormat.QR, "K7F-2M9-QX4"))
+
+        model.invitationOpened()
+        model.seen(ScannedCode(CodeFormat.QR, "K7F-2M9-QX4"))
+
+        assertNull(model.state.value.invitation)
     }
 
     /** Код с коробки ведёт в форму — тем самым текстом, каким его дал распознаватель. */
@@ -104,11 +119,11 @@ class ScannerViewModelTest {
     @Test
     fun comingBackForgetsWhatWasSaidAboutTheOldCode() {
         val model = scanner()
-        model.seen(ScannedCode(CodeFormat.QR, "K7F-2M9-QX4"))
+        model.seen(ScannedCode(CodeFormat.OTHER, "4607004891014"))
 
         model.resumed()
 
-        assertNull("весть о прежнем коде не пережила возвращения", model.state.value.notice)
+        assertFalse("весть о прежнем коде не пережила возвращения", model.state.value.isUnsupported)
     }
 
     /** До первой просьбы отказа ещё нет — есть незаданный вопрос, и спросить его можно. */

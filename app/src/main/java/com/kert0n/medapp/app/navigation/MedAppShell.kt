@@ -115,6 +115,11 @@ fun MedAppShell(
     // него. Передай значением — список экранов пришлось бы собирать заново на каждую смену
     // режима, и `NavDisplay` показал бы прежний.
     val planMode = rememberSaveable { mutableStateOf(PlanMode.COURSES) }
+    // Прочитанный камерой ключ приглашения — **в памяти оболочки**, а не в маршруте: ключ секрет, а
+    // маршрут ложится в сохранённую стопку (PLAN G3). Поэтому и не `rememberSaveable`: пережить
+    // смерть процесса ключ не должен, как не переживает её ключ на экране 21. Живёт он ровно от
+    // сканера до вступления, которое его забирает.
+    val scanned = remember { mutableStateOf<String?>(null) }
     // Цель применяется **один раз**: иначе поворот экрана возвращал бы человека туда, откуда он
     // уже ушёл. Намерение опустошает окно, а эта проверка бережёт от повторного применения.
     LaunchedEffect(opening) {
@@ -143,7 +148,7 @@ fun MedAppShell(
         bottomBar = { if (stacks.screen in PLACES) Places(stacks) }
     ) { padding ->
         NavDisplay(
-            entries = stacks.entries(remember(stacks, planMode) { screens(stacks, planMode) }),
+            entries = stacks.entries(remember(stacks, planMode, scanned) { screens(stacks, planMode, scanned) }),
             onBack = stacks::back,
             modifier = Modifier.padding(padding).consumeWindowInsets(padding),
             transitionSpec = { SWITCH },
@@ -190,7 +195,11 @@ fun MedAppShell(
  * Состояние экрану даёт `hiltViewModel` здесь же, а аргумент приходит **значением из ключа**:
  * экран получает `state` и действия и больше ничего (PLAN H1).
  */
-private fun screens(stacks: TabStacks, planMode: MutableState<PlanMode>) = entryProvider<NavKey> {
+private fun screens(
+    stacks: TabStacks,
+    planMode: MutableState<PlanMode>,
+    scanned: MutableState<String?>
+) = entryProvider<NavKey> {
     entry(Screen.MedKits) {
         val model: MedKitListViewModel = hiltViewModel()
         MedKitListScreen(
@@ -257,6 +266,14 @@ private fun screens(stacks: TabStacks, planMode: MutableState<PlanMode>) = entry
             state.joined?.let {
                 stacks.back()
                 stacks.go(Screen.MedKitContents(it))
+            }
+        }
+        // Пришли со сканера — код уже прочитан, и переписывать его человеку незачем. Ключ
+        // забирается один раз: иначе поворот экрана возвращал бы в поле то, что человек стёр.
+        LaunchedEffect(Unit) {
+            scanned.value?.let {
+                model.type(it)
+                scanned.value = null
             }
         }
         // Разрешённая камера открывается сразу, неразрешённая сперва спрашивает: просьба стоит
@@ -606,13 +623,21 @@ private fun screens(stacks: TabStacks, planMode: MutableState<PlanMode>) = entry
             model.opened()
             stacks.go(Screen.PackageForm(scannedCode = code))
         }
+        // Приглашение ведёт на вступление — **молча и с готовым кодом**, как коробка ведёт в
+        // заполненную форму: человек навёл камеру, и переспрашивать его незачем (решение владельца
+        // 2026-09-17). Сам ключ едет памятью оболочки, а не ключом маршрута (G3).
+        LaunchedEffect(state.invitation) {
+            val key = state.invitation ?: return@LaunchedEffect
+            model.invitationOpened()
+            scanned.value = key
+            stacks.go(Screen.MedKitJoining)
+        }
         val context = LocalContext.current
         ScannerScreen(
             state = state,
             onCode = model::seen,
             onAllow = askForCamera,
-            onOpenSettings = context::openAppSettings,
-            onJoin = { stacks.go(Screen.MedKitJoining) }
+            onOpenSettings = context::openAppSettings
         )
     }
     for (place in Place.entries - Place.MED_KITS - Place.PLAN - Place.OPTIONS - Place.SCANNER) {

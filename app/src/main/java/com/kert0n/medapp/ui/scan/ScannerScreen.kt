@@ -24,10 +24,8 @@ import androidx.compose.ui.unit.dp
 import com.kert0n.medapp.R
 import com.kert0n.medapp.domain.scan.ScannedCode
 import com.kert0n.medapp.presentation.scan.ScannerCamera
-import com.kert0n.medapp.presentation.scan.ScannerNotice
 import com.kert0n.medapp.presentation.scan.ScannerUiState
 import com.kert0n.medapp.ui.EmptyState
-import com.kert0n.medapp.ui.NavigationRow
 
 /**
  * Сканер (PLAN H3 №24). **Первым — живая картинка камеры**: человек уже держит коробку перед
@@ -44,7 +42,6 @@ fun ScannerScreen(
     onCode: (ScannedCode) -> Unit,
     onAllow: () -> Unit,
     onOpenSettings: () -> Unit,
-    onJoin: () -> Unit,
     modifier: Modifier = Modifier
 ) {
     Scaffold(
@@ -74,12 +71,10 @@ fun ScannerScreen(
                         icon = R.drawable.ic_no_photography
                     )
                 }
-                state.notice?.let {
-                    Notice(
-                        notice = it,
-                        onJoin = onJoin,
-                        modifier = Modifier.align(Alignment.BottomCenter).padding(16.dp)
-                    )
+                // Единственное, что сканер говорит от себя: код перед камерой не тот. Всё, что он
+                // узнал, он показывает не здесь, а на том экране, куда ведёт (C1).
+                if (state.isUnsupported) {
+                    Unsupported(Modifier.align(Alignment.BottomCenter).padding(16.dp))
                 }
             }
         }
@@ -87,49 +82,26 @@ fun ScannerScreen(
 }
 
 /**
- * Что сказано о прочитанном коде. Приглашение сканер не принимает сам: вступление живёт на своём
- * экране, где у него есть и поле кода, и все исходы (C1 «Приглашение в сканере не вступает»).
+ * Чужой код назван словами: молчание неотличимо от сломанной камеры, а человек будет держать
+ * коробку перед телефоном и ждать (PLAN H3 «Набор сканера»).
  */
 @Composable
-private fun Notice(notice: ScannerNotice, onJoin: () -> Unit, modifier: Modifier) = ElevatedCard(modifier) {
-    Column(
+private fun Unsupported(modifier: Modifier) = ElevatedCard(modifier) {
+    Row(
         modifier = Modifier.padding(16.dp),
-        verticalArrangement = Arrangement.spacedBy(8.dp)
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(8.dp)
     ) {
-        Row(
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(8.dp)
-        ) {
-            Icon(
-                painterResource(
-                    if (notice == ScannerNotice.INVITATION) R.drawable.ic_qr_code_2 else R.drawable.ic_warning
-                ),
-                contentDescription = null,
-                tint = if (notice == ScannerNotice.INVITATION) {
-                    MaterialTheme.colorScheme.tertiary
-                } else {
-                    MaterialTheme.colorScheme.error
-                }
-            )
-            Text(
-                stringResource(
-                    if (notice == ScannerNotice.INVITATION) {
-                        R.string.scanner_invitation
-                    } else {
-                        R.string.scanner_unsupported
-                    }
-                ),
-                style = MaterialTheme.typography.bodyMedium,
-                // Ширину забирает текст, а не значок: длинная фраза иначе переносится по слогам.
-                modifier = Modifier.weight(1f)
-            )
-        }
-        if (notice == ScannerNotice.INVITATION) {
-            NavigationRow(
-                icon = R.drawable.ic_group_add,
-                text = stringResource(R.string.med_kit_joining_join),
-                onClick = onJoin
-            )
-        }
+        Icon(
+            painterResource(R.drawable.ic_warning),
+            contentDescription = null,
+            tint = MaterialTheme.colorScheme.error
+        )
+        Text(
+            stringResource(R.string.scanner_unsupported),
+            style = MaterialTheme.typography.bodyMedium,
+            // Ширину забирает текст, а не значок: длинная фраза иначе переносится по слогам.
+            modifier = Modifier.weight(1f)
+        )
     }
 }
