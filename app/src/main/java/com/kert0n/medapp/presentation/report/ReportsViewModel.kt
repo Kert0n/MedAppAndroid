@@ -62,7 +62,7 @@ class ReportsViewModel @Inject constructor(
         .distinctUntilChanged()
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), null)
 
-    private val horizon = MutableStateFlow<HorizonChoice>(HorizonChoice.Preset(HorizonPreset.MONTH))
+    private val horizon = MutableStateFlow(HorizonChoice.DEFAULT)
 
     private val period = MutableStateFlow<PeriodChoice>(PeriodChoice.Preset(PeriodPreset.MONTH))
 
@@ -70,9 +70,9 @@ class ReportsViewModel @Inject constructor(
         reports.observeStockSummary().map { ScreenState.Ready(it.toPresentationDTO()) }
 
     private val future: Flow<ScreenState<FutureSpendingPresentationDTO>> =
-        combine(day.filterNotNull(), horizon) { day, choice -> SpendingHorizon(day.date, choice.until(day.date)) to choice }
+        combine(day.filterNotNull(), horizon) { day, choice -> day.date to choice.on(day.date) }
             .distinctUntilChanged()
-            .flatMapLatest { (horizon, choice) -> observeFuture(horizon, choice) }
+            .flatMapLatest { (today, choice) -> observeFuture(choice.horizon(today), choice) }
 
     private val spent: Flow<ScreenState<SpendingPresentationDTO>> =
         combine(day.filterNotNull(), period) { day, choice -> Triple(choice.period(day.date), day, choice) }

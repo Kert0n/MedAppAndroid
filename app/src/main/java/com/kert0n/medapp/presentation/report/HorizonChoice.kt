@@ -21,6 +21,30 @@ sealed interface HorizonChoice {
         is Preset -> preset.until(today)
         is Until -> date
     }
+
+    /**
+     * Каким выбор стал **сегодня**. Пресет остаётся собой — он и считается от сегодняшнего дня;
+     * названная человеком дата, которую сегодня обогнало, вопросом о будущем быть перестала, и
+     * выбор возвращается к умолчанию.
+     *
+     * Правило живёт здесь, а не у спрашивающего: иначе каждый, кто строит вопрос, повторял бы его
+     * заново — и однажды не повторил. Так и вышло: сборка вопроса роняла поток состояния в первую
+     * же полночь после выбранного дня (разбор #58).
+     */
+    fun on(today: LocalDate): HorizonChoice =
+        if (this is Until && date.isBefore(today)) DEFAULT else this
+
+    /** Вопрос о будущем от [today]. Собирается из выбора, уже приведённого к сегодняшнему дню. */
+    fun horizon(today: LocalDate): SpendingHorizon {
+        val asked = on(today)
+        return SpendingHorizon(today, asked.until(today))
+    }
+
+    companion object {
+
+        /** С чего начинается место и к чему возвращается устаревший выбор. */
+        val DEFAULT: HorizonChoice = Preset(HorizonPreset.MONTH)
+    }
 }
 
 /**

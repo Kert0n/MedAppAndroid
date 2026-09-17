@@ -48,6 +48,9 @@ class ShellNavigationTest {
      */
     private fun place(name: String) = compose.onNode(isSelectable() and hasText(name))
 
+    /** Экран ждёт чтения из базы, и секунды по умолчанию на это не хватает — как и в историях. */
+    private val WAIT = 10_000L
+
     /**
      * Пять мест на месте, и человек стоит в первом: без этого правила приложение открывается
      * неизвестно где, а пропавшее место делает свои экраны недостижимыми (PLAN H3 «Оболочка»).
@@ -127,7 +130,7 @@ class ShellNavigationTest {
             "Аптечки" to "Завести аптечку"
         )) {
             place(name).performClick()
-            compose.waitUntil { compose.onAllNodesWithText(shown).fetchSemanticsNodes().isNotEmpty() }
+            compose.waitUntil(WAIT) { compose.onAllNodesWithText(shown).fetchSemanticsNodes().isNotEmpty() }
         }
     }
 }

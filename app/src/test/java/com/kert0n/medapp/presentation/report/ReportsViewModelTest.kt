@@ -232,6 +232,39 @@ class ReportsViewModelTest {
     }
 
     /**
+     * **Дату, которую обогнало сегодня, спрашивать больше нельзя.** Ксения выбрала «до завтра» и
+     * оставила приложение открытым; в полночь названный ею день стал вчерашним, и вопрос о будущем
+     * из него не построить: `SpendingHorizon` требует, чтобы срок кончался не раньше, чем
+     * начинается.
+     *
+     * Красная проверка на найденном дефекте (разбор #58): сборка вопроса роняла поток состояния
+     * прямо в полночь, и экран умирал у человека на глазах. Выбор в этом случае возвращается к
+     * умолчанию, и чтение продолжается.
+     */
+    @Test
+    fun aDayLeftBehindByTodayStopsBeingAQuestion() = runTest {
+        val start = Instant.parse("2027-03-10T20:30:00Z") // 23:30 в Москве
+        val running = object : Clock() {
+            override fun instant(): Instant = start.plusMillis(testScheduler.currentTime)
+            override fun getZone(): ZoneId = moscow
+            override fun withZone(zone: ZoneId): Clock = this
+        }
+        val reads = Reads()
+        val model = model(reads, running)
+        backgroundScope.launch { model.state.collect { } }
+        runCurrent()
+        model.chooseUntil(LocalDate.of(2027, 3, 10))
+        runCurrent()
+
+        advanceTimeBy(31 * 60 * 1000L)
+        runCurrent()
+
+        // Поток жив, и спрошено умолчание от нового дня: месяц вперёд от 11 марта.
+        assertTrue("состояние оборвалось на полуночи", model.state.value.future is ScreenState.Loading || model.state.value.future is ScreenState.Ready)
+        assertEquals(LocalDate.of(2027, 4, 11), reads.horizons.last().until)
+    }
+
+    /**
      * Дальше трёх месяцев не спрашивают: негодная дата **не применяется** — прежний вопрос стоит,
      * нового чтения не начинается, исключение наружу не выходит (ТЗ 4.1.1.10.1).
      */
