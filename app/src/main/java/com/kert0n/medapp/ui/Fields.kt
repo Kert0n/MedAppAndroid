@@ -41,9 +41,12 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
+import androidx.compose.runtime.Stable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.painterResource
+import androidx.compose.ui.text.TextRange
+import androidx.compose.ui.text.input.TextFieldValue
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.res.stringResource
 import androidx.annotation.StringRes
@@ -415,6 +418,13 @@ internal val MoneyPresentationError.text: Int
  * источника — искать человек привык одинаково, и двум копиям этого поля незачем расходиться.
  *
  * Отбор поле не делает: оно отдаёт набранное тому, кто спрашивает хранение (PLAN H4).
+ *
+ * **Курсор поле держит само** ([Typing]). Запрос возвращается в поле не в тот же кадр: набранное
+ * уходит в модель, та считает список вне главного потока и отвечает состоянием, — и всё это время
+ * снаружи приходит прежний запрос. Строкой такое поле не удержать: `OutlinedTextField(value:
+ * String)` берёт буквы снаружи, а место курсора — из своей памяти, и обрезает второе по длине
+ * первого. Отставший пустой запрос обрезал курсор в начало, и вторая набранная буква вставала
+ * перед первой: после очистки «123» набиралось как «231» — и таким же уходило искать.
  */
 @Composable
 fun SearchField(
@@ -423,14 +433,18 @@ fun SearchField(
     label: String,
     modifier: Modifier = Modifier
 ) {
+    val typing = remember { Typing(value) }
+    // Запрос, сменившийся не от набора — сброс на экране, возврат к списку, — забирает и текст, и
+    // курсор: человек этих букв не набирал, и вставать ему между ними негде.
+    typing.take(value)
     OutlinedTextField(
-        value = value,
-        onValueChange = onValueChange,
+        value = typing.typed,
+        onValueChange = { typing.type(it, onValueChange) },
         singleLine = true,
         label = { Text(label) },
         trailingIcon = {
-            if (value.isNotEmpty()) {
-                IconButton(onClick = { onValueChange("") }) {
+            if (typing.typed.text.isNotEmpty()) {
+                IconButton(onClick = { typing.type(TextFieldValue(), onValueChange) }) {
                     Icon(
                         painterResource(R.drawable.ic_close),
                         contentDescription = stringResource(R.string.action_clear_search)
@@ -440,4 +454,38 @@ fun SearchField(
         },
         modifier = modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 8.dp)
     )
+}
+
+/**
+ * Набранное вместе с местом курсора в нём. Курсор запросу не принадлежит: тот, кого спрашивают,
+ * знает буквы и не знает, где между ними стоит человек, — поэтому наружу уходят одни буквы, а
+ * место остаётся здесь и живёт дольше, чем занимает ответ.
+ *
+ * `told` — последние буквы, о которых знают обе стороны. По ним свой вернувшийся запрос отличается
+ * от чужой смены, и ждать возврата, чтобы показать набранное, не приходится.
+ */
+@Stable
+private class Typing(private var told: String) {
+
+    var typed by mutableStateOf(TextFieldValue(told, TextRange(told.length)))
+        private set
+
+    /**
+     * Взять запрос, сменившийся снаружи. Свой вернувшийся — те же буквы — не в счёт: от него
+     * курсор не двигается. Чужой становится набранным целиком, и курсор встаёт в конец, как у
+     * текста, который начали не здесь.
+     */
+    fun take(text: String) {
+        if (text == told) return
+        told = text
+        typed = TextFieldValue(text, TextRange(text.length))
+    }
+
+    /** Набрали здесь: курсор берётся как есть, а буквы называются спрашивающему, если сменились. */
+    fun type(value: TextFieldValue, tell: (String) -> Unit) {
+        typed = value
+        if (value.text == told) return
+        told = value.text
+        tell(value.text)
+    }
 }
