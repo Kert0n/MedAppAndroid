@@ -19,6 +19,7 @@ import androidx.compose.ui.unit.dp
 import com.kert0n.medapp.R
 import com.kert0n.medapp.presentation.ScreenState
 import com.kert0n.medapp.presentation.report.HorizonPreset
+import com.kert0n.medapp.presentation.report.PeriodPreset
 import com.kert0n.medapp.presentation.report.ReportsUiState
 import com.kert0n.medapp.ui.ErrorMessage
 import com.kert0n.medapp.ui.LoadingState
@@ -26,7 +27,7 @@ import java.time.LocalDate
 import kotlin.uuid.Uuid
 
 /** Три отчёта места «Отчёты» — три его состояния (PLAN H3 «Набор аналитики», C1). */
-enum class ReportsMode { SUMMARY, FUTURE }
+enum class ReportsMode { SUMMARY, FUTURE, SPENT }
 
 /**
  * Место «Отчёты» — личная статистика человека (экран 26).
@@ -43,6 +44,8 @@ fun ReportsScreen(
     onMode: (ReportsMode) -> Unit,
     onHorizonPreset: (HorizonPreset) -> Unit,
     onHorizonUntil: (LocalDate) -> Unit,
+    onPeriodPreset: (PeriodPreset) -> Unit,
+    onPeriod: (LocalDate, LocalDate) -> Unit,
     onCourse: (Uuid) -> Unit,
     modifier: Modifier = Modifier
 ) {
@@ -65,6 +68,9 @@ fun ReportsScreen(
                 ReportsMode.SUMMARY -> Report(state.summary) { SummaryReport(it) }
                 ReportsMode.FUTURE -> Report(state.future) {
                     FutureReport(report = it, onPreset = onHorizonPreset, onUntil = onHorizonUntil, onCourse = onCourse)
+                }
+                ReportsMode.SPENT -> Report(state.spent) {
+                    SpentReport(report = it, onPreset = onPeriodPreset, onPeriod = onPeriod, onCourse = onCourse)
                 }
             }
         }
@@ -89,4 +95,5 @@ private val ReportsMode.label: Int
     get() = when (this) {
         ReportsMode.SUMMARY -> R.string.reports_mode_summary
         ReportsMode.FUTURE -> R.string.reports_mode_future
+        ReportsMode.SPENT -> R.string.reports_mode_spent
     }

@@ -665,4 +665,15 @@
         <item quantity="one">%d dose</item>
         <item quantity="other">%d doses</item>
     </plurals>
+    <string name="reports_mode_spent">Spent</string>
+    <string name="reports_spent_period">%1$s — %2$s</string>
+    <string name="reports_spent_by_course">By treatment</string>
+    <string name="reports_spent_one_off">One-off intakes</string>
+    <string name="reports_spent_empty">No intakes in this period</string>
+    <string name="reports_preset_year">Year</string>
+    <string name="reports_preset_own_period">Pick a period</string>
+    <plurals name="reports_intakes">
+        <item quantity="one">%d intake</item>
+        <item quantity="other">%d intakes</item>
+    </plurals>
 </resources>

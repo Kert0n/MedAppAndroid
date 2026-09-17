@@ -706,6 +706,8 @@ private fun screens(
             onMode = { reportsMode.value = it },
             onHorizonPreset = model::choose,
             onHorizonUntil = model::chooseUntil,
+            onPeriodPreset = model::choose,
+            onPeriod = model::choosePeriod,
             // Строка лечения ведёт на его карточку: запись эпизода вечна, и карточка умеет
             // закончившееся лечение (PLAN C1).
             onCourse = { stacks.go(Screen.CourseCard(it)) }

@@ -73,8 +73,12 @@ class ReportsViewModelTest {
         private fun answerTo(horizon: SpendingHorizon) =
             answers.getOrPut(horizon) { MutableSharedFlow(replay = 1, extraBufferCapacity = 1) }
 
-        override fun observeSpending(period: SpendingPeriod, zone: ZoneId): Flow<Spending> =
-            error("этот отчёт проверке не нужен")
+        val periods = mutableListOf<Pair<SpendingPeriod, ZoneId>>()
+
+        override fun observeSpending(period: SpendingPeriod, zone: ZoneId): Flow<Spending> {
+            periods += period to zone
+            return MutableStateFlow(Spending.EMPTY)
+        }
 
         override fun observeDayPlan(date: LocalDate, zone: ZoneId): Flow<DayPlan> =
             error("этот отчёт проверке не нужен")
@@ -108,6 +112,36 @@ class ReportsViewModelTest {
             listOf(SpendingHorizon(LocalDate.of(2027, 3, 10), LocalDate.of(2027, 4, 10))),
             reads.horizons
         )
+    }
+
+    /** Истраченное спрашивается за календарные дни человека — в его зоне, а не в UTC. */
+    @Test
+    fun spendingIsAskedInTheZoneOfTheHuman() = runTest {
+        val reads = Reads()
+        val model = model(reads, at("2027-03-10T09:00:00Z"))
+
+        backgroundScope.launch { model.state.collect { } }
+        runCurrent()
+
+        assertEquals(
+            listOf(SpendingPeriod(LocalDate.of(2027, 2, 10), LocalDate.of(2027, 3, 10)) to moscow),
+            reads.periods
+        )
+    }
+
+    /** Период длиннее года не применяется: предел принадлежит `SpendingPeriod` (ТЗ 4.1.1.10.2). */
+    @Test
+    fun aPeriodLongerThanAYearIsNotAsked() = runTest {
+        val reads = Reads()
+        val model = model(reads, at("2027-03-10T09:00:00Z"))
+        backgroundScope.launch { model.state.collect { } }
+        runCurrent()
+        val asked = reads.periods.toList()
+
+        model.choosePeriod(LocalDate.of(2026, 1, 1), LocalDate.of(2027, 3, 10))
+        runCurrent()
+
+        assertEquals(asked, reads.periods)
     }
 
     /** Другой пресет — другой вопрос, и он задаётся от того же сегодняшнего дня. */

@@ -700,4 +700,17 @@
         <item quantity="many">%d доз</item>
         <item quantity="other">%d дозы</item>
     </plurals>
+    <string name="reports_mode_spent">Истрачено</string>
+    <string name="reports_spent_period">С %1$s по %2$s</string>
+    <string name="reports_spent_by_course">По лечениям</string>
+    <string name="reports_spent_one_off">Разовые приёмы</string>
+    <string name="reports_spent_empty">За этот период приёмов не было</string>
+    <string name="reports_preset_year">Год</string>
+    <string name="reports_preset_own_period">Свой период</string>
+    <plurals name="reports_intakes">
+        <item quantity="one">%d приём</item>
+        <item quantity="few">%d приёма</item>
+        <item quantity="many">%d приёмов</item>
+        <item quantity="other">%d приёма</item>
+    </plurals>
 </resources>
