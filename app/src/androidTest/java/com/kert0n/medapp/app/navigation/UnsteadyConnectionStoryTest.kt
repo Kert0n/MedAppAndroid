@@ -11,6 +11,7 @@ import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performTextInput
+import androidx.test.espresso.Espresso.closeSoftKeyboard
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import androidx.test.platform.app.InstrumentationRegistry
 import com.kert0n.medapp.HiltTestActivity
@@ -264,6 +265,8 @@ class UnsteadyConnectionStoryTest {
         compose.onNodeWithText("Пересчитать").performClick()
         see("Пересчитал и увидел")
         compose.onNodeWithText("Пересчитал и увидел").performTextInput(actual)
+        // Пока клавиатура открыта, подвала формы нет (`Form`): человек сначала убирает её.
+        closeSoftKeyboard()
         compose.onNodeWithText("Записать").performClick()
         see("Сколько есть")
     }
