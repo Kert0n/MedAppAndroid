@@ -85,6 +85,7 @@ class MedKitJoiningViewModelTest {
 
     private class Laid : SnapshotStorage {
         override suspend fun serverKnows() = ServerKnowledge(emptySet(), emptySet(), emptySet(), emptySet())
+        override suspend fun packagesKnownOn(medKitId: Uuid): Set<Uuid> = emptySet()
         override suspend fun lay(snapshot: ServerSnapshot, at: Instant) = Unit
     }
 

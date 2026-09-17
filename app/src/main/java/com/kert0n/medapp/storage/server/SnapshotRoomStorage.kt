@@ -58,6 +58,8 @@ class SnapshotRoomStorage @Inject constructor(
         )
     }
 
+    override suspend fun packagesKnownOn(medKitId: Uuid): Set<Uuid> = packages.knownToServerOn(medKitId).toSet()
+
     override suspend fun lay(snapshot: ServerSnapshot, at: Instant) = database.withTransaction {
         val words = vocabulary.snapshot()
         // Полка, пришедшая с сервера, у нас заводится: имени и места хранения сервер не знает, и

@@ -76,6 +76,7 @@ class MedKitJoiningTest {
     private class Laid : SnapshotStorage {
         val laid = ArrayList<ServerSnapshot>()
         override suspend fun serverKnows() = ServerKnowledge(setOf(HOME_KIT), emptySet(), setOf(HOME_KIT), emptySet())
+        override suspend fun packagesKnownOn(medKitId: Uuid): Set<Uuid> = emptySet()
         override suspend fun lay(snapshot: ServerSnapshot, at: Instant) {
             laid += snapshot
         }

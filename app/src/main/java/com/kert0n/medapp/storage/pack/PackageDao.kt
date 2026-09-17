@@ -282,6 +282,17 @@ interface PackageDao {
     )
     suspend fun knownToServer(): List<Uuid>
 
+    /**
+     * То же, но на одной полке: перечитывание полки утверждает о ней целиком, и коробка, которой
+     * она не назвала, у нас кончается. О чужих полках это перечитывание не говорит ничего (E4).
+     */
+    @Query(
+        "SELECT p.id FROM packages p JOIN med_kits k ON k.id = p.med_kit_id " +
+            "WHERE p.med_kit_id = :medKitId AND k.publication = 'PUBLISHED' " +
+            "AND p.version IS NOT NULL AND p.status = 'ACTIVE'"
+    )
+    suspend fun knownToServerOn(medKitId: Uuid): List<Uuid>
+
     /** Все живые коробки — чтобы снимок не вернул убранную, пока он летел (PLAN C0, E4). */
     @Query("SELECT id FROM packages")
     suspend fun held(): List<Uuid>

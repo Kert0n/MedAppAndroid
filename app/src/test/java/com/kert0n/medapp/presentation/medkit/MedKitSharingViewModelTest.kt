@@ -111,6 +111,7 @@ class MedKitSharingViewModelTest {
 
     private object Untouched : SnapshotStorage {
         override suspend fun serverKnows(): ServerKnowledge = error("снимок этой проверке не нужен")
+        override suspend fun packagesKnownOn(medKitId: Uuid): Set<Uuid> = error("снимок этой проверке не нужен")
         override suspend fun lay(snapshot: ServerSnapshot, at: Instant): Unit = error("снимок этой проверке не нужен")
     }
 
