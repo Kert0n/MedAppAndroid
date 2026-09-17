@@ -157,4 +157,18 @@ class ScanSuggestionMapperTest {
         assertEquals("7", filled.amount)
         assertEquals("своё", filled.description)
     }
+
+    /**
+     * Голое «20» количеством не считается: двадцать чего — реестр не сказал. Возьми мы число,
+     * строка ушла бы из описания, и человек не увидел бы её вовсе (разбор #55).
+     */
+    @Test
+    fun aNumberWithoutAUnitIsNotAQuantity() {
+        val suggestion = PackageSuggestion(quantityText = "20", isMedicine = true)
+
+        val filled = suggestion.filling(empty, VOCABULARY)
+
+        assertEquals("", filled.amount)
+        assertEquals("20", filled.description)
+    }
 }

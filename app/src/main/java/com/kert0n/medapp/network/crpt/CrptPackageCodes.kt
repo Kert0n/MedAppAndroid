@@ -24,9 +24,13 @@ class CrptPackageCodes @Inject constructor(
 
     override suspend fun lookup(code: DataMatrixCode): PackageCodes.Lookup = when (val check = api.check(code)) {
         // Сегодня нужно, чтобы отсеять день продажи из будущего: коробку, ещё не проданную,
-        // человек в руках не держит. Время берётся часами, а не `LocalDate.now()` (PLAN H1).
-        is CrptCheck.Body ->
-            PackageCodes.Lookup.Found(check.dto.toSuggestion(vocabulary.snapshot(), LocalDate.now(clock)))
+        // человек в руках не держит. Время берётся часами, а не `LocalDate.now()` (PLAN H1), и
+        // день считается **в московских сутках** — тех же, в которых реестр называет дату продажи.
+        // Часы устройства стоят в своей зоне, и под полночь «сегодня» у них другое число: честная
+        // покупка сегодняшнего московского дня оказалась бы будущей и пропала (разбор #55).
+        is CrptCheck.Body -> PackageCodes.Lookup.Found(
+            check.dto.toSuggestion(vocabulary.snapshot(), LocalDate.now(clock.withZone(CRPT_ZONE)))
+        )
         CrptCheck.NotFound -> PackageCodes.Lookup.NotFound
         is CrptCheck.Unavailable -> PackageCodes.Lookup.Unavailable(check.reason)
     }

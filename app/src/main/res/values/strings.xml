@@ -601,6 +601,8 @@
     <string name="scanner_unsupported">Этот код не поддерживается: на упаковках лекарств стоит DataMatrix.</string>
     <string name="scanner_invitation">Это приглашение в аптечку.</string>
     <string name="pack_scan_asking">Спрашиваем «Честный знак» о коде с упаковки…</string>
+    <string name="pack_scan_not_found">Реестр не знает этого кода — заполните поля сами.</string>
+    <string name="pack_scan_unavailable">Реестр не ответил: %1$s. Заполните поля сами.</string>
     <string name="med_kit_joining_scan">Отсканировать код</string>
     <string name="med_kit_joining_aim">Наведите на QR приглашения</string>
     <string name="med_kit_joining_camera_denied">Камера запрещена. Введите код руками или разрешите камеру в настройках приложения.</string>

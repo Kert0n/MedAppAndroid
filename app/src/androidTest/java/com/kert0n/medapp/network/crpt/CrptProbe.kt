@@ -73,7 +73,7 @@ class CrptProbe {
                 val dto = crptJson.decodeFromString(CrptCheckNetworkDTO.serializer(), raw)
                 println("CRPT_PROBE[$index] codeFounded=${dto.codeFounded} category=${dto.category} name=${dto.productName} expireDate=${dto.expireDate}")
                 println("CRPT_PROBE[$index] pharmacy=${dto.pharmacy} labels=${dto.attributes.keys} country=${dto.chip("country")}")
-                println("CRPT_PROBE[$index] suggestion=${dto.toSuggestion(vocabulary, LocalDate.now())}")
+                println("CRPT_PROBE[$index] suggestion=${dto.toSuggestion(vocabulary, LocalDate.now(CRPT_ZONE))}")
             }
         }
     }

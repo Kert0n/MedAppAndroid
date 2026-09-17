@@ -108,6 +108,13 @@ class PackageFormViewModel @AssistedInject constructor(
      */
     private val asking = MutableStateFlow(opened.scannedCode?.isNotEmpty() == true)
 
+    /**
+     * Чем кончился разговор с реестром, если кончился ничем. Молчаливая пустая форма после трёх
+     * секунд ожидания — это исход, проглоченный экраном: человек не знает, не нашёлся ли код, не
+     * дошёл ли запрос и не зря ли он ждал (PLAN U1 «каждый исход сценария показан»).
+     */
+    private val silence = MutableStateFlow<PackageScanSilence?>(null)
+
 
     private val suggestions: Flow<Suggestions> =
         if (opened.packageId != null) flowOf<Suggestions>(Suggestions.None) else typed
@@ -145,7 +152,9 @@ class PackageFormViewModel @AssistedInject constructor(
     }
 
     /** Два ответа извне — справочника и реестра — идут вместе: складывать больше пяти потоков нечем. */
-    private val answers = combine(suggestions, asking) { suggestions, asking -> Answers(suggestions, asking) }
+    private val answers = combine(suggestions, asking, silence) { suggestions, asking, silence ->
+        Answers(suggestions, asking, silence)
+    }
 
     val state: StateFlow<PackageFormUiState> = combine(form, progress, stored, choices, answers) { form, progress, stored, choices, answers ->
         PackageFormUiState(
@@ -159,7 +168,8 @@ class PackageFormViewModel @AssistedInject constructor(
             isSaving = progress.isSaving,
             saved = progress.saved,
             suggestions = answers.suggestions,
-            isAsking = answers.asking
+            isAsking = answers.asking,
+            silence = answers.silence
         )
     }.stateIn(
         viewModelScope,
@@ -185,11 +195,17 @@ class PackageFormViewModel @AssistedInject constructor(
      */
     private suspend fun ask(code: String) {
         try {
-            val outcome = scanning.lookup(ScannedCode(CodeFormat.DATA_MATRIX, code))
-            if (outcome is PackageScanning.Outcome.Suggested) {
-                // Словарь нужен, чтобы узнать единицу, которую реестр назвал словом: свою клиент
-                // не заводит (PLAN D1). Снимок читается здесь же, как и перед записью формы.
-                form.value = outcome.suggestion.filling(form.value, vocabulary.snapshot())
+            when (val outcome = scanning.lookup(ScannedCode(CodeFormat.DATA_MATRIX, code))) {
+                is PackageScanning.Outcome.Suggested ->
+                    // Словарь нужен, чтобы узнать единицу, которую реестр назвал словом: свою
+                    // клиент не заводит (PLAN D1). Снимок читается здесь же, как перед записью.
+                    form.value = outcome.suggestion.filling(form.value, vocabulary.snapshot())
+                PackageScanning.Outcome.NotFound -> silence.value = PackageScanSilence.NotFound
+                // Код сюда приходит только DataMatrix'ом: сказать о нём нечего, кроме того же,
+                // что и о незнакомом коде, — заполнять форму нечем.
+                PackageScanning.Outcome.Unsupported -> silence.value = PackageScanSilence.NotFound
+                is PackageScanning.Outcome.Unavailable ->
+                    silence.value = PackageScanSilence.Unavailable(outcome.reason)
             }
         } finally {
             // Разговор кончился любым исходом — показываем форму. В `finally`, потому что отмена
@@ -277,7 +293,11 @@ class PackageFormViewModel @AssistedInject constructor(
         progress.value = Progress(error = error)
     }
 
-    private class Answers(val suggestions: Suggestions, val asking: Boolean)
+    private class Answers(
+        val suggestions: Suggestions,
+        val asking: Boolean,
+        val silence: PackageScanSilence?
+    )
 
     private class Choices(
         val medKits: List<MedKitPresentationDTO>,
@@ -312,8 +332,22 @@ data class PackageFormUiState(
     val saved: Uuid? = null,
     val suggestions: Suggestions = Suggestions.None,
     /** Идёт разговор с реестром: полей ещё нет, и показывать их пустыми нельзя. */
-    val isAsking: Boolean = false
+    val isAsking: Boolean = false,
+    /** Реестр ничего не дал, и сказано почему; `null` — дал или не спрашивали. */
+    val silence: PackageScanSilence? = null
 )
+
+/**
+ * Почему поля остались пустыми после скана. Случая два, и человек делает в них разное: код,
+ * которого реестр не знает, он заполнит руками и сейчас; до реестра, который не ответил, можно
+ * добраться позже — но коробку всё равно заводят руками, и потому оба случая ведут в ту же форму.
+ */
+sealed interface PackageScanSilence {
+
+    data object NotFound : PackageScanSilence
+
+    data class Unavailable(val reason: Unavailability) : PackageScanSilence
+}
 
 /**
  * Что справочник ответил на напечатанное (PLAN H3 №7). Случаи различает экран: ничего не

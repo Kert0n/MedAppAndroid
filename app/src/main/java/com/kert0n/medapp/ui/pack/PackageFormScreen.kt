@@ -30,6 +30,7 @@ import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.ui.unit.dp
 import com.kert0n.medapp.R
 import com.kert0n.medapp.presentation.pack.PackageFormError
+import com.kert0n.medapp.presentation.pack.PackageScanSilence
 import com.kert0n.medapp.presentation.pack.PackageFormPresentationDTO
 import com.kert0n.medapp.presentation.pack.withForm
 import com.kert0n.medapp.presentation.pack.PackageFormUiState
@@ -92,6 +93,9 @@ fun PackageFormScreen(
         Form(
             modifier = Modifier.padding(padding),
             actions = {
+                // Реестр промолчал — сказано почему, там же, где форма говорит об отказе записи:
+                // пустые поля после ожидания человек иначе читает как поломку (PLAN U1).
+                state.silence?.let { Text(it.message(), color = MaterialTheme.colorScheme.onSurfaceVariant) }
                 state.error?.let { Text(it.message(), color = MaterialTheme.colorScheme.error) }
                 Button(
                     onClick = onSave,
@@ -318,4 +322,11 @@ private fun SuggestionList(suggestions: Suggestions, onPick: (TemplatePresentati
 @Composable
 private fun Note(text: String) {
     Text(text, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+}
+
+/** Почему поля пусты — словами. Слова у случая свои: экран их не выбирает. */
+@Composable
+private fun PackageScanSilence.message(): String = when (this) {
+    PackageScanSilence.NotFound -> stringResource(R.string.pack_scan_not_found)
+    is PackageScanSilence.Unavailable -> stringResource(R.string.pack_scan_unavailable, stringResource(reason.text))
 }

@@ -140,28 +140,45 @@ class PackageFormScanTest {
         assertEquals("Цетиризин", state.form.name)
     }
 
-    /** «Не найдено» — обычный ответ, а не ошибка: форма остаётся пустой, и её заполняют руками. */
+    /**
+     * «Не найдено» — обычный ответ, а не ошибка: форму заполняют руками. Но **сказать об этом
+     * надо**: человек ждал ответа, и молчаливые пустые поля он читает как поломку, а не как
+     * «такого кода реестр не знает» (PLAN U1 «каждый исход показан»).
+     */
     @Test
-    fun anUnknownCodeLeavesAnOrdinaryEmptyForm() {
+    fun anUnknownCodeIsSaidAndLeavesAnOrdinaryForm() {
         codes.answer = PackageCodes.Lookup.NotFound
         val model = scanned()
 
-        val state = watching(model.state) { it.awaiting { seen -> seen.medKits.isNotEmpty() } }
+        val state = watching(model.state) { it.awaiting { seen -> !seen.isAsking } }
 
+        assertEquals(PackageScanSilence.NotFound, state.silence)
         assertEquals("", state.form.name)
         assertNull("«не найдено» — не отказ формы", state.error)
     }
 
-    /** Реестра нет — коробку всё равно заводят: форма работает и без него. */
+    /** Реестра нет — названа причина, и коробку всё равно заводят: форма работает и без него. */
     @Test
-    fun anUnreachableRegistryDoesNotBreakTheForm() {
+    fun anUnreachableRegistryIsSaidWithItsReason() {
         codes.answer = PackageCodes.Lookup.Unavailable(Unavailability.NO_CONNECTION)
         val model = scanned()
 
-        val state = watching(model.state) { it.awaiting { seen -> seen.medKits.isNotEmpty() } }
+        val state = watching(model.state) { it.awaiting { seen -> !seen.isAsking } }
 
+        assertEquals(PackageScanSilence.Unavailable(Unavailability.NO_CONNECTION), state.silence)
         assertEquals("", state.form.name)
         assertNull(state.error)
+    }
+
+    /** Ответ пришёл — говорить не о чем: поля заполнены, и молчание тут было бы не о чем. */
+    @Test
+    fun anAnsweredCodeSaysNothingExtra() {
+        codes.answer = FakePackageCodes.found()
+        val model = scanned()
+
+        val state = watching(model.state) { it.awaiting { seen -> seen.form.name.isNotBlank() } }
+
+        assertNull(state.silence)
     }
 
     /** У правки кода нет, и спрашивать реестр ей не о чем. */
