@@ -104,6 +104,20 @@ class PackageCardScreenTest {
         compose.onNodeWithText("Этой упаковки больше нет.").assertDoesNotExist()
     }
 
+    /**
+     * Коробка в базе есть, но сервер ещё отвечает: карточка ждёт, и ни одно действие не нажать —
+     * иначе приняли бы или выбросили по числу, которое через миг сменится (PLAN E4).
+     */
+    @Test
+    fun whileTheServerAnswersTheCardWaitsWithNothingToPress() {
+        show(card().copy(isFreshening = true))
+
+        compose.onNodeWithContentDescription("Загрузка").assertIsDisplayed()
+        compose.onNodeWithText("Сколько есть").assertDoesNotExist()
+        compose.onNodeWithContentDescription("Выбросить").assertDoesNotExist()
+        compose.onNodeWithText("Принять").assertDoesNotExist()
+    }
+
     @Test
     fun aGoneBoxIsSaidOutLoud() {
         show(PackageCardUiState(isGone = true))

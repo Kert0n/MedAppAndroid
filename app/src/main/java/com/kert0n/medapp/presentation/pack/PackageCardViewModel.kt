@@ -2,6 +2,7 @@ package com.kert0n.medapp.presentation.pack
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.kert0n.medapp.feature.operation.Freshening
 import com.kert0n.medapp.feature.packages.PackageRemoval
 import com.kert0n.medapp.feature.time.Today
 import com.kert0n.medapp.storage.course.CourseStorageRepository
@@ -33,11 +34,15 @@ import kotlinx.coroutines.launch
  * Имя полки и название держащего лечения — чужие агрегаты: в проекции коробки лежат их
  * тождества, а слова берутся чтениями. **Полка читается одна, а не все**: ради одного имени не
  * спрашивают `GROUP BY` по всем коробкам базы.
+ *
+ * Коробка при открытии перечитывается, и пока ответ не пришёл, карточка ждёт: число, по которому
+ * человек решает, должно быть свежим (PLAN E4). Без связи и у местной коробки ждать нечего.
  */
 @OptIn(ExperimentalCoroutinesApi::class)
 @HiltViewModel(assistedFactory = PackageCardViewModel.Factory::class)
 class PackageCardViewModel @AssistedInject constructor(
     private val removal: PackageRemoval,
+    freshening: Freshening,
     packages: PackageStorageRepository,
     medKits: MedKitStorageRepository,
     courses: CourseStorageRepository,
@@ -53,9 +58,25 @@ class PackageCardViewModel @AssistedInject constructor(
 
     private val removing = MutableStateFlow(Removing())
 
+    /** Перечитывание при открытии кончилось. */
+    private val freshened = MutableStateFlow(false)
+
+    init {
+        viewModelScope.launch {
+            try {
+                freshening.pack(packageId)
+            } finally {
+                freshened.value = true
+            }
+        }
+    }
+
     private val days = today.observe()
 
+    /** Коробка, как её прочитали, — вместе с тем, дождались ли ответа сервера. */
     private val pack = packages.observe(packageId)
+
+    private val read = combine(pack, freshened) { pack, freshened -> pack to freshened }
 
     private val place = combine(pack, days) { pack, day -> pack?.medKit?.id to day.date }
         .distinctUntilChanged()
@@ -76,16 +97,18 @@ class PackageCardViewModel @AssistedInject constructor(
 
     private val seenAndRefused = combine(days, refused) { day, refused -> day to refused }
 
-    val state: StateFlow<PackageCardUiState> = combine(pack, place, course, seenAndRefused, removing) { pack, place, course, (day, refused), removing ->
+    val state: StateFlow<PackageCardUiState> = combine(read, place, course, seenAndRefused, removing) { (pack, freshened), place, course, (day, refused), removing ->
         PackageCardUiState(
+            isFreshening = !freshened,
             pack = pack?.toPresentationDTO(),
             medKitName = place?.name,
             holdingCourseTitle = course?.title,
             lastUsedOn = pack?.lastUsedAt?.atZone(day.zone)?.toLocalDate(),
             today = day.date,
             isRefusedByServer = refused,
-            // «Нет» говорится только после чтения: до него это состояние сюда не доходит.
-            isGone = pack == null,
+            // «Нет» говорится только после чтения — и базы, и сервера: пока ждём ответа, коробка,
+            // которой в базе нет, ещё может оказаться (PLAN H3 «Непрочитанное не выдаётся за исчезнувшее»).
+            isGone = freshened && pack == null,
             asksToRemove = removing.asking,
             isBusy = removing.busy,
             isRemoved = removing.removed
@@ -136,6 +159,8 @@ class PackageCardViewModel @AssistedInject constructor(
  * выбросил, и экран уходит. [isBusy] — отказ: коробка ждёт ответа на другое решение (PLAN E1).
  */
 data class PackageCardUiState(
+    /** Коробка перечитывается у сервера: карточка ждёт (PLAN E4). */
+    val isFreshening: Boolean = false,
     val pack: PackagePresentationDTO? = null,
     val medKitName: String? = null,
     val holdingCourseTitle: String? = null,
@@ -150,5 +175,5 @@ data class PackageCardUiState(
     val isRemoved: Boolean = false
 ) {
     /** Пока первое чтение не пришло, карточка не говорит ни «есть», ни «нет». */
-    val isLoading: Boolean get() = pack == null && !isGone
+    val isLoading: Boolean get() = isFreshening || (pack == null && !isGone)
 }

@@ -2,6 +2,7 @@ package com.kert0n.medapp.presentation.pack
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.kert0n.medapp.feature.operation.Freshening
 import com.kert0n.medapp.feature.packages.PackageRelocation
 import com.kert0n.medapp.feature.time.Today
 import com.kert0n.medapp.presentation.medkit.MedKitPresentationDTO
@@ -29,11 +30,15 @@ import kotlinx.coroutines.launch
  * Нынешняя полка среди мест не предлагается: класть коробку туда, где она уже лежит, нечем.
  * Общие полки предлагаются наравне с местными — аптечки доступны всегда, а что при этом едет
  * серверу, решает сценарий (C3, E6).
+ *
+ * Коробка общей полки при открытии перечитывается, и пока сервер не ответил, экран ждёт: чужие
+ * брони на ней решают, предупреждать ли о переносе (PLAN E4).
  */
 @OptIn(ExperimentalCoroutinesApi::class)
 @HiltViewModel(assistedFactory = PackageTransferViewModel.Factory::class)
 class PackageTransferViewModel @AssistedInject constructor(
     private val relocation: PackageRelocation,
+    freshening: Freshening,
     packages: PackageStorageRepository,
     medKits: MedKitStorageRepository,
     today: Today,
@@ -49,12 +54,26 @@ class PackageTransferViewModel @AssistedInject constructor(
 
     private val progress = MutableStateFlow(Progress())
 
+    /** Перечитывание коробки при открытии кончилось (PLAN E4). */
+    private val freshened = MutableStateFlow(false)
+
+    init {
+        viewModelScope.launch {
+            try {
+                freshening.pack(packageId)
+            } finally {
+                freshened.value = true
+            }
+        }
+    }
+
     val state: StateFlow<PackageTransferUiState> = combine(
         packages.observe(packageId),
         today.observe().flatMapLatest { medKits.observeAll(it.date) },
         chosen,
-        progress
-    ) { pack, kits, chosen, progress ->
+        progress,
+        freshened
+    ) { pack, kits, chosen, progress, freshened ->
         PackageTransferUiState(
             places = kits.filter { it.id != pack?.medKit?.id }.map { it.toPresentationDTO() },
             chosen = chosen,
@@ -65,7 +84,7 @@ class PackageTransferViewModel @AssistedInject constructor(
             isGone = pack == null,
             refusal = progress.refusal,
             isDone = progress.done,
-            isLoaded = true
+            isLoaded = freshened
         )
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), PackageTransferUiState())
 

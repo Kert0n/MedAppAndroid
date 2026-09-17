@@ -137,7 +137,6 @@ class SharedShelfStoryTest {
         val code = marinaTakesTheCode()
         sergeyJoinsAndTakesTwo(code)
         marinaSeesTheNewNumber()
-        sergeyEmptiesTheBoxBehindHerBack()
         marinaTakesWhatIsNoLongerThereAndIsRefused()
     }
 
@@ -192,15 +191,22 @@ class SharedShelfStoryTest {
         check(taken is ApiResult.Success) { "Сергей не смог взять из коробки: $taken" }
     }
 
+    /**
+     * Марина открывает коробку — и карточка сначала спрашивает сервер: восемь, хотя «Обновить» она
+     * не нажимала (PLAN E4). Сколько именно, зависит от единицы боевого словаря, поэтому сверяется
+     * само число, а не вся строка.
+     */
     private fun marinaSeesTheNewNumber() {
-        refreshFromOptions()
         openTheShelf()
-        // Число стало другим: сколько именно, зависит от единицы боевого словаря, поэтому
-        // сверяется само число, а не вся строка.
-        compose.waitUntil(WAIT) { shownPart("8") }
+        compose.onNodeWithText("Ибупрофен Марины").performClick()
+        compose.waitUntil(WAIT) { shown("Сколько есть") }
+        compose.waitUntil(WAIT) { shownPart("8 ") }
     }
 
-    /** Сергей допивает коробку, пока Марина о ней не спрашивала: она думает, что там восемь. */
+    /**
+     * Сергей допивает коробку, пока у Марины открыт лист приёма: лист перечитан, но дальше
+     * человек набирает, а сервер не стоит на месте.
+     */
     private fun sergeyEmptiesTheBoxBehindHerBack() = runBlocking {
         val sergey = requireNotNull(ProbeAccounts.boris)
         val seen = success(sergey.packageSnapshot(box))
@@ -220,7 +226,8 @@ class SharedShelfStoryTest {
         compose.onNodeWithText("Ибупрофен Марины").performClick()
         compose.waitUntil(WAIT) { shown("Сколько есть") }
         compose.onNodeWithContentDescription("Принять").performClick()
-        compose.waitUntil(WAIT) { shown("Принять разово") }
+        compose.waitUntil(WAIT) { shown("Сколько принял") }
+        sergeyEmptiesTheBoxBehindHerBack()
         compose.onNodeWithText("Сколько принял").performTextInput("3")
         compose.onAllNodesWithText("Принять").onLast().performClick()
         compose.waitUntil(WAIT) { !shown("Принять разово") }

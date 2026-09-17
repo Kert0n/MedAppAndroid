@@ -125,6 +125,23 @@ class MedKitContentsScreenTest {
     }
 
     /**
+     * Полки у нас больше нет — её убрали у всех или нас из неё вывели, и перечитывание при открытии
+     * это записало (PLAN E4). Заводить в неё нечего: ни «Завести упаковку», ни плавающей кнопки, ни
+     * меню полки — только слова.
+     *
+     * Красная проверка: полка, которой нет, читалась пустой полкой и звала завести в неё коробку.
+     */
+    @Test
+    fun aShelfThatIsNoLongerOursOffersNothingToAdd() {
+        show(MedKitContentsUiState(isEverywhere = false, isAreaEmpty = true, today = today, isLoaded = true))
+
+        compose.onNodeWithText("Завести упаковку").assertDoesNotExist()
+        compose.onNodeWithContentDescription("Завести упаковку").assertDoesNotExist()
+        compose.onNodeWithContentDescription("Что сделать с аптечкой").assertDoesNotExist()
+        compose.onNodeWithText("Этой аптечки у вас больше нет.").assertIsDisplayed()
+    }
+
+    /**
      * Пустая полка — рассказ и одна кнопка: поиска и чипов нет (они обещали бы содержимое), а
      * плавающая кнопка спрятана.
      *
