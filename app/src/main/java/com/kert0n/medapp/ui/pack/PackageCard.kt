@@ -97,8 +97,6 @@ fun PackageCard(
             // человек ищет коробку в списке и должен понимать, почему число у неё оценочное
             // (PLAN E1, H3 «Набор общей полки»).
             when (pkg.status) {
-                // Внутри погашенной карточки цвет содержимого уже её: свой сделал бы надпись
-                // нечитаемой на этой подложке.
                 // Внутри залитой карточки цвет содержимого уже её: свой сделал бы надпись
                 // нечитаемой на этой подложке.
                 PackageStatus.REMOVING -> Marker(
@@ -111,8 +109,11 @@ fun PackageCard(
                     text = stringResource(R.string.pack_row_lost),
                     color = LocalContentColor.current
                 )
+                // Пометка стоит там же, где цвет: не всякое решение в пути меняет число — правка
+                // сведений и перенос его не трогают, — а сказать о нём нужно теми же словами.
+                // Цвет один ничего не говорит тому, кто его не различает (разбор CodeRabbit).
                 PackageStatus.ACTIVE, PackageStatus.CHANGING ->
-                    if (pkg.hasUnconfirmedChanges) {
+                    if (pending) {
                         Marker(
                             icon = R.drawable.ic_cloud_upload,
                             text = stringResource(R.string.pack_row_unconfirmed),

@@ -343,6 +343,29 @@ class MedKitContentsScreenTest {
     }
 
     /**
+     * Не всякое решение в пути меняет число: правка сведений и перенос его не трогают, и
+     * `hasUnconfirmedChanges` у такой коробки пуст. Пометка нужна ей ровно так же — иначе
+     * янтарная подложка остаётся единственным знаком, а цвет один ничего не говорит человеку,
+     * который его не различает (разбор CodeRabbit, PLAN H3 «Дизайн»).
+     */
+    @Test
+    fun aChangeThatDoesNotTouchTheNumberIsMarkedAllTheSame() {
+        show(
+            MedKitContentsUiState(
+                medKit = medKit(id = HOME_KIT, name = "Домашняя")
+                    .projection(MedKitContents(packages = 1, expired = 0)).toPresentationDTO(),
+                packages = listOf(
+                    pack(id = PACK, name = "Нурофен").markChanging(Uuid.random()).projected().toPresentationDTO()
+                ),
+                today = today,
+                isLoaded = true
+            )
+        )
+
+        compose.onNodeWithText("Изменение в пути").assertIsDisplayed()
+    }
+
+    /**
      * Выброшенная коробка — состояние конечное: она видна призраком, но **не нажимается**. Открыть
      * её карточку значило бы предложить человеку действия над тем, чего уже нет (решение владельца
      * 2026-09-17).
@@ -364,7 +387,10 @@ class MedKitContentsScreenTest {
             )
         )
 
-        compose.onNodeWithText("Цетрин").performClick()
+        // Спрашивается само состояние, а не только исход нажатия: погашенная карточка может
+        // сохранить действие в семантике, и тогда «не открылось» ничего бы не доказывало
+        // (разбор CodeRabbit).
+        compose.onNodeWithText("Цетрин").assertIsNotEnabled().performClick()
 
         assertNull(opened)
     }
