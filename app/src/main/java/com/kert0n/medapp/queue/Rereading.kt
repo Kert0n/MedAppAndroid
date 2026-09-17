@@ -74,7 +74,7 @@ class Rereading @Inject constructor(
             ),
             at
         )
-        return Outcome.Read
+        return Outcome.Read(packages = resolved.mapTo(HashSet()) { it.pack.id })
     }
 
     /** Одна коробка. 404 — её больше нет: выбросили, кончилась или унесли туда, где нас нет. */
@@ -95,7 +95,7 @@ class Rereading @Inject constructor(
         // Коробка на полке, которой у нас нет, — это не «пропала»: её переставили туда, где нас
         // нет, и отвечает за это полный снимок со своим утверждением о целом (E6).
         val snapshot = (resolution as? PackageSnapshotResolver.Resolution.Resolved)?.snapshot
-            ?: return Outcome.Read
+            ?: return Outcome.Read(packages = emptySet())
         storage.lay(
             ServerSnapshot(
                 participants = emptyMap(),
@@ -107,7 +107,7 @@ class Rereading @Inject constructor(
             ),
             at
         )
-        return Outcome.Read
+        return Outcome.Read(packages = setOf(snapshot.pack.id))
     }
 
     private fun gone(medKits: Set<Uuid>, packages: Set<Uuid>, knew: ServerKnowledge) = ServerSnapshot(
@@ -126,7 +126,12 @@ class Rereading @Inject constructor(
      */
     sealed interface Outcome {
 
-        data object Read : Outcome
+        /**
+         * Прочитано, и [packages] — коробки, которые ответ назвал и которые легли: у полки — её
+         * содержимое, у коробки — она сама. Свежими после этого чтения стали они все (PLAN E4).
+         * Коробка, которую не удалось разрешить, сюда не входит: о ней ничего не легло.
+         */
+        data class Read(val packages: Set<Uuid>) : Outcome
 
         data object Gone : Outcome
 

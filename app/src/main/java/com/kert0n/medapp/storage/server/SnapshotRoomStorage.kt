@@ -58,7 +58,13 @@ class SnapshotRoomStorage @Inject constructor(
         )
     }
 
-    override suspend fun packagesKnownOn(medKitId: Uuid): Set<Uuid> = packages.knownToServerOn(medKitId).toSet()
+    /**
+     * Правило «сервер знает коробку» живёт в одном запросе — [PackageDao.knownToServer], — а
+     * полка его только сужает: второй `WHERE` с тем же условием разошёлся бы с первым.
+     */
+    override suspend fun packagesKnownOn(medKitId: Uuid): Set<Uuid> = database.withTransaction {
+        packages.knownToServer().toSet() intersect packages.idsOn(medKitId).toSet()
+    }
 
     override suspend fun lay(snapshot: ServerSnapshot, at: Instant) = database.withTransaction {
         val words = vocabulary.snapshot()

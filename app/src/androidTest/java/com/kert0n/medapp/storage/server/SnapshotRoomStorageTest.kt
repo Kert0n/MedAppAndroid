@@ -220,6 +220,28 @@ class SnapshotRoomStorageTest {
     }
 
     /**
+     * То же на одной полке — для перечитывания полки (PLAN E4): правило «сервер знает коробку» то
+     * же самое, а коробки другой общей полки в ответ не входят, как бы хорошо сервер их ни знал.
+     */
+    @Test
+    fun whatTheServerKnowsOnOneShelfLeavesOutOtherShelves() = runTest {
+        val neighbour = Uuid.random()
+        storage.lay(
+            serverSnapshot(
+                mapOf(HOME_KIT to 2L, neighbour to 2L),
+                listOf(snapshot(PACK), snapshot(OTHER_PACK), snapshot(third, medKitId = neighbour)),
+                arrivedMedKits = setOf(neighbour)
+            ),
+            at
+        )
+        database.packages().setDecision(OTHER_PACK, PackageStatus.REMOVING, decidedBy = Uuid.random())
+
+        assertEquals(setOf(PACK), storage.packagesKnownOn(HOME_KIT))
+        assertEquals(setOf(third), storage.packagesKnownOn(neighbour))
+        assertEquals(emptySet<Uuid>(), storage.packagesKnownOn(SHARED_KIT))
+    }
+
+    /**
      * Полка, которой у нас не было, приходит со снимком: имени сервер не знает, и она заводится
      * «Общей аптечкой», которую человек переименует сам, — вместе со своими коробками (PLAN C0, E4).
      */
