@@ -99,7 +99,9 @@ android {
                 Base64.getEncoder().encodeToString(secretOrNull("MEDAPP_CRPT_PROBE_CODES").orEmpty().toByteArray())
         }
         if (project.hasProperty("probe")) {
-            for (user in listOf("A", "B")) {
+            // Третья учётка — для историй, где полок две, а людей трое: кто целевую полку не
+            // видит, тот бронь и теряет (PLAN E6).
+            for (user in listOf("A", "B", "C")) {
                 testInstrumentationRunnerArguments["probeLogin$user"] =
                     secretOrNull("MEDAPP_PROBE_${user}_LOGIN").orEmpty()
                 testInstrumentationRunnerArguments["probeKey$user"] =
