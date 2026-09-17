@@ -249,15 +249,21 @@ private fun SourceRow(
             Column {
                 Text(source.place(), style = MaterialTheme.typography.bodySmall)
                 // Коробка, о судьбе которой решение принято, ничего не обеспечивает ещё до ответа
-                // сервера (PLAN D4, E1). Приёмы из неё пропадают сразу, и человек должен прочитать
-                // почему — иначе нехватка выглядит ошибкой приложения.
-                source.leaving()?.let { Text(it, color = MaterialTheme.colorScheme.error) }
-                when (val fault = source.fault) {
-                    null -> {
+                // сервера (PLAN D4, E1). Приёмы из неё пропадают сразу, и человек читает почему —
+                // иначе нехватка выглядит ошибкой приложения. Выделение при этом только
+                // называется: двигать его у коробки, которой вот-вот не станет, некуда, а вернёт
+                // её отказ полки вместе с прежним числом.
+                val leaving = source.leaving()
+                when {
+                    leaving != null -> {
+                        Text(leaving, color = MaterialTheme.colorScheme.error)
+                        Text(source.allocation())
+                    }
+                    source.fault != null -> Text(source.fault.words(), color = MaterialTheme.colorScheme.error)
+                    else -> {
                         Text(source.allocation())
                         Allocation(source, dose = dose, enabled = !isFinished, onAllocate = onAllocate)
                     }
-                    else -> Text(fault.words(), color = MaterialTheme.colorScheme.error)
                 }
             }
         },
@@ -277,7 +283,8 @@ private fun SourceRow(
         tonalElevation = if (held) 8.dp else ListItemDefaults.Elevation,
         modifier = modifier
             .fillMaxWidth()
-            .alpha(if (source.fault == null) 1f else 0.6f)
+            // Приглушена и отключённая строка, и уходящая: обе ничего не дают.
+            .alpha(if (source.fault == null && source.leaving == null) 1f else 0.6f)
             .semantics {
                 customActions = listOf(
                     CustomAccessibilityAction(up) { onMoveUp(); true },
@@ -448,7 +455,10 @@ private fun Allocation(
 private fun CourseSourcePresentationDTO.place(): String = listOfNotNull(
     medKitName,
     expiresOn?.let { stringResource(R.string.course_source_expires, it.toPresentationDTO().text) },
-    availableToMe?.let { stringResource(R.string.course_source_free, it.amount, it.unit.name) }
+    // «Свободно 0» у уходящей коробки сказало бы, что она пустая; пустой она не стала — её
+    // просто не будет у человека. Об этом говорит строка причины.
+    availableToMe?.takeIf { leaving == null }
+        ?.let { stringResource(R.string.course_source_free, it.amount, it.unit.name) }
 ).joinToString(" · ")
 
 /**
@@ -456,11 +466,15 @@ private fun CourseSourcePresentationDTO.place(): String = listOfNotNull(
  * списках коробок, — одна беда называется в приложении одинаково.
  */
 @Composable
-private fun CourseSourcePresentationDTO.leaving(): String? = when (status) {
-    PackageStatus.REMOVING -> stringResource(R.string.pack_row_removal)
-    PackageStatus.LOST -> stringResource(R.string.pack_row_lost)
-    PackageStatus.ACTIVE, PackageStatus.CHANGING, null -> null
-}
+private fun CourseSourcePresentationDTO.leaving(): String? = leaving?.let { stringResource(it) }
+
+/** Та же беда теми же словами, что на списках коробок: пометка одна, и название у неё одно. */
+private val CourseSourcePresentationDTO.leaving: Int?
+    get() = when (status) {
+        PackageStatus.REMOVING -> R.string.pack_row_removal
+        PackageStatus.LOST -> R.string.pack_row_lost
+        PackageStatus.ACTIVE, PackageStatus.CHANGING, null -> null
+    }
 
 /** Сколько приёмов выделено — и сколько это в единицах коробки: то же число привычной мерой. */
 @Composable

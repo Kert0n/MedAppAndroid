@@ -29,6 +29,11 @@ import com.kert0n.medapp.presentation.pack.MedKitContentsUiState
 import com.kert0n.medapp.presentation.pack.PackageCardUiState
 import com.kert0n.medapp.presentation.pack.RemovalStep
 import com.kert0n.medapp.presentation.pack.toPresentationDTO
+import com.kert0n.medapp.domain.pack.PackageStatus
+import com.kert0n.medapp.presentation.course.CourseSourcePresentationDTO
+import com.kert0n.medapp.presentation.course.CourseSourcesUiState
+import com.kert0n.medapp.presentation.value.toPresentationDTO
+import com.kert0n.medapp.ui.course.CourseSourcesScreen
 import com.kert0n.medapp.ui.course.ShortageRemedies
 import com.kert0n.medapp.ui.medkit.MedKitContentsScreen
 import com.kert0n.medapp.ui.medkit.MedKitJoiningScreen
@@ -184,6 +189,46 @@ class U6ScreenShots : ScreenShots() {
     fun contentsInFlight() = shot("04-med-kit-contents/in-flight") {
         MedKitContentsScreen(contents(packages = inFlightBoxes()), {}, {}, {}, {}, {}, {}, {}, {}, {}, {}, {}, {}, {}, {})
     }
+
+    /**
+     * Источник, о судьбе которого решение уже принято: приёмов он больше не даёт, и строка
+     * называет причину теми же словами, что списки коробок (PLAN D4, замечание владельца
+     * 2026-09-17).
+     */
+    @Test
+    fun sourcesLeaving() = shot("16-course-sources/leaving") {
+        CourseSourcesScreen(
+            CourseSourcesUiState(
+                title = "Спина",
+                dose = Quantity(BigDecimal.ONE, pieces).toPresentationDTO(),
+                sources = listOf(
+                    leavingSource(PACK, "Ибупрофен", PackageStatus.REMOVING, allocated = 6),
+                    leavingSource(dacha, "Нурофен", PackageStatus.LOST, allocated = 4),
+                    leavingSource(SHARED_KIT, "Ибупрофен про запас", PackageStatus.ACTIVE, allocated = 4)
+                ),
+                coverage = CourseCoveragePresentationDTO(
+                    requiredDoses = 14, coveredDoses = 4, missingDoses = 10,
+                    coveredUntilOn = today.plusDays(2), firstUncoveredOn = today.plusDays(3)
+                )
+            ),
+            { _, _ -> }, { _, _ -> }, {}, {}, {}, {}, {}, {}, {}
+        )
+    }
+
+    private fun leavingSource(id: Uuid, name: String, status: PackageStatus, allocated: Int) =
+        CourseSourcePresentationDTO(
+            packageId = id,
+            name = name,
+            medKitName = "Семейная",
+            expiresOn = null,
+            availableToMe = pieces(if (status == PackageStatus.ACTIVE) "12" else "0").toPresentationDTO(),
+            allocatedDoses = allocated,
+            allocatedAmount = pieces(allocated.toString()).toPresentationDTO(),
+            coveredDoses = if (status == PackageStatus.ACTIVE) allocated else 0,
+            maxDoses = if (status == PackageStatus.ACTIVE) 12 else 0,
+            fault = null,
+            status = status
+        )
 
     @Test
     fun cardRefusedByServer() = shot("06-package-card/refused") {

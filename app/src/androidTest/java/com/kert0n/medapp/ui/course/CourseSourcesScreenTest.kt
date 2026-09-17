@@ -104,6 +104,11 @@ class CourseSourcesScreenTest {
         show(CourseSourcesUiState(sources = listOf(source(status = PackageStatus.REMOVING))))
 
         compose.onNodeWithText("Удаление в пути").assertIsDisplayed()
+        // Выделение только названо: двигать его у коробки, которой вот-вот не станет, некуда.
+        compose.onNode(slider).assertDoesNotExist()
+        // «Свободно 0» сказало бы, что коробка пустая; пустой она не стала.
+        compose.onNodeWithText("свободно", substring = true).assertDoesNotExist()
+        compose.onNodeWithText("выделено 3 приёма", substring = true).assertIsDisplayed()
     }
 
     /** Из аптечки вышли — коробка не наша, и слова те же, что на её списке. */
