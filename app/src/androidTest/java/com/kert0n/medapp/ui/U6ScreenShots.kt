@@ -154,10 +154,10 @@ class U6ScreenShots : ScreenShots() {
     }
 
     @Test
-    fun optionsRoot() = shot("27-options-place/root") { OptionsScreen(outstanding = 2, onSyncStatus = {}) }
+    fun optionsRoot() = shot("27-options-place/root") { OptionsScreen(outstanding = 2, onSyncStatus = {}, onSettings = {}) }
 
     @Test
-    fun optionsQuiet() = shot("27-options-place/quiet") { OptionsScreen(outstanding = 0, onSyncStatus = {}) }
+    fun optionsQuiet() = shot("27-options-place/quiet") { OptionsScreen(outstanding = 0, onSyncStatus = {}, onSettings = {}) }
 
     // ── Нехватка ──────────────────────────────────────────────────────────────────────────────
 

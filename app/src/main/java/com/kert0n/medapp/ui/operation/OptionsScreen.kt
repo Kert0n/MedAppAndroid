@@ -15,8 +15,8 @@ import com.kert0n.medapp.ui.NavigationRow
 
 /**
  * Место «Опции» (PLAN H3): комната, из которой уходят вглубь, и её постоянная форма — список
- * строк. Сейчас в ней одна — состояние синхронизации; настройки, разрешения и учётная запись
- * (№27) дописываются строками в U11, ничего не переделывая.
+ * строк: состояние синхронизации (№28) и экраны настроек (№27). Учётной записи среди строк нет
+ * (PLAN C1).
  *
  * Строка говорит, есть ли о чём беспокоиться: очередь, которая чего-то ждёт, названа прямо здесь,
  * иначе человек узнавал бы о ней только из уведомления.
@@ -26,6 +26,7 @@ import com.kert0n.medapp.ui.NavigationRow
 fun OptionsScreen(
     outstanding: Int,
     onSyncStatus: () -> Unit,
+    onSettings: () -> Unit,
     modifier: Modifier = Modifier
 ) {
     Scaffold(
@@ -41,6 +42,14 @@ fun OptionsScreen(
                         if (outstanding > 0) R.string.sync_status_attention else R.string.sync_status_supporting
                     ),
                     onClick = onSyncStatus
+                )
+            }
+            item {
+                NavigationRow(
+                    icon = R.drawable.ic_notifications,
+                    text = stringResource(R.string.settings_row),
+                    supporting = stringResource(R.string.settings_row_supporting),
+                    onClick = onSettings
                 )
             }
         }

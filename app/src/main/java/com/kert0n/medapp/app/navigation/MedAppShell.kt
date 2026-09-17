@@ -66,6 +66,9 @@ import com.kert0n.medapp.presentation.medkit.MedKitSharingViewModel
 import com.kert0n.medapp.presentation.medkit.MedKitListViewModel
 import com.kert0n.medapp.presentation.pack.MedKitContentsViewModel
 import com.kert0n.medapp.presentation.operation.SyncStatusViewModel
+import com.kert0n.medapp.presentation.settings.SettingsUiState
+import com.kert0n.medapp.presentation.settings.SettingsViewModel
+import com.kert0n.medapp.ui.settings.SettingsScreen
 import com.kert0n.medapp.presentation.pack.PackageCardViewModel
 import com.kert0n.medapp.presentation.pack.PackageFormViewModel
 import com.kert0n.medapp.presentation.pack.PackageRecountViewModel
@@ -554,7 +557,20 @@ private fun screens(stacks: TabStacks, planMode: MutableState<PlanMode>) = entry
         val model: SyncStatusViewModel = hiltViewModel()
         OptionsScreen(
             outstanding = model.state.collectAsStateWithLifecycle().value.rows.size,
-            onSyncStatus = { stacks.go(Screen.SyncStatus) }
+            onSyncStatus = { stacks.go(Screen.SyncStatus) },
+            onSettings = { stacks.go(Screen.Settings) }
+        )
+    }
+    entry(Screen.Settings) {
+        val model: SettingsViewModel = hiltViewModel()
+        val state = model.state.collectAsStateWithLifecycle().value
+        // Записанное — повод уйти: человек менял настройки, а не заполнял форму навсегда.
+        LaunchedEffect(state) { if (state is SettingsUiState.Editing && state.isSaved) stacks.back() }
+        SettingsScreen(
+            state = state,
+            onEdit = model::edit,
+            onSave = model::save,
+            onBack = stacks::back
         )
     }
     entry(Screen.SyncStatus) {

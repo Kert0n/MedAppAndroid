@@ -59,6 +59,7 @@
     <string name="action_choose">Выбрать</string>
     <string name="action_pick_date">Выбрать дату</string>
     <string name="action_clear_date">Убрать дату</string>
+    <string name="action_pick_time">Выбрать время</string>
     <string name="field_required">обязательно</string>
 
     <!-- Упаковка: заведение и правка -->
@@ -222,6 +223,30 @@
     <string name="sync_status">Синхронизация</string>
     <string name="sync_status_supporting">Что уехало на сервер, а что ещё ждёт</string>
     <string name="sync_status_attention">Есть незакрытые операции</string>
+    <string name="settings_row">Уведомления</string>
+    <string name="settings_row_supporting">Пороги, время сводки, обмен с сервером</string>
+
+    <!-- Настройки (экран 27) -->
+    <string name="settings_title">Настройки</string>
+    <string name="settings_intake_reminders">Напоминания о приёмах</string>
+    <string name="settings_snooze_minutes">Отложить на, мин</string>
+    <string name="settings_section_expiry">Сроки и обеспечение</string>
+    <string name="settings_expiry_source_reminders">Напоминать о сроках источников</string>
+    <string name="settings_threshold_days">Предупреждать о нехватке за, дней</string>
+    <string name="settings_section_digest">Сводка дня</string>
+    <string name="settings_digest">Присылать сводку на день</string>
+    <string name="settings_digest_at">Время сводки</string>
+    <string name="settings_section_remote">Общие аптечки</string>
+    <string name="settings_remote_change">Сообщать о чужих изменениях</string>
+    <string name="settings_section_sync">Обмен с сервером</string>
+    <string name="settings_sync_interval">Узнавать о чужих изменениях каждые</string>
+    <string name="settings_interval_minutes">%1$d мин</string>
+    <string name="settings_interval_hours">%1$d ч</string>
+    <string name="settings_snooze_not_a_number">Минуты — это число</string>
+    <string name="settings_snooze_not_forward">Отложить можно только вперёд</string>
+    <string name="settings_threshold_not_a_number">Дни — это число</string>
+    <string name="settings_threshold_negative">Дней не бывает меньше нуля</string>
+    <string name="settings_not_saved">Не удалось записать — прежние настройки действуют</string>
     <string name="sync_refresh">Обновить</string>
     <string name="sync_running">Идёт обмен с сервером</string>
     <string name="sync_offline">Связи нет — очередь подождёт</string>

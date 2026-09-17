@@ -17,9 +17,12 @@ class FakeSettingsStore(saved: AppSettings = AppSettings.DEFAULT, var lost: Bool
     var saved: AppSettings
         get() = flow.value
         set(value) { flow.value = value }
+    /** Сколько раз просили записать — в том числе впустую: экран не должен просить дважды. */
+    var saves = 0
     override fun observe(): Flow<AppSettings> = flow
     override suspend fun current(): AppSettings = flow.value
     override suspend fun save(settings: AppSettings): SettingsSaved {
+        saves++
         if (lost) return SettingsSaved.LOST
         flow.value = settings
         return SettingsSaved.SAVED

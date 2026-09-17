@@ -86,6 +86,10 @@ sealed interface Screen : NavKey {
     @Serializable
     data object SyncStatus : Screen
 
+    /** Настройки уведомлений и обмена (PLAN H3 №27): данных не несут — набор один. */
+    @Serializable
+    data object Settings : Screen
+
     /**
      * Редактор лечения (PLAN H3 №15): без [courseId] — новый черновик, с ним — записанный
      * черновик или идущее лечение; что из двух, экран узнаёт у базы.
