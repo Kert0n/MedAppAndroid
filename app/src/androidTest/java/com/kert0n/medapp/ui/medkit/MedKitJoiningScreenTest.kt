@@ -27,13 +27,33 @@ class MedKitJoiningScreenTest {
 
     private var typed = ""
     private var joined = 0
+    private var scanned = 0
 
     private fun show(state: MedKitJoiningUiState) {
         compose.setContent {
             MedAppTheme {
-                MedKitJoiningScreen(state, onType = { typed = it }, onJoin = { joined++ }, onBack = {})
+                MedKitJoiningScreen(
+                    state,
+                    onType = { typed = it },
+                    onJoin = { joined++ },
+                    onBack = {},
+                    onScan = { scanned++ }
+                )
             }
         }
+    }
+
+    /**
+     * Код приглашения чаще показывают с экрана телефона, чем переписывают: камера стоит рядом с
+     * полем и **до** вступления — сперва берут код, потом входят (U9).
+     */
+    @Test
+    fun theCodeCanBeTakenByCamera() {
+        show(MedKitJoiningUiState())
+
+        compose.onNodeWithText("Отсканировать код").performClick()
+
+        assertEquals(1, scanned)
     }
 
     /** Первым — поле кода: за этим сюда и приходят, и сказано, что человек получит. */

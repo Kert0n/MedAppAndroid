@@ -10,6 +10,7 @@ import android.view.WindowManager
 import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
+import androidx.compose.ui.test.performScrollTo
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import androidx.test.platform.app.InstrumentationRegistry
 import com.kert0n.medapp.domain.Unavailability
@@ -124,7 +125,8 @@ class MedKitSharingScreenTest {
 
         compose.onNodeWithText("K7F-2M9-QX4").assertIsDisplayed()
         compose.onNodeWithText("Примерно до 15:30").assertIsDisplayed()
-        compose.onNodeWithText("Обновить код").assertIsDisplayed()
+        // На узком экране (360×640 dp) кнопка лежит ниже сгиба: человек до неё долистывает.
+        compose.onNodeWithText("Обновить код").performScrollTo().assertIsDisplayed()
     }
 
     /**

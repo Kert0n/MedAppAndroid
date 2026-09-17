@@ -51,9 +51,18 @@ sealed interface Screen : NavKey {
     /**
      * Заведение и правка упаковки — тоже один экран (PLAN H3 №7, №8): [packageId] назван —
      * правка, не назван — заведение, и тогда [medKitId] говорит, откуда человек пришёл.
+     *
+     * [scannedCode] — код DataMatrix с упаковки, если форму открыл сканер. В маршрут едет **код**,
+     * а не то, что о нём рассказал реестр: код — это идентификатор коробки, и он переживает смерть
+     * процесса так же честно, как любой другой, а предложение к тому времени было бы устаревшей
+     * копией чужого ответа (PLAN C1 «Результат сканирования — заполненная форма»).
      */
     @Serializable
-    data class PackageForm(val medKitId: Uuid? = null, val packageId: Uuid? = null) : Screen
+    data class PackageForm(
+        val medKitId: Uuid? = null,
+        val packageId: Uuid? = null,
+        val scannedCode: String? = null
+    ) : Screen
 
     /** Карточка упаковки (PLAN H3 №6): сколько есть, что это, где лежит — и что с ней сделать. */
     @Serializable

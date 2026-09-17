@@ -13,79 +13,21 @@ object CrptFixtures {
     /** Настоящий текст сканера начинается с `01`, поля `91`/`92` отделены GS. */
     const val SCANNED = "0104601234567890215ABCDE12345" + GS + "91EE11" + GS + "92dGVzdA=="
 
-    val found = """
-        {
-          "id": 855204142,
-          "checkDate": 1789401743131,
-          "codeFounded": true,
-          "status": "item_sold_receipt",
-          "statusV2": "item_sold_receipt",
-          "verified": true,
-          "country": 5,
-          "known": true,
-          "category": "drugs",
-          "categoryV2": "drugs",
-          "context": "scan",
-          "code": "01046012345678902100000000000\u001d91EE11\u001d92AAAA",
-          "gtin": "04601234567890",
-          "serial": "0000000000000",
-          "productName": "Цетрин",
-          "outerStatus": "in_sale",
-          "receiptDate": 1763200500000,
-          "applicationDate": 1745776145000,
-          "codeType": "datamatrix",
-          "expireDate": 1838073600000,
-          "lastOperationDate": 1763200500000,
-          "isBlocked": false,
-          "wrongDocs": false,
-          "screen": {
-            "navBar": [{"order": 10, "itemType": "alarm_add", "alarmName": "Цетрин"}],
-            "items": [
-              {
-                "order": 10, "itemType": "main_card", "title": "Цетрин",
-                "statusCard": {"statusType": "neutral", "title": "Товар продан 15 ноября 2025", "complaintButton": false},
-                "chips": [
-                  {"order": 10, "chipType": "country", "value": "ИНДИЯ"},
-                  {"order": 20, "chipType": "simple_text", "value": "Д-Р РЕДДИ`С ЛАБОРАТОРИС ЛТД."}
-                ]
-              },
-              {
-                "order": 20, "itemType": "expiration_card",
-                "expirations": [{"showDetails": false, "expirationDescription": [{"order": 10, "icon": "ok", "expiration": "Годен ещё больше года", "conditions": "До 31 марта 2028"}]}]
-              },
-              {"order": 40, "itemType": "group_card", "images": [], "averagePriceRequest": false},
-              {
-                "order": 50, "itemType": "pharmacy_search",
-                "pharmacyData": {"title": "Цетрин", "activeSubstance": "цетиризин", "form": "таблетки покрытые пленочной оболочкой", "dosage": "10 мг", "quantity": "30 шт", "image": "https://example.invalid/cetrine.jpg"}
-              },
-              {
-                "order": 60, "itemType": "instruction",
-                "attrList": [{"label": "Показания к применению", "value": "<P>Взрослым и детям с 6 лет</P>"}],
-                "batch": "B0000000"
-              },
-              {
-                "order": 70, "itemType": "attributes_card",
-                "attrList": [
-                  {"label": "Международное наименование", "value": "ЦЕТИРИЗИН"},
-                  {"label": "Описание", "value": "ТАБЛЕТКИ ПОКРЫТЫЕ ПЛЕНОЧНОЙ ОБОЛОЧКОЙ, 10 мг"},
-                  {"label": "Внутри упаковки", "value": "БЛИСТЕР - 3 шт по 10"},
-                  {"label": "Комплектность", "value": "~"}
-                ]
-              },
-              {
-                "order": 90, "itemType": "attributes",
-                "attrList": [
-                  {"label": "Производитель", "value": "Д-Р РЕДДИ`С ЛАБОРАТОРИС ЛТД."},
-                  {"label": "Импортёр", "value": "ОБЩЕСТВО С ОГРАНИЧЕННОЙ ОТВЕТСТВЕННОСТЬЮ \"ДР. РЕДДИ`С ЛАБОРАТОРИС\""},
-                  {"label": "Серия", "value": "B0000000"}
-                ]
-              },
-              {"order": 100, "itemType": "doc_links", "docLinksData": [{}]},
-              {"order": 110, "itemType": "complaint_from_card"}
-            ]
-          }
-        }
-    """.trimIndent()
+    /**
+     * Ответ реестра **как он есть**: снят живым запросом 2026-09-17 и лежит файлом
+     * `test/resources/crpt/found.json` целиком — с картинками, HTML-инструкцией и всеми блоками,
+     * которых мы не читаем. Написанная от руки фикстура показывает то, что мы ожидали увидеть;
+     * снятая — то, что реестр присылает на самом деле, и разойтись с ней нельзя незаметно.
+     *
+     * Заменены только опознавательные поля кода: `code`, `gtin`, `serial` и `id`. Чужой код в
+     * репозитории — это возможность спросить реестр о чужой коробке.
+     */
+    val found: String = read("found.json")
+
+    private fun read(name: String): String =
+        checkNotNull(CrptFixtures::class.java.getResourceAsStream("/crpt/$name")) {
+            "фикстура ответа реестра /crpt/$name не найдена"
+        }.use { it.readBytes().decodeToString() }
 
     /**
      * Второй живой ответ той же пробы: составная дозировка, блок картинок и `receiptDate`

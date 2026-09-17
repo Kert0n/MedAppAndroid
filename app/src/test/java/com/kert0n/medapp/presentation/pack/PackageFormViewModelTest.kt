@@ -2,11 +2,13 @@ package com.kert0n.medapp.presentation.pack
 
 import com.kert0n.medapp.feature.packages.PackageAdding
 import com.kert0n.medapp.feature.packages.PackageDescribing
+import com.kert0n.medapp.feature.scan.PackageScanning
 import com.kert0n.medapp.feature.template.TemplateSearching
 import com.kert0n.medapp.feature.time.Today
 import com.kert0n.medapp.fixture.DirectTransactions
 import com.kert0n.medapp.fixture.FakeFollowing
 import com.kert0n.medapp.fixture.FakeMedKits
+import com.kert0n.medapp.fixture.FakePackageCodes
 import com.kert0n.medapp.fixture.FakePackageTemplates
 import com.kert0n.medapp.fixture.FakePackages
 import com.kert0n.medapp.fixture.FakeQueue
@@ -44,6 +46,9 @@ class PackageFormViewModelTest {
 
     private val packages = FakePackages()
 
+    /** Реестр кодов: обычной форме он не нужен вовсе, и спрашивать его она не должна. */
+    private val codes = FakePackageCodes()
+
     private val medKits = FakeMedKits(medKit(id = HOME_KIT, name = "Домашняя"))
 
     private val queue = QueueService(DirectTransactions, FakeQueue())
@@ -55,6 +60,7 @@ class PackageFormViewModelTest {
         adding = PackageAdding(packages, medKits, queue, DirectTransactions, clock),
         describing = PackageDescribing(packages, FakeFollowing(), queue, DirectTransactions, clock),
         searching = TemplateSearching(FakePackageTemplates()),
+        scanning = PackageScanning(codes),
         packages = packages,
         vocabulary = vocabulary,
         medKits = medKits,

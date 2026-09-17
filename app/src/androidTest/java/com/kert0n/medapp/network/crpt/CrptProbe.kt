@@ -26,6 +26,7 @@ import kotlin.uuid.Uuid
 import org.junit.Assert.assertTrue
 import org.junit.Assume.assumeTrue
 import org.junit.Test
+import java.time.LocalDate
 
 /**
  * Живой ответ «Честного знака» — **по одному запросу на код** за запуск и только по `-PprobeCrpt`
@@ -72,7 +73,7 @@ class CrptProbe {
                 val dto = crptJson.decodeFromString(CrptCheckNetworkDTO.serializer(), raw)
                 println("CRPT_PROBE[$index] codeFounded=${dto.codeFounded} category=${dto.category} name=${dto.productName} expireDate=${dto.expireDate}")
                 println("CRPT_PROBE[$index] pharmacy=${dto.pharmacy} labels=${dto.attributes.keys} country=${dto.chip("country")}")
-                println("CRPT_PROBE[$index] suggestion=${dto.toSuggestion(vocabulary)}")
+                println("CRPT_PROBE[$index] suggestion=${dto.toSuggestion(vocabulary, LocalDate.now(CRPT_ZONE))}")
             }
         }
     }

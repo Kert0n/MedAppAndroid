@@ -39,6 +39,13 @@ class Vocabulary(units: Collection<QuantityUnit>, forms: Collection<DosageForm>)
      */
     fun formWithName(name: String): DosageForm? = forms.values.firstOrNull { it.name == name }
 
+    /**
+     * Единица по её точному имени — тем же доводом, что и [formWithName]: «Честный знак» называет
+     * количество словами («30 шт»), и единицу из этих слов надо взять у сервера, а не завести свою
+     * (PLAN H5). Промах значит «такой единицы словарь не знает», и тогда её называет человек.
+     */
+    fun unitWithName(name: String): QuantityUnit? = units.values.firstOrNull { it.name == name }
+
     override fun equals(other: Any?): Boolean =
         this === other || (other is Vocabulary && units == other.units && forms == other.forms)
 
