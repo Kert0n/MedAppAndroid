@@ -36,11 +36,30 @@ fun debugSecret(key: String, fallback: String): String = secretOrNull(key) ?: ru
  * сборки release, а не сделана на конфигурации: иначе отсутствие секрета роняло бы и
  * debug-сборку, и разбор проекта в IDE.
  */
-val secretsMissingForRelease = listOf("MEDAPP_REGISTRATION_TOKEN").filter { secretOrNull(it) == null }
+val secretsMissingForRelease = listOf(
+    "MEDAPP_REGISTRATION_TOKEN",
+    "MEDAPP_KEYSTORE_FILE",
+    "MEDAPP_KEYSTORE_PASSWORD",
+    "MEDAPP_KEY_ALIAS",
+    "MEDAPP_KEY_PASSWORD"
+).filter { secretOrNull(it) == null }
 
+/**
+ * Ключ подписи: путь берётся тем же способом, что и прочие секреты, и разрешается от корня
+ * клиента, чтобы в local.properties лежало `keystore/…`, а не путь с чужой машины. Сам ключ
+ * в репозиторий не попадает (`/keystore/` в .gitignore): потерянный или утёкший ключ значит,
+ * что обновлять уже установленное приложение больше нечем.
+ */
+val releaseKeystore = secretOrNull("MEDAPP_KEYSTORE_FILE")?.let(rootProject::file)
+
+/**
+ * Названный, но отсутствующий ключ здесь не проверяется: до этой задачи доходит `validateSigningRelease`
+ * самого AGP и называет разрешённый путь целиком. Задача отвечает за другое — что параметры вообще
+ * заданы.
+ */
 val verifyReleaseSecrets = tasks.register("verifyReleaseSecrets") {
     group = "verification"
-    description = "Не даёт собрать release без настроенных секретов (G1)."
+    description = "Не даёт собрать release без настроенных секретов и параметров подписи (G1)."
     doLast {
         if (secretsMissingForRelease.isNotEmpty()) {
             throw GradleException(
@@ -125,6 +144,23 @@ android {
         buildConfigField("long", "INVITATION_TERM_MINUTES", "60L")
     }
 
+    /**
+     * Подпись release живёт настройкой сборки, а не разовой командой: иначе каждая следующая
+     * сборка подписывается по памяти того, кто её делает. Настройка заводится **только с ключом
+     * на руках** — без него разбор проекта в IDE и debug-сборка не должны падать, а release и так
+     * не соберётся: его останавливает `verifyReleaseSecrets`, называя, чего не хватает.
+     */
+    signingConfigs {
+        if (releaseKeystore != null) {
+            create("release") {
+                storeFile = releaseKeystore
+                storePassword = secretOrNull("MEDAPP_KEYSTORE_PASSWORD")
+                keyAlias = secretOrNull("MEDAPP_KEY_ALIAS")
+                keyPassword = secretOrNull("MEDAPP_KEY_PASSWORD")
+            }
+        }
+    }
+
     buildTypes {
         debug {
             buildConfigField(
@@ -134,6 +170,7 @@ android {
             )
         }
         release {
+            signingConfig = signingConfigs.findByName("release")
             isMinifyEnabled = false
             proguardFiles(
                 getDefaultProguardFile("proguard-android-optimize.txt"),
