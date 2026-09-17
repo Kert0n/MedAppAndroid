@@ -604,4 +604,5 @@
     <string name="scanner_invitation">Это приглашение в аптечку.</string>
     <string name="med_kit_joining_scan">Отсканировать код</string>
     <string name="med_kit_joining_aim">Наведите на QR приглашения</string>
+    <string name="med_kit_joining_camera_denied">Камера запрещена. Введите код руками или разрешите камеру в настройках приложения.</string>
 </resources>

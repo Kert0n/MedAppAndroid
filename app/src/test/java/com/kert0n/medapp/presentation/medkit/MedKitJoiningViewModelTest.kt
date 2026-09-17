@@ -156,6 +156,26 @@ class MedKitJoiningViewModelTest {
         assertEquals(0, server.asked)
     }
 
+    /**
+     * Камеру не дали — сказано словами. Молчание здесь неотличимо от сломанной кнопки: человек
+     * жмёт «Отсканировать», и ничего не происходит; при этом поле кода и вступление остаются
+     * на месте — код вводят руками (разбор #55).
+     */
+    @Test
+    fun aDeniedCameraIsSaidInWordsAndTypingStays() {
+        val server = Server(HttpStatusCode.Created, shelfJson(SHARED_KIT))
+        val model = viewModel(server)
+
+        watching(model.state) { state ->
+            model.scan()
+            model.cameraDenied()
+            state.awaiting { it.refusal != null }
+        }
+
+        assertEquals(MedKitJoiningRefusal.CameraDenied, model.state.value.refusal)
+        assertEquals(false, model.state.value.isScanning)
+    }
+
     /** Вошёл — экран называет полку, и оболочка ведёт в неё. */
     @Test
     fun joiningNamesTheShelfToGoTo() {

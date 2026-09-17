@@ -261,7 +261,9 @@ private fun screens(stacks: TabStacks, planMode: MutableState<PlanMode>) = entry
         }
         // Разрешённая камера открывается сразу, неразрешённая сперва спрашивает: просьба стоит
         // там, где человек нажал «Отсканировать», и объяснять её не нужно.
-        val askForCamera = rememberCameraPermissionRequest { granted -> if (granted) model.scan() }
+        val askForCamera = rememberCameraPermissionRequest { granted ->
+            if (granted) model.scan() else model.cameraDenied()
+        }
         MedKitJoiningScreen(
             state = state,
             onType = model::type,

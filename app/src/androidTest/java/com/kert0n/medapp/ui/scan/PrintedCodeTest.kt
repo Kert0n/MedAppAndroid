@@ -18,10 +18,9 @@ import org.junit.runner.RunWith
  * кодом этого не проверить: ZXing рисует DataMatrix **без** FNC1, а «Честный знак» печатает GS1 —
  * с признаком в начале и разделителями GS между полями.
  *
- * Здесь держатся два обещания разбора. Внутренние разделители доезжают до нас **как напечатаны**:
- * возьми мы `displayValue` вместо `rawValue`, они исчезли бы, и в реестр ушёл бы другой код. А
- * ведущий признак FNC1 снимается: тот же признак сетевая граница дописывает текстом `{FNC1}`, и
- * оставленный здесь он удвоил бы начало кода (PLAN H5).
+ * Правил здесь три, и у каждого своя проверка: код узнаётся DataMatrix, ведущий признак FNC1
+ * снимается, разделители между полями остаются. Слепленные в одну, второе и третье молчали бы,
+ * пока не выполнено первое (разбор #55).
  */
 @RunWith(AndroidJUnit4::class)
 class PrintedCodeTest {
@@ -39,14 +38,34 @@ class PrintedCodeTest {
         }
     }
 
-    /** Снимок коробки «Уголь активированный» — той самой, с которой снята фикстура CRPT. */
+    /**
+     * Снимок коробки «Уголь активированный» — той самой, с которой снята фикстура CRPT. Формат
+     * называет распознаватель: узнай он здесь что-то другое, весь путь кода повёл бы не туда.
+     */
     @Test
-    fun aPrintedCodeIsReadWithItsSeparators() {
+    fun aPrintedCodeIsReadAsDataMatrix() {
+        assertEquals(CodeFormat.DATA_MATRIX, read("charcoal.jpg").format)
+    }
+
+    /**
+     * Ведущий признак FNC1 снимается: тот же признак сетевая граница дописывает **текстом**
+     * `{FNC1}`, и оставленный здесь он удвоил бы начало кода — в реестр ушёл бы не тот код, что
+     * напечатан на коробке (PLAN H5).
+     */
+    @Test
+    fun theLeadingFnc1MarkerIsStripped() {
         val code = read("charcoal.jpg")
 
-        assertEquals(CodeFormat.DATA_MATRIX, code.format)
         assertTrue("код начинается с GTIN, а не с признака FNC1: ${code.text}", code.text.startsWith("01"))
-        assertTrue("разделители между полями на месте", code.text.contains(GS))
+    }
+
+    /**
+     * Разделители **между полями** остаются: их защищает правило «код не разбирается». Возьми мы
+     * `displayValue` вместо `rawValue`, они исчезли бы, и реестр получил бы слипшиеся поля.
+     */
+    @Test
+    fun theSeparatorsBetweenFieldsAreKept() {
+        assertTrue("разделители между полями на месте", read("charcoal.jpg").text.contains(GS))
     }
 
     /**

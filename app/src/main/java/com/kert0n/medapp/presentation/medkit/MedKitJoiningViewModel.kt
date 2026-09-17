@@ -42,7 +42,16 @@ class MedKitJoiningViewModel @Inject constructor(
 
     /** Открыть камеру: код приглашения чаще показывают с экрана, чем переписывают. */
     fun scan() {
-        _state.value = _state.value.copy(isScanning = true)
+        _state.value = _state.value.copy(isScanning = true, refusal = null)
+    }
+
+    /**
+     * Камеру не дали. Молчание здесь неотличимо от сломанной кнопки: человек жмёт «Отсканировать»
+     * и ничего не происходит. Сказано словами, а поле кода и вступление остаются на месте — код
+     * вводят руками, и это деградация, а не тупик (разбор #55).
+     */
+    fun cameraDenied() {
+        _state.value = _state.value.copy(isScanning = false, refusal = MedKitJoiningRefusal.CameraDenied)
     }
 
     fun stopScanning() {
@@ -130,6 +139,9 @@ sealed interface MedKitJoiningRefusal {
 
     /** Уже в этой аптечке: она у человека есть, и он найдёт её в списке. */
     data object AlreadyMember : MedKitJoiningRefusal
+
+    /** Камеру не разрешили: код остаётся ввести руками. */
+    data object CameraDenied : MedKitJoiningRefusal
 
     /** Сервера нет: причина и повтор. */
     data class Unavailable(val reason: Unavailability) : MedKitJoiningRefusal

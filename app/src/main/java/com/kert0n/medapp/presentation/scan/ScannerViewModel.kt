@@ -42,7 +42,9 @@ class ScannerViewModel @Inject constructor(
      */
     fun resumed() {
         last = null
-        _state.value = _state.value.copy(camera = camera())
+        // Сказанное о прежнем коде забывается вместе с ним: вернувшись от вступления, человек
+        // видел бы «это приглашение» о коде, которого сканер уже не помнит (разбор #55).
+        _state.value = _state.value.copy(camera = camera(), notice = null, opening = null)
     }
 
     /** Система ответила на просьбу о камере: спрошено — значит, второго диалога уже не будет. */

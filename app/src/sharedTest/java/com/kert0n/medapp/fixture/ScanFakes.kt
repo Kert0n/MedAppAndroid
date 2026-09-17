@@ -9,11 +9,12 @@ import kotlinx.coroutines.CompletableDeferred
  * Реестр «Честного знака» для проверок: живой спрашивают одна проба и только по явной просьбе
  * (AGENTS «Бережно к чужому API»).
  *
- * Отвечает тем, что положили: [answer] — один ответ на любой код. Спрошенное запоминается —
- * «один код — один запрос» иначе нечем проверить.
+ * Отвечает тем, что положили, и **падает, когда не положили ничего**: проверка, не ждавшая запроса
+ * в реестр, должна о нём узнать, а не получить тихое «не найдено» (разбор #55). Спрошенное
+ * запоминается — «один код — один запрос» иначе нечем проверить.
  */
 class FakePackageCodes(
-    var answer: PackageCodes.Lookup = PackageCodes.Lookup.NotFound
+    var answer: PackageCodes.Lookup? = null
 ) : PackageCodes {
 
     val asked = mutableListOf<DataMatrixCode>()
@@ -23,7 +24,7 @@ class FakePackageCodes(
     override suspend fun lookup(code: DataMatrixCode): PackageCodes.Lookup {
         asked += code
         held?.await()
-        return answer
+        return requireNotNull(answer) { "реестр спрошен о $code, а проверка ответа не задавала" }
     }
 
     /** Ответ не приходит, пока проверка его не отпустит: так видно форму до ответа реестра. */

@@ -156,5 +156,6 @@ private val MedKitJoiningRefusal.text: Int
         MedKitJoiningRefusal.Empty -> R.string.med_kit_joining_code_empty
         MedKitJoiningRefusal.Invalid -> R.string.med_kit_joining_invalid
         MedKitJoiningRefusal.AlreadyMember -> R.string.med_kit_joining_already_member
+        MedKitJoiningRefusal.CameraDenied -> R.string.med_kit_joining_camera_denied
         is MedKitJoiningRefusal.Unavailable -> reason.text
     }

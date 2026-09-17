@@ -96,6 +96,21 @@ class ScannerViewModelTest {
         assertEquals(dataMatrix.text, model.state.value.opening)
     }
 
+    /**
+     * Сказанное о прежнем коде забывается вместе с ним. Оставь весть — и человек, вернувшийся от
+     * вступления в аптечку, читал бы «это приглашение» о коде, которого сканер уже не помнит, и
+     * нажимал бы на строку, ведущую в никуда (разбор #55).
+     */
+    @Test
+    fun comingBackForgetsWhatWasSaidAboutTheOldCode() {
+        val model = scanner()
+        model.seen(ScannedCode(CodeFormat.QR, "K7F-2M9-QX4"))
+
+        model.resumed()
+
+        assertNull("весть о прежнем коде не пережила возвращения", model.state.value.notice)
+    }
+
     /** До первой просьбы отказа ещё нет — есть незаданный вопрос, и спросить его можно. */
     @Test
     fun aRefusalIsToldApartFromAnUnaskedQuestion() {
