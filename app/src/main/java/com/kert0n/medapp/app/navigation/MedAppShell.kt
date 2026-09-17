@@ -75,7 +75,6 @@ import com.kert0n.medapp.presentation.settings.SettingsViewModel
 import com.kert0n.medapp.ui.settings.LanguageScreen
 import com.kert0n.medapp.ui.settings.PermissionsScreen
 import com.kert0n.medapp.ui.settings.SettingsScreen
-import com.kert0n.medapp.ui.openAppSettings
 import com.kert0n.medapp.presentation.pack.PackageCardViewModel
 import com.kert0n.medapp.presentation.pack.PackageFormViewModel
 import com.kert0n.medapp.presentation.pack.PackageRecountViewModel

@@ -270,7 +270,7 @@
     <string name="permissions_camera">Camera</string>
     <string name="permissions_granted">Allowed</string>
     <string name="permissions_denied">Off — fix in the phone\'s settings</string>
-    <string name="permissions_absent">Not on this device — codes are typed in by hand</string>
+    <string name="permissions_absent">Not on this device — packages are added on a kit</string>
     <string name="permissions_not_needed">Not needed on this version of Android</string>
 
     <!-- Language (screen 27). Language names are in their own language and are not translated. -->

@@ -275,7 +275,7 @@
     <string name="permissions_camera">Камера</string>
     <string name="permissions_granted">Разрешено</string>
     <string name="permissions_denied">Выключено — исправить в настройках телефона</string>
-    <string name="permissions_absent">Нет на этом устройстве — коды вводятся вручную</string>
+    <string name="permissions_absent">Нет на этом устройстве — коробки заводятся на полке</string>
     <string name="permissions_not_needed">Не требуется на этой версии Android</string>
 
     <!-- Язык (экран 27). Названия языков — на своём языке, не переводятся. -->

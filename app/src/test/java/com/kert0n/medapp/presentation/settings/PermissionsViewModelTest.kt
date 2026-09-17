@@ -74,7 +74,7 @@ class PermissionsViewModelTest {
         assertTrue(model.state.value.hasTrouble)
     }
 
-    /** Камеры нет — это не беда и чинить нечего: коды вводятся вручную (T-45). */
+    /** Камеры нет — это не беда и чинить нечего: коробки заводятся на полке (T-45). */
     @Test
     fun anAbsentCameraIsNotTrouble() {
         val system = System(camera = CameraAccess.ABSENT)
