@@ -1,6 +1,5 @@
 package com.kert0n.medapp.network.crpt
 
-import com.kert0n.medapp.domain.scan.ScannedCategory
 import com.kert0n.medapp.domain.value.DosageForm
 import com.kert0n.medapp.domain.value.Vocabulary
 import java.time.LocalDate
@@ -130,10 +129,4 @@ class CrptSuggestionTest {
         assertNull(suggestion.boughtOn)
     }
 
-    /** Чем реестр счёл товар, называется его случаем, а не строкой: «drugs» — это лекарство. */
-    @Test
-    fun theRegistrysCategoryBecomesOneOfFourCases() {
-        assertEquals(ScannedCategory.MEDICINE, dto(CrptFixtures.found).toSuggestion(words, TODAY).category)
-        assertEquals(ScannedCategory.OTHER, dto(CrptFixtures.cosmetics).toSuggestion(words, TODAY).category)
-    }
 }

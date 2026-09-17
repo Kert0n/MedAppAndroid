@@ -21,7 +21,6 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.pluralStringResource
@@ -30,7 +29,6 @@ import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.ui.unit.dp
 import com.kert0n.medapp.R
-import com.kert0n.medapp.domain.scan.ScannedCategory
 import com.kert0n.medapp.presentation.pack.PackageFormError
 import com.kert0n.medapp.presentation.pack.PackageFormPresentationDTO
 import com.kert0n.medapp.presentation.pack.withForm
@@ -67,13 +65,6 @@ fun PackageFormScreen(
     modifier: Modifier = Modifier
 ) {
     val form = state.form
-    // Категорию реестр называет по-своему («drugs»), и человеку она нужна его словами — а слова
-    // живут здесь, в `R.string`. Кладёт их в поле экран, той же дверью, что и любой ввод человека:
-    // один раз и только в пустое, чтобы не спорить с тем, что человек написал сам.
-    val scanned = state.scanned?.label?.let { stringResource(it) }
-    LaunchedEffect(scanned) {
-        if (scanned != null && form.category.isBlank()) onEdit(form.copy(category = scanned))
-    }
     Scaffold(
         modifier = modifier.fillMaxSize(),
         topBar = {
@@ -328,14 +319,3 @@ private fun SuggestionList(suggestions: Suggestions, onPick: (TemplatePresentati
 private fun Note(text: String) {
     Text(text, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
 }
-
-/** Как категория реестра называется по-человечески. Слова — свойство случая, а не выбор экрана. */
-@get:StringRes
-private val ScannedCategory.label: Int?
-    get() = when (this) {
-        ScannedCategory.MEDICINE -> R.string.pack_category_medicine
-        ScannedCategory.SUPPLEMENT -> R.string.pack_category_supplement
-        ScannedCategory.ANTISEPTIC -> R.string.pack_category_antiseptic
-        // Чем товар не является, реестр знает, а чем является — нет: выдумывать за него нечего.
-        ScannedCategory.OTHER -> null
-    }

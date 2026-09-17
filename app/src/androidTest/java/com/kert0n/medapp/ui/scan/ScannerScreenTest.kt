@@ -28,7 +28,6 @@ class ScannerScreenTest {
     @get:Rule
     val compose = createComposeRule()
 
-    private var manual = 0
     private var joined = 0
     private var allowed = 0
     private var settings = 0
@@ -41,24 +40,10 @@ class ScannerScreenTest {
                     onCode = {},
                     onAllow = { allowed++ },
                     onOpenSettings = { settings++ },
-                    onJoin = { joined++ },
-                    onManual = { manual++ }
+                    onJoin = { joined++ }
                 )
             }
         }
-    }
-
-    /**
-     * Ручной ввод стоит внизу **всегда**, а не только при беде: код бывает затёрт, а коробка —
-     * без кода вовсе, и уходить с места за этим незачем.
-     */
-    @Test
-    fun manualEntryIsAlwaysThere() {
-        show(ScannerUiState(camera = ScannerCamera.ABSENT))
-
-        compose.onNodeWithText("Ввести вручную").performClick()
-
-        assertEquals(1, manual)
     }
 
     /**
@@ -69,7 +54,8 @@ class ScannerScreenTest {
     fun aDeviceWithoutACameraIsToldSoAndAsksForNothing() {
         show(ScannerUiState(camera = ScannerCamera.ABSENT))
 
-        compose.onNodeWithText("На этом устройстве нет камеры. Коробки заводятся вручную.").assertIsDisplayed()
+        compose.onNodeWithText("На этом устройстве нет камеры. Заводите коробки на полке — там же, где и без кода.")
+            .assertIsDisplayed()
         compose.onNodeWithText("Разрешить камеру").assertIsNotDisplayed()
     }
 

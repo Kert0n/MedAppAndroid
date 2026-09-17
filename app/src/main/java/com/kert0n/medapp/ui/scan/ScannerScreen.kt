@@ -10,7 +10,6 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.material3.ElevatedCard
 import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
@@ -46,7 +45,6 @@ fun ScannerScreen(
     onAllow: () -> Unit,
     onOpenSettings: () -> Unit,
     onJoin: () -> Unit,
-    onManual: () -> Unit,
     modifier: Modifier = Modifier
 ) {
     Scaffold(
@@ -84,13 +82,6 @@ fun ScannerScreen(
                     )
                 }
             }
-            HorizontalDivider()
-            NavigationRow(
-                icon = R.drawable.ic_keyboard,
-                text = stringResource(R.string.scanner_manual),
-                onClick = onManual,
-                supporting = stringResource(R.string.scanner_manual_explained)
-            )
         }
     }
 }

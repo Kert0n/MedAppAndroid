@@ -612,8 +612,7 @@ private fun screens(stacks: TabStacks, planMode: MutableState<PlanMode>) = entry
             onCode = model::seen,
             onAllow = askForCamera,
             onOpenSettings = context::openAppSettings,
-            onJoin = { stacks.go(Screen.MedKitJoining) },
-            onManual = { stacks.go(Screen.PackageForm()) }
+            onJoin = { stacks.go(Screen.MedKitJoining) }
         )
     }
     for (place in Place.entries - Place.MED_KITS - Place.PLAN - Place.OPTIONS - Place.SCANNER) {

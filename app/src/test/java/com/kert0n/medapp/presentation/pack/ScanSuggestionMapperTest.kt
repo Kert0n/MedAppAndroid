@@ -2,7 +2,6 @@ package com.kert0n.medapp.presentation.pack
 
 import com.kert0n.medapp.domain.pack.ExpiryDate
 import com.kert0n.medapp.domain.scan.PackageSuggestion
-import com.kert0n.medapp.domain.scan.ScannedCategory
 import com.kert0n.medapp.fixture.TABLETS
 import com.kert0n.medapp.fixture.TABLET_FORM
 import com.kert0n.medapp.fixture.VOCABULARY
@@ -25,7 +24,7 @@ class ScanSuggestionMapperTest {
         val suggestion = PackageSuggestion(
             formText = "таблетки, покрытые оболочкой",
             form = TABLET_FORM,
-            category = ScannedCategory.MEDICINE
+            isMedicine = true
         )
 
         assertEquals(TABLET_FORM.id, suggestion.filling(empty, VOCABULARY).form?.id)
@@ -38,7 +37,7 @@ class ScanSuggestionMapperTest {
      */
     @Test
     fun anUnknownFormLeavesTheFieldEmptyButIsNotLost() {
-        val suggestion = PackageSuggestion(formText = "лиофилизат", form = null, category = ScannedCategory.MEDICINE)
+        val suggestion = PackageSuggestion(formText = "лиофилизат", form = null, isMedicine = true)
 
         val filled = suggestion.filling(empty, VOCABULARY)
 
@@ -51,7 +50,7 @@ class ScanSuggestionMapperTest {
     fun theExpiryIsShownTheWayItIsPrinted() {
         val suggestion = PackageSuggestion(
             expiresOn = ExpiryDate.of(YearMonth.of(2027, 5)),
-            category = ScannedCategory.MEDICINE
+            isMedicine = true
         )
 
         assertEquals("05.2027", suggestion.filling(empty, VOCABULARY).expiresOn)
@@ -64,7 +63,7 @@ class ScanSuggestionMapperTest {
      */
     @Test
     fun aPlainQuantityBecomesTheNumberAndItsUnit() {
-        val suggestion = PackageSuggestion(quantityText = "30 ${TABLETS.name}", category = ScannedCategory.MEDICINE)
+        val suggestion = PackageSuggestion(quantityText = "30 ${TABLETS.name}", isMedicine = true)
 
         val filled = suggestion.filling(empty, VOCABULARY)
 
@@ -79,7 +78,7 @@ class ScanSuggestionMapperTest {
      */
     @Test
     fun anUnknownUnitStillLeavesTheNumber() {
-        val suggestion = PackageSuggestion(quantityText = "20 капсул", category = ScannedCategory.MEDICINE)
+        val suggestion = PackageSuggestion(quantityText = "20 капсул", isMedicine = true)
 
         val filled = suggestion.filling(empty, VOCABULARY)
 
@@ -94,7 +93,7 @@ class ScanSuggestionMapperTest {
      */
     @Test
     fun aCompositeQuantityDoesNotBecomeANumber() {
-        val suggestion = PackageSuggestion(quantityText = "20 таблеток в 2 блистерах", category = ScannedCategory.MEDICINE)
+        val suggestion = PackageSuggestion(quantityText = "20 таблеток в 2 блистерах", isMedicine = true)
 
         val filled = suggestion.filling(empty, VOCABULARY)
 
@@ -113,7 +112,7 @@ class ScanSuggestionMapperTest {
         val suggestion = PackageSuggestion(
             activeSubstance = "цетиризин",
             dosageText = "10 мг",
-            category = ScannedCategory.MEDICINE
+            isMedicine = true
         )
 
         val filled = suggestion.filling(empty, VOCABULARY)
@@ -130,18 +129,10 @@ class ScanSuggestionMapperTest {
     fun theDayItWasSoldBecomesTheDayItWasBought() {
         val suggestion = PackageSuggestion(
             boughtOn = java.time.LocalDate.of(2026, 9, 15),
-            category = ScannedCategory.MEDICINE
+            isMedicine = true
         )
 
         assertEquals(java.time.LocalDate.of(2026, 9, 15), suggestion.filling(empty, VOCABULARY).purchasedOn)
-    }
-
-    /** Категория остаётся экрану: реестр называет её «drugs», а человеку она нужна его словами. */
-    @Test
-    fun theCategoryIsNotFilledWithTheRegistrysOwnWord() {
-        val suggestion = PackageSuggestion(category = ScannedCategory.MEDICINE)
-
-        assertEquals("", suggestion.filling(empty, VOCABULARY).category)
     }
 
     /**
@@ -156,7 +147,7 @@ class ScanSuggestionMapperTest {
             country = "Индия",
             quantityText = "30 ${TABLETS.name}",
             activeSubstance = "цетиризин",
-            category = ScannedCategory.MEDICINE
+            isMedicine = true
         )
 
         val filled = suggestion.filling(typed, VOCABULARY)
