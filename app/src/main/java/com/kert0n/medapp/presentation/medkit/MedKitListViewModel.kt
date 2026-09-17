@@ -9,13 +9,13 @@ import com.kert0n.medapp.storage.medkit.MedKitStorageRepository
 import dagger.hilt.android.lifecycle.HiltViewModel
 import javax.inject.Inject
 import kotlinx.coroutines.ExperimentalCoroutinesApi
-import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
-import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.flatMapLatest
 import kotlinx.coroutines.flow.stateIn
-import kotlinx.coroutines.launch
+import com.kert0n.medapp.presentation.Fresh
+import com.kert0n.medapp.presentation.readAfter
+import kotlinx.coroutines.flow.map
 
 /**
  * Список аптечек (PLAN H3 №2). Состояние целиком приходит из базы: человек видит не названия, а
@@ -40,23 +40,17 @@ class MedKitListViewModel @Inject constructor(
     today: Today
 ) : ViewModel() {
 
-    /** Перечитывание списка при входе кончилось. */
-    private val freshened = MutableStateFlow(false)
-
-    init {
-        viewModelScope.launch {
-            try {
-                freshening.medKits()
-            } finally {
-                freshened.value = true
-            }
-        }
+    /** Список, прочитанный после перечитывания: до него — ожидание. */
+    private val kits = viewModelScope.readAfter(freshening::medKits) {
+        today.observe().flatMapLatest { day -> medKits.observeAll(day.date) }
     }
 
-    val state: StateFlow<ScreenState<List<MedKitPresentationDTO>>> = today.observe()
-        .flatMapLatest { day -> medKits.observeAll(day.date) }
-        .combine(freshened) { kits, freshened ->
-            if (freshened) ScreenState.Ready(kits.map { it.toPresentationDTO() }) else ScreenState.Loading
+    val state: StateFlow<ScreenState<List<MedKitPresentationDTO>>> = kits
+        .map { kits ->
+            when (kits) {
+                Fresh.Waiting -> ScreenState.Loading
+                is Fresh.Read -> ScreenState.Ready(kits.value.map { it.toPresentationDTO() })
+            }
         }
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), ScreenState.Loading)
 }

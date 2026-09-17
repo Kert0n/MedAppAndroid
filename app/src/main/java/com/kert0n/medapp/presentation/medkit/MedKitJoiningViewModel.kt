@@ -40,9 +40,15 @@ class MedKitJoiningViewModel @Inject constructor(
         _state.value = _state.value.copy(code = code, refusal = null)
     }
 
-    /** Открыть камеру: код приглашения чаще показывают с экрана, чем переписывают. */
+    /**
+     * Открыть камеру: код приглашения чаще показывают с экрана, чем переписывают. Пока идёт
+     * вступление или оно кончилось, камера не открывается: новый код подменил бы на экране тот,
+     * на который придёт ответ.
+     */
     fun scan() {
-        _state.value = _state.value.copy(isScanning = true, refusal = null)
+        val now = _state.value
+        if (now.isWorking || now.joined != null) return
+        _state.value = now.copy(isScanning = true, refusal = null)
     }
 
     /**
@@ -63,8 +69,12 @@ class MedKitJoiningViewModel @Inject constructor(
      * годится, и приложение молча ждёт другого кадра, а не шлёт на сервер заведомо чужую строку.
      */
     fun seen(code: ScannedCode) {
+        val now = _state.value
+        // Кадр, пришедший в очереди после первого узнанного кода, не подменяет код, по которому
+        // уже входят.
+        if (now.isWorking || now.joined != null) return
         if (code.format != CodeFormat.QR || code.text.isEmpty()) return
-        _state.value = _state.value.copy(code = code.text, refusal = null, isScanning = false)
+        _state.value = now.copy(code = code.text, refusal = null, isScanning = false)
         join()
     }
 

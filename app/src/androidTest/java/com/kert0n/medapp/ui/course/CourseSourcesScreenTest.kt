@@ -6,6 +6,7 @@ import androidx.compose.ui.test.SemanticsMatcher
 import androidx.compose.ui.test.assertCountEquals
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.hasAnyAncestor
+import androidx.compose.ui.test.hasAnyDescendant
 import androidx.compose.ui.test.hasSetTextAction
 import androidx.compose.ui.test.hasText
 import androidx.compose.ui.test.isDialog
@@ -226,6 +227,22 @@ class CourseSourcesScreenTest {
         compose.onNodeWithContentDescription("Переставить: Нурофен").assertIsDisplayed()
         compose.onNodeWithContentDescription("Переставить: Ибупрофен").assertIsDisplayed()
     }
+
+    /**
+     * Чтецу предложены только те перестановки, что возможны: у верхней коробки «Выше» ничего не
+     * сдвинуло бы, а чтец всё равно доложил бы об успехе, и человек решил бы, что порядок поменялся.
+     */
+    @Test
+    fun onlyPossibleMovesAreOfferedToAScreenReader() {
+        show(CourseSourcesUiState(sources = listOf(source(), source(OTHER_PACK, "Ибупрофен"))))
+
+        assertEquals(listOf("Ниже"), movesOf("Нурофен"))
+        assertEquals(listOf("Выше"), movesOf("Ибупрофен"))
+    }
+
+    private fun movesOf(name: String): List<String> =
+        compose.onNode(hasAnyDescendant(hasText(name)) and SemanticsMatcher.keyIsDefined(SemanticsActions.CustomActions))
+            .fetchSemanticsNode().config[SemanticsActions.CustomActions].map { it.label }
 
     /** Пусто — это не отказ: сказано, что делать, и кнопка одна. */
     @Test

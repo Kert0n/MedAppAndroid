@@ -36,6 +36,8 @@ import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
+import com.kert0n.medapp.presentation.Fresh
+import com.kert0n.medapp.presentation.readAfter
 
 /**
  * Карточка пункта плана (PLAN H3 №18): тот же ответ, что и в строке дня, но набранный руками —
@@ -88,27 +90,30 @@ class IntakeCardViewModel @AssistedInject constructor(
             }
         }
 
-    /** Перечитывание источников при открытии кончилось. */
-    private val freshened = MutableStateFlow(false)
+    /** Пункт с источниками, прочитанный после перечитывания их коробок (PLAN E4). */
+    private val fresh = viewModelScope.readAfter({
+        val sources = episode.first().second?.second.orEmpty()
+        freshening.packs(sources.mapTo(HashSet()) { it.pkg.id })
+    }) { episode }
 
-    init {
-        viewModelScope.launch {
-            try {
-                val sources = episode.first().second?.second.orEmpty()
-                freshening.packs(sources.mapTo(HashSet()) { it.pkg.id })
-            } finally {
-                freshened.value = true
-            }
+    /**
+     * Пока ждём, лечение и время видны из базы — ждёт только выбор пачки и дозы; после — всё
+     * прочитанное после ответа.
+     */
+    private val shown = combine(episode, fresh) { live, fresh ->
+        when (fresh) {
+            Fresh.Waiting -> live to false
+            is Fresh.Read -> fresh.value to true
         }
     }
 
     val state: StateFlow<IntakeCardUiState> = combine(
-        episode,
+        shown,
         today.observe(),
         typed,
-        writing,
-        freshened
-    ) { (intake, episode), day, typed, writing, freshened ->
+        writing
+    ) { (read, freshened), day, typed, writing ->
+        val (intake, episode) = read
         val title = episode?.first
         // Пункта нет — расписание перестроили, пока карточку держали открытой: показывать нечего.
         if (intake == null || title == null) IntakeCardUiState(isGone = true)

@@ -118,8 +118,8 @@ class PackageCardViewModelTest {
 
     /**
      * Коробка общей полки при связи перечитывается, и пока сервер не ответил, карточка ждёт — хотя
-     * в базе коробка уже есть: число, по которому решают, должно быть свежим (PLAN E4). Спрошено
-     * ровно один раз.
+     * в базе коробка уже есть: число, по которому решают, должно быть свежим (PLAN E4). Прежнее
+     * число из базы до ответа не показывается вовсе, и спрошено ровно один раз.
      */
     @Test
     fun aSharedBoxWaitsForTheServerOnce() {
@@ -129,8 +129,9 @@ class PackageCardViewModelTest {
         val model = viewModel(freshening = com.kert0n.medapp.fixture.onlineFreshening(server, stored, clock))
 
         watching(model.state) { state ->
-            state.awaiting { it.pack != null }
+            state.awaiting { it.isFreshening }
             assertTrue(state.value.isLoading)
+            assertEquals(null, state.value.pack)
             assertFalse(state.value.isGone)
             server.release()
             state.awaiting { !it.isLoading }

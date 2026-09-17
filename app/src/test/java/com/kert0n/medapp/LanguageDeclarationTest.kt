@@ -28,7 +28,9 @@ class LanguageDeclarationTest {
     /** Без `autoStoreLocales` выбор языка до Android 13 не пережил бы перезапуск. */
     @Test
     fun theChoiceIsStoredBeforeAndroid13() {
-        assertTrue("выбор языка до Android 13 не сохраняется", "autoStoreLocales" in manifest)
+        // Имя без значения не держит ничего: `android:value="false"` выключило бы то же хранение.
+        val stored = """<meta-data\s+android:name="autoStoreLocales"\s+android:value="true"\s*/>""".toRegex()
+        assertTrue("выбор языка до Android 13 не сохраняется", stored.containsMatchIn(manifest))
     }
 
     /** Объявленные языки — ровно те, что знает порт: лишний нечем показать, недостающий нечем выбрать. */
@@ -63,9 +65,14 @@ class LanguageDeclarationTest {
         val names = { file: File -> """<(?:string|plurals|string-array) name="([^"]+)"""".toRegex().findAll(file.readText()).map { it.groupValues[1] }.toSet() }
         val defaults = main.resolve("res/values/strings.xml")
         val untranslatable = """<string name="([^"]+)" translatable="false"""".toRegex().findAll(defaults.readText()).map { it.groupValues[1] }.toSet()
+        // Язык умолчания назван у самих строк умолчания: пропускается он один, а пропавший файл
+        // любого другого языка — провал, а не пропуск.
+        val default = """tools:locale="([a-zA-Z-]+)"""".toRegex().find(defaults.readText())?.groupValues?.get(1)
+            ?: error("строки умолчания не назвали свой язык")
         for (language in AppLanguage.declared) {
+            if (language.tag == default) continue
             val translation = main.resolve("res/values-${language.tag}/strings.xml")
-            if (!translation.isFile) continue // язык умолчания лежит в values/
+            assertTrue("у языка ${language.tag} нет своих строк", translation.isFile)
             assertEquals("values-${language.tag} расходится с values", names(defaults) - untranslatable, names(translation))
         }
     }

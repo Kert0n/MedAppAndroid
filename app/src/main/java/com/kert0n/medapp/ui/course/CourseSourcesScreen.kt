@@ -180,8 +180,8 @@ private fun Sources(
                     isFinished = state.isFinished,
                     onAllocate = onAllocate,
                     onDetach = { onDetach(source.packageId) },
-                    onMoveUp = { if (index > 0) onMove(index, index - 1) },
-                    onMoveDown = { if (index < count - 1) onMove(index, index + 1) },
+                    onMoveUp = if (index > 0) { { onMove(index, index - 1) } } else null,
+                    onMoveDown = if (index < count - 1) { { onMove(index, index + 1) } } else null,
                     held = held,
                     modifier = Modifier
                         .zIndex(if (held) 1f else 0f)
@@ -295,8 +295,9 @@ private fun SourceRow(
     isFinished: Boolean,
     onAllocate: (Uuid, Int) -> Unit,
     onDetach: () -> Unit,
-    onMoveUp: () -> Unit,
-    onMoveDown: () -> Unit,
+    /** `null` — двигать некуда: действия нет, и чтец не докладывает об успехе, которого не было. */
+    onMoveUp: (() -> Unit)?,
+    onMoveDown: (() -> Unit)?,
     held: Boolean,
     modifier: Modifier,
     handleModifier: Modifier
@@ -310,9 +311,9 @@ private fun SourceRow(
             // Приглушена и отключённая коробка, и уходящая: обе ничего не дают.
             .alpha(if (source.fault == null && source.leaving == null) 1f else 0.6f)
             .semantics {
-                customActions = listOf(
-                    CustomAccessibilityAction(up) { onMoveUp(); true },
-                    CustomAccessibilityAction(down) { onMoveDown(); true }
+                customActions = listOfNotNull(
+                    onMoveUp?.let { move -> CustomAccessibilityAction(up) { move(); true } },
+                    onMoveDown?.let { move -> CustomAccessibilityAction(down) { move(); true } }
                 )
             },
         // Поднятая карточка видна тенью.

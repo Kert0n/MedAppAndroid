@@ -127,7 +127,7 @@ class RemovalDialogLookTest {
             }
         }
 
-        compose.onNodeWithText("Источники потеряют: Спина, Колено. Сами лечения останутся.").assertIsDisplayed()
+        compose.onNodeWithText("Могут потерять источники: Спина, Колено. Сами лечения останутся.").assertIsDisplayed()
         // Три судьбы плюс последствия — самый длинный разговор об уборке. Каждая должна
         // **дочитываться**: обрезанная подпись у последней и была бедой на снимке владельца.
         val dialog = compose.onNode(isDialog()).getUnclippedBoundsInRoot()

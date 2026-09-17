@@ -22,6 +22,8 @@ import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.flatMapLatest
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
+import com.kert0n.medapp.presentation.Fresh
+import com.kert0n.medapp.presentation.readAfter
 
 /**
  * Перенос упаковки на другую полку (PLAN H3 №11). Перенос двигает место, а не остаток: из
@@ -54,26 +56,16 @@ class PackageTransferViewModel @AssistedInject constructor(
 
     private val progress = MutableStateFlow(Progress())
 
-    /** Перечитывание коробки при открытии кончилось (PLAN E4). */
-    private val freshened = MutableStateFlow(false)
-
-    init {
-        viewModelScope.launch {
-            try {
-                freshening.pack(packageId)
-            } finally {
-                freshened.value = true
-            }
-        }
-    }
+    /** Коробка, прочитанная после перечитывания (PLAN E4): её чужие брони решают предупреждение. */
+    private val fresh = viewModelScope.readAfter({ freshening.pack(packageId) }) { packages.observe(packageId) }
 
     val state: StateFlow<PackageTransferUiState> = combine(
-        packages.observe(packageId),
+        fresh,
         today.observe().flatMapLatest { medKits.observeAll(it.date) },
         chosen,
-        progress,
-        freshened
-    ) { pack, kits, chosen, progress, freshened ->
+        progress
+    ) { fresh, kits, chosen, progress ->
+        val pack = (fresh as? Fresh.Read)?.value
         PackageTransferUiState(
             places = kits.filter { it.id != pack?.medKit?.id }.map { it.toPresentationDTO() },
             chosen = chosen,
@@ -84,7 +76,7 @@ class PackageTransferViewModel @AssistedInject constructor(
             isGone = pack == null,
             refusal = progress.refusal,
             isDone = progress.done,
-            isLoaded = freshened
+            isLoaded = fresh is Fresh.Read
         )
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), PackageTransferUiState())
 

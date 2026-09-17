@@ -167,6 +167,7 @@ class MedKitJoiningViewModelTest {
         val model = viewModel(server)
 
         watching(model.state) { state ->
+            model.type("K7F-2M9")
             model.scan()
             model.cameraDenied()
             state.awaiting { it.refusal != null }
@@ -174,6 +175,30 @@ class MedKitJoiningViewModelTest {
 
         assertEquals(MedKitJoiningRefusal.CameraDenied, model.state.value.refusal)
         assertEquals(false, model.state.value.isScanning)
+        assertEquals("K7F-2M9", model.state.value.code)
+    }
+
+    /**
+     * Кадр, пришедший в очереди после узнанного кода, не подменяет код, по которому вошли, и
+     * второго вступления не зовёт: иначе ответ на первый код лёг бы под вторым.
+     */
+    @Test
+    fun aLateFrameDoesNotReplaceTheCodeBeingJoined() {
+        val server = Server(HttpStatusCode.Created, shelfJson(SHARED_KIT))
+        val model = viewModel(server)
+
+        watching(model.state) { state ->
+            model.scan()
+            model.seen(ScannedCode(CodeFormat.QR, "K7F-2M9-QX4"))
+            model.seen(ScannedCode(CodeFormat.QR, "ZZZ-000-ZZZ"))
+            model.scan()
+            state.awaiting { it.joined != null }
+        }
+        model.seen(ScannedCode(CodeFormat.QR, "ZZZ-000-ZZZ"))
+
+        assertEquals("K7F-2M9-QX4", model.state.value.code)
+        assertEquals(false, model.state.value.isScanning)
+        assertEquals(1, server.asked)
     }
 
     /** Вошёл — экран называет полку, и оболочка ведёт в неё. */

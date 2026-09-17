@@ -179,7 +179,7 @@
     <string name="med_kit_remove_throw_away_consequence">Аптечка и всё, что в ней лежит, исчезнут</string>
     <string name="med_kit_remove_move_consequence">Выберите, куда переложить лекарства</string>
     <string name="med_kit_remove_empty_consequence">Убирать нечего — аптечка пуста</string>
-    <string name="med_kit_remove_affects_courses">Источники потеряют: %1$s. Сами лечения останутся.</string>
+    <string name="med_kit_remove_affects_courses">Могут потерять источники: %1$s. Сами лечения останутся.</string>
     <string name="med_kit_leave">Выйти и оставить остальным</string>
     <string name="med_kit_leave_consequence">Аптечка останется у других, а вам её лекарства будут недоступны</string>
     <string name="med_kit_remove_target_title">Куда перенести лекарства?</string>

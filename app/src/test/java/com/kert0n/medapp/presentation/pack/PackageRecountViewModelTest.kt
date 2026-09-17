@@ -200,7 +200,8 @@ class PackageRecountViewModelTest {
 
     /**
      * Коробка общей полки при связи перечитывается, и пока сервер не ответил, пересчёт ждёт:
-     * «сейчас записано» должно быть свежим — от него считается разница (PLAN E4). Спрошено один раз.
+     * «сейчас записано» должно быть свежим — от него считается разница (PLAN E4). Спрошено один раз,
+     * и прежнее число до ответа не показано.
      */
     @Test
     fun aSharedBoxIsRecountedOnlyAfterTheServerAnswers() {
@@ -210,8 +211,10 @@ class PackageRecountViewModelTest {
         val model = viewModel(freshening = com.kert0n.medapp.fixture.onlineFreshening(server, stored, clock))
 
         watching(model.state) { state ->
-            state.awaiting { it.pack != null }
+            state.awaiting { it.isFreshening }
             org.junit.Assert.assertTrue(state.value.isLoading)
+            // Прежнее «сейчас записано» до ответа не показано: от него отсчитали бы разницу.
+            assertEquals(null, state.value.pack)
             server.release()
             state.awaiting { !it.isLoading }
         }

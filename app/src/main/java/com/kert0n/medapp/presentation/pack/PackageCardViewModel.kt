@@ -26,6 +26,8 @@ import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
+import com.kert0n.medapp.presentation.Fresh
+import com.kert0n.medapp.presentation.readAfter
 
 /**
  * Карточка упаковки (PLAN H3 №6). Первым — сколько есть; остальное человек читает вторым
@@ -58,25 +60,15 @@ class PackageCardViewModel @AssistedInject constructor(
 
     private val removing = MutableStateFlow(Removing())
 
-    /** Перечитывание при открытии кончилось. */
-    private val freshened = MutableStateFlow(false)
-
-    init {
-        viewModelScope.launch {
-            try {
-                freshening.pack(packageId)
-            } finally {
-                freshened.value = true
-            }
-        }
-    }
+    /** Коробка, прочитанная после перечитывания (PLAN E4): до него — ожидание. */
+    private val fresh = viewModelScope.readAfter({ freshening.pack(packageId) }) { packages.observe(packageId) }
 
     private val days = today.observe()
 
-    /** Коробка, как её прочитали, — вместе с тем, дождались ли ответа сервера. */
-    private val pack = packages.observe(packageId)
+    private val pack = fresh.map { (it as? Fresh.Read)?.value }
 
-    private val read = combine(pack, freshened) { pack, freshened -> pack to freshened }
+    /** Коробка, как её прочитали, — вместе с тем, дождались ли ответа сервера. */
+    private val read = fresh.map { (it as? Fresh.Read)?.value to (it is Fresh.Read) }
 
     private val place = combine(pack, days) { pack, day -> pack?.medKit?.id to day.date }
         .distinctUntilChanged()

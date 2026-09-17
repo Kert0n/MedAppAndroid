@@ -2,7 +2,6 @@ package com.kert0n.medapp.presentation.pack
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
-import com.kert0n.medapp.domain.pack.PackageProjection
 import com.kert0n.medapp.feature.operation.Freshening
 import com.kert0n.medapp.feature.packages.PackageAdjusting
 import com.kert0n.medapp.presentation.ParsedInput
@@ -22,6 +21,8 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
+import com.kert0n.medapp.presentation.Fresh
+import com.kert0n.medapp.presentation.readAfter
 
 /**
  * Пересчёт (PLAN H3 №9): человек посчитал и увидел не то число, что записано. Он называет то,
@@ -53,38 +54,21 @@ class PackageRecountViewModel @AssistedInject constructor(
 
     private val progress = MutableStateFlow(Progress())
 
-    /** Перечитывание коробки при открытии кончилось (PLAN E4). */
-    private val freshened = MutableStateFlow(false)
-
-    init {
-        viewModelScope.launch {
-            try {
-                freshening.pack(packageId)
-            } finally {
-                freshened.value = true
-            }
-        }
-    }
-
     /**
-     * Коробка, как её прочитали, — доменной проекцией, а не строками экрана: от увиденного числа
-     * отсчитывается разница, и собирать его обратно из строки значило бы разбирать то, что уже
-     * было величиной. Прочитана или ещё нет — часть ответа: `null` внутри [Reading.Read] значит
-     * «коробки нет», а само отсутствие чтения не значит ничего.
+     * Коробка, как её прочитали после перечитывания, — доменной проекцией, а не строками экрана: от
+     * увиденного числа отсчитывается разница, и собирать его обратно из строки значило бы разбирать
+     * то, что уже было величиной. Прочитана или ещё нет — часть ответа: `null` внутри [Fresh.Read]
+     * значит «коробки нет», а само отсутствие чтения не значит ничего.
      */
-    private val seen = MutableStateFlow<Reading>(Reading.Unread)
+    private val seen = viewModelScope.readAfter({ freshening.pack(packageId) }) { packages.observe(packageId) }
 
-    init {
-        viewModelScope.launch { packages.observe(packageId).collect { seen.value = Reading.Read(it) } }
-    }
-
-    val state: StateFlow<PackageRecountUiState> = combine(seen, form, progress, freshened) { reading, form, progress, freshened ->
-        val pack = (reading as? Reading.Read)?.pack
+    val state: StateFlow<PackageRecountUiState> = combine(seen, form, progress) { reading, form, progress ->
+        val pack = (reading as? Fresh.Read)?.value
         PackageRecountUiState(
-            isFreshening = !freshened,
+            isFreshening = reading is Fresh.Waiting,
             pack = pack?.toPresentationDTO(),
             form = form,
-            isGone = freshened && reading is Reading.Read && pack == null,
+            isGone = reading is Fresh.Read && pack == null,
             error = progress.error,
             isDone = progress.done
         )
@@ -121,7 +105,7 @@ class PackageRecountViewModel @AssistedInject constructor(
 
     /** Что человек назвал, в единице коробки. Нажать до чтения нельзя: экран ещё показывает загрузку. */
     private suspend fun parse(): ParsedInput<PackageAdjusting.Action.Recount, PackageRecountError> {
-        val pack = (seen.value as? Reading.Read)?.pack ?: return ParsedInput.Rejected(PackageRecountError.Gone)
+        val pack = (seen.value as? Fresh.Read)?.value ?: return ParsedInput.Rejected(PackageRecountError.Gone)
         val shown = pack.availability.effective
         val typed = QuantityPresentationDTO(form.value.amount, shown.unit.toPresentationDTO())
         return when (val parsed = typed.toDomain(vocabulary.snapshot())) {
@@ -130,11 +114,6 @@ class PackageRecountViewModel @AssistedInject constructor(
                 if (parsed.value.isZero) ParsedInput.Rejected(PackageRecountError.Zero)
                 else ParsedInput.Parsed(PackageAdjusting.Action.Recount(seen = shown, actual = parsed.value))
         }
-    }
-
-    private sealed interface Reading {
-        data object Unread : Reading
-        data class Read(val pack: PackageProjection?) : Reading
     }
 
     private data class Progress(

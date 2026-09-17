@@ -171,7 +171,7 @@
     <string name="med_kit_remove_throw_away_consequence">The kit and everything in it will disappear</string>
     <string name="med_kit_remove_move_consequence">Choose where to move the medicines</string>
     <string name="med_kit_remove_empty_consequence">Nothing to remove — the kit is empty</string>
-    <string name="med_kit_remove_affects_courses">Sources will be lost by: %1$s. The treatments themselves will stay.</string>
+    <string name="med_kit_remove_affects_courses">These may lose their sources: %1$s. The treatments themselves will stay.</string>
     <string name="med_kit_leave">Leave it to the others</string>
     <string name="med_kit_leave_consequence">The kit will stay with the others, and its medicines will be unavailable to you</string>
     <string name="med_kit_remove_target_title">Where to move the medicines?</string>
