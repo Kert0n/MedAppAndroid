@@ -1,4 +1,4 @@
-<resources>
+<resources xmlns:tools="http://schemas.android.com/tools" tools:locale="ru">
     <string name="app_name">MedApp</string>
 
     <!-- Общие состояния экрана -->
@@ -241,6 +241,7 @@
     <string name="permissions_row">Разрешения</string>
     <string name="permissions_row_supporting">Уведомления, будильники, камера</string>
     <string name="permissions_row_attention">Что-то выключено</string>
+    <string name="language_row">Язык</string>
 
     <!-- Настройки (экран 27) -->
     <string name="settings_title">Настройки</string>
@@ -275,6 +276,12 @@
     <string name="permissions_denied">Выключено — исправить в настройках телефона</string>
     <string name="permissions_absent">Нет на этом устройстве — коды вводятся вручную</string>
     <string name="permissions_not_needed">Не требуется на этой версии Android</string>
+
+    <!-- Язык (экран 27). Названия языков — на своём языке, не переводятся. -->
+    <string name="language_title">Язык</string>
+    <string name="language_system">Как в системе</string>
+    <string name="language_russian" translatable="false">Русский</string>
+    <string name="language_english" translatable="false">English</string>
     <string name="sync_refresh">Обновить</string>
     <string name="sync_running">Идёт обмен с сервером</string>
     <string name="sync_offline">Связи нет — очередь подождёт</string>

@@ -22,6 +22,7 @@ import com.kert0n.medapp.platform.notifications.NotificationChannels.Companion.i
 import com.kert0n.medapp.storage.course.CourseStorageRepository
 import com.kert0n.medapp.storage.intake.IntakeStorageRepository
 import com.kert0n.medapp.storage.pack.PackageStorageRepository
+import com.kert0n.medapp.platform.settings.AppLanguages
 import dagger.hilt.android.qualifiers.ApplicationContext
 import java.time.format.DateTimeFormatter
 import java.time.format.FormatStyle
@@ -48,8 +49,12 @@ class SystemNotifier @Inject constructor(
     private val intakes: IntakeStorageRepository,
     private val courses: CourseStorageRepository,
     private val packages: PackageStorageRepository,
-    private val readiness: NotificationReadiness
+    private val readiness: NotificationReadiness,
+    private val languages: AppLanguages
 ) : Notifier {
+
+    /** Слова шторки — на языке приложения: до Android 13 контекст процесса сам его не знает. */
+    private val words: Context get() = languages.speaking(context)
 
     override suspend fun show(reminder: Reminder): Delivery {
         // Проверка стоит здесь, а не в отдельном методе: lint видит её только рядом с `notify`.
@@ -75,7 +80,7 @@ class SystemNotifier @Inject constructor(
             val intake = (reminder.target as? NotificationTarget.Intake)?.intakeId ?: continue
             // Все действия — без экрана, своим приёмником: «Принял» пишет в фоне, а не вышло —
             // приходит «нужно ваше решение» (C1). Запускать окно из приёмника платформа не даёт.
-            builder.addAction(0, context.getString(action.label), actionIntent(intake, action, reminder.key))
+            builder.addAction(0, words.getString(action.label), actionIntent(intake, action, reminder.key))
         }
         NotificationManagerCompat.from(context).notify(reminder.key.subject, reminder.kind.ordinal, builder.build())
         return Delivery.SHOWN
@@ -96,21 +101,21 @@ class SystemNotifier @Inject constructor(
             val pkg = intake.plannedPackage?.name
             when (notification.kind) {
                 NotificationKind.INTAKE_DECISION -> Text(
-                    context.getString(R.string.notice_intake_decision_title, title),
-                    context.getString(R.string.notice_intake_decision_body)
+                    words.getString(R.string.notice_intake_decision_title, title),
+                    words.getString(R.string.notice_intake_decision_body)
                 )
                 NotificationKind.INTAKE_DUE -> Text(
-                    context.getString(R.string.notice_intake_due_title, title),
-                    if (pkg != null) context.getString(R.string.notice_intake_due_body, dose, pkg) else context.getString(R.string.notice_intake_due_unsupplied, dose)
+                    words.getString(R.string.notice_intake_due_title, title),
+                    if (pkg != null) words.getString(R.string.notice_intake_due_body, dose, pkg) else words.getString(R.string.notice_intake_due_unsupplied, dose)
                 )
-                else -> Text(context.getString(R.string.notice_intake_missed_title, title), context.getString(R.string.notice_intake_missed_body, dose))
+                else -> Text(words.getString(R.string.notice_intake_missed_title, title), words.getString(R.string.notice_intake_missed_body, dose))
             }
         }
         is NotificationTarget.PackageCard -> {
             val pkg = packages.observe(target.packageId).first() ?: return null
             val until = pkg.facts.expiresOn?.lastDay?.format(DATE) ?: return null
             Text(
-                context.getString(
+                words.getString(
                     when (notification.kind) {
                         NotificationKind.EXPIRY_SOURCE_3D -> R.string.notice_expiry_3d_title
                         NotificationKind.EXPIRY_SOURCE_1D -> R.string.notice_expiry_1d_title
@@ -118,7 +123,7 @@ class SystemNotifier @Inject constructor(
                     },
                     pkg.name
                 ),
-                context.getString(R.string.notice_expiry_body, until)
+                words.getString(R.string.notice_expiry_body, until)
             )
         }
         is NotificationTarget.CourseSources -> {
@@ -126,9 +131,9 @@ class SystemNotifier @Inject constructor(
             val coverage = courses.observeCoverage(target.courseId).first()
             val zone = record.prescription.schedule.zone
             val until = coverage?.coveredUntil?.atZone(zone)?.toLocalDate()?.format(DATE)
-            val body = if (until != null) context.getString(R.string.notice_coverage_body_until, until) else context.getString(R.string.notice_coverage_body_none)
+            val body = if (until != null) words.getString(R.string.notice_coverage_body_until, until) else words.getString(R.string.notice_coverage_body_none)
             Text(
-                context.getString(
+                words.getString(
                     when (notification.kind) {
                         NotificationKind.COVERAGE_SHORT -> R.string.notice_coverage_short_title
                         NotificationKind.COVERAGE_3D -> R.string.notice_coverage_3d_title
@@ -139,8 +144,8 @@ class SystemNotifier @Inject constructor(
                 body
             )
         }
-        is NotificationTarget.DayPlan -> Text(context.getString(R.string.notice_digest_title), context.getString(R.string.notice_digest_body, target.date.format(DATE)))
-        NotificationTarget.SyncStatus -> Text(context.getString(R.string.notice_sync_attention_title), context.getString(R.string.notice_sync_attention_body))
+        is NotificationTarget.DayPlan -> Text(words.getString(R.string.notice_digest_title), words.getString(R.string.notice_digest_body, target.date.format(DATE)))
+        NotificationTarget.SyncStatus -> Text(words.getString(R.string.notice_sync_attention_title), words.getString(R.string.notice_sync_attention_body))
     }
 
     /**

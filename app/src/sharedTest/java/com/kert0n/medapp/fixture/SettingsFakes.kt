@@ -1,9 +1,12 @@
 package com.kert0n.medapp.fixture
 
+import android.content.Context
 import com.kert0n.medapp.feature.notification.DailySchedule
 import com.kert0n.medapp.feature.settings.AppSettings
 import com.kert0n.medapp.feature.settings.SettingsSaved
 import com.kert0n.medapp.feature.settings.SettingsStore
+import com.kert0n.medapp.platform.settings.AppLanguage
+import com.kert0n.medapp.platform.settings.AppLanguages
 import com.kert0n.medapp.queue.SyncInterval
 import com.kert0n.medapp.queue.SyncSchedule
 import java.time.Instant
@@ -43,4 +46,22 @@ class FakeDailySchedule : DailySchedule {
     var runs = 0
     override suspend fun keepDaily(at: LocalTime) { kept += at }
     override fun runNow() { runs++ }
+}
+
+/**
+ * Язык в памяти: проверкам важно, что выбрано, а не что об этом узнала система. Настоящий выбор
+ * на Android 13+ перевёл бы весь прогон — язык приложения тестов не меняется никогда.
+ */
+class FakeAppLanguages(var chosen: AppLanguage = AppLanguage.SYSTEM) : AppLanguages {
+    val choices = ArrayList<AppLanguage>()
+    override fun current(): AppLanguage = chosen
+    override fun choose(language: AppLanguage) {
+        choices += language
+        chosen = language
+    }
+    override fun speaking(context: Context): Context = context
+    fun reset() {
+        chosen = AppLanguage.SYSTEM
+        choices.clear()
+    }
 }

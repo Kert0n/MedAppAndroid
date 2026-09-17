@@ -1,5 +1,6 @@
 package com.kert0n.medapp.platform.notifications
 
+import com.kert0n.medapp.fixture.FakeAppLanguages
 import android.Manifest
 import android.app.NotificationManager
 import android.content.Context
@@ -58,8 +59,8 @@ class SystemNotifierTest {
     fun setUp() = runTest {
         database = inMemoryDatabase()
         database.packageRepository().add(pack(quantity = tablets("20"), expiresOn = expiry))
-        notifier = SystemNotifier(context, database.intakeRepository(), database.courseRepository(), database.packageRepository(), NotificationChannels(context))
-        NotificationChannels(context).ensure()
+        notifier = SystemNotifier(context, database.intakeRepository(), database.courseRepository(), database.packageRepository(), NotificationChannels(context, FakeAppLanguages()), FakeAppLanguages())
+        NotificationChannels(context, FakeAppLanguages()).ensure()
         manager.cancelAll()
     }
 
@@ -86,7 +87,7 @@ class SystemNotifierTest {
             assertEquals(channel.name, expected, system.importance)
         }
         // Повторное заведение каналов ничего не ломает.
-        NotificationChannels(context).ensure()
+        NotificationChannels(context, FakeAppLanguages()).ensure()
         assertEquals(NotificationChannel.entries.size, manager.notificationChannels.count { it.id in NotificationChannel.entries.map { c -> c.id } })
     }
 
@@ -265,7 +266,7 @@ class SystemNotifierTest {
             android.app.NotificationChannel("legacy", "Прежний канал", android.app.NotificationManager.IMPORTANCE_LOW)
         )
 
-        NotificationChannels(context).ensure()
+        NotificationChannels(context, FakeAppLanguages()).ensure()
 
         assertEquals(null, manager.getNotificationChannel("legacy"))
     }
@@ -295,7 +296,7 @@ class SystemNotifierTest {
             )
         } finally {
             // Возвращается с прежней важностью: её никто не понижал, и система отдаёт ту же.
-            NotificationChannels(context).ensure()
+            NotificationChannels(context, FakeAppLanguages()).ensure()
         }
     }
 }

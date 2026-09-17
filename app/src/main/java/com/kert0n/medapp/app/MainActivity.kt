@@ -2,7 +2,7 @@ package com.kert0n.medapp.app
 
 import android.content.Intent
 import android.os.Bundle
-import androidx.activity.ComponentActivity
+import androidx.appcompat.app.AppCompatActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.compose.runtime.mutableStateOf
@@ -14,6 +14,10 @@ import dagger.hilt.android.AndroidEntryPoint
 /**
  * Единственное окно приложения (PLAN H3): всё остальное — места внутри оболочки.
  *
+ * Наследует `AppCompatActivity` ради одного — языка приложения до Android 13: выбранный человеком
+ * язык AppCompat применяет к окну при его создании, и без этого родителя `setApplicationLocales`
+ * там ничего не делает (PLAN C1 «Язык хранит система»). Всё остальное по-прежнему рисует Compose.
+ *
  * Окно же и принимает намерение из шторки: цель кладёт `SystemNotifier`, читает её
  * [NotificationTargetExtras] — своего разбора extras здесь не пишется (разбор #29).
  *
@@ -23,7 +27,7 @@ import dagger.hilt.android.AndroidEntryPoint
  * цель, которую оболочка ещё не применила, переживает пересоздание в сохранённом состоянии.
  */
 @AndroidEntryPoint
-class MainActivity : ComponentActivity() {
+class MainActivity : AppCompatActivity() {
 
     /** Цель, которую оболочка ещё не применила; применила — `null`. */
     private val opening = mutableStateOf<NotificationTarget?>(null)

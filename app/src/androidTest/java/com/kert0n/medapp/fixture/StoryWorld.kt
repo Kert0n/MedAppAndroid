@@ -141,6 +141,7 @@ class StoryWorld private constructor(start: Instant, zone: ZoneId) {
     fun end() {
         scope.cancel()
         TestPermissions.reset()
+        TestLanguages.reset()
         current = null
     }
 

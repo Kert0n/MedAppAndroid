@@ -66,9 +66,11 @@ import com.kert0n.medapp.presentation.medkit.MedKitSharingViewModel
 import com.kert0n.medapp.presentation.medkit.MedKitListViewModel
 import com.kert0n.medapp.presentation.pack.MedKitContentsViewModel
 import com.kert0n.medapp.presentation.operation.SyncStatusViewModel
+import com.kert0n.medapp.presentation.settings.LanguageViewModel
 import com.kert0n.medapp.presentation.settings.PermissionsViewModel
 import com.kert0n.medapp.presentation.settings.SettingsUiState
 import com.kert0n.medapp.presentation.settings.SettingsViewModel
+import com.kert0n.medapp.ui.settings.LanguageScreen
 import com.kert0n.medapp.ui.settings.PermissionsScreen
 import com.kert0n.medapp.ui.settings.SettingsScreen
 import com.kert0n.medapp.ui.openAppDetailsSettings
@@ -569,7 +571,17 @@ private fun screens(stacks: TabStacks, planMode: MutableState<PlanMode>) = entry
             onSyncStatus = { stacks.go(Screen.SyncStatus) },
             onSettings = { stacks.go(Screen.Settings) },
             permissionsTrouble = permissions.state.collectAsStateWithLifecycle().value.hasTrouble,
-            onPermissions = { stacks.go(Screen.Permissions) }
+            onPermissions = { stacks.go(Screen.Permissions) },
+            language = hiltViewModel<LanguageViewModel>().state.collectAsStateWithLifecycle().value,
+            onLanguage = { stacks.go(Screen.Language) }
+        )
+    }
+    entry(Screen.Language) {
+        val model: LanguageViewModel = hiltViewModel()
+        LanguageScreen(
+            current = model.state.collectAsStateWithLifecycle().value,
+            onChoose = model::choose,
+            onBack = stacks::back
         )
     }
     entry(Screen.Permissions) {

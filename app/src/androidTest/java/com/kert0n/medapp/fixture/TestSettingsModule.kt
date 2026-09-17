@@ -9,6 +9,7 @@ import com.kert0n.medapp.feature.settings.SettingsStore
 import com.kert0n.medapp.platform.settings.CameraAccess
 import com.kert0n.medapp.platform.settings.PermissionStates
 import com.kert0n.medapp.platform.settings.DataStoreSettings
+import com.kert0n.medapp.platform.settings.AppLanguages
 import com.kert0n.medapp.platform.settings.DevicePermissions
 import com.kert0n.medapp.domain.notification.NotificationChannel
 import com.kert0n.medapp.domain.notification.NotificationReadiness
@@ -65,7 +66,15 @@ object TestSettingsModule {
     @Provides
     @Singleton
     fun permissions(): DevicePermissions = TestPermissions
+
+    /** Язык проверкам называет подделка: настоящий выбор на 13+ перевёл бы весь прогон. */
+    @Provides
+    @Singleton
+    fun languages(): AppLanguages = TestLanguages
 }
+
+/** Язык, «выбранный» в проверке; после каждой истории возвращается к «как в системе». */
+val TestLanguages = FakeAppLanguages()
 
 /**
  * Что система «разрешила» в проверке. По умолчанию — всё: истории, которым разрешения безразличны,

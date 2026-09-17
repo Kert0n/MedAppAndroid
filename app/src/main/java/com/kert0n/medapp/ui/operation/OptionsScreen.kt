@@ -11,7 +11,9 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
 import com.kert0n.medapp.R
+import com.kert0n.medapp.presentation.settings.LanguageChoice
 import com.kert0n.medapp.ui.NavigationRow
+import com.kert0n.medapp.ui.settings.words
 
 /**
  * Место «Опции» (PLAN H3): комната, из которой уходят вглубь, и её постоянная форма — список
@@ -30,6 +32,8 @@ fun OptionsScreen(
     onSettings: () -> Unit,
     permissionsTrouble: Boolean,
     onPermissions: () -> Unit,
+    language: LanguageChoice,
+    onLanguage: () -> Unit,
     modifier: Modifier = Modifier
 ) {
     Scaffold(
@@ -63,6 +67,14 @@ fun OptionsScreen(
                         if (permissionsTrouble) R.string.permissions_row_attention else R.string.permissions_row_supporting
                     ),
                     onClick = onPermissions
+                )
+            }
+            item {
+                NavigationRow(
+                    icon = R.drawable.ic_language,
+                    text = stringResource(R.string.language_row),
+                    supporting = language.words(),
+                    onClick = onLanguage
                 )
             }
         }

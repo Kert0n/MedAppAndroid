@@ -1,5 +1,6 @@
 package com.kert0n.medapp.ui
 
+import com.kert0n.medapp.presentation.settings.LanguageChoice
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import com.kert0n.medapp.domain.medkit.InvitationKey
 import com.kert0n.medapp.domain.medkit.MedKit
@@ -154,10 +155,10 @@ class U6ScreenShots : ScreenShots() {
     }
 
     @Test
-    fun optionsRoot() = shot("27-options-place/root") { OptionsScreen(outstanding = 2, onSyncStatus = {}, onSettings = {}, permissionsTrouble = true, onPermissions = {}) }
+    fun optionsRoot() = shot("27-options-place/root") { OptionsScreen(outstanding = 2, onSyncStatus = {}, onSettings = {}, permissionsTrouble = true, onPermissions = {}, language = LanguageChoice.SYSTEM, onLanguage = {}) }
 
     @Test
-    fun optionsQuiet() = shot("27-options-place/quiet") { OptionsScreen(outstanding = 0, onSyncStatus = {}, onSettings = {}, permissionsTrouble = false, onPermissions = {}) }
+    fun optionsQuiet() = shot("27-options-place/quiet") { OptionsScreen(outstanding = 0, onSyncStatus = {}, onSettings = {}, permissionsTrouble = false, onPermissions = {}, language = LanguageChoice.SYSTEM, onLanguage = {}) }
 
     // ── Нехватка ──────────────────────────────────────────────────────────────────────────────
 

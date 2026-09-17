@@ -158,6 +158,26 @@ android {
     }
 
     /**
+     * Языки приложения — ровно те, что оно объявляет (`localeConfig`, `AppLanguage`): переводы
+     * библиотек на остальные языки в APK не едут, и системе не на что предлагать выбор, которого
+     * у приложения нет. Список держит `LanguageDeclarationTest`.
+     */
+    androidResources {
+        localeFilters += listOf("ru", "en")
+    }
+
+    /**
+     * Язык выбирают внутри приложения, поэтому оба перевода едут в каждой установке: сборка
+     * не режет их по языку устройства — иначе выбранный «English» на русском телефоне было бы
+     * нечем показать без докачки из магазина.
+     */
+    bundle {
+        language {
+            enableSplit = false
+        }
+    }
+
+    /**
      * Условная запись не молчит (PLAN C1): результат записи, помеченной `@CheckResult`, обязан быть
      * прочитан — «ноль строк незаконен» держит сборка, а не внимание.
      */
@@ -201,6 +221,9 @@ kotlin {
 
 dependencies {
     implementation(libs.androidx.core.ktx)
+    // Язык приложения до Android 13 хранит и применяет AppCompat (`setApplicationLocales`); на 13+
+    // он же делегирует системе (PLAN C1 «Язык хранит система»).
+    implementation(libs.androidx.appcompat)
     implementation(libs.androidx.lifecycle.runtime.ktx)
     implementation(libs.androidx.lifecycle.runtime.compose)
     implementation(libs.androidx.lifecycle.process)

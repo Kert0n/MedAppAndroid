@@ -1,0 +1,39 @@
+package com.kert0n.medapp.presentation.settings
+
+import com.kert0n.medapp.fixture.FakeAppLanguages
+import com.kert0n.medapp.platform.settings.AppLanguage
+import org.junit.Assert.assertEquals
+import org.junit.Test
+
+/** Язык (PLAN H3 №27): отмечено то, что хранит система; выбор доходит до неё и только новый. */
+class LanguageViewModelTest {
+
+    @Test
+    fun theCurrentLanguageComesFromTheSystem() {
+        val model = LanguageViewModel(FakeAppLanguages(AppLanguage.ENGLISH))
+
+        assertEquals(LanguageChoice.ENGLISH, model.state.value)
+    }
+
+    @Test
+    fun choosingReachesTheSystemAndIsShown() {
+        val languages = FakeAppLanguages()
+        val model = LanguageViewModel(languages)
+
+        model.choose(LanguageChoice.RUSSIAN)
+
+        assertEquals(listOf(AppLanguage.RUSSIAN), languages.choices)
+        assertEquals(LanguageChoice.RUSSIAN, model.state.value)
+    }
+
+    /** Нажатие на уже выбранное ничего не меняет — и окно не пересоздаётся зря. */
+    @Test
+    fun choosingTheSameLanguageAgainDoesNothing() {
+        val languages = FakeAppLanguages(AppLanguage.RUSSIAN)
+        val model = LanguageViewModel(languages)
+
+        model.choose(LanguageChoice.RUSSIAN)
+
+        assertEquals(emptyList<AppLanguage>(), languages.choices)
+    }
+}
