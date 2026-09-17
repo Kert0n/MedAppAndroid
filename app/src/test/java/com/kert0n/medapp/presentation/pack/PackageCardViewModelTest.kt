@@ -136,7 +136,7 @@ class PackageCardViewModelTest {
             state.awaiting { !it.isLoading }
         }
 
-        assertEquals(1, server.asked.size)
+        assertEquals(listOf("/v1/drugs/$PACK"), server.asked)
     }
 
     /** Без связи — и у местной коробки — карточка не ждёт сервера: показывает базу сразу. */

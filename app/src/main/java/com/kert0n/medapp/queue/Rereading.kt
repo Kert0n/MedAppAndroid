@@ -85,10 +85,17 @@ class Rereading @Inject constructor(
                 else -> Outcome.Refused(answer.failure.asUnavailability())
             }
         }
-        // Коробка на полке, которой у нас нет, — это не «пропала»: её переставили туда, где нас
-        // нет, и отвечает за это полный снимок со своим утверждением о целом (E6).
-        val snapshot = (snapshots.resolve(read, at) as? PackageSnapshotResolver.Resolution.Resolved)?.snapshot
-            ?: return Outcome.Read
+        val snapshot = when (val resolution = snapshots.resolve(read, at)) {
+            is PackageSnapshotResolver.Resolution.Resolved -> resolution.snapshot
+            // Коробка на полке, которой у нас нет, — это не «пропала»: её переставили туда, где нас
+            // нет, и отвечает за это полный снимок со своим утверждением о целом (E6).
+            is PackageSnapshotResolver.Resolution.Elsewhere -> return Outcome.Read
+            // Ничего не легло: словарь не дочитался или ответ вне контракта. Прочитанным это не
+            // считается — иначе коробка сошла бы за свежую, а человек видел бы старое число.
+            is PackageSnapshotResolver.Resolution.Unresolved -> return Outcome.Refused(
+                if (resolution.stop) Unavailability.NO_CONNECTION else Unavailability.SERVER_SILENT
+            )
+        }
         storage.lay(
             ServerSnapshot(
                 participants = emptyMap(),

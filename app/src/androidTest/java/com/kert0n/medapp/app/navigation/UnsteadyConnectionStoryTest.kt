@@ -1,5 +1,7 @@
 package com.kert0n.medapp.app.navigation
 
+import androidx.compose.ui.semantics.SemanticsProperties
+import androidx.compose.ui.semantics.getOrNull
 import androidx.compose.ui.test.hasText
 import androidx.compose.ui.test.junit4.v2.createAndroidComposeRule
 import androidx.compose.ui.test.onAllNodesWithText
@@ -193,7 +195,7 @@ class UnsteadyConnectionStoryTest {
 
         outToPlaces()
         compose.onAllNodesWithText("Опции").onLast().performClick()
-        compose.waitUntil(WAIT) { shown("Синхронизация") }
+        see("Синхронизация")
         compose.onAllNodesWithText("Синхронизация").onFirst().performClick()
         compose.waitUntil(WAIT) { compose.onAllNodesWithText("Отправится, когда будет связь").fetchSemanticsNodes().size == 2 }
     }
@@ -220,37 +222,37 @@ class UnsteadyConnectionStoryTest {
 
     private fun launch() {
         compose.setContent { MedAppTheme { MedAppShell() } }
-        compose.waitUntil(WAIT) { shown("Дача") }
+        see("Дача")
     }
 
     private fun openTheBox(expectWaiting: Boolean) {
         compose.onNodeWithText("Дача").performClick()
-        compose.waitUntil(WAIT) { shown("Парацетамол") }
+        see("Парацетамол")
         compose.onNodeWithText("Парацетамол").performClick()
         if (!expectWaiting) {
             // Без связи ждать нечего: карточка сразу со своим числом.
             compose.waitUntil(2_000) { shown("Сколько есть") }
         }
-        compose.waitUntil(WAIT) { shown("Сколько есть") }
+        see("Сколько есть")
     }
 
     private fun reopenTheBox() {
         outToPlaces()
         compose.onAllNodesWithText("Аптечки").onLast().performClick()
-        compose.waitUntil(WAIT) { shown("Дача") }
-        openTheBox(expectWaiting = !connection.online.value)
+        see("Дача")
+        openTheBox(expectWaiting = connection.online.value)
     }
 
     private fun openTheSheet() {
         compose.onNodeWithContentDescription("Принять").performClick()
-        compose.waitUntil(WAIT) { shown("Сколько принял") }
+        see("Сколько принял")
     }
 
     private fun typeAndTake(amount: String) {
         compose.onNodeWithText("Сколько принял").performTextInput(amount)
         compose.onAllNodesWithText("Принять").onLast().performClick()
         compose.waitUntil(WAIT) { !shown("Сколько принял") }
-        compose.waitUntil(WAIT) { shown("Сколько есть") }
+        see("Сколько есть")
     }
 
     private fun takeFromTheSheet(amount: String) {
@@ -260,10 +262,10 @@ class UnsteadyConnectionStoryTest {
 
     private fun recount(actual: String) {
         compose.onNodeWithText("Пересчитать").performClick()
-        compose.waitUntil(WAIT) { shown("Пересчитал и увидел") }
+        see("Пересчитал и увидел")
         compose.onNodeWithText("Пересчитал и увидел").performTextInput(actual)
         compose.onNodeWithText("Записать").performClick()
-        compose.waitUntil(WAIT) { shown("Сколько есть") }
+        see("Сколько есть")
     }
 
     private fun neighbourTakes(amount: String) = runBlocking {
@@ -300,10 +302,28 @@ class UnsteadyConnectionStoryTest {
             compose.activityRule.scenario.onActivity { it.onBackPressedDispatcher.onBackPressed() }
             compose.waitForIdle()
         }
-        compose.waitUntil(WAIT) { shown("Опции") }
+        see("Опции")
     }
 
     private fun shown(text: String) = compose.onAllNodesWithText(text).fetchSemanticsNodes().isNotEmpty()
+
+    /** Ждёт слов на экране, а не дождавшись — называет, что человек видит вместо них. */
+    private fun see(text: String) {
+        try {
+            compose.waitUntil(WAIT) { shown(text) }
+        } catch (timeout: androidx.compose.ui.test.ComposeTimeoutException) {
+            throw AssertionError("не дождались «$text»; на экране: ${screenTexts()}", timeout)
+        }
+    }
+
+    private fun screenTexts(): String {
+        val nodes = compose.onAllNodes(hasText("", substring = true)).fetchSemanticsNodes()
+        val words = mutableListOf<String>()
+        for (node in nodes) {
+            node.config.getOrNull(SemanticsProperties.Text)?.forEach { words += it.text }
+        }
+        return words.distinct().joinToString(" | ")
+    }
 
     private fun shownPart(text: String) =
         compose.onAllNodes(hasText(text, substring = true)).fetchSemanticsNodes().isNotEmpty()

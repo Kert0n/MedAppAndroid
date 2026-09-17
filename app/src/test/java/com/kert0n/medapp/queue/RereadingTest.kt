@@ -30,6 +30,7 @@ import kotlin.uuid.Uuid
 import kotlinx.coroutines.test.runTest
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNull
+import org.junit.Assert.assertTrue
 import org.junit.Test
 
 /**
@@ -90,6 +91,8 @@ class RereadingTest {
                 MockEngine { request ->
                     if (!online) throw java.io.IOException("нет связи")
                     val path = request.url.encodedPath
+                    // Словарь дочитывается сам, когда ответ назвал незнакомое; здесь он недостижим.
+                    if (path == "/v1/quantity-units" || path == "/v1/form-types") throw java.io.IOException("словарь недоступен")
                     if (path !in answers) error("перечитывание спросило лишнее: $path")
                     val body = answers[path] ?: return@MockEngine respond("", HttpStatusCode.NotFound)
                     respond(body, HttpStatusCode.OK, headersOf(HttpHeaders.ContentType, "application/json"))
@@ -164,6 +167,24 @@ class RereadingTest {
         val outcome = rereading(storage, mapOf("/v1/drugs/$PACK" to drug(PACK, medKitId = HOME_KIT))).pack(PACK)
 
         assertEquals(Rereading.Outcome.Read, outcome)
+        assertNull(storage.laid)
+    }
+
+    /**
+     * Коробка пришла в единице, которой словарь не знает, а дочитать словарь не удалось: ничего не
+     * легло, и сказать «прочитано» нельзя — дверь сочла бы коробку свежей на полминуты и показала бы
+     * человеку старое число без повтора.
+     *
+     * Красная проверка: всякий неразрешённый ответ считался прочитанным.
+     */
+    @Test
+    fun aBoxThatCouldNotBeResolvedIsNotRead() = runTest {
+        val storage = Laid(known = setOf(PACK), held = setOf(PACK))
+        val unknownUnit = Uuid.parse("00000000-0000-4000-8000-000000000099")
+
+        val outcome = rereading(storage, mapOf("/v1/drugs/$PACK" to drug(PACK, unitId = unknownUnit))).pack(PACK)
+
+        assertTrue("неразрешённая коробка названа прочитанной: $outcome", outcome is Rereading.Outcome.Refused)
         assertNull(storage.laid)
     }
 

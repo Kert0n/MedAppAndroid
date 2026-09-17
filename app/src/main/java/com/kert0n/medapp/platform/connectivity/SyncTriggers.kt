@@ -14,6 +14,7 @@ import java.util.concurrent.atomic.AtomicBoolean
 import javax.inject.Inject
 import javax.inject.Singleton
 import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.CoroutineStart
 import kotlinx.coroutines.launch
 
 /**
@@ -55,6 +56,8 @@ class SyncTriggers @Inject constructor(
         })
         // Связь, которая была при подписке, поводом не считается: вход в приложение уже позвал
         // заход. Повод — связь, появившаяся после потери.
-        scope.launch { connection.returns().collect { synchronization.request() } }
+        // Подписка ставится до возврата из `start`: связь, вернувшаяся между стартом и первым
+        // значением, иначе сошла бы за «была при подписке», и повод потерялся бы.
+        scope.launch(start = CoroutineStart.UNDISPATCHED) { connection.returns().collect { synchronization.request() } }
     }
 }

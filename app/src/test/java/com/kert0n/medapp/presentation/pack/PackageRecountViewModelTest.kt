@@ -216,6 +216,6 @@ class PackageRecountViewModelTest {
             state.awaiting { !it.isLoading }
         }
 
-        assertEquals(1, server.asked.size)
+        assertEquals(listOf("/v1/drugs/$PACK"), server.asked)
     }
 }

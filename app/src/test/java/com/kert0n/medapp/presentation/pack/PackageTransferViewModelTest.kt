@@ -243,6 +243,6 @@ class PackageTransferViewModelTest {
             state.awaiting { it.isLoaded }
         }
 
-        assertEquals(1, server.asked.size)
+        assertEquals(listOf("/v1/drugs/$PACK"), server.asked)
     }
 }

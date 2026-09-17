@@ -137,7 +137,7 @@ class FresheningTest {
         clock.now = clock.now.plus(Duration.ofSeconds(29))
         freshening.pack(PACK)
 
-        assertEquals(1, server.asked.size)
+        assertEquals(listOf("/v1/drugs/$PACK"), server.asked)
 
         clock.now = clock.now.plus(Duration.ofSeconds(1))
         freshening.pack(PACK)
@@ -166,7 +166,7 @@ class FresheningTest {
         card.join()
         sheet.join()
 
-        assertEquals(1, server.asked.size)
+        assertEquals(listOf("/v1/drugs/$PACK"), server.asked)
     }
 
     /** Не прочиталось — свежим не стало: следующее открытие спрашивает снова. */
@@ -197,6 +197,6 @@ class FresheningTest {
         until("чтение легло") { server.laid.isNotEmpty() }
         freshening.pack(PACK)
 
-        assertEquals(1, server.asked.size)
+        assertEquals(listOf("/v1/drugs/$PACK"), server.asked)
     }
 }

@@ -17,6 +17,7 @@ import org.junit.Test
 @OptIn(ExperimentalCoroutinesApi::class)
 class ConnectionTest {
 
+    /** Иначе каждый вход в приложение звал бы второй заход поверх того, что уже позвал сам вход. */
     @Test
     fun connectionThatWasThereWhenListeningStartedIsNotAReturn() = runTest(UnconfinedTestDispatcher()) {
         val connection = FakeConnection(online = true)
@@ -29,6 +30,7 @@ class ConnectionTest {
         assertEquals(0, heard.size)
     }
 
+    /** Иначе второй тоннель за день не довёз бы записанное в нём до ручного «Обновить». */
     @Test
     fun connectionThatAppearsAfterItWasLostIsHeardEachTime() = runTest(UnconfinedTestDispatcher()) {
         val connection = FakeConnection(online = true)
@@ -44,6 +46,7 @@ class ConnectionTest {
         assertEquals(2, heard.size)
     }
 
+    /** Иначе приложение, запущенное без связи, не заметило бы, что она появилась. */
     @Test
     fun startingOfflineAndGettingConnectionIsAReturn() = runTest(UnconfinedTestDispatcher()) {
         val connection = FakeConnection(online = false)
