@@ -162,7 +162,7 @@ class CourseCardScreenTest {
             )
         )
 
-        compose.onNodeWithText("Было 12 приёмов, стало 7").assertIsDisplayed()
+        compose.onNodeWithText("Приёмы: было 12, стало 7").assertIsDisplayed()
         compose.onNodeWithText("15.03.2027 · Нурофен").assertIsDisplayed()
     }
 

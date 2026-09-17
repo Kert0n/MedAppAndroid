@@ -612,7 +612,7 @@
     <string name="course_cancel_title">Отменить лечение?</string>
     <string name="course_cancel_explained">Будущие приёмы уйдут, пачки освободятся. Принятое и пропущенное останется в истории.</string>
     <string name="course_reductions">Обеспечение сокращалось</string>
-    <string name="course_reduction">Было %1$d приёмов, стало %2$d</string>
+    <string name="course_reduction">Приёмы: было %1$d, стало %2$d</string>
     <string name="course_items">Приёмы</string>
     <string name="course_item_planned">запланирован</string>
     <string name="course_item_taken">принят</string>
