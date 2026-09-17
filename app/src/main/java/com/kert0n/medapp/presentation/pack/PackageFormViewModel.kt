@@ -3,6 +3,7 @@ package com.kert0n.medapp.presentation.pack
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.kert0n.medapp.domain.scan.CodeFormat
+import com.kert0n.medapp.domain.scan.ScannedCategory
 import com.kert0n.medapp.domain.scan.ScannedCode
 import com.kert0n.medapp.feature.packages.PackageAdding
 import com.kert0n.medapp.feature.packages.PackageDescribing
@@ -101,6 +102,19 @@ class PackageFormViewModel @AssistedInject constructor(
     /** Что человек печатает в названии. Выбор карточки сюда не пишет — иначе её имя тут же искалось бы заново. */
     private val typed = MutableStateFlow("")
 
+    /**
+     * Идёт ли разговор с реестром. Пока идёт, полей не видно вовсе: пустую форму, которая через
+     * секунду заполнится сама, человек успевает прочитать как «ничего не нашлось» и начинает
+     * печатать поверх — а на плохой связи сидит и смотрит на неё (замечание владельца 2026-09-17).
+     */
+    private val asking = MutableStateFlow(opened.scannedCode?.isNotEmpty() == true)
+
+    /**
+     * Чем реестр счёл товар. Здесь оно перечислением, а не словами: категорию человек видит в поле
+     * на своём языке, и берёт эти слова экран — текстов для человека в представлении нет (PLAN H1).
+     */
+    private val scanned = MutableStateFlow<ScannedCategory?>(null)
+
     private val suggestions: Flow<Suggestions> =
         if (opened.packageId != null) flowOf<Suggestions>(Suggestions.None) else typed
             .map { it.trim().take(TemplateQuery.MAX_LENGTH) }
@@ -136,7 +150,12 @@ class PackageFormViewModel @AssistedInject constructor(
         )
     }
 
-    val state: StateFlow<PackageFormUiState> = combine(form, progress, stored, choices, suggestions) { form, progress, stored, choices, suggestions ->
+    /** Два ответа извне — справочника и реестра — идут вместе: складывать больше пяти потоков нечем. */
+    private val answers = combine(suggestions, asking, scanned) { suggestions, asking, scanned ->
+        Answers(suggestions, asking, scanned)
+    }
+
+    val state: StateFlow<PackageFormUiState> = combine(form, progress, stored, choices, answers) { form, progress, stored, choices, answers ->
         PackageFormUiState(
             form = form,
             isEditing = opened.packageId != null,
@@ -147,12 +166,18 @@ class PackageFormViewModel @AssistedInject constructor(
             error = progress.error,
             isSaving = progress.isSaving,
             saved = progress.saved,
-            suggestions = suggestions
+            suggestions = answers.suggestions,
+            isAsking = answers.asking,
+            scanned = answers.scanned
         )
     }.stateIn(
         viewModelScope,
         SharingStarted.WhileSubscribed(5_000),
-        PackageFormUiState(form = form.value, isEditing = opened.packageId != null)
+        PackageFormUiState(
+            form = form.value,
+            isEditing = opened.packageId != null,
+            isAsking = asking.value
+        )
     )
 
     init {
@@ -168,11 +193,18 @@ class PackageFormViewModel @AssistedInject constructor(
      * у неё нет.
      */
     private suspend fun ask(code: String) {
-        val outcome = scanning.lookup(ScannedCode(CodeFormat.DATA_MATRIX, code))
-        if (outcome is PackageScanning.Outcome.Suggested) {
-            // Словарь нужен, чтобы узнать единицу, которую реестр назвал словом: свою клиент не
-            // заводит (PLAN D1). Снимок читается здесь же, как и перед записью формы.
-            form.value = outcome.suggestion.filling(form.value, vocabulary.snapshot())
+        try {
+            val outcome = scanning.lookup(ScannedCode(CodeFormat.DATA_MATRIX, code))
+            if (outcome is PackageScanning.Outcome.Suggested) {
+                // Словарь нужен, чтобы узнать единицу, которую реестр назвал словом: свою клиент
+                // не заводит (PLAN D1). Снимок читается здесь же, как и перед записью формы.
+                form.value = outcome.suggestion.filling(form.value, vocabulary.snapshot())
+                scanned.value = outcome.suggestion.category
+            }
+        } finally {
+            // Разговор кончился любым исходом — показываем форму. В `finally`, потому что отмена
+            // тоже исход: оставленный признак запер бы экран в ожидании навсегда.
+            asking.value = false
         }
     }
 
@@ -255,6 +287,12 @@ class PackageFormViewModel @AssistedInject constructor(
         progress.value = Progress(error = error)
     }
 
+    private class Answers(
+        val suggestions: Suggestions,
+        val asking: Boolean,
+        val scanned: ScannedCategory?
+    )
+
     private class Choices(
         val medKits: List<MedKitPresentationDTO>,
         val units: List<UnitPresentationDTO>,
@@ -286,7 +324,11 @@ data class PackageFormUiState(
     val error: PackageFormError? = null,
     val isSaving: Boolean = false,
     val saved: Uuid? = null,
-    val suggestions: Suggestions = Suggestions.None
+    val suggestions: Suggestions = Suggestions.None,
+    /** Идёт разговор с реестром: полей ещё нет, и показывать их пустыми нельзя. */
+    val isAsking: Boolean = false,
+    /** Чем реестр счёл товар: словами это называет экран, и он же кладёт их в поле категории. */
+    val scanned: ScannedCategory? = null
 )
 
 /**

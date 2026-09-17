@@ -33,12 +33,31 @@ import com.kert0n.medapp.domain.Unavailability
  * экранах — иначе каждый следующий экран изобретает своё.
  */
 
-/** Ожидание. Подписи нет, но она есть у экранного чтеца: кружок сам по себе ему ничего не говорит. */
+/**
+ * Ожидание. Подписи нет, но она есть у экранного чтеца: кружок сам по себе ему ничего не говорит.
+ *
+ * [text] называет, **чего** ждут, когда ждать приходится заметно долго и не по своей воле: «читаем
+ * из базы» человеку знать незачем, а «спрашиваем „Честный знак“» на плохой связи — единственное,
+ * что отличает работу от зависшего экрана.
+ */
 @Composable
-fun LoadingState(modifier: Modifier = Modifier) {
+fun LoadingState(modifier: Modifier = Modifier, text: String? = null) {
     val description = stringResource(R.string.state_loading)
     Middle(modifier) {
-        CircularProgressIndicator(Modifier.semantics { contentDescription = description })
+        Column(
+            horizontalAlignment = Alignment.CenterHorizontally,
+            verticalArrangement = Arrangement.spacedBy(16.dp)
+        ) {
+            CircularProgressIndicator(Modifier.semantics { contentDescription = description })
+            if (text != null) {
+                Text(
+                    text,
+                    style = MaterialTheme.typography.bodyLarge,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    textAlign = TextAlign.Center
+                )
+            }
+        }
     }
 }
 

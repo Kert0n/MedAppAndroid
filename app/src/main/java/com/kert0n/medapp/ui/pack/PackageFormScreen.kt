@@ -21,6 +21,7 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.pluralStringResource
@@ -29,6 +30,7 @@ import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.ui.unit.dp
 import com.kert0n.medapp.R
+import com.kert0n.medapp.domain.scan.ScannedCategory
 import com.kert0n.medapp.presentation.pack.PackageFormError
 import com.kert0n.medapp.presentation.pack.PackageFormPresentationDTO
 import com.kert0n.medapp.presentation.pack.withForm
@@ -37,6 +39,7 @@ import com.kert0n.medapp.presentation.pack.Suggestions
 import com.kert0n.medapp.presentation.pack.TemplatePresentationDTO
 import com.kert0n.medapp.ui.DateField
 import com.kert0n.medapp.ui.Form
+import com.kert0n.medapp.ui.LoadingState
 import com.kert0n.medapp.ui.PickerField
 import com.kert0n.medapp.ui.QuantityField
 import com.kert0n.medapp.ui.text
@@ -64,6 +67,13 @@ fun PackageFormScreen(
     modifier: Modifier = Modifier
 ) {
     val form = state.form
+    // Категорию реестр называет по-своему («drugs»), и человеку она нужна его словами — а слова
+    // живут здесь, в `R.string`. Кладёт их в поле экран, той же дверью, что и любой ввод человека:
+    // один раз и только в пустое, чтобы не спорить с тем, что человек написал сам.
+    val scanned = state.scanned?.label?.let { stringResource(it) }
+    LaunchedEffect(scanned) {
+        if (scanned != null && form.category.isBlank()) onEdit(form.copy(category = scanned))
+    }
     Scaffold(
         modifier = modifier.fillMaxSize(),
         topBar = {
@@ -82,6 +92,12 @@ fun PackageFormScreen(
             )
         }
     ) { padding ->
+        // Пока реестр отвечает, полей не видно вовсе: пустая форма, которая через секунду
+        // заполнится сама, читается как «ничего не нашлось», и человек начинает печатать поверх —
+        // а на плохой связи просто сидит и смотрит в неё (замечание владельца 2026-09-17).
+        if (state.isAsking) {
+            return@Scaffold LoadingState(Modifier.padding(padding), stringResource(R.string.pack_scan_asking))
+        }
         Form(
             modifier = Modifier.padding(padding),
             actions = {
@@ -313,3 +329,13 @@ private fun Note(text: String) {
     Text(text, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
 }
 
+/** Как категория реестра называется по-человечески. Слова — свойство случая, а не выбор экрана. */
+@get:StringRes
+private val ScannedCategory.label: Int?
+    get() = when (this) {
+        ScannedCategory.MEDICINE -> R.string.pack_category_medicine
+        ScannedCategory.SUPPLEMENT -> R.string.pack_category_supplement
+        ScannedCategory.ANTISEPTIC -> R.string.pack_category_antiseptic
+        // Чем товар не является, реестр знает, а чем является — нет: выдумывать за него нечего.
+        ScannedCategory.OTHER -> null
+    }
