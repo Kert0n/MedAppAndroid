@@ -21,7 +21,6 @@ import androidx.compose.ui.unit.dp
 import com.kert0n.medapp.R
 import com.kert0n.medapp.domain.report.SpendingPeriod
 import com.kert0n.medapp.presentation.report.PeriodPreset
-import com.kert0n.medapp.ui.DAY
 import com.kert0n.medapp.ui.DayPicker
 import com.kert0n.medapp.ui.daysBetween
 import java.time.LocalDate
