@@ -68,6 +68,14 @@ import com.kert0n.medapp.presentation.medkit.MedKitSharingViewModel
 import com.kert0n.medapp.presentation.medkit.MedKitListViewModel
 import com.kert0n.medapp.presentation.pack.MedKitContentsViewModel
 import com.kert0n.medapp.presentation.operation.SyncStatusViewModel
+import com.kert0n.medapp.presentation.operation.OptionsViewModel
+import com.kert0n.medapp.presentation.settings.LanguageViewModel
+import com.kert0n.medapp.presentation.settings.PermissionsViewModel
+import com.kert0n.medapp.presentation.settings.SettingsUiState
+import com.kert0n.medapp.presentation.settings.SettingsViewModel
+import com.kert0n.medapp.ui.settings.LanguageScreen
+import com.kert0n.medapp.ui.settings.PermissionsScreen
+import com.kert0n.medapp.ui.settings.SettingsScreen
 import com.kert0n.medapp.presentation.pack.PackageCardViewModel
 import com.kert0n.medapp.presentation.pack.PackageFormViewModel
 import com.kert0n.medapp.presentation.pack.PackageRecountViewModel
@@ -583,10 +591,53 @@ private fun screens(
         )
     }
     entry(Screen.Options) {
-        val model: SyncStatusViewModel = hiltViewModel()
+        val model: OptionsViewModel = hiltViewModel()
+        // Разрешения и язык хранит система: вернулся — спрашиваем заново (PLAN H3 №27).
+        LifecycleResumeEffect(model) {
+            model.refresh()
+            onPauseOrDispose { }
+        }
         OptionsScreen(
-            outstanding = model.state.collectAsStateWithLifecycle().value.rows.size,
-            onSyncStatus = { stacks.go(Screen.SyncStatus) }
+            state = model.state.collectAsStateWithLifecycle().value,
+            onSyncStatus = { stacks.go(Screen.SyncStatus) },
+            onSettings = { stacks.go(Screen.Settings) },
+            onPermissions = { stacks.go(Screen.Permissions) },
+            onLanguage = { stacks.go(Screen.Language) }
+        )
+    }
+    entry(Screen.Language) {
+        val model: LanguageViewModel = hiltViewModel()
+        LanguageScreen(
+            current = model.state.collectAsStateWithLifecycle().value,
+            onChoose = model::choose,
+            onBack = stacks::back
+        )
+    }
+    entry(Screen.Permissions) {
+        val model: PermissionsViewModel = hiltViewModel()
+        val context = LocalContext.current
+        LifecycleResumeEffect(model) {
+            model.refresh()
+            onPauseOrDispose { }
+        }
+        PermissionsScreen(
+            state = model.state.collectAsStateWithLifecycle().value,
+            onFixNotifications = context::openNotificationSettings,
+            onFixAlarms = context::openExactAlarmSettings,
+            onFixCamera = context::openAppSettings,
+            onBack = stacks::back
+        )
+    }
+    entry(Screen.Settings) {
+        val model: SettingsViewModel = hiltViewModel()
+        val state = model.state.collectAsStateWithLifecycle().value
+        // Записанное — повод уйти: человек менял настройки, а не заполнял форму навсегда.
+        LaunchedEffect(state) { if (state is SettingsUiState.Editing && state.isSaved) stacks.back() }
+        SettingsScreen(
+            state = state,
+            onEdit = model::edit,
+            onSave = model::save,
+            onBack = stacks::back
         )
     }
     entry(Screen.SyncStatus) {

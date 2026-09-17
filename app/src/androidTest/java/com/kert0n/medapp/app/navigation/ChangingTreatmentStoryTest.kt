@@ -6,8 +6,11 @@ import androidx.compose.ui.test.SemanticsNodeInteraction
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.hasAnyAncestor
 import androidx.compose.ui.test.hasText
+import androidx.compose.ui.test.SemanticsMatcher
+import androidx.compose.ui.test.hasAnyDescendant
 import androidx.compose.ui.test.isDialog
 import androidx.compose.ui.test.junit4.v2.createAndroidComposeRule
+import androidx.compose.ui.test.onAllNodesWithContentDescription
 import androidx.compose.ui.test.onAllNodesWithText
 import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithText
@@ -155,18 +158,23 @@ class ChangingTreatmentStoryTest {
     private fun heSpendsTheOpenedBoxFirst() {
         compose.onNodeWithText("Источники лечения").performScrollTo().performClick()
         compose.waitUntil(WAIT) {
-            compose.onAllNodesWithText("Подключить ещё").fetchSemanticsNodes().isNotEmpty()
+            // Ориентир — первая строка над коробками: «подключить» стоит под ними и на узком
+            // экране ленивым списком ещё не нарисована.
+            compose.onAllNodesWithText("Берётся сверху вниз").fetchSemanticsNodes().isNotEmpty()
         }
 
         // Перестановка доступна и пальцем (перетаскиванием за ручку), и действием доступности;
         // проверка берёт второе — оно называет себя словом.
-        compose.onNodeWithText("Дачная пачка").moveIt("Выше")
+        // Действия висят на карточке коробки: ползунок и поле внутри неё чтец читает отдельно.
+        compose.onNode(
+            hasAnyDescendant(hasText("Дачная пачка")) and SemanticsMatcher.keyIsDefined(SemanticsActions.CustomActions)
+        ).moveIt("Выше")
         // Подвал уходит на время ввода: человек убирает клавиатуру, чтобы нажать.
         closeSoftKeyboard()
         compose.onNodeWithText("Сохранить").performClick()
 
         compose.waitUntil(WAIT) {
-            compose.onAllNodesWithText("Правка не записана", substring = true).fetchSemanticsNodes().isEmpty()
+            compose.onAllNodesWithText("С правкой").fetchSemanticsNodes().isEmpty()
         }
         // Записанный состав виден на самом экране, и порядок в нём — тот, что выбрал Пётр:
         // початая коробка стоит первой. Без этого шаг проходил бы и со сломанной перестановкой.
@@ -197,10 +205,12 @@ class ChangingTreatmentStoryTest {
     private fun heGivesTheOtherBoxAway() {
         compose.onNodeWithText("Источники лечения").performScrollTo().performClick()
         compose.waitUntil(WAIT) {
-            compose.onAllNodesWithText("Подключить ещё").fetchSemanticsNodes().isNotEmpty()
+            // Ориентир — первая строка над коробками: «подключить» стоит под ними и на узком
+            // экране ленивым списком ещё не нарисована.
+            compose.onAllNodesWithText("Берётся сверху вниз").fetchSemanticsNodes().isNotEmpty()
         }
 
-        compose.onAllNodesWithText("Отвязать")[0].performClick()
+        compose.onAllNodesWithContentDescription("Отвязать")[0].performClick()
         compose.onNodeWithText("Отвязать пачку?").assertIsDisplayed()
         compose.onNode(hasText("Отвязать") and hasAnyAncestor(isDialog())).performClick()
         // Подвал уходит на время ввода: человек убирает клавиатуру, чтобы нажать.

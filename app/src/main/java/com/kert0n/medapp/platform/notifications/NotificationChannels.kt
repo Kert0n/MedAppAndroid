@@ -12,6 +12,7 @@ import com.kert0n.medapp.R
 import com.kert0n.medapp.domain.notification.NotificationChannel
 import com.kert0n.medapp.domain.notification.NotificationReadiness
 import com.kert0n.medapp.domain.notification.Readiness
+import com.kert0n.medapp.platform.settings.AppLanguages
 import dagger.hilt.android.qualifiers.ApplicationContext
 import javax.inject.Inject
 import javax.inject.Singleton
@@ -22,7 +23,10 @@ import javax.inject.Singleton
  * Заводить каналы повторно безопасно — система хранит выбор человека, а не наши умолчания.
  */
 @Singleton
-class NotificationChannels @Inject constructor(@ApplicationContext private val context: Context) : NotificationReadiness {
+class NotificationChannels @Inject constructor(
+    @ApplicationContext private val context: Context,
+    private val languages: AppLanguages
+) : NotificationReadiness {
 
     /**
      * Можно ли сказать: разрешение `POST_NOTIFICATIONS` (с Android 13), уведомления приложения
@@ -39,9 +43,11 @@ class NotificationChannels @Inject constructor(@ApplicationContext private val c
     fun ensure() {
         val manager = context.getSystemService(NotificationManager::class.java)
         val ours = NotificationChannel.entries.map { it.id }
+        // Названия каналов человек читает в настройках телефона — на языке приложения, не системы.
+        val words = languages.speaking(context)
         for (channel in NotificationChannel.entries) {
             manager.createNotificationChannel(
-                SystemChannel(channel.id, context.getString(channel.title), channel.importance.system)
+                SystemChannel(channel.id, words.getString(channel.title), channel.importance.system)
             )
         }
         // Канал, который приложение перестало объявлять, система держит у себя дальше: у того, кто

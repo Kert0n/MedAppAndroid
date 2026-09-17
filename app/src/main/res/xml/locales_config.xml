@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+    Языки, на которых приложение говорит (PLAN C1 «Язык хранит система»). Тот же список, что у
+    `AppLanguage` и у `localeFilters` сборки; равенство держит `LanguageDeclarationTest`.
+-->
+<locale-config xmlns:android="http://schemas.android.com/apk/res/android">
+    <locale android:name="ru" />
+    <locale android:name="en" />
+</locale-config>

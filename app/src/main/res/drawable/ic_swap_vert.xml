@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Material Symbols «swap_vert», выгружен scripts/add-icon.mjs. Руками не правится. -->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="24dp"
+    android:height="24dp"
+    android:viewportWidth="960"
+    android:viewportHeight="960">
+    <group
+        android:translateX="0"
+        android:translateY="960">
+        <path
+            android:fillColor="#FF000000"
+            android:pathData="M323-450v-316L202-645l-42-42 193-193 193 193-42 42-121-121v316h-60ZM607-80 414-273l42-42 121 121v-316h60v316l121-121 42 42L607-80Z" />
+    </group>
+</vector>

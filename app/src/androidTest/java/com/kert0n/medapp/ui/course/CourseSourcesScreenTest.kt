@@ -125,7 +125,8 @@ class CourseSourcesScreenTest {
         show(CourseSourcesUiState(sources = listOf(source())))
 
         compose.onNodeWithText("Нурофен").assertIsDisplayed()
-        compose.onNodeWithText("Домашняя · свободно 20 таблетка").assertIsDisplayed()
+        compose.onNodeWithText("Домашняя").assertIsDisplayed()
+        compose.onNodeWithText("свободно 20 таблетка").assertIsDisplayed()
         compose.onNodeWithText("выделено 3 приёма · 6 таблетка").assertIsDisplayed()
     }
 
@@ -174,7 +175,7 @@ class CourseSourcesScreenTest {
     fun detachingAsksBeforeItDoesAnything() {
         show(CourseSourcesUiState(sources = listOf(source())))
 
-        compose.onNodeWithText("Отвязать").performClick()
+        compose.onNodeWithContentDescription("Отвязать").performClick()
 
         assertEquals(PACK, detached)
         assertEquals(0, confirmed)
@@ -232,7 +233,7 @@ class CourseSourcesScreenTest {
         show(CourseSourcesUiState())
 
         compose.onNodeWithText("Пачек пока нет — подключите первую.").assertIsDisplayed()
-        compose.onNodeWithText("Подключить ещё").performClick()
+        compose.onNodeWithText("Подключить ещё коробку").performClick()
         assertEquals(1, added)
     }
 
@@ -241,8 +242,8 @@ class CourseSourcesScreenTest {
     fun aFinishedCourseOffersNoActions() {
         show(CourseSourcesUiState(sources = listOf(source()), isFinished = true))
 
-        compose.onNodeWithText("Отвязать").assertDoesNotExist()
-        compose.onNodeWithText("Подключить ещё").assertDoesNotExist()
+        compose.onNodeWithContentDescription("Отвязать").assertDoesNotExist()
+        compose.onNodeWithText("Подключить ещё коробку").assertDoesNotExist()
     }
 
     /**
@@ -286,8 +287,7 @@ class CourseSourcesScreenTest {
 
         compose.onNodeWithText("нужно 10 приёмов · обеспечено 3").assertIsDisplayed()
         compose.onNodeWithText("Не хватает 7 приёмов").assertIsDisplayed()
-        compose.onNodeWithText("Правка не записана: обеспечение пересчитается после «Сохранить».")
-            .assertIsDisplayed()
+        compose.onNodeWithText("С правкой").assertIsDisplayed()
     }
 
     /** «Сохранить» уносит собранный состав одним решением. */
