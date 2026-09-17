@@ -2,6 +2,8 @@ package com.kert0n.medapp.app
 
 import android.content.Intent
 import android.os.Bundle
+import com.kert0n.medapp.platform.notifications.NotificationChannels
+import javax.inject.Inject
 import androidx.appcompat.app.AppCompatActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
@@ -32,8 +34,16 @@ class MainActivity : AppCompatActivity() {
     /** Цель, которую оболочка ещё не применила; применила — `null`. */
     private val opening = mutableStateOf<NotificationTarget?>(null)
 
+    /**
+     * Названия каналов человек читает в настройках телефона. Язык меняют, пересоздавая окно, а не
+     * процесс, поэтому каналы переименовываются здесь, а не только при старте приложения.
+     */
+    @Inject
+    lateinit var channels: NotificationChannels
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        channels.ensure()
         enableEdgeToEdge()
         opening.value = savedInstanceState?.getBundle(PENDING)?.let(::pendingOf)
             ?: NotificationTargetExtras.launchOpening(intent, windowRestored = savedInstanceState != null)

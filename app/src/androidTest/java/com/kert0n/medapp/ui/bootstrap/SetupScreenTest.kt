@@ -32,6 +32,7 @@ class SetupScreenTest {
         compose.setContent { MedAppTheme { SetupScreen(state, onRetry, onStartOver = { startedOver++ }) } }
     }
 
+    /** Пока проверка идёт, повторить нечего: второе нажатие начало бы вторую проверку поверх первой. */
     @Test
     fun whileCheckingThereIsNothingToPress() {
         show(AppStartState.Checking)
@@ -40,6 +41,7 @@ class SetupScreenTest {
         compose.onNodeWithText("Повторить").assertDoesNotExist()
     }
 
+    /** Отказ называет причину и даёт повторить: без этого первый запуск без связи — тупик без слов. */
     @Test
     fun aFailedSetupSaysWhyAndOffersRetry() {
         var retried = 0

@@ -3,6 +3,7 @@ package com.kert0n.medapp.ui.settings
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.test.assertIsDisplayed
+import androidx.compose.ui.test.assertIsNotEnabled
 import androidx.compose.ui.test.assertIsOff
 import androidx.compose.ui.test.assertIsOn
 import androidx.compose.ui.test.junit4.v2.createComposeRule
@@ -100,6 +101,6 @@ class SettingsScreenTest {
         show(SettingsUiState.Editing(filled.copy(digest = false)))
 
         compose.onNodeWithText("Присылать сводку на день").performScrollTo().assertIsOff()
-        compose.onNodeWithContentDescription("Выбрать время").performScrollTo().assertIsDisplayed()
+        compose.onNodeWithContentDescription("Выбрать время").performScrollTo().assertIsNotEnabled()
     }
 }

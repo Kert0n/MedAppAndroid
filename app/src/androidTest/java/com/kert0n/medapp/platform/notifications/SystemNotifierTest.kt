@@ -75,6 +75,7 @@ class SystemNotifierTest {
         android.os.Build.VERSION.SDK_INT < android.os.Build.VERSION_CODES.TIRAMISU ||
             ContextCompat.checkSelfPermission(context, Manifest.permission.POST_NOTIFICATIONS) == PackageManager.PERMISSION_GRANTED
 
+    /** Без заведённого канала показ молча не доходит, а с чужой важностью шторка звенит не так, как обещано (PLAN D8). */
     @Test
     fun everyChannelExistsWithItsImportance() {
         for (channel in NotificationChannel.entries) {

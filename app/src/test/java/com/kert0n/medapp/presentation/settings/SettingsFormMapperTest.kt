@@ -56,6 +56,7 @@ class SettingsFormMapperTest {
         assertEquals(60L, odd.toFormPresentationDTO().syncIntervalMinutes)
     }
 
+    /** Буквы в минутах — отказ у своего поля, а не исключение разбора и не молчаливый ноль. */
     @Test
     fun snoozeThatIsNotANumberIsRejectedByName() {
         val form = filled.toFormPresentationDTO().copy(snoozeMinutes = "abc")
@@ -71,6 +72,7 @@ class SettingsFormMapperTest {
         assertEquals(ParsedInput.Rejected(SettingsFormError.Input.SNOOZE_NOT_FORWARD), form.parsed())
     }
 
+    /** Отрицательных дней не бывает: без отказа тип уронил бы разбор своим `require`. */
     @Test
     fun negativeThresholdIsRejectedByName() {
         val form = filled.toFormPresentationDTO().copy(coverageThresholdDays = "-1")
@@ -78,6 +80,7 @@ class SettingsFormMapperTest {
         assertEquals(ParsedInput.Rejected(SettingsFormError.Input.THRESHOLD_NEGATIVE), form.parsed())
     }
 
+    /** Пустое поле дней — «не число», а не ноль: иначе стёртое поле молча выключило бы предупреждение. */
     @Test
     fun emptyThresholdIsNotANumber() {
         val form = filled.toFormPresentationDTO().copy(coverageThresholdDays = " ")

@@ -24,35 +24,39 @@ class PermissionsViewModel @Inject constructor(
     private val readiness: NotificationReadiness
 ) : ViewModel() {
 
-    private val _state = MutableStateFlow(now())
+    private val _state = MutableStateFlow(permissionsNow(permissions, readiness))
 
     val state: StateFlow<PermissionsPresentationDTO> = _state.asStateFlow()
 
     /** Человек вернулся из системных настроек: спрашиваем заново — там он мог всё и починить. */
     fun refresh() {
-        _state.value = now()
+        _state.value = permissionsNow(permissions, readiness)
     }
+}
 
-    private fun now(): PermissionsPresentationDTO {
-        val readiness = readiness.now()
-        val states = permissions.current()
-        return PermissionsPresentationDTO(
-            notifications = when {
-                !readiness.allowed -> PermissionState.DENIED
-                NotificationChannel.INTAKES in readiness.muted -> PermissionState.MUTED
-                else -> PermissionState.GRANTED
-            },
-            // До Android 12 точность будильников не спрашивают: разрешения не существует.
-            exactAlarms = when {
-                Build.VERSION.SDK_INT < Build.VERSION_CODES.S -> PermissionState.NOT_NEEDED
-                states.exactAlarms -> PermissionState.GRANTED
-                else -> PermissionState.DENIED
-            },
-            camera = when (states.camera) {
-                CameraAccess.GRANTED -> PermissionState.GRANTED
-                CameraAccess.DENIED -> PermissionState.DENIED
-                CameraAccess.ABSENT -> PermissionState.ABSENT
-            }
-        )
-    }
+/**
+ * Разрешения так, как их видит экран, — сейчас. Читают два владельца, экран разрешений и «Опции»:
+ * правило «что из этого беда» одно, и живёт оно здесь, а не в каждом из них.
+ */
+fun permissionsNow(permissions: DevicePermissions, readiness: NotificationReadiness): PermissionsPresentationDTO {
+    val readiness = readiness.now()
+    val states = permissions.current()
+    return PermissionsPresentationDTO(
+        notifications = when {
+            !readiness.allowed -> PermissionState.DENIED
+            NotificationChannel.INTAKES in readiness.muted -> PermissionState.MUTED
+            else -> PermissionState.GRANTED
+        },
+        // До Android 12 точность будильников не спрашивают: разрешения не существует.
+        exactAlarms = when {
+            Build.VERSION.SDK_INT < Build.VERSION_CODES.S -> PermissionState.NOT_NEEDED
+            states.exactAlarms -> PermissionState.GRANTED
+            else -> PermissionState.DENIED
+        },
+        camera = when (states.camera) {
+            CameraAccess.GRANTED -> PermissionState.GRANTED
+            CameraAccess.DENIED -> PermissionState.DENIED
+            CameraAccess.ABSENT -> PermissionState.ABSENT
+        }
+    )
 }

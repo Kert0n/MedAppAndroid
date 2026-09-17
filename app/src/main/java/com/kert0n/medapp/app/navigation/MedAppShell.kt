@@ -68,6 +68,7 @@ import com.kert0n.medapp.presentation.medkit.MedKitSharingViewModel
 import com.kert0n.medapp.presentation.medkit.MedKitListViewModel
 import com.kert0n.medapp.presentation.pack.MedKitContentsViewModel
 import com.kert0n.medapp.presentation.operation.SyncStatusViewModel
+import com.kert0n.medapp.presentation.operation.OptionsViewModel
 import com.kert0n.medapp.presentation.settings.LanguageViewModel
 import com.kert0n.medapp.presentation.settings.PermissionsViewModel
 import com.kert0n.medapp.presentation.settings.SettingsUiState
@@ -590,20 +591,17 @@ private fun screens(
         )
     }
     entry(Screen.Options) {
-        val model: SyncStatusViewModel = hiltViewModel()
-        val permissions: PermissionsViewModel = hiltViewModel()
-        // Разрешения меняют у системы: вернулся — спрашиваем заново (PLAN H3 №27).
-        LifecycleResumeEffect(permissions) {
-            permissions.refresh()
+        val model: OptionsViewModel = hiltViewModel()
+        // Разрешения и язык хранит система: вернулся — спрашиваем заново (PLAN H3 №27).
+        LifecycleResumeEffect(model) {
+            model.refresh()
             onPauseOrDispose { }
         }
         OptionsScreen(
-            outstanding = model.state.collectAsStateWithLifecycle().value.rows.size,
+            state = model.state.collectAsStateWithLifecycle().value,
             onSyncStatus = { stacks.go(Screen.SyncStatus) },
             onSettings = { stacks.go(Screen.Settings) },
-            permissionsTrouble = permissions.state.collectAsStateWithLifecycle().value.hasTrouble,
             onPermissions = { stacks.go(Screen.Permissions) },
-            language = hiltViewModel<LanguageViewModel>().state.collectAsStateWithLifecycle().value,
             onLanguage = { stacks.go(Screen.Language) }
         )
     }

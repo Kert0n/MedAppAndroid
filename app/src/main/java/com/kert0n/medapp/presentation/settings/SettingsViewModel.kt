@@ -39,6 +39,9 @@ class SettingsViewModel @Inject constructor(
 
     fun edit(form: SettingsFormPresentationDTO) {
         val editing = _state.value as? SettingsUiState.Editing ?: return
+        // Пока идёт запись, правка не принимается: запись кладёт состояние, снятое до неё, и
+        // набранное сейчас пропало бы молча.
+        if (editing.isSaving) return
         // Ввод снимает отказ: человек уже правит то, на что ему указали.
         _state.value = editing.copy(form = form, error = null)
     }

@@ -64,6 +64,7 @@ class SettingsStoryTest {
         TestLanguages.reset()
     }
 
+    /** Путь Зои целиком: записанное читается снова, починенное разрешение гаснет само, выбор языка помнится. */
     @Test
     fun zoyaSetsUpTheAppInOneEvening() {
         toOptions()

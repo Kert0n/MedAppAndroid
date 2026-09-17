@@ -234,6 +234,7 @@ class MedKitContentsScreenTest {
         compose.onNodeWithContentDescription("Завести упаковку").assertDoesNotExist()
     }
 
+    /** Внутри полки её имя на строках не повторяется: человек знает, куда пришёл, а повтор съедает строку. */
     @Test
     fun insideAShelfItsNameIsNotRepeatedOnEveryRow() {
         show(contents())
@@ -281,6 +282,7 @@ class MedKitContentsScreenTest {
         compose.onNodeWithContentDescription("Что сделать с аптечкой").assertDoesNotExist()
     }
 
+    /** У названной полки есть «Править» и «Убрать»: без меню их негде найти. */
     @Test
     fun aNamedShelfOffersToEditAndToRemove() {
         show(contents())

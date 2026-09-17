@@ -83,20 +83,33 @@ class SettingsViewModelTest {
         assertEquals(60L, state.form.syncIntervalMinutes)
     }
 
-    /** Двойное «сохранить» зовёт сценарий один раз; записанное уходит планировщику. */
+    /** Двойное «сохранить» зовёт сценарий один раз: иначе вторая запись перечитывала бы и пересоздавала задачи зря. */
     @Test
     fun savingTwiceWritesOnce() {
         val model = viewModel()
 
         watching(model.state) { state ->
             state.awaiting { it is SettingsUiState.Editing }
-            model.edit((state.value as SettingsUiState.Editing).form.copy(syncIntervalMinutes = 15))
             model.save()
             model.save()
             state.awaiting { it is SettingsUiState.Editing && it.isSaved }
         }
 
         assertEquals(1, store.saves)
+    }
+
+    /** Записанный интервал обмена уходит планировщику: иначе фоновый заход шёл бы по-старому. */
+    @Test
+    fun theSavedIntervalReachesTheScheduler() {
+        val model = viewModel()
+
+        watching(model.state) { state ->
+            state.awaiting { it is SettingsUiState.Editing }
+            model.edit((state.value as SettingsUiState.Editing).form.copy(syncIntervalMinutes = 15))
+            model.save()
+            state.awaiting { it is SettingsUiState.Editing && it.isSaved }
+        }
+
         assertEquals(listOf(SyncInterval(15)), sync.kept)
     }
 

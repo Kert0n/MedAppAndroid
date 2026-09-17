@@ -11,7 +11,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
 import com.kert0n.medapp.R
-import com.kert0n.medapp.presentation.settings.LanguageChoice
+import com.kert0n.medapp.presentation.operation.OptionsPresentationDTO
 import com.kert0n.medapp.ui.NavigationRow
 import com.kert0n.medapp.ui.settings.words
 
@@ -27,12 +27,10 @@ import com.kert0n.medapp.ui.settings.words
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun OptionsScreen(
-    outstanding: Int,
+    state: OptionsPresentationDTO,
     onSyncStatus: () -> Unit,
     onSettings: () -> Unit,
-    permissionsTrouble: Boolean,
     onPermissions: () -> Unit,
-    language: LanguageChoice,
     onLanguage: () -> Unit,
     modifier: Modifier = Modifier
 ) {
@@ -43,10 +41,10 @@ fun OptionsScreen(
         LazyColumn(Modifier.padding(padding).fillMaxSize()) {
             item {
                 NavigationRow(
-                    icon = if (outstanding > 0) R.drawable.ic_sync_problem else R.drawable.ic_sync,
+                    icon = if (state.outstanding > 0) R.drawable.ic_sync_problem else R.drawable.ic_sync,
                     text = stringResource(R.string.sync_status),
                     supporting = stringResource(
-                        if (outstanding > 0) R.string.sync_status_attention else R.string.sync_status_supporting
+                        if (state.outstanding > 0) R.string.sync_status_attention else R.string.sync_status_supporting
                     ),
                     onClick = onSyncStatus
                 )
@@ -61,10 +59,10 @@ fun OptionsScreen(
             }
             item {
                 NavigationRow(
-                    icon = if (permissionsTrouble) R.drawable.ic_warning else R.drawable.ic_verified_user,
+                    icon = if (state.permissionsTrouble) R.drawable.ic_warning else R.drawable.ic_verified_user,
                     text = stringResource(R.string.permissions_row),
                     supporting = stringResource(
-                        if (permissionsTrouble) R.string.permissions_row_attention else R.string.permissions_row_supporting
+                        if (state.permissionsTrouble) R.string.permissions_row_attention else R.string.permissions_row_supporting
                     ),
                     onClick = onPermissions
                 )
@@ -73,7 +71,7 @@ fun OptionsScreen(
                 NavigationRow(
                     icon = R.drawable.ic_language,
                     text = stringResource(R.string.language_row),
-                    supporting = language.words(),
+                    supporting = state.language.words(),
                     onClick = onLanguage
                 )
             }

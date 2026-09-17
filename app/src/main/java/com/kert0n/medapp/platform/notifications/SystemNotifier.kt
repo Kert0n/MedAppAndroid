@@ -113,7 +113,7 @@ class SystemNotifier @Inject constructor(
         }
         is NotificationTarget.PackageCard -> {
             val pkg = packages.observe(target.packageId).first() ?: return null
-            val until = pkg.facts.expiresOn?.lastDay?.format(DATE) ?: return null
+            val until = pkg.facts.expiresOn?.lastDay?.format(DATE.withLocale(words.resources.configuration.locales[0])) ?: return null
             Text(
                 words.getString(
                     when (notification.kind) {
@@ -130,7 +130,7 @@ class SystemNotifier @Inject constructor(
             val record = courses.findRecord(target.courseId) ?: return null
             val coverage = courses.observeCoverage(target.courseId).first()
             val zone = record.prescription.schedule.zone
-            val until = coverage?.coveredUntil?.atZone(zone)?.toLocalDate()?.format(DATE)
+            val until = coverage?.coveredUntil?.atZone(zone)?.toLocalDate()?.format(DATE.withLocale(words.resources.configuration.locales[0]))
             val body = if (until != null) words.getString(R.string.notice_coverage_body_until, until) else words.getString(R.string.notice_coverage_body_none)
             Text(
                 words.getString(
@@ -144,7 +144,7 @@ class SystemNotifier @Inject constructor(
                 body
             )
         }
-        is NotificationTarget.DayPlan -> Text(words.getString(R.string.notice_digest_title), words.getString(R.string.notice_digest_body, target.date.format(DATE)))
+        is NotificationTarget.DayPlan -> Text(words.getString(R.string.notice_digest_title), words.getString(R.string.notice_digest_body, target.date.format(DATE.withLocale(words.resources.configuration.locales[0]))))
         NotificationTarget.SyncStatus -> Text(words.getString(R.string.notice_sync_attention_title), words.getString(R.string.notice_sync_attention_body))
     }
 

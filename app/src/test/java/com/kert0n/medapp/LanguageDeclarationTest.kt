@@ -19,9 +19,15 @@ class LanguageDeclarationTest {
 
     private val manifest = main.resolve("AndroidManifest.xml").readText()
 
+    /** Без `localeConfig` системе нечего предложить в настройках языка приложения. */
     @Test
-    fun theManifestDeclaresTheLanguagesAndStoresTheChoice() {
+    fun theManifestDeclaresTheLanguages() {
         assertTrue("приложение не объявило языков: системе нечего предложить", "android:localeConfig=\"@xml/locales_config\"" in manifest)
+    }
+
+    /** Без `autoStoreLocales` выбор языка до Android 13 не пережил бы перезапуск. */
+    @Test
+    fun theChoiceIsStoredBeforeAndroid13() {
         assertTrue("выбор языка до Android 13 не сохраняется", "autoStoreLocales" in manifest)
     }
 

@@ -21,6 +21,7 @@ class AndroidDevicePermissionsTest {
 
     private val context = InstrumentationRegistry.getInstrumentation().targetContext
 
+    /** Состояние разрешений — системы, а не догадка: иначе строка «Разрешения» врала бы после отзыва в настройках. */
     @Test
     fun statesComeFromTheSystem() {
         val states = AndroidDevicePermissions(context, FakeReminders(canBeExact = true), NotificationChannels(context, FakeAppLanguages())).current()

@@ -28,6 +28,7 @@ class PermissionsViewModelTest {
         override fun now() = Readiness(notifications, muted)
     }
 
+    /** Всё разрешённое — не беда: иначе строка «Разрешения» в «Опциях» звала бы чинить то, что не сломано. */
     @Test
     fun everythingAllowedIsNoTrouble() {
         val model = PermissionsViewModel(System(), System())

@@ -26,12 +26,21 @@ class LanguageScreenTest {
 
     private fun row(name: String) = compose.onNode(isSelectable() and hasText(name))
 
+    /** Отмечен текущий язык и только он: две отметки или ни одной не говорят, на каком языке приложение. */
     @Test
-    fun theCurrentLanguageIsMarkedAndAnotherCanBeChosen() {
+    fun onlyTheCurrentLanguageIsMarked() {
         compose.setContent { MedAppTheme { LanguageScreen(LanguageChoice.SYSTEM, onChoose = { chosen = it }, onBack = {}) } }
 
         row("Как в системе").assertIsDisplayed().assertIsSelected()
         row("Русский").assertIsNotSelected()
+        row("English").assertIsNotSelected()
+    }
+
+    /** Нажатие на строку выбирает её язык: иначе строка выглядит выбором, а ничего не меняет. */
+    @Test
+    fun tappingARowChoosesItsLanguage() {
+        compose.setContent { MedAppTheme { LanguageScreen(LanguageChoice.SYSTEM, onChoose = { chosen = it }, onBack = {}) } }
+
         row("English").performClick()
 
         assertEquals(LanguageChoice.ENGLISH, chosen)
