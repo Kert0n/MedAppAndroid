@@ -72,29 +72,33 @@ jobs:
         run: ./gradlew :app:assembleRelease
 
       # Неподписанная сборка называется иначе (`app-release-unsigned.apk`), поэтому имя файла здесь
-      # и есть проверка подписи: подменить его нечем.
+      # и есть проверка подписи: подменить его нечем. Порядок шагов таков, что релиз ни в один
+      # момент не остаётся без APK.
       - name: Замена вложения latest
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           apk=app/build/outputs/apk/release/app-release.apk
           test -f "$apk"
+          sha=$(git rev-parse --short HEAD)
+          cp "$apk" "medapp-1.0-release-$sha.apk"
           cp "$apk" medapp-1.0-release.apk
           # Релиза может не быть вовсе — первая публикация его и заводит.
           gh release view latest >/dev/null 2>&1 ||
             gh release create latest --title "Latest" --notes "Сборка main."
-          # Замена сносит прежнее вложение до того, как ляжет новое: пока замена идёт, прежняя
-          # сборка лежит рядом на машине, и сорвавшаяся замена возвращает её на место.
-          mkdir -p previous
-          gh release download latest --pattern medapp-1.0-release.apk --dir previous || true
+          # Сборка под своим именем ложится первой и **ничего не сносит**: после неё в релизе
+          # заведомо есть рабочий APK. Только потом заменяется постоянное вложение — то, на
+          # которое ссылаются, — и замена сносит прежнее до того, как ляжет новое. Сорвётся
+          # замена — скачать всё равно есть что, и прогон остаётся провалом.
+          gh release upload latest "medapp-1.0-release-$sha.apk"
           if ! gh release upload latest medapp-1.0-release.apk --clobber; then
-            if [ -f previous/medapp-1.0-release.apk ]; then
-              gh release upload latest previous/medapp-1.0-release.apk --clobber &&
-                echo "::error::Замена не удалась, в релизе возвращена прежняя сборка."
-            fi
+            echo "::error::Постоянное вложение заменить не удалось; в релизе лежит medapp-1.0-release-$sha.apk."
             exit 1
           fi
-          gh release edit latest --notes "Сборка main: $(git log -1 --pretty='%s') ($(git rev-parse --short HEAD))."
+          # Постоянное вложение на месте — сборка под своим именем больше не нужна: иначе релиз
+          # растёт на 66 МБ с каждой публикацией.
+          gh release delete-asset latest "medapp-1.0-release-$sha.apk" --yes
+          gh release edit latest --notes "Сборка main: $(git log -1 --pretty='%s') ($sha)."
 
       - name: Ключ подписи не остаётся
         if: always()
