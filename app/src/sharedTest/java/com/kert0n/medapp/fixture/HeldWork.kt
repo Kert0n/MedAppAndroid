@@ -1,12 +1,15 @@
 package com.kert0n.medapp.fixture
 
+import com.kert0n.medapp.domain.medkit.MedKit
 import com.kert0n.medapp.domain.medkit.MedKitProjection
+import com.kert0n.medapp.domain.medkit.MedKitStatus
 import com.kert0n.medapp.domain.pack.PackageProjection
 import com.kert0n.medapp.domain.value.Vocabulary
 import com.kert0n.medapp.queue.Transactions
 import com.kert0n.medapp.storage.medkit.MedKitStorageRepository
 import com.kert0n.medapp.storage.pack.PackageStorageRepository
 import com.kert0n.medapp.storage.value.VocabularyStorageRepository
+import java.time.Instant
 import java.time.LocalDate
 import kotlin.uuid.Uuid
 import kotlinx.coroutines.flow.Flow
@@ -83,14 +86,41 @@ class HeldPackages(
     }
 }
 
-/** Полки, первое чтение которых проверка держит: до него карточка ещё не знает места коробки. */
+/**
+ * Полки, первое чтение которых проверка держит: до него карточка ещё не знает места коробки.
+ *
+ * Отвечает **только** на тот вопрос, о котором проверка: остальное — крик с именем метода, иначе
+ * карточка, сменившая способ читать полку, зеленела бы на чужом ответе.
+ */
 class HeldMedKits(
     private val real: MedKitStorageRepository,
     val door: Held = Held()
-) : MedKitStorageRepository by real {
+) : MedKitStorageRepository {
 
     override fun observe(id: Uuid, today: LocalDate): Flow<MedKitProjection?> = flow {
         door.pass()
         emitAll(real.observe(id, today))
     }
+
+    override fun observeAll(today: LocalDate): Flow<List<MedKitProjection>> = flow { notAsked("observeAll") }
+
+    override suspend fun find(id: Uuid): MedKit? = notAsked("find")
+
+    override fun observeSyncedAt(id: Uuid): Flow<Instant?> = flow { notAsked("observeSyncedAt") }
+
+    override suspend fun add(medKit: MedKit) = notAsked("add")
+
+    override suspend fun describe(medKitId: Uuid, name: String, location: String?): Boolean = notAsked("describe")
+
+    override suspend fun delete(id: Uuid): Boolean = notAsked("delete")
+
+    override suspend fun mark(medKitId: Uuid, status: MedKitStatus): Boolean = notAsked("mark")
+
+    override suspend fun applyServerParticipants(id: Uuid, participantCount: Long, syncedAt: Instant) =
+        notAsked("applyServerParticipants")
+
+    override suspend fun abandonServer(at: Instant): Int = notAsked("abandonServer")
+
+    private fun notAsked(method: String): Nothing =
+        error("карточка читает место одним чтением полки, а спросила «$method» — модель разъехалась с проверкой")
 }

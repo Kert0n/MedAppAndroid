@@ -203,6 +203,9 @@ class DemoFilm : ScreenTour() {
         // одним вызовом, поэтому захват не отменяется на полпути.
         shell("input draganddrop $x $from $x $to 2000")
         play(2.6)
+        val (_, movedTo) = spotOf(handle + name)
+        val (_, stayedAt) = spotOf(handle + other)
+        check(movedTo < stayedAt) { "строка «$name» осталась на месте: перетаскивание не сыграло" }
     }
 
     /** Напечатать в поле: буквы важны сами по себе, и внедрённый ввод показывает их так же. */
@@ -228,6 +231,12 @@ class DemoFilm : ScreenTour() {
         return here
     }
 
+    /**
+     * Весь сюжет защиты одним прогоном. Сцена, которая не сыграла, — дыра в демонстрации, и
+     * молчать о ней нельзя: без этого прогон зеленеет, а на записи не хватает того, о чём
+     * рассказывают вслух. Поэтому каждая сцена ждёт своего экрана и падает с именем подписи,
+     * которой не дождалась.
+     */
     @Test
     fun demo() {
         // Сцена 1. Аптечки
@@ -337,8 +346,7 @@ class DemoFilm : ScreenTour() {
         Thread.sleep(4000)
         // Код читает настоящий распознаватель с настоящей фотографии коробки, а дальше идёт
         // обычный путь приложения: форма уже знает то, что сказал реестр.
-        val code = runCatching { codeFromPhoto() }.getOrNull()
-        if (code == null) return
+        val code = codeFromPhoto()
         compose.runOnUiThread { stacks.go(Screen.PackageForm(scannedCode = code)) }
         show("Новая упаковка")
         beat(4.0)

@@ -81,23 +81,28 @@ jobs:
           apk=app/build/outputs/apk/release/app-release.apk
           test -f "$apk"
           sha=$(git rev-parse --short HEAD)
-          cp "$apk" "medapp-1.0-release-$sha.apk"
+          # Имя временного вложения своё у каждой попытки: оставшееся от сорвавшейся не должно
+          # мешать повтору — `gh release upload` без замены на занятое имя не ложится.
+          temporary="medapp-1.0-release-$sha-$GITHUB_RUN_ID-$GITHUB_RUN_ATTEMPT.apk"
+          cp "$apk" "$temporary"
           cp "$apk" medapp-1.0-release.apk
           # Релиза может не быть вовсе — первая публикация его и заводит.
           gh release view latest >/dev/null 2>&1 ||
             gh release create latest --title "Latest" --notes "Сборка main."
-          # Сборка под своим именем ложится первой и **ничего не сносит**: после неё в релизе
+          # Сборка под временным именем ложится первой и **ничего не сносит**: после неё в релизе
           # заведомо есть рабочий APK. Только потом заменяется постоянное вложение — то, на
           # которое ссылаются, — и замена сносит прежнее до того, как ляжет новое. Сорвётся
           # замена — скачать всё равно есть что, и прогон остаётся провалом.
-          gh release upload latest "medapp-1.0-release-$sha.apk"
+          gh release upload latest "$temporary"
           if ! gh release upload latest medapp-1.0-release.apk --clobber; then
-            echo "::error::Постоянное вложение заменить не удалось; в релизе лежит medapp-1.0-release-$sha.apk."
+            echo "::error::Постоянное вложение заменить не удалось; в релизе лежит $temporary."
             exit 1
           fi
-          # Постоянное вложение на месте — сборка под своим именем больше не нужна: иначе релиз
-          # растёт на 66 МБ с каждой публикацией.
-          gh release delete-asset latest "medapp-1.0-release-$sha.apk" --yes
+          # Постоянное вложение на месте — временные больше не нужны, включая оставшиеся от
+          # сорвавшихся попыток: иначе релиз растёт на 66 МБ с каждой из них.
+          gh release view latest --json assets \
+            --jq '.assets[].name | select(startswith("medapp-1.0-release-"))' |
+            while read -r leftover; do gh release delete-asset latest "$leftover" --yes; done
           gh release edit latest --notes "Сборка main: $(git log -1 --pretty='%s') ($sha)."
 
       - name: Ключ подписи не остаётся
