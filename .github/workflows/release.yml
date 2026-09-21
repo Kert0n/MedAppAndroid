@@ -25,7 +25,12 @@ concurrency:
 jobs:
   publish:
     name: Сборка и замена вложения
-    if: github.event_name == 'workflow_dispatch' || github.event.workflow_run.conclusion == 'success'
+    # Чужой форк тоже проходит «Проверку» — она про debug и секретов не просит. Пускать его
+    # сборку к ключу подписи нельзя: публикуем только то, что пришло из своего репозитория.
+    if: >-
+      github.event_name == 'workflow_dispatch' ||
+      (github.event.workflow_run.conclusion == 'success' &&
+      github.event.workflow_run.head_repository.full_name == github.repository)
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v5
@@ -75,7 +80,20 @@ jobs:
           apk=app/build/outputs/apk/release/app-release.apk
           test -f "$apk"
           cp "$apk" medapp-1.0-release.apk
-          gh release upload latest medapp-1.0-release.apk --clobber
+          # Релиза может не быть вовсе — первая публикация его и заводит.
+          gh release view latest >/dev/null 2>&1 ||
+            gh release create latest --title "Latest" --notes "Сборка main."
+          # Замена сносит прежнее вложение до того, как ляжет новое: пока замена идёт, прежняя
+          # сборка лежит рядом на машине, и сорвавшаяся замена возвращает её на место.
+          mkdir -p previous
+          gh release download latest --pattern medapp-1.0-release.apk --dir previous || true
+          if ! gh release upload latest medapp-1.0-release.apk --clobber; then
+            if [ -f previous/medapp-1.0-release.apk ]; then
+              gh release upload latest previous/medapp-1.0-release.apk --clobber &&
+                echo "::error::Замена не удалась, в релизе возвращена прежняя сборка."
+            fi
+            exit 1
+          fi
           gh release edit latest --notes "Сборка main: $(git log -1 --pretty='%s') ($(git rev-parse --short HEAD))."
 
       - name: Ключ подписи не остаётся

@@ -15,7 +15,7 @@
 |---|---|
 | понять продукт и правила за пять минут | [AGENTS.md](AGENTS.md) |
 | писать код | [плане набора (архив зонтика)](https://github.com/Kert0n/MedAppDocs/blob/main/docs/plans/android-ui-plan.md) — оглавление в начале ведёт в нужную часть |
-| взять следующую задачу | [плане набора (архив зонтика), часть I](https://github.com/Kert0n/MedAppDocs/blob/main/docs/plans/android-ui-plan.md#часть-i-план-работ): девятнадцать PR с планом коммитов внутри каждого |
+| взять следующую задачу | [плане набора (архив зонтика), часть I](https://github.com/Kert0n/MedAppDocs/blob/main/docs/plans/android-ui-plan.md#часть-i-план-работ--base): девятнадцать PR с планом коммитов внутри каждого |
 | понять, чем принимается работа | [плане набора (архив зонтика), J4](https://github.com/Kert0n/MedAppDocs/blob/main/docs/plans/android-ui-plan.md#j4-матрица-требований) — матрица требований |
 
 ## Обращения и изменения
