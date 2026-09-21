@@ -1,0 +1,83 @@
+# Публикация latest. Собранный APK кладётся в релиз `latest` тем же именем вложения — ссылка на
+# скачивание не меняется, и у того, кто её сохранил, всегда последняя сборка main.
+#
+# Идёт **после** «Проверки»: публиковать из main, не дождавшись тестов и lint, значит раздавать
+# то, что не собиралось. Поэтому триггер — успешное завершение той сборки на том же коммите, а не
+# push сам по себе.
+name: Публикация latest
+
+on:
+  workflow_run:
+    workflows: [Проверка]
+    types: [completed]
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+# Публикация не отменяется на ходу: прерванная между сборкой и заменой вложения оставила бы в
+# релизе предыдущий APK молча.
+concurrency:
+  group: release-latest
+  cancel-in-progress: false
+
+jobs:
+  publish:
+    name: Сборка и замена вложения
+    if: github.event_name == 'workflow_dispatch' || github.event.workflow_run.conclusion == 'success'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          # Коммит тот же, что проверяла «Проверка», а не голова main: между ними мог лечь ещё один.
+          ref: ${{ github.event.workflow_run.head_sha || github.sha }}
+
+      - name: JDK
+        uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: '25'
+
+      - name: Gradle
+        uses: gradle/actions/setup-gradle@v5
+
+      # Ключ подписи в репозитории не лежит (G1): он приходит секретом и живёт только в этом
+      # прогоне. Без него сборка не подписывается, и вложению неоткуда взяться.
+      - name: Ключ подписи
+        env:
+          KEYSTORE: ${{ secrets.MEDAPP_KEYSTORE_BASE64 }}
+        run: |
+          if [ -z "$KEYSTORE" ]; then
+            echo "::error::Секрет MEDAPP_KEYSTORE_BASE64 не задан: подписать release нечем."
+            exit 1
+          fi
+          mkdir -p keystore
+          printf '%s' "$KEYSTORE" | base64 -d > keystore/medapp-release.jks
+
+      - name: Сборка
+        env:
+          MEDAPP_KEYSTORE_FILE: keystore/medapp-release.jks
+          MEDAPP_KEYSTORE_PASSWORD: ${{ secrets.MEDAPP_KEYSTORE_PASSWORD }}
+          MEDAPP_KEY_ALIAS: ${{ secrets.MEDAPP_KEY_ALIAS }}
+          MEDAPP_KEY_PASSWORD: ${{ secrets.MEDAPP_KEY_PASSWORD }}
+          MEDAPP_REGISTRATION_TOKEN: ${{ secrets.MEDAPP_REGISTRATION_TOKEN }}
+          MEDAPP_BASE_URL: ${{ secrets.MEDAPP_BASE_URL }}
+          MEDAPP_CRPT_BASE_URL: ${{ secrets.MEDAPP_CRPT_BASE_URL }}
+        run: ./gradlew :app:assembleRelease
+
+      # Неподписанная сборка называется иначе (`app-release-unsigned.apk`), поэтому имя файла здесь
+      # и есть проверка подписи: подменить его нечем.
+      - name: Замена вложения latest
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          apk=app/build/outputs/apk/release/app-release.apk
+          test -f "$apk"
+          cp "$apk" medapp-1.0-release.apk
+          gh release upload latest medapp-1.0-release.apk --clobber
+          gh release edit latest --notes "Сборка main: $(git log -1 --pretty='%s') ($(git rev-parse --short HEAD))."
+
+      - name: Ключ подписи не остаётся
+        if: always()
+        run: rm -f keystore/medapp-release.jks
