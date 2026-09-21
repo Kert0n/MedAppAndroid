@@ -2,6 +2,8 @@ package com.kert0n.medapp.presentation.pack
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.kert0n.medapp.domain.medkit.MedKitProjection
+import com.kert0n.medapp.domain.pack.PackageProjection
 import com.kert0n.medapp.feature.operation.Freshening
 import com.kert0n.medapp.feature.packages.PackageRemoval
 import com.kert0n.medapp.feature.time.Today
@@ -70,9 +72,15 @@ class PackageCardViewModel @AssistedInject constructor(
     /** Коробка, как её прочитали, — вместе с тем, дождались ли ответа сервера. */
     private val read = fresh.map { (it as? Fresh.Read)?.value to (it is Fresh.Read) }
 
+    /**
+     * Место коробки вместе с тем, о **какой** коробке оно прочитано. Пока читается полка новой
+     * коробки, в руках остаётся ответ о прежней — а его место этой коробке не принадлежит.
+     */
     private val place = combine(pack, days) { pack, day -> pack?.medKit?.id to day.date }
         .distinctUntilChanged()
-        .flatMapLatest { (medKitId, today) -> medKitId?.let { medKits.observe(it, today) } ?: flowOf(null) }
+        .flatMapLatest { (medKitId, today) ->
+            medKitId?.let { id -> medKits.observe(id, today).map { Place(id, it) } } ?: flowOf(Place())
+        }
 
     private val course = pack.map { it?.holdingCourseId }
         .distinctUntilChanged()
@@ -93,13 +101,14 @@ class PackageCardViewModel @AssistedInject constructor(
         PackageCardUiState(
             isFreshening = !freshened,
             pack = pack?.toPresentationDTO(),
-            medKitName = place?.name,
+            medKitName = place.of(pack)?.name,
             holdingCourseTitle = course?.title,
             lastUsedOn = pack?.lastUsedAt?.atZone(day.zone)?.toLocalDate(),
             today = day.date,
             isRefusedByServer = refused,
             // «Нет» говорится только после чтения — и базы, и сервера: пока ждём ответа, коробка,
             // которой в базе нет, ещё может оказаться (PLAN H3 «Непрочитанное не выдаётся за исчезнувшее»).
+            isPlaceUnread = pack != null && !place.isOf(pack),
             isGone = freshened && pack == null,
             asksToRemove = removing.asking,
             isBusy = removing.busy,
@@ -136,6 +145,17 @@ class PackageCardViewModel @AssistedInject constructor(
         }
     }
 
+    /**
+     * Ответ о месте: чьё место прочитано и что прочитано. Пустая аптечка у **своей** коробки —
+     * «полки не стало», у чужой — «ещё не читали», и путать их нельзя.
+     */
+    private class Place(private val medKitId: Uuid? = null, private val medKit: MedKitProjection? = null) {
+
+        fun isOf(pack: PackageProjection?) = medKitId == pack?.medKit?.id
+
+        fun of(pack: PackageProjection?) = medKit.takeIf { isOf(pack) }
+    }
+
     private data class Removing(
         val asking: Boolean = false,
         /** Решение уже отдано сценарию: второго такого же не начинается. */
@@ -153,6 +173,8 @@ class PackageCardViewModel @AssistedInject constructor(
 data class PackageCardUiState(
     /** Коробка перечитывается у сервера: карточка ждёт (PLAN E4). */
     val isFreshening: Boolean = false,
+    /** Место коробки ещё не прочитано: «аптечка неизвестна» — утверждение, и до чтения оно ложно. */
+    val isPlaceUnread: Boolean = false,
     val pack: PackagePresentationDTO? = null,
     val medKitName: String? = null,
     val holdingCourseTitle: String? = null,
@@ -167,5 +189,5 @@ data class PackageCardUiState(
     val isRemoved: Boolean = false
 ) {
     /** Пока первое чтение не пришло, карточка не говорит ни «есть», ни «нет». */
-    val isLoading: Boolean get() = isFreshening || (pack == null && !isGone)
+    val isLoading: Boolean get() = isFreshening || isPlaceUnread || (pack == null && !isGone)
 }

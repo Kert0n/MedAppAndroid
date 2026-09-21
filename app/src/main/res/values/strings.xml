@@ -115,6 +115,7 @@
     <string name="pack_suggestions_searching">Ищу в справочнике…</string>
     <string name="pack_suggestions_none">В справочнике не нашлось.</string>
     <string name="pack_suggestions_unavailable">Подсказок нет: %1$s</string>
+    <string name="pack_suggestions_title">Из справочника</string>
     <string name="pack_busy">Упаковка ждёт ответа сервера на другое решение — правку пока не записать.</string>
     <plurals name="pack_too_long">
         <item quantity="one">Поле длиннее %1$d символа.</item>
@@ -141,6 +142,7 @@
     <string name="contents_search_here">Поиск по аптечке</string>
     <string name="contents_search_everywhere">Поиск по всем аптечкам</string>
     <string name="action_clear_search">Очистить поиск</string>
+    <string name="action_hide_suggestions">Скрыть подсказки</string>
     <string name="contents_menu">Что сделать с аптечкой</string>
     <string name="contents_edit">Править</string>
     <string name="contents_remove">Убрать</string>

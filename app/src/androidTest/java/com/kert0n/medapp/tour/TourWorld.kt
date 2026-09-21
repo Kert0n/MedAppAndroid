@@ -201,6 +201,28 @@ class TourWorld(private val database: MedAppDatabase, val zone: ZoneId = ZoneId.
     private fun schedule(start: LocalDate, vararg times: LocalTime) =
         com.kert0n.medapp.fixture.schedule(start = start, daysOfWeek = DayOfWeek.entries.toSet(), times = times.toList(), zone = zone)
 
+    /**
+     * Лечение, у которого приём приходится на ближайшую минуту: по нему заводится обязательство
+     * напомнить, и снимок шторки показывает настоящее уведомление, а не его изображение.
+     */
+    suspend fun intakeDueNow() {
+        val scenarios = scenarios()
+        val at = now.atZone(zone).toLocalTime().withSecond(0).withNano(0)
+        val created = scenarios.courseDrafting.create("Цетрин при аллергии", "Назначил терапевт")
+        val saved = scenarios.courseDrafting.edit(
+            created.id, created.revision,
+            listOf(
+                CourseDrafting.Edit.SetDose(Dose(pcs("1"))),
+                CourseDrafting.Edit.SetForm(tabletsForm),
+                CourseDrafting.Edit.SetSchedule(schedule(today, at)),
+                CourseDrafting.Edit.SetTotalDoses(Doses(5)),
+                CourseDrafting.Edit.Attach(cetrin, Doses(5))
+            )
+        ) as CourseDrafting.Outcome.Saved
+        scenarios.courseActivation.activate(saved.draft.id, saved.draft.revision)
+        scenarios.dailyRound.run()
+    }
+
     /** Коробка, у которой срок кончается сегодня, и проход дня, который об этом скажет при входе. */
     suspend fun expiringToday() {
         database.packageRepository().add(

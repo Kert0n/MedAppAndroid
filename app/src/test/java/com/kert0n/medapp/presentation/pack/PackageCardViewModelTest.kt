@@ -13,6 +13,7 @@ import com.kert0n.medapp.fixture.FakePackages
 import com.kert0n.medapp.fixture.FakeQueue
 import com.kert0n.medapp.fixture.FakeSyncOperations
 import com.kert0n.medapp.fixture.HOME_KIT
+import com.kert0n.medapp.fixture.HeldMedKits
 import com.kert0n.medapp.fixture.HeldPackages
 import com.kert0n.medapp.fixture.HeldTransactions
 import com.kert0n.medapp.fixture.MainDispatcherRule
@@ -83,7 +84,8 @@ class PackageCardViewModelTest {
     private fun viewModel(
         packages: PackageStorageRepository = stored,
         transactions: Transactions = DirectTransactions,
-        freshening: com.kert0n.medapp.feature.operation.Freshening = offlineFreshening(packages, clock)
+        freshening: com.kert0n.medapp.feature.operation.Freshening = offlineFreshening(packages, clock),
+        medKits: MedKitStorageRepository = this.medKits
     ) = PackageCardViewModel(
         removal = PackageRemoval(packages, queue, transactions, clock),
         freshening = freshening,
@@ -113,6 +115,39 @@ class PackageCardViewModelTest {
             assertFalse(state.value.isGone)
             held.door.release()
             state.awaiting { it.pack != null }
+        }
+    }
+
+    /**
+     * Коробка приходит раньше своего места: полку читают отдельным потоком, и пока её ответ в
+     * пути, карточка держит в руках ответ о прежней коробке — то есть ни о какой. Объявить себя
+     * готовой в этот миг значит сказать «аптечка неизвестна» о коробке, у которой место есть
+     * (PLAN H3 «Непрочитанное не выдаётся за исчезнувшее»).
+     *
+     * Красная проверка: считать готовность по одной коробке — готовое состояние приходит с пустым
+     * именем аптечки.
+     */
+    @Test
+    fun theCardWaitsUntilThePlaceOfTheBoxIsRead() {
+        stored.lying(pack(id = PACK, medKit = medKit(id = SHARED_KIT, name = "Дача", publication = MedKit.Publication.PUBLISHED, participantCount = 2).ref))
+        val server = com.kert0n.medapp.fixture.RereadingServer(clock)
+        server.hold()
+        val held = HeldMedKits(medKits)
+        val model = viewModel(freshening = com.kert0n.medapp.fixture.onlineFreshening(server, stored, clock), medKits = held)
+
+        watching(model.state) { state ->
+            // Место ещё не спрашивали: коробки нет, и спрашивать не о чем.
+            state.awaiting { it.isFreshening }
+            held.door.hold()
+
+            server.release()
+            state.awaiting { it.pack != null }
+            assertTrue(state.value.isLoading)
+            assertNull(state.value.medKitName)
+
+            held.door.release()
+            state.awaiting { !it.isLoading }
+            assertEquals("Дача", state.value.medKitName)
         }
     }
 

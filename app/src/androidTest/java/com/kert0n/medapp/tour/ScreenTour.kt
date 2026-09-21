@@ -1,6 +1,7 @@
 package com.kert0n.medapp.tour
 
 import android.graphics.Bitmap
+import androidx.compose.runtime.Composable
 import androidx.compose.ui.test.hasSetTextAction
 import androidx.compose.ui.test.hasText
 import androidx.compose.ui.test.junit4.v2.createAndroidComposeRule
@@ -85,7 +86,7 @@ abstract class ScreenTour {
         world = TourWorld(database)
         runBlocking { world.seed() }
         prepare()
-        compose.setContent { MedAppTheme(darkTheme = darkTheme()) { MedAppShell() } }
+        compose.setContent { MedAppTheme(darkTheme = darkTheme()) { Content() } }
     }
 
     /** Тёмная тема задаётся теме, а не системе: смена ночного режима пересоздала бы окно. */
@@ -93,6 +94,14 @@ abstract class ScreenTour {
 
     /** Что ещё поставить до появления оболочки: разрешения, настройки. */
     protected open fun prepare() = Unit
+
+    /**
+     * Что показывается обходу. По умолчанию - сама оболочка; переопределяют её те, кому нужен
+     * доступ к стопкам мест (например, съёмка демонстрации, где приложение открывает экран так же,
+     * как это делает сканер, узнавший код).
+     */
+    @Composable
+    protected open fun Content() = MedAppShell()
 
     @After
     fun close() {
@@ -460,6 +469,54 @@ class DarkTour : ScreenTour() {
         tap("День")
         see("Нурофен от спины")
         snap("12-day/dark")
+    }
+}
+
+/**
+ * Напоминание в шторке — единственное, что человек видит **вне** приложения. Уведомление здесь
+ * настоящее: вне истории граф отдаёт `SystemNotifier`, а показ делает владелец доставки, как в
+ * работающем приложении.
+ */
+@HiltAndroidTest
+@RunWith(AndroidJUnit4::class)
+class NotificationTour : ScreenTour() {
+
+    @Inject
+    lateinit var dailyRound: com.kert0n.medapp.feature.notification.DailyRound
+
+    @Inject
+    lateinit var reminders: com.kert0n.medapp.feature.notification.ReminderOutbox
+
+    /** Каналы заводит приложение при старте; тестовое приложение этого не делает, и показ уходит в никуда. */
+    @Inject
+    lateinit var channels: com.kert0n.medapp.platform.notifications.NotificationChannels
+
+    override fun prepare() {
+        InstrumentationRegistry.getInstrumentation().uiAutomation
+            .grantRuntimePermission("com.kert0n.medapp", android.Manifest.permission.POST_NOTIFICATIONS)
+        channels.ensure()
+        runBlocking { world.intakeDueNow() }
+    }
+
+    /**
+     * Снимок шторки с настоящим уведомлением. Без него единственное, что человек видит **вне**
+     * приложения, в коллекции описано бы словами — и разошлось бы с тем, что показывает телефон,
+     * незаметно для всех.
+     */
+    @Test
+    fun notificationInTheShade() {
+        see("Без ответа за прошлые дни")
+        tap("Закрыть")
+        // Показ — отдельный шаг владельца доставки: в приложении его зовёт запущенный владелец, а
+        // здесь обход делает это явно.
+        runBlocking {
+            dailyRound.run()
+            reminders.pass()
+        }
+        shell("cmd statusbar expand-notifications")
+        Thread.sleep(2000)
+        snap("29-notification/shade")
+        shell("cmd statusbar collapse")
     }
 }
 

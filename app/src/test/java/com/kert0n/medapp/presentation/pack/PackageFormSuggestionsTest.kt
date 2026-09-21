@@ -245,6 +245,34 @@ class PackageFormSuggestionsTest {
         assertEquals(1, templates.asked.size)
     }
 
+    /**
+     * Отказ кончает разговор со справочником, а напечатанное оставляет человеку: список свёрнут,
+     * название на месте, карточка не выбрана, и заново справочник не спрашивают. Печать после
+     * отказа ищет снова — как и печать после выбора.
+     *
+     * Красная проверка: снять сам отказ (пустое тело `dismiss`) — список остаётся висеть под
+     * полем, и отказаться от него человеку нечем.
+     */
+    @Test
+    fun refusingEndsTheConversationAndKeepsWhatWasTyped() = runTest {
+        val model = viewModel()
+        model.type("парац")
+        advanceTimeBy(400)
+        assertTrue(model.state.value.suggestions is Suggestions.Found)
+
+        model.dismiss()
+        advanceTimeBy(400)
+
+        assertEquals(Suggestions.None, model.state.value.suggestions)
+        assertEquals("парац", model.state.value.form.name)
+        assertEquals(null, model.state.value.form.templateId)
+        assertEquals(listOf("парац"), templates.asked.map { it.text })
+
+        model.type("парацет")
+        advanceTimeBy(400)
+        assertEquals(listOf("парац", "парацет"), templates.asked.map { it.text })
+    }
+
     /** Выбранная карточка уходит с записью: коробка помнит, откуда пришла (D3). */
     @Test
     fun theChosenCardTravelsWithTheRecord() = runTest {
