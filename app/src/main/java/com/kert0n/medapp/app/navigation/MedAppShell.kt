@@ -343,6 +343,7 @@ private fun screens(
             state = state,
             onEdit = model::edit,
             onPick = model::pick,
+            onDismissSuggestions = model::dismiss,
             onSave = model::save,
             onCancel = stacks::back,
             // Количество здесь показано, но не правится: у пересчёта свой экран (H3 №8).

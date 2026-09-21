@@ -111,6 +111,7 @@
     <string name="pack_suggestions_searching">Searching the catalogue…</string>
     <string name="pack_suggestions_none">Nothing found in the catalogue.</string>
     <string name="pack_suggestions_unavailable">No suggestions: %1$s</string>
+    <string name="pack_suggestions_title">From the catalogue</string>
     <string name="pack_busy">The package is waiting for the server\'s answer on another decision — the change can\'t be saved yet.</string>
     <plurals name="pack_too_long">
         <item quantity="one">The field is longer than %1$d character.</item>
@@ -135,6 +136,7 @@
     <string name="contents_search_here">Search this kit</string>
     <string name="contents_search_everywhere">Search all kits</string>
     <string name="action_clear_search">Clear search</string>
+    <string name="action_hide_suggestions">Hide suggestions</string>
     <string name="contents_menu">What to do with the kit</string>
     <string name="contents_edit">Edit</string>
     <string name="contents_remove">Remove</string>

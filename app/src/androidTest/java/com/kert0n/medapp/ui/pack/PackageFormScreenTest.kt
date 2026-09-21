@@ -3,6 +3,8 @@ package com.kert0n.medapp.ui.pack
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.junit4.v2.createComposeRule
 import androidx.compose.ui.test.onAllNodesWithText
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performScrollTo
@@ -42,6 +44,7 @@ class PackageFormScreenTest {
     private var cancelled = 0
     private var recounted = 0
     private var picked: TemplatePresentationDTO? = null
+    private var dismissed = 0
 
     private val shelf = medKit(id = HOME_KIT, name = "Домашняя").projection(MedKitContents.EMPTY).toPresentationDTO()
 
@@ -52,6 +55,7 @@ class PackageFormScreenTest {
                     state = state,
                     onEdit = {},
                     onPick = { picked = it },
+                    onDismissSuggestions = { dismissed++ },
                     onSave = { saved++ },
                     onCancel = { cancelled++ },
                     onRecount = { recounted++ }
@@ -114,6 +118,40 @@ class PackageFormScreenTest {
         compose.onNodeWithText("Подсказок нет: Нет связи с сервером. Проверьте подключение.").assertIsDisplayed()
         compose.onNodeWithText("Сохранить").performClick()
         assertEquals(1, saved)
+    }
+
+    /**
+     * От подсказок отказываются крестиком в шапке блока, и он есть у **любого** его состояния:
+     * список, «ищу», недоступный справочник. Без отказа блок стоит под названием до конца
+     * заполнения формы — обязательные поля видно только сквозь десять карточек.
+     *
+     * Крестик стоит у поля, а не под списком: на узком устройстве низ блока за краем экрана.
+     *
+     * Красная проверка: убрать шапку из `SuggestionList` — отказаться от списка нечем.
+     */
+    @Test
+    fun theSuggestionBlockIsRefusedByTheCross() {
+        val shown = mutableStateOf<Suggestions>(Suggestions.Found(listOf(paracetamol)))
+        compose.setContent {
+            MedAppTheme {
+                PackageFormScreen(
+                    state = adding(suggestions = shown.value),
+                    onEdit = {},
+                    onPick = {},
+                    onDismissSuggestions = { dismissed++ },
+                    onSave = {},
+                    onCancel = {},
+                    onRecount = {}
+                )
+            }
+        }
+
+        val states = listOf(Suggestions.Found(listOf(paracetamol)), Suggestions.Searching, Suggestions.Unavailable(Unavailability.NO_CONNECTION))
+        for ((refusals, suggestions) in states.withIndex()) {
+            compose.runOnIdle { shown.value = suggestions }
+            compose.onNodeWithContentDescription("Скрыть подсказки").assertIsDisplayed().performClick()
+            assertEquals(refusals + 1, dismissed)
+        }
     }
 
     /**

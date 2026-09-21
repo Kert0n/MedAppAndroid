@@ -9,6 +9,7 @@ import androidx.compose.foundation.layout.defaultMinSize
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.material3.Button
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
@@ -21,6 +22,7 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.pluralStringResource
@@ -60,6 +62,7 @@ fun PackageFormScreen(
     state: PackageFormUiState,
     onEdit: (PackageFormPresentationDTO) -> Unit,
     onPick: (TemplatePresentationDTO) -> Unit,
+    onDismissSuggestions: () -> Unit,
     onSave: () -> Unit,
     onCancel: () -> Unit,
     onRecount: () -> Unit,
@@ -142,7 +145,7 @@ fun PackageFormScreen(
                 modifier = Modifier.fillMaxWidth()
             )
 
-            SuggestionList(state.suggestions, onPick)
+            SuggestionList(state.suggestions, onPick, onDismissSuggestions)
 
             // Форма выпуска — перед количеством: она подсказывает единицу, которой это меряют.
             PickerField(
@@ -289,39 +292,71 @@ private fun PackageFormError.message(): String = when (this) {
  * Подсказки справочника под полем названия (PLAN H3 №7, U2). Состояния различимы словами: ничего
  * не спрашивали — ничего; ищем; нашлось — строки; не нашлось — не ошибка; недоступно — причина, и
  * форма живёт. Список короткий и известен целиком — `Column`, а не `LazyColumn` внутри прокрутки.
+ *
+ * **От предложения отказываются крестиком в шапке.** Предложение — разговор, и кончить его можно
+ * не только согласием: человек, который пишет своё, сворачивает блок и идёт к остальным полям.
+ * Крестик стоит у поля, а не под списком: строк до десяти, и низ блока на узком устройстве за
+ * краем экрана. Закрывает он **любое** состояние блока, включая «ищу» и названную причину
+ * недоступности.
  */
 @Composable
-private fun SuggestionList(suggestions: Suggestions, onPick: (TemplatePresentationDTO) -> Unit) {
-    when (suggestions) {
-        Suggestions.None -> Unit
-        Suggestions.Searching -> Note(stringResource(R.string.pack_suggestions_searching))
-        is Suggestions.Unavailable -> Text(
-            stringResource(R.string.pack_suggestions_unavailable, stringResource(suggestions.reason.text)),
-            style = MaterialTheme.typography.bodySmall,
-            color = MaterialTheme.colorScheme.error
-        )
-        is Suggestions.Found -> if (suggestions.templates.isEmpty()) {
-            Note(stringResource(R.string.pack_suggestions_none))
-        } else {
-            Column(Modifier.fillMaxWidth()) {
-                for (template in suggestions.templates) {
-                    ListItem(
-                        headlineContent = { Text(template.name) },
-                        // Чем узнать карточку: форма и производитель — что известно; пустое молчит.
-                        supportingContent = listOfNotNull(template.form?.name, template.manufacturer)
-                            .takeIf { it.isNotEmpty() }
-                            ?.let { known -> { Text(known.joinToString(" · ")) } },
-                        modifier = Modifier.clickable { onPick(template) }
-                    )
-                }
+private fun SuggestionList(
+    suggestions: Suggestions,
+    onPick: (TemplatePresentationDTO) -> Unit,
+    onDismiss: () -> Unit
+) {
+    if (suggestions == Suggestions.None) return
+    Column(Modifier.fillMaxWidth()) {
+        Row(
+            Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            SuggestionsWords(suggestions, Modifier.weight(1f))
+            IconButton(onClick = onDismiss) {
+                Icon(
+                    painterResource(R.drawable.ic_close),
+                    contentDescription = stringResource(R.string.action_hide_suggestions),
+                    modifier = Modifier.size(20.dp)
+                )
             }
+        }
+        if (suggestions !is Suggestions.Found) return@Column
+        for (template in suggestions.templates) {
+            ListItem(
+                headlineContent = { Text(template.name) },
+                // Чем узнать карточку: форма и производитель — что известно; пустое молчит.
+                supportingContent = listOfNotNull(template.form?.name, template.manufacturer)
+                    .takeIf { it.isNotEmpty() }
+                    ?.let { known -> { Text(known.joinToString(" · ")) } },
+                modifier = Modifier.clickable { onPick(template) }
+            )
         }
     }
 }
 
+/** Чем блок подсказок кончился — словами. Причина недоступности окрашена, ответ справочника нет. */
 @Composable
-private fun Note(text: String) {
-    Text(text, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+private fun SuggestionsWords(suggestions: Suggestions, modifier: Modifier) = when (suggestions) {
+    Suggestions.None -> Unit
+    Suggestions.Searching -> Note(stringResource(R.string.pack_suggestions_searching), modifier)
+    is Suggestions.Unavailable -> Text(
+        stringResource(R.string.pack_suggestions_unavailable, stringResource(suggestions.reason.text)),
+        style = MaterialTheme.typography.bodySmall,
+        color = MaterialTheme.colorScheme.error,
+        modifier = modifier
+    )
+    is Suggestions.Found -> Note(
+        stringResource(
+            if (suggestions.templates.isEmpty()) R.string.pack_suggestions_none else R.string.pack_suggestions_title
+        ),
+        modifier
+    )
+}
+
+@Composable
+private fun Note(text: String, modifier: Modifier = Modifier) {
+    Text(text, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant, modifier = modifier)
 }
 
 /** Почему поля пусты — словами. Слова у случая свои: экран их не выбирает. */
