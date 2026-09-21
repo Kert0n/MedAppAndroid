@@ -118,6 +118,10 @@ class DemoFilm : ScreenTour() {
      * слайд-шоу. Здесь часы идут, как у человека: кадр, и столько же сна.
      */
     private fun play(seconds: Double) {
+        // Отобрать у проверки автоматический ход часов нельзя: системные события идут в настоящем
+        // времени, а распознаватель жеста живёт на этих часах — перетаскивание перестаёт
+        // срабатывать вовсе (проверено прогоном). Поэтому кадры крутятся **вдобавок** к нему: в
+        // паузах, где иначе ничего не двигалось бы.
         repeat((seconds * 1000 / FRAME).toInt()) {
             compose.mainClock.advanceTimeByFrame()
             Thread.sleep(FRAME)
@@ -178,12 +182,24 @@ class DemoFilm : ScreenTour() {
         play(after)
     }
 
-    /** Место внизу: до него доходят «назад», как и у человека, а потом жмут вкладку. */
+    /** Панель мест видна только у корней мест: по ней и видно, что «назад» дошёл докуда надо. */
+    private fun atPlaces() = shown("Аптечки") && shown("План") && shown("Сканер") && shown("Опции")
+
+    /**
+     * Место внизу: до него доходят «назад», как и у человека, а потом жмут вкладку.
+     *
+     * После каждого «назад» панель мест ждут отдельно: приходит она не в тот же кадр, и решение
+     * «ещё не дома» по пустому дереву отправило бы следующий «назад» уже с корня места — а он
+     * закрывает приложение, и запись обрывается на полуслове.
+     */
     private fun goTo(place: String) {
         repeat(6) {
-            if (shown("Аптечки") && shown("План") && shown("Сканер") && shown("Опции")) return@repeat
+            if (atPlaces()) return@repeat
             goBack(0.35)
+            val until = System.currentTimeMillis() + 1_000
+            while (!atPlaces() && System.currentTimeMillis() < until) play(FRAME / 1000.0)
         }
+        check(atPlaces()) { "панель мест так и не появилась: следующий «назад» закрыл бы приложение" }
         show(place)
         val node = compose.onAllNodesWithText(place).onLast().fetchSemanticsNode()
         val at = node.positionOnScreen
@@ -199,10 +215,19 @@ class DemoFilm : ScreenTour() {
         val handle = "Переставить: "
         val (x, from) = spotOf(handle + name)
         val (_, to) = spotOf(handle + other)
-        // Перетаскивание системы: палец давит, держит дольше долгого нажатия и ведёт строку — всё
-        // одним вызовом, поэтому захват не отменяется на полпути.
-        shell("input draganddrop $x $from $x $to 2000")
-        play(2.6)
+        // Палец давит, держит дольше долгого нажатия и ведёт строку шагами. Одним вызовом это не
+        // делается: `input draganddrop` ведёт палец сразу, захват строки не успевает случиться, и
+        // строка остаётся на месте — молча.
+        shell("input motionevent DOWN $x $from")
+        play(1.0)
+        val step = (to - from) / 12
+        for (i in 1..12) {
+            shell("input motionevent MOVE $x ${from + step * i}")
+            play(0.06)
+        }
+        play(0.4)
+        shell("input motionevent UP $x $to")
+        play(1.0)
         val (_, movedTo) = spotOf(handle + name)
         val (_, stayedAt) = spotOf(handle + other)
         check(movedTo < stayedAt) { "строка «$name» осталась на месте: перетаскивание не сыграло" }
@@ -217,7 +242,11 @@ class DemoFilm : ScreenTour() {
 
     /** Нажать по части подписи: время пункта стоит в строке вместе с названием. */
     private fun pressPart(text: String) {
-        compose.waitUntil(WAIT) { compose.onAllNodes(hasText(text, substring = true)).fetchSemanticsNodes().isNotEmpty() }
+        val until = System.currentTimeMillis() + WAIT
+        while (compose.onAllNodes(hasText(text, substring = true)).fetchSemanticsNodes().isEmpty()) {
+            check(System.currentTimeMillis() < until) { "на экране так и не появилось «$text»" }
+            play(FRAME / 1000.0)
+        }
         val node = compose.onAllNodes(hasText(text, substring = true)).onFirst().fetchSemanticsNode()
         val at = node.positionOnScreen
         finger((at.x + node.size.width / 2).toInt(), (at.y + node.size.height / 2).toInt())
