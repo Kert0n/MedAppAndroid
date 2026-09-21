@@ -3,8 +3,12 @@ package com.kert0n.medapp.tour
 import android.Manifest
 import android.graphics.BitmapFactory
 import androidx.compose.runtime.Composable
-import androidx.compose.ui.geometry.Offset
-import androidx.compose.ui.test.onNodeWithContentDescription
+import androidx.compose.ui.test.hasText
+import androidx.compose.ui.test.onFirst
+import androidx.compose.ui.test.onLast
+import androidx.compose.ui.test.onAllNodesWithContentDescription
+import androidx.compose.ui.test.onAllNodesWithText
+import androidx.compose.ui.test.performTextInput
 import androidx.compose.ui.test.performTouchInput
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import androidx.test.platform.app.InstrumentationRegistry
@@ -85,6 +89,11 @@ class DemoFilm : ScreenTour() {
         val automation = InstrumentationRegistry.getInstrumentation().uiAutomation
         automation.grantRuntimePermission("com.kert0n.medapp", Manifest.permission.POST_NOTIFICATIONS)
         automation.grantRuntimePermission("com.kert0n.medapp", Manifest.permission.CAMERA)
+        // Переходы окон идут своим чередом: выключенные системой, они дали бы ту же склейку, что
+        // и стоящие часы Compose.
+        for (scale in listOf("window_animation_scale", "transition_animation_scale", "animator_duration_scale")) {
+            shell("settings put global $scale 1")
+        }
         channels.ensure()
         runBlocking {
             world.intakeDueNow()
@@ -104,102 +113,180 @@ class DemoFilm : ScreenTour() {
     }
 
     /**
-     * Перетащить строку источника за ручку: шаг берётся из расстояния между самими ручками, а
-     * не из догадки о высоте карточки.
+     * Кадр за кадром в настоящем времени. Часы Compose в проверке стоят и прыгают вперёд только
+     * там, где проверка ждёт покоя, — переход при этом проскакивает целиком, и запись выходит
+     * слайд-шоу. Здесь часы идут, как у человека: кадр, и столько же сна.
      */
-    private fun dragSource(name: String, other: String, up: Boolean) {
-        val handle = "Переставить: "
-        val from = compose.onNodeWithContentDescription(handle + name).fetchSemanticsNode()
-        val to = compose.onNodeWithContentDescription(handle + other).fetchSemanticsNode()
-        val step = to.positionInRoot.y - from.positionInRoot.y
-        compose.onNodeWithContentDescription(handle + name).performTouchInput {
-            down(center)
-            advanceEventTime(800)                 // дольше долгого нажатия: захват строки
-            repeat(12) {
-                moveBy(Offset(0f, step / 12f))
-                advanceEventTime(45)
-            }
-            advanceEventTime(250)
-            up()
+    private fun play(seconds: Double) {
+        repeat((seconds * 1000 / FRAME).toInt()) {
+            compose.mainClock.advanceTimeByFrame()
+            Thread.sleep(FRAME)
         }
-        compose.waitForIdle()
     }
 
     /**
      * Пауза между действиями: на записи она и есть темп показа. [PACE] подогнан так, чтобы весь
      * сюжет занимал около двух минут - столько отведено демонстрации на защите.
      */
-    private fun beat(seconds: Double = 1.4) {
-        compose.waitForIdle()
-        Thread.sleep((seconds * PACE * 1000).toLong())
+    private fun beat(seconds: Double = 1.4) = play(seconds * PACE)
+
+    /** Где на экране лежит подпись: по ней бьёт палец, а не внедрённое нажатие. */
+    private fun spotOf(text: String): Pair<Int, Int> {
+        val node = if (shown(text)) compose.onAllNodesWithText(text).onFirst().fetchSemanticsNode()
+        else compose.onAllNodesWithContentDescription(text).onFirst().fetchSemanticsNode()
+        val at = node.positionOnScreen
+        return (at.x + node.size.width / 2).toInt() to (at.y + node.size.height / 2).toInt()
+    }
+
+    /**
+     * Нажать **пальцем**: палец опускается, держится и поднимается, а не бьёт мгновенно. Системный
+     * кружок «показывать касания» в запись не попадает — его рисует не приложение, — зато волна
+     * Material под пальцем рисуется самим экраном, и на записи видно, куда человек нажал.
+     * Внедрённое нажатие Compose не даёт ни волны, ни перехода: экран просто вдруг становится
+     * другим.
+     */
+    private fun press(text: String, after: Double = 0.7) {
+        show(text)
+        val (x, y) = spotOf(text)
+        finger(x, y)
+        play(after)
+    }
+
+    /**
+     * Палец бьёт в точку системным событием. Волна нажатия Material живёт около трети секунды и
+     * гаснет сама — на записи её видно, потому что кадры идут в настоящем времени; раздельные
+     * `motionevent` и нулевой `swipe` до экрана не доходят вовсе.
+     */
+    private fun finger(x: Int, y: Int) {
+        shell("input tap $x $y")
+        play(HOLD / 1000.0)
+    }
+
+    /** Дождаться подписи, не останавливая часы: приход экрана тоже должен быть виден. */
+    private fun show(text: String, timeout: Long = WAIT) {
+        val until = System.currentTimeMillis() + timeout
+        while (System.currentTimeMillis() < until) {
+            if (shown(text) || described(text)) return
+            play(FRAME / 1000.0)
+        }
+        error("на экране так и не появилось «$text»")
+    }
+
+    /** Системная «назад» — тем же путём, каким её нажимает человек. */
+    private fun goBack(after: Double = 0.7) {
+        shell("input keyevent 4")
+        play(after)
+    }
+
+    /** Место внизу: до него доходят «назад», как и у человека, а потом жмут вкладку. */
+    private fun goTo(place: String) {
+        repeat(6) {
+            if (shown("Аптечки") && shown("План") && shown("Сканер") && shown("Опции")) return@repeat
+            goBack(0.35)
+        }
+        show(place)
+        val node = compose.onAllNodesWithText(place).onLast().fetchSemanticsNode()
+        val at = node.positionOnScreen
+        finger((at.x + node.size.width / 2).toInt(), (at.y + node.size.height / 2).toInt())
+        play(0.7)
+    }
+
+    /**
+     * Перетащить строку источника за ручку: палец давит, держит дольше долгого нажатия и ведёт
+     * строку шагами - каждое событие настоящее, поэтому на записи видно и захват, и ход.
+     */
+    private fun dragSource(name: String, other: String) {
+        val handle = "Переставить: "
+        val (x, from) = spotOf(handle + name)
+        val (_, to) = spotOf(handle + other)
+        // Перетаскивание системы: палец давит, держит дольше долгого нажатия и ведёт строку — всё
+        // одним вызовом, поэтому захват не отменяется на полпути.
+        shell("input draganddrop $x $from $x $to 2000")
+        play(2.6)
+    }
+
+    /** Напечатать в поле: буквы важны сами по себе, и внедрённый ввод показывает их так же. */
+    private fun fill(label: String, text: String) {
+        show(label)
+        compose.onAllNodesWithText(label).onFirst().performTextInput(text)
+        play(0.6)
+    }
+
+    /** Нажать по части подписи: время пункта стоит в строке вместе с названием. */
+    private fun pressPart(text: String) {
+        compose.waitUntil(WAIT) { compose.onAllNodes(hasText(text, substring = true)).fetchSemanticsNodes().isNotEmpty() }
+        val node = compose.onAllNodes(hasText(text, substring = true)).onFirst().fetchSemanticsNode()
+        val at = node.positionOnScreen
+        finger((at.x + node.size.width / 2).toInt(), (at.y + node.size.height / 2).toInt())
+        play(0.7)
     }
 
     /** Нажать, если такая подпись на экране есть: сюжет не должен падать из-за одной кнопки. */
-    private fun tapIfShown(text: String): Boolean {
+    private fun pressIfShown(text: String): Boolean {
         val here = shown(text) || described(text)
-        if (here) tap(text)
+        if (here) press(text)
         return here
     }
 
     @Test
     fun demo() {
         // Сцена 1. Аптечки
-        see("Без ответа за прошлые дни")
+        show("Без ответа за прошлые дни")
         beat(2.0)
-        tap("Закрыть")
-        see("Домашняя")
+        press("Закрыть")
+        show("Домашняя")
         beat(3.0)
 
-        tap("Домашняя")
-        see("Нурофен")
+        press("Домашняя")
+        show("Нурофен")
         beat(2.5)
-        tap("Просроченные")
+        press("Просроченные")
         beat(2.5)
-        tap("Просроченные")
+        press("Просроченные")
         beat(0.8)
 
         // Сцена 2. Упаковка
-        tap("Нурофен")
-        see("Сколько есть")
+        press("Нурофен")
+        show("Сколько есть")
         beat(3.5)
-        back()
+        goBack()
 
         // Сцена 3. Курс лечения
-        place("План")
-        tap("Курсы")
-        see("Нурофен от спины")
+        goTo("План")
+        press("Курсы")
+        show("Нурофен от спины")
         beat(2.0)
-        tap("Нурофен от спины")
+        press("Нурофен от спины")
         beat(2.5)
-        tap("Источники лечения")
+        press("Источники лечения")
         beat(2.5)
 
         // Смена приоритета: подключаем вторую пачку и ставим её первой - у неё срок ближе.
-        tap("Подключить ещё коробку")
-        see("Подключить пачку")
+        press("Подключить ещё коробку")
+        show("Подключить пачку")
         beat(2.5)
         // Список длинный, и пачка добавлена последней: человек нашёл бы её так же - поиском.
-        type("Поиск по названию", "Экспресс")
+        fill("Поиск по названию", "Экспресс")
         beat(2.0)
-        tap("Нурофен Экспресс")
-        see("Берётся сверху вниз")
+        press("Нурофен Экспресс")
+        show("Берётся сверху вниз")
         beat(2.5)
-        runCatching { dragSource("Нурофен Экспресс", "Нурофен", up = true) }
+        dragSource("Нурофен Экспресс", "Нурофен")
         beat(3.0)
-        tapIfShown("Сохранить")
+        pressIfShown("Сохранить")
         beat(2.0)
 
         // Сцена 4. План дня и напоминание
-        place("План")
-        tap("День")
-        see("Нурофен от спины")
+        goTo("План")
+        press("День")
+        show("Нурофен от спины")
         beat(3.0)
-        tapPart("14:00")
-        see("Из какой коробки")
+        pressPart("14:00")
+        show("Из какой коробки")
         beat(2.5)
-        tapIfShown("Принял")
+        pressIfShown("Принял")
         beat(2.0)
-        back()
+        goBack()
 
         runBlocking {
             dailyRound.run()
@@ -211,55 +298,61 @@ class DemoFilm : ScreenTour() {
         beat(1.0)
 
         // Сцена 5. Общая аптечка
-        place("Аптечки")
-        tap("Дача")
-        see("Но-шпа")
+        goTo("Аптечки")
+        press("Дача")
+        show("Но-шпа")
         beat(2.5)
-        tap("Но-шпа")
-        see("Сколько есть")
+        press("Но-шпа")
+        show("Сколько есть")
         beat(3.0)
-        back()
-        tap("Смекта")
-        see("Сколько есть")
+        goBack()
+        press("Смекта")
+        show("Сколько есть")
         beat(2.5)
-        back()
-        tap("Аспирин")
-        see("Сколько есть")
+        goBack()
+        press("Аспирин")
+        show("Сколько есть")
         beat(3.0)
-        back()
+        goBack()
 
         // Сцена 6. Приглашение в общую аптечку. Ключ и QR в кадр не попадают: их выдаёт сервер, а
         // обход идёт без сети - экран показывает, чем аптечка становится общей.
-        tap("Что сделать с аптечкой")
+        press("Что сделать с аптечкой")
         beat(1.2)
         // У общей полки приглашение зовётся «Пригласить», у местной - «Поделиться аптечкой».
-        if (!tapIfShown("Пригласить")) tapIfShown("Поделиться аптечкой")
-        see("Поделиться")
+        if (!pressIfShown("Пригласить")) pressIfShown("Поделиться аптечкой")
+        show("Поделиться")
         beat(3.0)
 
         // Сцена 7. Отчёты и сканер
-        place("Отчёты")
-        see("По категориям")
+        goTo("Отчёты")
+        show("По категориям")
         beat(2.5)
-        tap("Расход")
+        press("Расход")
         beat(2.5)
-        tap("Истрачено")
+        press("Истрачено")
         beat(2.5)
 
-        place("Сканер")
+        goTo("Сканер")
         Thread.sleep(4000)
         // Код читает настоящий распознаватель с настоящей фотографии коробки, а дальше идёт
         // обычный путь приложения: форма уже знает то, что сказал реестр.
         val code = runCatching { codeFromPhoto() }.getOrNull()
         if (code == null) return
         compose.runOnUiThread { stacks.go(Screen.PackageForm(scannedCode = code)) }
-        see("Новая упаковка")
+        show("Новая упаковка")
         beat(4.0)
     }
 
     private companion object {
 
         /** Во сколько раз пауза длиннее обычной: на записи она и есть темп показа. */
-        const val PACE = 1.7
+        const val PACE = 1.35
+
+        /** Кадр в миллисекундах: столько же и спим, чтобы часы шли как у человека. */
+        const val FRAME = 16L
+
+        /** Сколько палец держится на месте: столько живёт волна нажатия, и её видно на записи. */
+        const val HOLD = 260
     }
 }
