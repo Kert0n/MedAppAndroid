@@ -45,6 +45,13 @@ val secretsMissingForRelease = listOf(
 ).filter { secretOrNull(it) == null }
 
 /**
+ * Какая это по счёту публикация. Номер приходит от CI (`MEDAPP_PUBLICATION`), и другого источника
+ * у него нет: считать публикации по коммитам или тегам значило бы считать не то — уезжает в
+ * релиз не каждый коммит.
+ */
+val publication: Int = secretOrNull("MEDAPP_PUBLICATION")?.toIntOrNull() ?: 0
+
+/**
  * Ключ подписи: путь берётся тем же способом, что и прочие секреты, и разрешается от корня
  * клиента, чтобы в local.properties лежало `keystore/…`, а не путь с чужой машины. Сам ключ
  * в репозиторий не попадает (`/keystore/` в .gitignore): потерянный или утёкший ключ значит,
@@ -92,8 +99,11 @@ android {
         applicationId = "com.kert0n.medapp"
         minSdk = 29
         targetSdk = 37
-        versionCode = 1
-        versionName = "1.0"
+        // Номер публикации даёт CI: он растёт на единицу с каждой сборкой, уехавшей в `latest`,
+        // и по нему растёт минорная версия. У своей сборки номера нет — она никуда не уезжает, и
+        // версия у неё остаётся 1.0, а `versionCode` — единица, ниже любой опубликованной.
+        versionCode = publication + 1
+        versionName = "1.$publication"
 
         testInstrumentationRunner = "com.kert0n.medapp.HiltTestRunner"
 

@@ -1,5 +1,5 @@
-# Публикация latest. Собранный APK кладётся в релиз `latest` тем же именем вложения — ссылка на
-# скачивание не меняется, и у того, кто её сохранил, всегда последняя сборка main.
+# Публикация latest. Собранный APK кладётся в релиз `latest` под своей версией: у каждой
+# публикации минорная версия на единицу больше прежней, и это видно прямо в имени файла.
 #
 # Идёт **после** «Проверки»: публиковать из main, не дождавшись тестов и lint, значит раздавать
 # то, что не собиралось. Поэтому триггер — успешное завершение той сборки на том же коммите, а не
@@ -69,41 +69,41 @@ jobs:
           MEDAPP_REGISTRATION_TOKEN: ${{ secrets.MEDAPP_REGISTRATION_TOKEN }}
           MEDAPP_BASE_URL: ${{ secrets.MEDAPP_BASE_URL }}
           MEDAPP_CRPT_BASE_URL: ${{ secrets.MEDAPP_CRPT_BASE_URL }}
+          # Счёт публикаций ведёт сам прогон: у каждой сборки, уехавшей в latest, минорная версия
+          # на единицу больше прежней, а `versionCode` растёт вместе с ней.
+          MEDAPP_PUBLICATION: ${{ github.run_number }}
         run: ./gradlew :app:assembleRelease
 
       # Неподписанная сборка называется иначе (`app-release-unsigned.apk`), поэтому имя файла здесь
       # и есть проверка подписи: подменить его нечем. Порядок шагов таков, что релиз ни в один
       # момент не остаётся без APK.
-      - name: Замена вложения latest
+      - name: Публикация сборки в latest
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           apk=app/build/outputs/apk/release/app-release.apk
           test -f "$apk"
           sha=$(git rev-parse --short HEAD)
-          # Имя временного вложения своё у каждой попытки: оставшееся от сорвавшейся не должно
-          # мешать повтору — `gh release upload` без замены на занятое имя не ложится.
-          temporary="medapp-1.0-release-$sha-$GITHUB_RUN_ID-$GITHUB_RUN_ATTEMPT.apk"
-          cp "$apk" "$temporary"
-          cp "$apk" medapp-1.0-release.apk
+          # Та же версия, что собрана: номер публикации ведёт сам прогон.
+          version="1.$GITHUB_RUN_NUMBER"
+          file="medapp-$version-release.apk"
+          cp "$apk" "$file"
           # Релиза может не быть вовсе — первая публикация его и заводит.
           gh release view latest >/dev/null 2>&1 ||
             gh release create latest --title "Latest" --notes "Сборка main."
-          # Сборка под временным именем ложится первой и **ничего не сносит**: после неё в релизе
-          # заведомо есть рабочий APK. Только потом заменяется постоянное вложение — то, на
-          # которое ссылаются, — и замена сносит прежнее до того, как ляжет новое. Сорвётся
-          # замена — скачать всё равно есть что, и прогон остаётся провалом.
-          gh release upload latest "$temporary"
-          if ! gh release upload latest medapp-1.0-release.apk --clobber; then
-            echo "::error::Постоянное вложение заменить не удалось; в релизе лежит $temporary."
-            exit 1
-          fi
-          # Постоянное вложение на месте — временные больше не нужны, включая оставшиеся от
-          # сорвавшихся попыток: иначе релиз растёт на 66 МБ с каждой из них.
+          # Имя у каждой публикации своё, поэтому загрузка **ничего не сносит**: прежняя сборка
+          # лежит в релизе, пока новая не легла, и сорвавшаяся загрузка оставляет релиз с тем, что
+          # в нём было. `--clobber` нужен одному случаю — повтору того же прогона, который кладёт
+          # ту же самую сборку под тем же именем.
+          gh release upload latest "$file" --clobber
+          # Релиз зовётся latest и держит последнюю сборку: прежние уходят, иначе он растёт на
+          # 66 МБ с каждой публикацией.
           gh release view latest --json assets \
-            --jq '.assets[].name | select(startswith("medapp-1.0-release-"))' |
-            while read -r leftover; do gh release delete-asset latest "$leftover" --yes; done
-          gh release edit latest --notes "Сборка main: $(git log -1 --pretty='%s') ($sha)."
+            --jq '.assets[].name | select(test("^medapp-.*-release\\.apk$"))' |
+            while read -r previous; do
+              [ "$previous" = "$file" ] || gh release delete-asset latest "$previous" --yes
+            done
+          gh release edit latest --notes "Сборка main $version: $(git log -1 --pretty='%s') ($sha)."
 
       - name: Ключ подписи не остаётся
         if: always()
