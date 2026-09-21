@@ -1,10 +1,13 @@
 package com.kert0n.medapp.fixture
 
+import com.kert0n.medapp.domain.medkit.MedKitProjection
 import com.kert0n.medapp.domain.pack.PackageProjection
 import com.kert0n.medapp.domain.value.Vocabulary
 import com.kert0n.medapp.queue.Transactions
+import com.kert0n.medapp.storage.medkit.MedKitStorageRepository
 import com.kert0n.medapp.storage.pack.PackageStorageRepository
 import com.kert0n.medapp.storage.value.VocabularyStorageRepository
+import java.time.LocalDate
 import kotlin.uuid.Uuid
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -77,5 +80,17 @@ class HeldPackages(
     override fun observe(id: Uuid): Flow<PackageProjection?> = flow {
         door.pass()
         emitAll(real.observe(id))
+    }
+}
+
+/** Полки, первое чтение которых проверка держит: до него карточка ещё не знает места коробки. */
+class HeldMedKits(
+    private val real: MedKitStorageRepository,
+    val door: Held = Held()
+) : MedKitStorageRepository by real {
+
+    override fun observe(id: Uuid, today: LocalDate): Flow<MedKitProjection?> = flow {
+        door.pass()
+        emitAll(real.observe(id, today))
     }
 }
