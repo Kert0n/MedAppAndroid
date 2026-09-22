@@ -571,7 +571,7 @@
     <string name="course_source_move_down">Down</string>
     <string name="course_source_expired">Expired: good until %1$s</string>
     <string name="course_source_expired_title">The drug has expired</string>
-    <string name="course_source_expired_body">The treatment will take from “%1$s” — it is good until %2$s. It\'s your call; we only warn.</string>
+    <string name="course_source_expired_body">The treatment will take doses from “%1$s” — it is good until %2$s. It\'s your call; we only warn.</string>
     <string name="action_understood">Got it</string>
     <string name="course_source_free">%1$s %2$s free</string>
     <string name="course_source_expires">good until %1$s</string>
