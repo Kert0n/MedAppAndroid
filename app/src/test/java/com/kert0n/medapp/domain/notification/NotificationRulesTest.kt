@@ -90,6 +90,22 @@ class NotificationRulesTest {
         assertNull(covered.noticeOn(moscowMidnight(uncoveredOn)))
     }
 
+    /**
+     * Нехватка обнаружилась за два дня до первого необеспеченного приёма — или сверки в день «−3» не
+     * было. Предупредить заранее всё ещё стоит: купить успеют.
+     *
+     * Красная проверка: предупреждение заранее считалось только ровно за порог, и опоздание на день
+     * оставляло человека без него до самого дня исчерпания.
+     */
+    @Test
+    fun aShortageFoundTwoDaysAheadIsStillAnnouncedAhead() {
+        val course = activeCourse(schedule = schedule(start = LocalDate.of(2027, 3, 10), times = listOf(LocalTime.of(1, 0))), totalDoses = 7, sources = listOf(source(PACK, 3)))
+        val coverage = course.coverage(CourseProgress.none, availability(PACK to tablets("20")))
+        val uncoveredOn = LocalDate.of(2027, 3, 13)
+
+        assertEquals(CourseCoverage.Notice.AHEAD, coverage.noticeOn(uncoveredOn.minusDays(2).atStartOfDay(MOSCOW).toInstant()))
+    }
+
     @Test
     fun onlyTheIntakeReminderIsExact() {
         assertTrue(NotificationKind.INTAKE_DUE.exact)
