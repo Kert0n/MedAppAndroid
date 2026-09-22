@@ -234,7 +234,18 @@ class SharedShelfStoryTest {
 
         refreshFromOptions()
 
-        compose.waitUntil(WAIT) { shown("На сервере осталось меньше, чем вы списали") }
+        // Отказ приходит ответом сервера, и ждать его дольше одного захода нормально. Но если
+        // сервер ограничивает частоту, он о списании вообще ничего не сказал: история не
+        // провалена — она не состоялась, и это пропуск с названной причиной, а не красный отчёт.
+        try {
+            compose.waitUntil(WAIT) { shown("На сервере осталось меньше, чем вы списали") }
+        } catch (timeout: androidx.compose.ui.test.ComposeTimeoutException) {
+            assumeTrue(
+                "боевой сервер ограничивает частоту обращений",
+                !runBlocking { ProbeAccounts.throttled() }
+            )
+            throw AssertionError("отказ сервера не пришёл; на экране: ${screenTexts()}", timeout)
+        }
         compose.onNodeWithText("Пересчитать остаток").assertIsDisplayed()
     }
 

@@ -10,6 +10,7 @@ import com.kert0n.medapp.network.pack.PackagePostNetworkDTO
 import com.kert0n.medapp.network.pack.PackageSnapshotNetworkDTO
 import com.kert0n.medapp.network.pack.PackageSyncNetworkDTO
 import kotlin.uuid.Uuid
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.runBlocking
 import org.junit.After
 import org.junit.Assert.assertEquals
@@ -100,6 +101,24 @@ class ContractProbe {
     private fun failure(result: ApiResult<*>): ApiFailure =
         (result as? ApiResult.Failure)?.failure ?: throw AssertionError("ожидался отказ: $result")
 
+    /**
+     * Отказ **по существу**: пока сервер считает попытки входа и отвечает 429, о пароле он не
+     * сказал ничего, и утверждать «не принят» не о чем. В полном прогоне к этим пробам мы
+     * приходим после десятка входов, и счётчик срабатывает — тогда проба ждёт и спрашивает
+     * снова, вместо того чтобы объявить провалом работу сервера, которую он ещё не сделал.
+     */
+    private suspend fun judged(call: suspend () -> ApiResult<*>): ApiFailure {
+        var waited = 0L
+        while (true) {
+            val failure = failure(call())
+            if (failure !is ApiFailure.TooManyRequests) return failure
+            val pause = failure.retryAfter?.inWholeMilliseconds ?: 5_000L
+            assertTrue("сервер считает попытки входа дольше минуты: $failure", waited + pause <= 60_000L)
+            delay(pause)
+            waited += pause
+        }
+    }
+
     private suspend fun newKit(): Uuid {
         val id = Uuid.random()
         success(owner.createMedKit(MedKitPostNetworkDTO(id)))
@@ -141,13 +160,13 @@ class ContractProbe {
         // Токен сборки проверяется первым: придуманные данные до учётки не доходят.
         val invented = AccountCredentials.random()
         assertEquals(ApiFailure.RegistrationRefused, failure(anonymous.register(invented, "not-the-build-token")))
-        assertEquals(ApiFailure.Unauthorized, failure(anonymous.token(invented)))
+        assertEquals(ApiFailure.Unauthorized, judged { anonymous.token(invented) })
     }
 
     @Test
     fun wrongPasswordIsNotAccepted() = runBlocking {
         val wrong = AccountCredentials(ownerAccount.login, "not-the-password")
-        assertEquals(ApiFailure.Unauthorized, failure(anonymous.token(wrong)))
+        assertEquals(ApiFailure.Unauthorized, judged { anonymous.token(wrong) })
     }
 
     @Test

@@ -45,10 +45,12 @@ import java.math.BigDecimal
 import javax.inject.Inject
 import kotlin.uuid.Uuid
 import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.withTimeout
 import org.junit.After
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertTrue
 import org.junit.Assume.assumeTrue
 import org.junit.Before
 import org.junit.Rule
@@ -115,8 +117,22 @@ class UnsteadyConnectionStoryTest {
             )
             // Полка уже общая и сосед в ней — завязка, а не предмет истории: её путь проверяет история Марины.
             assertEquals(MedKitPublishing.Outcome.PUBLISHING, publishing.publish(shelf.id))
-            synchronization.synchronize()
-            assertEquals(MedKit.Publication.PUBLISHED, requireNotNull(database.medKits().find(shelf.id)).toDomain().publication)
+            // Заход повторяется, пока полка не вышла. Одного прохода хватает не всегда: боевой
+            // сервер считает обращения с адреса, и в полном прогоне очередь получает 429 —
+            // она честно откладывает повтор, а завязка объявляла бы это провалом истории.
+            var waited = 0L
+            while (published() != MedKit.Publication.PUBLISHED) {
+                if (waited >= 60_000L) {
+                    // Сервер ограничивает частоту — история не провалена, она не состоялась.
+                    assumeTrue("боевой сервер ограничивает частоту обращений", !ProbeAccounts.throttled())
+                    throw AssertionError("полка не вышла за минуту: ${published()}")
+                }
+                synchronization.synchronize()
+                if (published() != MedKit.Publication.PUBLISHED) {
+                    delay(5_000L)
+                    waited += 5_000L
+                }
+            }
             val key = (invitation.invite(shelf.id) as MedKitInvitation.Outcome.Invited).invitation.key.value
             success(requireNotNull(ProbeAccounts.boris).joinMedKit(MembershipPostNetworkDTO(key)))
         }
@@ -125,6 +141,10 @@ class UnsteadyConnectionStoryTest {
         // Как в `MedApp.onCreate` — на главном потоке: наблюдатель жизни процесса иначе не ставится.
         InstrumentationRegistry.getInstrumentation().runOnMainSync { triggers.start() }
     }
+
+    /** Вышла ли полка на сервер — по тому, что записано в базе. */
+    private suspend fun published(): MedKit.Publication =
+        requireNotNull(database.medKits().find(shelf.id)).toDomain().publication
 
     @After
     fun tearDown() = runBlocking {
