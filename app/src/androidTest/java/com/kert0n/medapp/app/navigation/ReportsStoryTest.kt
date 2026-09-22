@@ -191,7 +191,7 @@ class ReportsStoryTest {
      * выпитыми: запись эпизода вечна, и отчёт читает её, а не план.
      */
     private fun spentShowsTheFinishedTreatmentAndTheOneOffIntakes() {
-        compose.onNodeWithText("Истрачено").performClick()
+        compose.onNodeWithText("Принято").performClick()
         see("По лечениям")
         see("Спина, две недели")
         see("3 приёма")
@@ -204,7 +204,7 @@ class ReportsStoryTest {
         compose.onNode(hasClickAction() and hasText("Спина, две недели", substring = true)).performClick()
         see("Завершён")
         back()
-        see("Истрачено")
+        see("Принято")
     }
 
     /** У законченного лечения будущего нет: в расходе стоит только идущий сироп. */

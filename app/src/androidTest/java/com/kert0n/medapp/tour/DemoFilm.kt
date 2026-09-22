@@ -368,7 +368,7 @@ class DemoFilm : ScreenTour() {
         beat(2.5)
         press("Расход")
         beat(2.5)
-        press("Истрачено")
+        press("Принято")
         beat(2.5)
 
         goTo("Сканер")

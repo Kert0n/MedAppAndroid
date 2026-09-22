@@ -134,6 +134,25 @@ class ReportsScreenTest {
         }
     }
 
+    /**
+     * **Вкладки стоят осью времени слева направо**: «Принято» — что уже принято за период,
+     * «Сводка» — что лежит сейчас, «Расход» — сколько уйдёт до выбранной даты. Прежний порядок
+     * вёл настоящее → будущее → прошлое, и взгляд, уйдя вперёд, возвращался назад (решение
+     * владельца). Проверяется положением на экране, а не местом в перечислении: человек читает
+     * строку, а не код.
+     */
+    @Test
+    fun theTabsStandAsAnAxisOfTime() {
+        show(ReportsUiState())
+
+        val order = listOf("Принято", "Сводка", "Расход")
+        assertEquals(order, order.sortedBy { left(it) })
+    }
+
+    /** Где вкладка начинается: порядок читается по положению. */
+    private fun left(text: String): Float =
+        compose.onNodeWithText(text).fetchSemanticsNode().positionInRoot.x
+
     /** Пока чтение не пришло, экран ждёт — и говорит об этом экранному чтецу. */
     @Test
     fun anUnreadReportWaits() {
@@ -159,7 +178,7 @@ class ReportsScreenTest {
         compose.onNodeWithText("Упаковок пока нет").assertIsDisplayed()
         compose.onNodeWithText("Расход").performClick()
         compose.onNodeWithText("Идущих лечений на этот срок нет").assertIsDisplayed()
-        compose.onNodeWithText("Истрачено").performClick()
+        compose.onNodeWithText("Принято").performClick()
         compose.onNodeWithText("За этот период приёмов не было").assertIsDisplayed()
     }
 
@@ -218,7 +237,7 @@ class ReportsScreenTest {
     fun largeFontKeepsEveryChoiceReadable() {
         show(ReportsUiState(spent = ScreenState.Ready(spent)), mode = ReportsMode.SPENT, scale = 1.3f)
 
-        compose.onNodeWithText("Истрачено").assertIsDisplayed()
+        compose.onNodeWithText("Принято").assertIsDisplayed()
         compose.onNodeWithText("3 месяца").assertIsDisplayed()
         compose.onNodeWithText("Свой период").assertIsDisplayed()
     }
@@ -237,7 +256,7 @@ class ReportsScreenTest {
         val restoration = StateRestorationTester(compose)
         restoration.setContent { Screen(ReportsUiState(spent = ScreenState.Ready(spent)), ReportsMode.SUMMARY) }
 
-        compose.onNodeWithText("Истрачено").performClick()
+        compose.onNodeWithText("Принято").performClick()
         compose.onNodeWithText("С 10.02.2027 по 10.03.2027").assertIsDisplayed()
 
         restoration.emulateSavedInstanceStateRestore()
