@@ -283,7 +283,7 @@ class DemoFilm : ScreenTour() {
         press("Просроченные")
         beat(0.8)
 
-        // Сцена 2. Упаковка
+        // Сцена 2. Лекарство
         press("Нурофен")
         show("Сколько есть")
         beat(3.5)
@@ -300,8 +300,8 @@ class DemoFilm : ScreenTour() {
         beat(2.5)
 
         // Смена приоритета: подключаем вторую пачку и ставим её первой - у неё срок ближе.
-        press("Подключить ещё коробку")
-        show("Подключить пачку")
+        press("Подключить ещё препарат")
+        show("Подключить препарат")
         beat(2.5)
         // Список длинный, и пачка добавлена последней: человек нашёл бы её так же - поиском.
         fill("Поиск по названию", "Экспресс")
@@ -320,7 +320,7 @@ class DemoFilm : ScreenTour() {
         show("Нурофен от спины")
         beat(3.0)
         pressPart("14:00")
-        show("Из какой коробки")
+        show("Откуда принять")
         beat(2.5)
         pressIfShown("Принял")
         beat(2.0)
@@ -377,7 +377,7 @@ class DemoFilm : ScreenTour() {
         // обычный путь приложения: форма уже знает то, что сказал реестр.
         val code = codeFromPhoto()
         compose.runOnUiThread { stacks.go(Screen.PackageForm(scannedCode = code)) }
-        show("Новая упаковка")
+        show("Новое лекарство")
         beat(4.0)
     }
 

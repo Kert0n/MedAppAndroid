@@ -129,8 +129,8 @@ class NotificationRoutingTest {
 
         open(NotificationTarget.Intake(intakeId))
 
-        compose.waitUntil(WAIT) { compose.onAllNodesWithText("Из какой коробки").fetchSemanticsNodes().isNotEmpty() }
-        compose.onNodeWithText("Из какой коробки").assertIsDisplayed()
+        compose.waitUntil(WAIT) { compose.onAllNodesWithText("Откуда принять").fetchSemanticsNodes().isNotEmpty() }
+        compose.onNodeWithText("Откуда принять").assertIsDisplayed()
     }
 
     /** Коробка ведёт на свою карточку: человек нажал на новость о ней и попал к ней. */

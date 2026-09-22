@@ -185,7 +185,7 @@ class CourseCardScreenTest {
 
         compose.onNodeWithText("Отменить лечение?").assertIsDisplayed()
         compose.onNodeWithText(
-            "Будущие приёмы уйдут, пачки освободятся. Принятое и пропущенное останется в истории."
+            "Будущие приёмы уйдут, препараты освободятся. Принятое и пропущенное останется в истории."
         ).assertIsDisplayed()
     }
 
@@ -291,7 +291,7 @@ class CourseCardScreenTest {
 
         compose.onNodeWithText("Не хватает 19 приёмов", substring = true).performClick()
         compose.onNodeWithText("Что можно сделать").assertIsDisplayed()
-        compose.onNodeWithText("Подключить ещё коробку").performClick()
+        compose.onNodeWithText("Подключить ещё препарат").performClick()
 
         assertEquals(1, attached)
     }

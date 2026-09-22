@@ -144,8 +144,8 @@ class QueueTroublesStoryTest {
         openSyncStatus()
 
         compose.onNodeWithText("На сервере осталось меньше, чем вы списали").assertIsDisplayed()
-        compose.onNodeWithText("Коробку изменили раньше вас").assertIsDisplayed()
-        compose.onAllNodesWithText("Пересчитать коробку").assertCountEquals(2)
+        compose.onNodeWithText("Лекарство изменили раньше вас").assertIsDisplayed()
+        compose.onAllNodesWithText("Пересчитать остаток").assertCountEquals(2)
     }
 
     /**
@@ -158,7 +158,7 @@ class QueueTroublesStoryTest {
 
         openSyncStatus()
 
-        compose.onNodeWithText("У коробки сменилась единица измерения").assertIsDisplayed()
+        compose.onNodeWithText("У лекарства сменилась единица измерения").assertIsDisplayed()
     }
 
     /**

@@ -72,7 +72,7 @@ class SetupScreenTest {
     fun aLostKeyListsWhatStaysAndWhatGoes() {
         show(AppStartState.KeyLost)
 
-        compose.onNodeWithText("Местные аптечки и коробки").assertIsDisplayed()
+        compose.onNodeWithText("Местные аптечки и лекарства").assertIsDisplayed()
         compose.onNodeWithText("Общие аптечки — подключить заново по приглашению").assertIsDisplayed()
         compose.onNodeWithText("Начать с новой учётной записью").performScrollTo().assertIsDisplayed()
     }

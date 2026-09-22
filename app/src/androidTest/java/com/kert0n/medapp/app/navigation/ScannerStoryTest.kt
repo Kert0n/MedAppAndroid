@@ -103,7 +103,7 @@ class ScannerStoryTest {
     private fun heAimsAtTheCodeOnTheBox() {
         compose.runOnUiThread { stacks.go(Screen.PackageForm(scannedCode = code)) }
         compose.waitUntil(WAIT) {
-            compose.onAllNodesWithText("Новая упаковка").fetchSemanticsNodes().isNotEmpty()
+            compose.onAllNodesWithText("Новое лекарство").fetchSemanticsNodes().isNotEmpty()
         }
     }
 

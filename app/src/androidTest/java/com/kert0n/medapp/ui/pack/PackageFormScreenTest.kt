@@ -182,7 +182,7 @@ class PackageFormScreenTest {
     fun theSaveButtonStaysAliveAndTheRefusalIsInWords() {
         show(adding(error = PackageFormError.NameEmpty))
 
-        compose.onNodeWithText("Название нужно: без него упаковку не найти ни поиском, ни глазами.")
+        compose.onNodeWithText("Название нужно: без него лекарство не найти ни поиском, ни глазами.")
             .assertIsDisplayed()
         compose.onNodeWithText("Сохранить").performClick()
 

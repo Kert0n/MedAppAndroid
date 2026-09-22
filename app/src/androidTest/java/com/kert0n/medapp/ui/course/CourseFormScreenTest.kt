@@ -213,7 +213,7 @@ class CourseFormScreenTest {
         show(editing(mode = CourseFormUiState.Mode.DRAFT, asksToDiscard = true))
 
         compose.onNodeWithText("Удалить черновик?").assertIsDisplayed()
-        compose.onNodeWithText("Записанное назначение и заметка пропадут. Пачки он не занимал.").assertIsDisplayed()
+        compose.onNodeWithText("Записанное назначение и заметка пропадут. Препаратов он не занимал.").assertIsDisplayed()
         compose.onNodeWithText("Удалить черновик").performClick()
 
         assertEquals(1, confirmed)

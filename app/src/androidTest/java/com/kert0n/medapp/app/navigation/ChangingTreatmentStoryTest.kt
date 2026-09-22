@@ -211,7 +211,7 @@ class ChangingTreatmentStoryTest {
         }
 
         compose.onAllNodesWithContentDescription("Отвязать")[0].performClick()
-        compose.onNodeWithText("Отвязать пачку?").assertIsDisplayed()
+        compose.onNodeWithText("Отвязать препарат?").assertIsDisplayed()
         compose.onNode(hasText("Отвязать") and hasAnyAncestor(isDialog())).performClick()
         // Подвал уходит на время ввода: человек убирает клавиатуру, чтобы нажать.
         closeSoftKeyboard()

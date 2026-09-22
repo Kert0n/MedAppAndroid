@@ -167,7 +167,7 @@ class SharedBoxStoryTest {
     private fun theNoticeLeadsToTheSourcesAndTheReserveSilencesIt() {
         val shortage = requireNotNull(shortageFor(back))
         runBlocking { world.tap(shortage) }
-        compose.waitUntil(WAIT) { shown("Подключить ещё коробку") && shown("Ибупрофен папин") }
+        compose.waitUntil(WAIT) { shown("Подключить ещё препарат") && shown("Ибупрофен папин") }
 
         runBlocking {
             val plan = requireNotNull(database.courseRepository().findPlan(back))

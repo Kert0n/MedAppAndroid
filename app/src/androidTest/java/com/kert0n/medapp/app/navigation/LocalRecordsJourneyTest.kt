@@ -126,7 +126,7 @@ class LocalRecordsJourneyTest {
         closeSoftKeyboard()
         compose.onNodeWithText("Записать").performClick()
 
-        compose.waitUntil(WAIT) { compose.onAllNodesWithText("Ноль — это выбросить упаковку: сделайте это с её карточки.").fetchSemanticsNodes().isNotEmpty() }
+        compose.waitUntil(WAIT) { compose.onAllNodesWithText("Ноль — это выбросить лекарство: сделайте это с его карточки.").fetchSemanticsNodes().isNotEmpty() }
         // Экран остался пересчётом: ни ухода, ни вопроса — отказ и та же форма.
         compose.onNodeWithText("Записать").assertIsDisplayed()
         back()
@@ -150,7 +150,7 @@ class LocalRecordsJourneyTest {
         compose.waitUntil(WAIT) { compose.onAllNodesWithText("Сколько есть").fetchSemanticsNodes().isNotEmpty() }
 
         compose.onNodeWithContentDescription("Править сведения").performClick()
-        compose.waitUntil(WAIT) { compose.onAllNodesWithText("Правка упаковки").fetchSemanticsNodes().isNotEmpty() }
+        compose.waitUntil(WAIT) { compose.onAllNodesWithText("Правка лекарства").fetchSemanticsNodes().isNotEmpty() }
         back()
         compose.waitUntil(WAIT) { compose.onAllNodesWithText("Сколько есть").fetchSemanticsNodes().isNotEmpty() }
 
@@ -176,7 +176,7 @@ class LocalRecordsJourneyTest {
         compose.onNodeWithText("Сохранить").performClick()
         compose.waitUntil(WAIT) { compose.onAllNodesWithText("Пока пусто").fetchSemanticsNodes().isNotEmpty() }
         compose.onNodeWithText("Домашняя").performClick()
-        compose.onNodeWithText("Завести упаковку").performClick()
+        compose.onNodeWithText("Завести лекарство").performClick()
 
         compose.onNodeWithText("Название").performTextInput("Нуро")
         compose.waitUntil(3_000) { compose.onAllNodesWithText("Нурофен").fetchSemanticsNodes().isNotEmpty() }
@@ -202,7 +202,7 @@ class LocalRecordsJourneyTest {
         compose.waitUntil(WAIT) { compose.onAllNodesWithText("Пока пусто").fetchSemanticsNodes().isNotEmpty() }
 
         compose.onNodeWithText("Домашняя").performClick()
-        compose.onNodeWithText("Завести упаковку").performClick()
+        compose.onNodeWithText("Завести лекарство").performClick()
         compose.onNodeWithText("Название").performTextInput("Нурофен")
         compose.onNodeWithText("Количество").performTextInput("20")
         compose.onNodeWithText("Единица").performScrollTo().performClick()

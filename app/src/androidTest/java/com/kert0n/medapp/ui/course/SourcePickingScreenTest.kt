@@ -81,7 +81,7 @@ class SourcePickingScreenTest {
         show(SourcePickingUiState(packages = listOf(candidate(Attachability.HeldByCourse("Ибупрофен")))))
 
         compose.onNodeWithText("Нурофен").assertIsDisplayed()
-        compose.onNodeWithText("Занята лечением «Ибупрофен».").assertIsDisplayed()
+        compose.onNodeWithText("Занят лечением «Ибупрофен».").assertIsDisplayed()
     }
 
     /** Нажатие по неподходящей ничего не подключает: причина названа, и решение за человеком. */
@@ -92,7 +92,7 @@ class SourcePickingScreenTest {
         compose.onNodeWithText("Нурофен").performClick()
 
         assertNull(attached)
-        compose.onNodeWithText("Укажите форму выпуска у этой пачки, чтобы подключить её к курсу.")
+        compose.onNodeWithText("Укажите форму выпуска у этого препарата, чтобы подключить его к курсу.")
             .assertIsDisplayed()
     }
 
@@ -119,7 +119,7 @@ class SourcePickingScreenTest {
     fun nothingToAttachIsExplained() {
         show(SourcePickingUiState())
 
-        compose.onNodeWithText("Подходящих пачек нет: заведите коробку на полке или укажите ей форму.")
+        compose.onNodeWithText("Подходящих препаратов нет: заведите лекарство на полке или укажите ему форму.")
             .assertIsDisplayed()
     }
 
@@ -132,7 +132,7 @@ class SourcePickingScreenTest {
     fun anExpiredBoxSaysSoAndStillAttaches() {
         show(SourcePickingUiState(packages = listOf(candidate().copy(expiredOn = java.time.LocalDate.of(2027, 3, 1)))))
 
-        compose.onNodeWithText("Просрочена: годна до 01.03.2027").assertIsDisplayed()
+        compose.onNodeWithText("Просрочен: годен до 01.03.2027").assertIsDisplayed()
         compose.onNodeWithText("Нурофен").performClick()
 
         assertEquals(PACK, attached)
@@ -149,7 +149,7 @@ class SourcePickingScreenTest {
             )
         )
 
-        compose.onNodeWithText("Коробка просрочена").assertIsDisplayed()
+        compose.onNodeWithText("Препарат просрочен").assertIsDisplayed()
         compose.onNodeWithText("Понятно").performClick()
 
         assertEquals(1, expiredSeen)

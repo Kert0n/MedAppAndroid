@@ -78,7 +78,7 @@ class PermissionsScreenTest {
     fun anAbsentCameraIsExplainedAndNotClickable() {
         show(PermissionsPresentationDTO(PermissionState.GRANTED, PermissionState.NOT_NEEDED, PermissionState.ABSENT))
 
-        compose.onNodeWithText("Нет на этом устройстве — коробки заводятся на полке").assertIsDisplayed()
+        compose.onNodeWithText("Нет на этом устройстве — лекарства заводятся на полке").assertIsDisplayed()
         compose.onNodeWithText("Не требуется на этой версии Android").assertIsDisplayed()
         compose.onNode(hasAnyDescendant(hasText("Камера")) and hasClickAction(), useUnmergedTree = true).assertDoesNotExist()
     }

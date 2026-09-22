@@ -64,7 +64,7 @@ class PackageRecountScreenTest {
     @Test
     fun aGoneBoxIsSaidOutLoud() {
         show(PackageRecountUiState(isGone = true))
-        compose.onNodeWithText("Этой упаковки больше нет.").assertIsDisplayed()
+        compose.onNodeWithText("Этого лекарства больше нет.").assertIsDisplayed()
         compose.onNodeWithText("Записать").assertDoesNotExist()
     }
 
@@ -105,7 +105,7 @@ class PackageRecountScreenTest {
     fun zeroIsRefusedInWords() {
         show(recount(amount = "0", error = PackageRecountError.Zero))
 
-        compose.onNodeWithText("Ноль — это выбросить упаковку: сделайте это с её карточки.").assertIsDisplayed()
+        compose.onNodeWithText("Ноль — это выбросить лекарство: сделайте это с его карточки.").assertIsDisplayed()
         compose.onNodeWithText("Записать").assertIsDisplayed()
     }
 }

@@ -117,7 +117,7 @@ class CourseSourcesScreenTest {
     fun aBoxOfAShelfWeLeftSaysSoInTheRow() {
         show(CourseSourcesUiState(sources = listOf(source(status = PackageStatus.LOST))))
 
-        compose.onNodeWithText("Коробка не у нас").assertIsDisplayed()
+        compose.onNodeWithText("Лекарство не у нас").assertIsDisplayed()
     }
 
     /** Строка говорит всё сразу: что за коробка, где лежит, сколько свободно и сколько выделено. */
@@ -145,7 +145,7 @@ class CourseSourcesScreenTest {
             )
         )
 
-        compose.onNodeWithText("Одной дозы (21 таблетка) здесь не наберётся: доза берётся из одной коробки.")
+        compose.onNodeWithText("Одной дозы (21 таблетка) здесь не наберётся: доза берётся из одного препарата.")
             .assertIsDisplayed()
     }
 
@@ -168,7 +168,7 @@ class CourseSourcesScreenTest {
     fun aFaultedSourceSaysWhatHappened() {
         show(CourseSourcesUiState(sources = listOf(source(fault = CourseSource.Fault.UNIT_MISMATCH))))
 
-        compose.onNodeWithText("Другая единица — снимите пачку или поправьте её сведения.").assertIsDisplayed()
+        compose.onNodeWithText("Другая единица — снимите препарат или поправьте его сведения.").assertIsDisplayed()
     }
 
     /** «Отвязать» у идущего лечения только спрашивает: сценарий зовётся после ответа человека. */
@@ -187,8 +187,8 @@ class CourseSourcesScreenTest {
     fun theQuestionIsAnsweredByTheSameWord() {
         show(CourseSourcesUiState(sources = listOf(source()), asksToDetach = PACK))
 
-        compose.onNodeWithText("Отвязать пачку?").assertIsDisplayed()
-        compose.onNodeWithText("Лечение останется, но эта коробка перестанет его обеспечивать, а её бронь снимется.")
+        compose.onNodeWithText("Отвязать препарат?").assertIsDisplayed()
+        compose.onNodeWithText("Лечение останется, но этот препарат перестанет его обеспечивать, а его бронь снимется.")
             .assertIsDisplayed()
     }
 
@@ -249,8 +249,8 @@ class CourseSourcesScreenTest {
     fun anEmptyStackInvitesToAttachTheFirstBox() {
         show(CourseSourcesUiState())
 
-        compose.onNodeWithText("Пачек пока нет — подключите первую.").assertIsDisplayed()
-        compose.onNodeWithText("Подключить ещё коробку").performClick()
+        compose.onNodeWithText("Препаратов пока нет — подключите первый.").assertIsDisplayed()
+        compose.onNodeWithText("Подключить ещё препарат").performClick()
         assertEquals(1, added)
     }
 
@@ -260,7 +260,7 @@ class CourseSourcesScreenTest {
         show(CourseSourcesUiState(sources = listOf(source()), isFinished = true))
 
         compose.onNodeWithContentDescription("Отвязать").assertDoesNotExist()
-        compose.onNodeWithText("Подключить ещё коробку").assertDoesNotExist()
+        compose.onNodeWithText("Подключить ещё препарат").assertDoesNotExist()
     }
 
     /**
