@@ -132,7 +132,10 @@ fun CourseSourcesScreen(
             when {
                 state.isLoading -> LoadingState()
                 state.isGone -> ErrorMessage(text = stringResource(R.string.course_missing))
-                state.sources.isEmpty() -> EmptyState(
+                // Пустой состав **с незаписанной правкой** — не «пока ничего нет»: человек
+                // только что всё снял, и ему нужна «Сохранить», которая живёт в списке. Иначе
+                // экран предлагает действие, которое нельзя довести.
+                state.sources.isEmpty() && !state.hasUnsavedChanges -> EmptyState(
                     text = stringResource(R.string.course_sources_empty),
                     actionText = stringResource(R.string.course_sources_add).takeUnless { state.isFinished },
                     onAction = onAdd.takeUnless { state.isFinished }
@@ -141,8 +144,8 @@ fun CourseSourcesScreen(
             }
         }
     }
-    state.asksToDetach?.let {
-        DetachDialog(onConfirm = onConfirmDetach, onDismiss = onDismissDetach)
+    state.asksToDetach?.let { asked ->
+        DetachDialog(isLast = asked.isLast, onConfirm = onConfirmDetach, onDismiss = onDismissDetach)
     }
 }
 
@@ -599,11 +602,17 @@ internal fun CourseSourcesMessage.words(): String = when (this) {
 
 
 @Composable
-private fun DetachDialog(onConfirm: () -> Unit, onDismiss: () -> Unit) {
+private fun DetachDialog(isLast: Boolean, onConfirm: () -> Unit, onDismiss: () -> Unit) {
     AlertDialog(
         onDismissRequest = onDismiss,
-        title = { Text(stringResource(R.string.course_source_detach_title)) },
-        text = { Text(stringResource(R.string.course_source_detach_explained)) },
+        // У последней коробки цена ответа другая — лечению станет нечем обеспечиваться, — и
+        // записывается он сразу, без «Сохранить». Об этом и спрашивают своими словами.
+        title = {
+            Text(stringResource(if (isLast) R.string.course_source_detach_last_title else R.string.course_source_detach_title))
+        },
+        text = {
+            Text(stringResource(if (isLast) R.string.course_source_detach_last_explained else R.string.course_source_detach_explained))
+        },
         confirmButton = {
             TextButton(onClick = onConfirm) { Text(stringResource(R.string.course_source_detach)) }
         },

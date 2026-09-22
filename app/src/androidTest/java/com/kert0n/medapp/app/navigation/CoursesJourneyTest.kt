@@ -30,11 +30,13 @@ import com.kert0n.medapp.fixture.pack
 import com.kert0n.medapp.fixture.courseRepository
 import com.kert0n.medapp.fixture.packageRepository
 import com.kert0n.medapp.fixture.tablets
+import com.kert0n.medapp.fixture.treatmentStarted
 import androidx.compose.ui.geometry.Offset
 import com.kert0n.medapp.storage.database.MedAppDatabase
 import java.time.ZoneId
 import java.time.Instant
 import java.time.LocalDate
+import java.time.LocalTime
 import kotlin.uuid.Uuid
 import com.kert0n.medapp.storage.medkit.toStorageEntity as toMedKitStorageEntity
 import com.kert0n.medapp.storage.value.toStorageEntity
@@ -299,4 +301,35 @@ class CoursesJourneyTest {
     /** Где строка начинается: порядок читается по положению, а не по номеру в дереве. */
     private fun rowTop(name: String): Float =
         compose.onNodeWithText(name).fetchSemanticsNode().positionInRoot.y
+
+    /**
+     * **Последний препарат можно отвязать.** Коробка кончилась или ушла с полки — лечение
+     * остаётся, но взять дозу неоткуда, и это законное состояние: назначено, а купить не успели.
+     * Раньше это было невозможно вовсе: список пустел, вместе с ним уходила «Сохранить», и
+     * записать снятие становилось нечем (найдено владельцем).
+     */
+    @Test
+    fun theLastSourceOfACourseCanBeLetGo() {
+        val course: Uuid
+        runBlocking {
+            database.packageRepository().add(
+                pack(id = PACK, name = "Нурофен", quantity = tablets("20"), form = TABLET_FORM)
+            )
+            course = database.treatmentStarted(
+                Instant.now(), "Спина", PACK, LocalDate.now(zone), listOf(LocalTime.of(9, 0))
+            )
+        }
+
+        compose.waitUntil(WAIT) { compose.onAllNodesWithText("Спина").fetchSemanticsNodes().isNotEmpty() }
+        compose.onNodeWithText("Спина").performClick()
+        compose.onNodeWithText("Источники лечения").performScrollTo().performClick()
+        compose.waitUntil(WAIT) { compose.onAllNodesWithText("Нурофен").fetchSemanticsNodes().isNotEmpty() }
+
+        compose.onNodeWithContentDescription("Отвязать").performClick()
+        compose.onNodeWithText("Отвязать").performClick()
+
+        compose.waitUntil(WAIT) {
+            runBlocking { database.courseRepository().findPlan(course) }?.sources?.isEmpty() == true
+        }
+    }
 }
