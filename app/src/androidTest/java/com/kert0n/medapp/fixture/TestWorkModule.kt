@@ -6,7 +6,6 @@ import androidx.work.WorkManager
 import androidx.work.testing.WorkManagerTestInitHelper
 import androidx.test.platform.app.InstrumentationRegistry
 import com.kert0n.medapp.di.WorkModule
-import com.kert0n.medapp.platform.background.WorkManagerSyncSchedule
 import com.kert0n.medapp.queue.SyncSchedule
 import dagger.Module
 import dagger.Provides
@@ -47,7 +46,14 @@ object TestWorkModule {
         return WorkManager.getInstance(target)
     }
 
+    /**
+     * Заход без человека в проверках **не ставится**. Испытательный `WorkManager` выполняет
+     * поставленное сразу и на том же потоке, и `Synchronization`, оставив что-то в очереди,
+     * запустила бы настоящий заход — под `-Pprobe` приложение живёт пробной учёткой, и заход
+     * ушёл бы в боевой сервер. Кому нужен настоящий планировщик, собирает
+     * `WorkManagerSyncSchedule` сам (`SyncBackgroundTest`) — там он и проверяется.
+     */
     @Provides
     @Singleton
-    fun syncSchedule(implementation: WorkManagerSyncSchedule): SyncSchedule = implementation
+    fun syncSchedule(): SyncSchedule = FakeSyncSchedule()
 }
