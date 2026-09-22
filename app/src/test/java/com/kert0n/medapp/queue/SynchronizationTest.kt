@@ -230,6 +230,52 @@ class SynchronizationTest {
         scope.cancel()
     }
 
+    /**
+     * Заход упал — ждущие получают **сбой**, а не отмену: сбой они умеют пережить, а отмена значила
+     * бы для них «остановили нас самих».
+     */
+    @Test
+    fun aFailedRoundIsAFailureForEveryoneWaiting() = kotlinx.coroutines.runBlocking {
+        val scope = kotlinx.coroutines.CoroutineScope(kotlinx.coroutines.SupervisorJob() + kotlinx.coroutines.Dispatchers.Default)
+        val gate = CompletableDeferred<Unit>()
+        val api = MedAppApi(medAppHttpClient(MockEngine { gate.await(); error("сервер ответил не по-человечески") }, "https://medapp.test"))
+        val storage = EmptyQueue(java.util.Collections.synchronizedList(ArrayList()))
+        val vocabulary = VocabularyResolver(Store(), api)
+        val resolver = PackageSnapshotResolver(vocabulary, storage)
+        val failing = Synchronization(
+            QueueWorker(storage, NoTransport, vocabulary, resolver, clock),
+            SnapshotApplier(api, Nothing(), vocabulary, resolver, clock),
+            Backlog(null), Schedule(), clock, scope
+        )
+
+        val first = async { kotlin.runCatching { failing.synchronize() }.exceptionOrNull() }
+        val second = async { kotlin.runCatching { failing.synchronize() }.exceptionOrNull() }
+        gate.complete(Unit)
+
+        for (outcome in listOf(first.await(), second.await())) {
+            assertEquals(false, outcome is kotlinx.coroutines.CancellationException)
+            assertEquals("сервер ответил не по-человечески", outcome?.message)
+        }
+        scope.cancel()
+    }
+
+    /**
+     * Кончилась область приложения — кончился и заход: это единственная отмена, которая его
+     * останавливает, и ждущие получают её как свою остановку.
+     */
+    @Test
+    fun theEndOfTheApplicationScopeStopsTheRound() = kotlinx.coroutines.runBlocking {
+        val calls = java.util.Collections.synchronizedList(ArrayList<String>())
+        val scope = kotlinx.coroutines.CoroutineScope(kotlinx.coroutines.SupervisorJob() + kotlinx.coroutines.Dispatchers.Default)
+        val synchronization = synchronization(calls, gate = CompletableDeferred(), scope = scope)
+
+        val waiting = async { kotlin.runCatching { synchronization.synchronize() }.exceptionOrNull() }
+        while ("снимок" !in calls) kotlinx.coroutines.delay(10)
+        scope.cancel()
+
+        assertEquals(true, waiting.await() is kotlinx.coroutines.CancellationException)
+    }
+
     /** Не прочитали — кэш прежний, и время последнего успешного чтения не сдвигается (PLAN E4). */
     @Test
     fun aRoundThatCouldNotReadKeepsTheLastRefreshTime() = runTest {

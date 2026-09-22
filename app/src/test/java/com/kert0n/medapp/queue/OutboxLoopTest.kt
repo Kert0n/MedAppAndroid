@@ -137,12 +137,29 @@ class OutboxLoopTest {
         }
         loop.start()
         runCurrent()
+        assertNotNull("чужая отмена записана сбоем прохода", loop.state.value.lastFailure)
 
         signals.emit(Unit)
         runCurrent()
 
         assertEquals("после чужой отмены цикл не слушает сигналы", 2, passes)
-        assertNotNull(loop.state.value.lastFailure)
+    }
+
+    /** Своя отмена — конец цикла: область цикла кончилась, и сигналы больше никто не обслуживает. */
+    @Test
+    fun ownCancellationStopsTheLoop() = runTest {
+        var passes = 0
+        val own = kotlinx.coroutines.CoroutineScope(backgroundScope.coroutineContext + kotlinx.coroutines.Job(backgroundScope.coroutineContext[kotlinx.coroutines.Job]))
+        val loop = OutboxLoop(ready(), Duration.ofMinutes(1), Clock.fixed(now, ZoneOffset.UTC), own) { passes++; null }
+        loop.start()
+        runCurrent()
+
+        own.coroutineContext[kotlinx.coroutines.Job]!!.cancel()
+        runCurrent()
+        loop.runNow()
+        runCurrent()
+
+        assertEquals(1, passes)
     }
 
     @Test
