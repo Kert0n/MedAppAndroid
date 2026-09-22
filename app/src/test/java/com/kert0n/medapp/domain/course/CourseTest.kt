@@ -128,6 +128,21 @@ class CourseTest {
         )
     }
 
+    /**
+     * Курс, записанный до правила о потолке, читается: предел — правило **действия** (назначить,
+     * начать, изменить), а не того, что уже лежит в базе. Лечение на 15 000 доз законно жило и
+     * считалось, и чтение его не должно падать.
+     *
+     * Красная проверка (разбор #66): предел стоял `require` в конструкторе `Prescription`, и чтение
+     * такого курса из хранения бросало на каждом экране и в каждой сверке.
+     */
+    @Test
+    fun aCourseRecordedBeforeTheLimitIsStillRead() {
+        val recorded = activeCourse(totalDoses = Prescription.MAX_TOTAL_DOSES + 5_000)
+
+        assertEquals((Prescription.MAX_TOTAL_DOSES + 5_000).doses, recorded.remainingDoses(CourseProgress.none))
+    }
+
     @Test
     fun settingTheDraftScheduleRaisesTheRevision() {
         // Расписание меняет состав будущих пунктов, поэтому редакция растёт — в отличие от
