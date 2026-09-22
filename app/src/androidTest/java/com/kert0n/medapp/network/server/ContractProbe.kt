@@ -112,7 +112,10 @@ class ContractProbe {
         while (true) {
             val failure = failure(call())
             if (failure !is ApiFailure.TooManyRequests) return failure
-            val pause = failure.retryAfter?.inWholeMilliseconds ?: 5_000L
+            // Не меньше секунды: `Retry-After: 0` — законный ответ, и без нижней границы проба
+            // крутилась бы вплотную, добивая тот самый счётчик, которого ждёт (и `waited` не рос
+            // бы вовсе — выйти из круга стало бы нечем).
+            val pause = (failure.retryAfter?.inWholeMilliseconds ?: 5_000L).coerceAtLeast(1_000L)
             assertTrue("сервер считает попытки входа дольше минуты: $failure", waited + pause <= 60_000L)
             delay(pause)
             waited += pause
@@ -155,6 +158,10 @@ class ContractProbe {
         }
     }
 
+    /**
+     * Токен сборки — единственное, чем сервер отличает наше приложение от чужого клиента. Прими
+     * он чужой, учётка завелась бы у любого, и выданный пропуск открыл бы чужие полки.
+     */
     @Test
     fun foreignRegistrationTokenIsRefusedWithoutAnAccount() = runBlocking {
         // Токен сборки проверяется первым: придуманные данные до учётки не доходят.
@@ -163,6 +170,10 @@ class ContractProbe {
         assertEquals(ApiFailure.Unauthorized, judged { anonymous.token(invented) })
     }
 
+    /**
+     * Пароль — всё, что стоит между чужим и аптечкой человека: имя учётки известно, а ключ нет.
+     * Выдай сервер пропуск по неверному паролю — и чужой читает и тратит чужие коробки.
+     */
     @Test
     fun wrongPasswordIsNotAccepted() = runBlocking {
         val wrong = AccountCredentials(ownerAccount.login, "not-the-password")

@@ -504,9 +504,14 @@ done
 ставится устройству:
 
 ```bash
-adb -s emulator-5554 shell am get-config | head -1   # BigLatest: ждём ru-rRU первым
-adb -s emulator-5556 shell am get-config | head -1   # Sm29:      ждём ru-rRU первым
-adb -s emulator-5558 shell am get-config | head -1   # BigScaled: ждём en-rUS — так и задумано
+# Не печатать, а проверять: `am get-config` на мёртвом устройстве отвечает пустотой, и
+# «посмотрел глазами» тогда ничего не значит.
+# `[-,]` в конце — не придирка: у устройства список языков, и первым он пишет `ru-rRU,en-rUS`.
+locale() { adb -s "$1" shell am get-config | head -1 | grep -qE -- "-$2[-,]" \
+  && echo "$1: $2" || { echo "$1: ждали $2, а там $(adb -s "$1" shell am get-config | head -1)"; return 1; }; }
+locale emulator-5554 ru-rRU || exit 1   # BigLatest
+locale emulator-5556 ru-rRU || exit 1   # Sm29
+locale emulator-5558 en-rUS || exit 1   # BigScaled — английский нарочно
 ```
 
 Прогоном дело не кончается: экраны, которые PR трогает, **проходятся руками на обоих** — крупный
