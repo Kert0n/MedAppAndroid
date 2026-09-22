@@ -130,6 +130,7 @@ class QueueWorker @Inject constructor(
             }
             is Take.Sending -> take.operation
         }
+        pass.sentIds += taken.id
         packageId?.let(pass.freshPackages::add)
         val request = checkNotNull(taken.prepared) { "взятая в отправку операция несёт запрос" }
         return when (val result = transport.send(request)) {
@@ -362,6 +363,12 @@ class QueueWorker @Inject constructor(
         /** Операции, чей ответ в этом проходе уже записан: сбой после него — ожидание, а не повтор. */
         val answeredIds = HashSet<Uuid>()
 
+        /**
+         * Операции, взятые этим проходом в отправку: запрос мог дойти до сервера, и сбой после взятия
+         * оставляет его исход неизвестным — как смерть процесса посреди отправки (PLAN E3).
+         */
+        val sentIds = HashSet<Uuid>()
+
         fun skip(id: Uuid, reason: String) {
             skipped += Report.Skipped(id, reason)
             skippedIds += id
@@ -409,9 +416,12 @@ class QueueWorker @Inject constructor(
                     if (step.answered) {
                         storage.defer(operation.id, reason, clock.instant(), notBefore = later(operation))
                     } else {
+                        // Взятая в отправку — исход неизвестен: запрос мог примениться, а записать ответ
+                        // не вышло. Иначе 412 на повторе переподготовил бы разницу поверх неё самой.
                         storage.settle(
                             operation.id,
-                            Delivery.Retry(reason, notBefore = later(operation)).settlement(operation.command),
+                            Delivery.Retry(reason, notBefore = later(operation), outcomeUnknown = operation.id in sentIds)
+                                .settlement(operation.command),
                             clock.instant()
                         )
                     }

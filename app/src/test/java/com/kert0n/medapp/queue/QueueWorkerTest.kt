@@ -728,11 +728,13 @@ class QueueWorkerTest {
         storage.answeredFails = true
         worker(storage, server).drain()
         storage.answeredFails = false
-        worker(storage, server, clock = Clock.fixed(now.plusSeconds(3600), ZoneOffset.UTC)).drain()
+        val later = now.plusSeconds(3600)
+        worker(storage, server, clock = Clock.fixed(later, ZoneOffset.UTC)).drain()
 
         assertEquals(2, server.sent.size)
         assertEquals(server.sent[0], server.sent[1])
-        assertEquals(Delivery.Applied(PackageState.Present(resolved(snapshot))), storage.settled.last().second)
+        val laid = resolved(snapshot).let { PackageSnapshot(it.pack, it.sync.copy(syncedAt = later)) }
+        assertEquals(Delivery.Applied(PackageState.Present(laid)), storage.settled.last().second)
     }
 
     @Test
