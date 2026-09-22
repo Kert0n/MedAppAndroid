@@ -272,7 +272,7 @@
     <string name="permissions_camera">Camera</string>
     <string name="permissions_granted">Allowed</string>
     <string name="permissions_denied">Off — fix in the phone\'s settings</string>
-    <string name="permissions_absent">Not on this device — medicines are added on a kit</string>
+    <string name="permissions_absent">Not on this device — medicines are added to a kit</string>
     <string name="permissions_not_needed">Not needed on this version of Android</string>
 
     <!-- Language (screen 27). Language names are in their own language and are not translated. -->
@@ -557,10 +557,10 @@
     <string name="intake_taken_amount">How much was taken</string>
     <string name="intake_record">Take</string>
     <string name="intake_not_enough">There isn\'t that much here.</string>
-    <string name="intake_package_unusable">This medicine no longer exists.</string>
-    <string name="intake_unit_mismatch">The medicine is counted in a different unit.</string>
+    <string name="intake_package_unusable">This one no longer exists.</string>
+    <string name="intake_unit_mismatch">A different unit is used here.</string>
     <string name="intake_episode_closed">The treatment is over: its plan no longer accepts answers.</string>
-    <string name="intake_not_a_source">This medicine is not among the treatment\'s sources — record the intake as one-off.</string>
+    <string name="intake_not_a_source">Not among the treatment\'s sources — record the intake as one-off.</string>
     <string name="course_sources_stale">The sources were edited from another screen — the list was reread, try again.</string>
     <string name="course_sources_empty">No drugs yet — attach the first one.</string>
     <string name="course_source_detach">Detach</string>
@@ -571,7 +571,7 @@
     <string name="course_source_move_down">Down</string>
     <string name="course_source_expired">Expired: good until %1$s</string>
     <string name="course_source_expired_title">The drug has expired</string>
-    <string name="course_source_expired_body">The treatment will take from “%1$s” — it was good until %2$s. It\'s your call; we only warn.</string>
+    <string name="course_source_expired_body">The treatment will take from “%1$s” — it is good until %2$s. It\'s your call; we only warn.</string>
     <string name="action_understood">Got it</string>
     <string name="course_source_free">%1$s %2$s free</string>
     <string name="course_source_expires">good until %1$s</string>
@@ -627,17 +627,17 @@
     <string name="course_attach_incomplete">Set the treatment\'s dose and form first.</string>
     <string name="course_picking_search">Search by name</string>
     <string name="course_picking_nothing_found">Nothing found. Try a different name.</string>
-    <string name="course_picking_empty">No suitable drugs: add a medicine on a shelf or set its form.</string>
+    <string name="course_picking_empty">No suitable drugs: add a medicine to a kit or set its form.</string>
     <string name="action_got_it">Got it</string>
 
     <!-- Scanner -->
     <string name="scanner_aim">Point at the code on the package</string>
     <string name="scanner_preview">Camera image</string>
-    <string name="scanner_camera_denied">To read codes from packages, the app needs the camera. Without it, add medicines on a kit.</string>
+    <string name="scanner_camera_denied">To read codes from packages, the app needs the camera. Without it, add medicines to a kit.</string>
     <string name="scanner_camera_allow">Allow the camera</string>
     <string name="scanner_camera_refused">The camera is not allowed. You can allow it in the app settings.</string>
     <string name="scanner_camera_settings">Open settings</string>
-    <string name="scanner_camera_absent">This device has no camera. Add medicines on a kit — just as without a code.</string>
+    <string name="scanner_camera_absent">This device has no camera. Add medicines to a kit — just as without a code.</string>
     <string name="scanner_unsupported">This code is not supported: medicine packages carry a DataMatrix code.</string>
     <string name="pack_scan_asking">Asking the Chestny Znak registry about the code…</string>
     <string name="pack_scan_not_found">The registry does not know this code — fill in the fields yourself.</string>

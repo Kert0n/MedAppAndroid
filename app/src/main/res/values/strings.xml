@@ -580,10 +580,10 @@
     <string name="intake_taken_amount">Сколько принял</string>
     <string name="intake_record">Принять</string>
     <string name="intake_not_enough">Столько здесь не наберётся.</string>
-    <string name="intake_package_unusable">Этого лекарства больше нет.</string>
-    <string name="intake_unit_mismatch">Лекарство считают в другой единице.</string>
+    <string name="intake_package_unusable">Этого больше нет.</string>
+    <string name="intake_unit_mismatch">Здесь другая единица.</string>
     <string name="intake_episode_closed">Лечение закончено: его план ответов больше не принимает.</string>
-    <string name="intake_not_a_source">Это лекарство не из источников лечения — запишите приём разовым.</string>
+    <string name="intake_not_a_source">Это не из источников лечения — запишите приём разовым.</string>
     <string name="course_sources_stale">Источники правили с другого экрана — список перечитан, повторите.</string>
     <string name="course_sources_empty">Препаратов пока нет — подключите первый.</string>
     <string name="course_source_detach">Отвязать</string>
@@ -594,7 +594,7 @@
     <string name="course_source_move_down">Ниже</string>
     <string name="course_source_expired">Просрочен: годен до %1$s</string>
     <string name="course_source_expired_title">Препарат просрочен</string>
-    <string name="course_source_expired_body">Лечение будет брать «%1$s» — срок до %2$s. Решать вам; мы лишь предупреждаем.</string>
+    <string name="course_source_expired_body">Лечение будет брать из препарата «%1$s» — он годен до %2$s. Решать вам; мы лишь предупреждаем.</string>
     <string name="action_understood">Понятно</string>
     <string name="course_source_free">свободно %1$s %2$s</string>
     <string name="course_source_expires">годен до %1$s</string>
