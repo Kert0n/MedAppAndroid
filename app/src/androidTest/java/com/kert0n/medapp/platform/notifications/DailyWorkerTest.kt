@@ -107,6 +107,38 @@ class DailyWorkerTest {
         )
     }
 
+    /**
+     * Ежедневная работа — единственное, что держит процесс, когда его подняла система: после
+     * загрузки, перевода часов, по расписанию. Кончилась она — процесс вправе умереть, и будильник
+     * к ближайшему приёму к этому мигу обязан стоять.
+     *
+     * Красная проверка: работа сверяла обещания и кончалась, а ставить будильник оставляла циклу
+     * владельца доставки в области приложения; в процессе, который система убила сразу после
+     * работы, утреннее напоминание не приходило.
+     */
+    @Test
+    fun theWorkLeavesTheDayArmed(): Unit = runBlocking {
+        database.packageRepository().add(pack(id = PACK, quantity = tablets("20"), form = TABLET_FORM))
+        val yesterday = Scenarios(database, Instant.parse("2027-03-10T05:00:00Z"))
+        val created = yesterday.courseDrafting.create("Ибупрофен")
+        val draft = (yesterday.courseDrafting.edit(
+            created.id, created.revision,
+            listOf(
+                CourseDrafting.Edit.SetDose(dose("2")), CourseDrafting.Edit.SetForm(TABLET_FORM),
+                CourseDrafting.Edit.SetSchedule(schedule(start = LocalDate.of(2027, 3, 10))),
+                CourseDrafting.Edit.SetTotalDoses(Doses(5)), CourseDrafting.Edit.Attach(PACK, Doses(5))
+            )
+        ) as CourseDrafting.Outcome.Saved).draft
+        yesterday.courseActivation.activate(draft.id, draft.revision)
+        val today = Scenarios(database, now)
+
+        assertEquals(ListenableWorker.Result.success(), worker(today).doWork())
+
+        val next = database.intakeRepository().ofCourse(draft.id).filterIsInstance<CourseIntake>()
+            .filter { it.status == IntakeStatus.PLANNED }.minOf { it.plannedAt }
+        assertEquals("работа кончилась, а будильника к ближайшему приёму нет", next, today.reminders.exactAt)
+    }
+
     /** Ежедневная задача одна: повторная постановка её не сдвигает; «сейчас» — отдельная разовая. */
     @Test
     fun theDailyWorkIsOneAndKept() = runBlocking {
