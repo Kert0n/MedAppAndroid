@@ -504,7 +504,9 @@ done
 ставится устройству:
 
 ```bash
-adb -s <устройство> shell am get-config | head -1   # ждём ru-rRU первым
+adb -s emulator-5554 shell am get-config | head -1   # BigLatest: ждём ru-rRU первым
+adb -s emulator-5556 shell am get-config | head -1   # Sm29:      ждём ru-rRU первым
+adb -s emulator-5558 shell am get-config | head -1   # BigScaled: ждём en-rUS — так и задумано
 ```
 
 Прогоном дело не кончается: экраны, которые PR трогает, **проходятся руками на обоих** — крупный
@@ -542,10 +544,14 @@ KSP (`kspCaches/debug/backups` — «NoSuchFileException», обе сборки 
 собирает **один раз**, а по устройствам расходится инструментация:
 
 ```bash
-./gradlew :app:assembleDebug :app:assembleDebugAndroidTest
+# Не собралось — гонять нечего: на устройстве лежит APK прошлого раза, и прогон по нему
+# отчитается бодрым `OK (` о коде, которого в ветке уже нет.
+./gradlew :app:assembleDebug :app:assembleDebugAndroidTest || exit 1
 pids=(); rc=0
 for d in emulator-5554 emulator-5556 emulator-5558; do
-  ( adb -s $d install -r -g app/build/outputs/apk/debug/app-debug.apk >/dev/null
+  # `set -e` внутри — по той же причине: не встало, значит проверять нечего.
+  ( set -e
+    adb -s $d install -r -g app/build/outputs/apk/debug/app-debug.apk >/dev/null
     adb -s $d install -r -g app/build/outputs/apk/androidTest/debug/app-debug-androidTest.apk >/dev/null
     adb -s $d shell am instrument -w -e package com.kert0n.medapp.ui.course \
       com.kert0n.medapp.test/com.kert0n.medapp.HiltTestRunner > instr-$d.txt 2>&1 ) & pids+=($!)
