@@ -156,10 +156,13 @@ class CourseSourcesViewModel @AssistedInject constructor(
             stored.collect { fresh ->
                 latest.value = Reading(fresh)
                 // Состав сменился — правка начинается заново: она была о прежнем составе, и
-                // после нашей же записи, и после чужой.
+                // после нашей же записи, и после чужой. **Вопрос уходит вместе с ней**: он был о
+                // том же прежнем составе, а у последней коробки ответ записывает сразу — и снял
+                // бы не то, о чём спрашивали.
                 val started = editing.value
                 if (fresh == null || started == null || started.revision != fresh.revision) {
                     editing.value = fresh?.let { Editing(it.revision, it.sources) }
+                    writing.value = writing.value.copy(asksToDetach = null)
                 }
             }
         }

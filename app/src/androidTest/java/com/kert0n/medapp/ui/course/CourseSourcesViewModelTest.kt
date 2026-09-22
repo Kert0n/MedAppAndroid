@@ -7,6 +7,7 @@ import com.kert0n.medapp.domain.value.Doses
 import com.kert0n.medapp.feature.course.CourseDrafting
 import com.kert0n.medapp.feature.course.SourceEstimates
 import com.kert0n.medapp.feature.time.Today
+import com.kert0n.medapp.feature.course.SourceEditing
 import com.kert0n.medapp.fixture.OTHER_PACK
 import com.kert0n.medapp.fixture.PACK
 import com.kert0n.medapp.fixture.QuietClock
@@ -275,6 +276,33 @@ class CourseSourcesViewModelTest {
         }
 
         assertEquals(emptyList<Uuid>(), requireNotNull(database.courseRepository().findPlan(id)).sources.map { it.pkg.id })
+    }
+
+    /**
+     * **Чужая правка уносит вопрос вместе с правкой.** Состав сменился под руками — местная
+     * правка начинается заново, и вопрос о ней тоже: он был о прежнем составе. Останься он на
+     * экране, ответ у последней коробки записал бы **сразу** — и снял бы не то, о чём спрашивали.
+     */
+    @Test
+    fun aForeignEditTakesTheQuestionAwayWithIt() = runBlocking {
+        val id = startedWithOneBox()
+        val model = model(id)
+
+        watching(model.state) { state ->
+            state.awaiting(PATIENTLY) { it.sources.size == 1 && !it.isDraft }
+            model.askToDetach(PACK)
+            state.awaiting(PATIENTLY) { it.asksToDetach != null }
+
+            // Другое устройство подключило к лечению вторую коробку, пока вопрос стоял.
+            val plan = requireNotNull(database.courseRepository().findPlan(id))
+            scenarios.sourceEditing.save(
+                id, plan.revision,
+                listOf(SourceEditing.Source(PACK, Doses(3)), SourceEditing.Source(OTHER_PACK, Doses(0)))
+            )
+
+            state.awaiting(PATIENTLY) { it.sources.size == 2 && it.asksToDetach == null }
+        }
+        Unit
     }
 
     /**
