@@ -10,7 +10,6 @@ import com.kert0n.medapp.network.pack.PackagePostNetworkDTO
 import com.kert0n.medapp.network.pack.PackageSnapshotNetworkDTO
 import com.kert0n.medapp.network.pack.PackageSyncNetworkDTO
 import kotlin.uuid.Uuid
-import kotlinx.coroutines.delay
 import kotlinx.coroutines.runBlocking
 import org.junit.After
 import org.junit.Assert.assertEquals
@@ -63,7 +62,18 @@ class ContractProbe {
             owner = requireNotNull(ProbeAccounts.anna)
             guest = requireNotNull(ProbeAccounts.boris)
             anonymous = requireNotNull(ProbeAccounts.anonymous)
-            unit = runBlocking { success(owner.quantityUnits()).first().id }
+            // Первое же чтение говорит, готов ли сервер вообще разговаривать. 429 — не провал
+            // пробы: сервер считает обращения с адреса и о контракте ничего не сказал. Проба
+            // откладывается с названной причиной, а не краснеет пятнадцатью строками подряд.
+            when (val units = runBlocking { owner.quantityUnits() }) {
+                is ApiResult.Success -> unit = units.value.first().id
+                is ApiResult.Failure -> {
+                    if (units.failure !is ApiFailure.TooManyRequests) {
+                        throw AssertionError("проба не смогла начать: $units")
+                    }
+                    skipReason = "боевой сервер считает обращения с адреса — проба отложена"
+                }
+            }
         }
 
         /** Готовый запрос очереди — примитивами, как его и шлёт `QueueHttpTransport`. */
@@ -102,24 +112,19 @@ class ContractProbe {
         (result as? ApiResult.Failure)?.failure ?: throw AssertionError("ожидался отказ: $result")
 
     /**
-     * Отказ **по существу**: пока сервер считает попытки входа и отвечает 429, о пароле он не
-     * сказал ничего, и утверждать «не принят» не о чем. В полном прогоне к этим пробам мы
-     * приходим после десятка входов, и счётчик срабатывает — тогда проба ждёт и спрашивает
-     * снова, вместо того чтобы объявить провалом работу сервера, которую он ещё не сделал.
+     * Отказ **по существу**: 429 — это не «пароль не принят», а «сервер о пароле не говорил».
+     * Он считает попытки входа с адреса, и счёт этот живёт дольше минуты — переждать его в
+     * проверке нечем, а повторять попытки значит его же и кормить. Поэтому проба не повторяет и
+     * не выдумывает: она откладывается с названной причиной, и в отчёте это пропуск, а не
+     * красная строка о работе, которой сервер не делал.
      */
     private suspend fun judged(call: suspend () -> ApiResult<*>): ApiFailure {
-        var waited = 0L
-        while (true) {
-            val failure = failure(call())
-            if (failure !is ApiFailure.TooManyRequests) return failure
-            // Не меньше секунды: `Retry-After: 0` — законный ответ, и без нижней границы проба
-            // крутилась бы вплотную, добивая тот самый счётчик, которого ждёт (и `waited` не рос
-            // бы вовсе — выйти из круга стало бы нечем).
-            val pause = (failure.retryAfter?.inWholeMilliseconds ?: 5_000L).coerceAtLeast(1_000L)
-            assertTrue("сервер считает попытки входа дольше минуты: $failure", waited + pause <= 60_000L)
-            delay(pause)
-            waited += pause
-        }
+        val failure = failure(call())
+        assumeTrue(
+            "боевой сервер считает попытки входа с адреса — проба отложена",
+            failure !is ApiFailure.TooManyRequests
+        )
+        return failure
     }
 
     private suspend fun newKit(): Uuid {
