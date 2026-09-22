@@ -81,7 +81,7 @@ class SourcePickingScreenTest {
         show(SourcePickingUiState(packages = listOf(candidate(Attachability.HeldByCourse("Ибупрофен")))))
 
         compose.onNodeWithText("Нурофен").assertIsDisplayed()
-        compose.onNodeWithText("Занята лечением «Ибупрофен».").assertIsDisplayed()
+        compose.onNodeWithText("Занят лечением «Ибупрофен».").assertIsDisplayed()
     }
 
     /** Нажатие по неподходящей ничего не подключает: причина названа, и решение за человеком. */
@@ -132,7 +132,7 @@ class SourcePickingScreenTest {
     fun anExpiredBoxSaysSoAndStillAttaches() {
         show(SourcePickingUiState(packages = listOf(candidate().copy(expiredOn = java.time.LocalDate.of(2027, 3, 1)))))
 
-        compose.onNodeWithText("Просрочена: годна до 01.03.2027").assertIsDisplayed()
+        compose.onNodeWithText("Просрочен: годен до 01.03.2027").assertIsDisplayed()
         compose.onNodeWithText("Нурофен").performClick()
 
         assertEquals(PACK, attached)

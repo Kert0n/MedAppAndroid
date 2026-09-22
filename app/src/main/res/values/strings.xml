@@ -592,7 +592,7 @@
     <string name="course_source_handle">Переставить: %1$s</string>
     <string name="course_source_move_up">Выше</string>
     <string name="course_source_move_down">Ниже</string>
-    <string name="course_source_expired">Просрочена: годна до %1$s</string>
+    <string name="course_source_expired">Просрочен: годен до %1$s</string>
     <string name="course_source_expired_title">Препарат просрочен</string>
     <string name="course_source_expired_body">Лечение будет брать «%1$s» — срок до %2$s. Решать вам; мы лишь предупреждаем.</string>
     <string name="action_understood">Понятно</string>
@@ -646,13 +646,13 @@
     <string name="course_source_unusable">Этот препарат выбрасывают или его полки больше нет.</string>
     <string name="course_source_unusable_named">Препарат «%1$s» выбрасывают, или его полки больше нет.</string>
     <string name="course_picking">Подключить препарат</string>
-    <string name="course_attach_already">Уже подключена к этому лечению.</string>
-    <string name="course_attach_held">Занята другим лечением.</string>
-    <string name="course_attach_held_named">Занята лечением «%1$s».</string>
+    <string name="course_attach_already">Уже подключён к этому лечению.</string>
+    <string name="course_attach_held">Занят другим лечением.</string>
+    <string name="course_attach_held_named">Занят лечением «%1$s».</string>
     <string name="course_attach_needs_form">Укажите форму выпуска у этого препарата, чтобы подключить его к курсу.</string>
     <string name="course_attach_other_form">Другая форма выпуска.</string>
     <string name="course_attach_other_unit">Другая единица измерения.</string>
-    <string name="course_attach_unusable">Выброшена или утрачена — ждёт ответа.</string>
+    <string name="course_attach_unusable">Выброшен или утрачен — ждёт ответа.</string>
     <string name="course_attach_incomplete">Сначала укажите дозу и форму лечения.</string>
     <string name="course_picking_search">Поиск по названию</string>
     <string name="course_picking_nothing_found">Ничего не нашлось. Попробуйте другое название.</string>
