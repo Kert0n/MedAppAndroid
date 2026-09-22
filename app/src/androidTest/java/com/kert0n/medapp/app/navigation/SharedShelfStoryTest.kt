@@ -285,7 +285,18 @@ class SharedShelfStoryTest {
         try {
             compose.waitUntil(WAIT) { shownPart("Последний обмен в") }
         } catch (timeout: androidx.compose.ui.test.ComposeTimeoutException) {
-            throw AssertionError("заход не кончился; на экране: ${screenTexts()}", timeout)
+            // Причину знает сама очередь: «429» — сервер считает обращения с адреса и о нашем
+            // заходе ничего не сказал. Это пропуск с названной причиной, а не провал истории.
+            val stuck = runBlocking { database.syncOperations().all() }
+                .lastOrNull { it.operation.lastError != null }?.operation
+            assumeTrue(
+                "боевой сервер ограничивает частоту обращений",
+                stuck?.lastError?.contains("429") != true
+            )
+            throw AssertionError(
+                "заход не кончился; на экране: ${screenTexts()}; очередь: ${stuck?.status} ${stuck?.lastError}",
+                timeout
+            )
         }
     }
 

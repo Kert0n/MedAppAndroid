@@ -123,9 +123,15 @@ class UnsteadyConnectionStoryTest {
             var waited = 0L
             while (published() != MedKit.Publication.PUBLISHED) {
                 if (waited >= 60_000L) {
-                    // Сервер ограничивает частоту — история не провалена, она не состоялась.
-                    assumeTrue("боевой сервер ограничивает частоту обращений", !ProbeAccounts.throttled())
-                    throw AssertionError("полка не вышла за минуту: ${published()}")
+                    // Почему не вышла — знает сама очередь: причину последнего захода она
+                    // записала строкой. «429» значит, что сервер считает обращения с адреса и о
+                    // полке ничего не сказал: история не провалена — она не состоялась.
+                    val left = database.syncOperations().all().lastOrNull { it.operation.medKitId == shelf.id }
+                    assumeTrue(
+                        "боевой сервер ограничивает частоту обращений",
+                        left?.operation?.lastError?.contains("429") != true
+                    )
+                    throw AssertionError("полка не вышла за минуту: ${published()}; очередь: ${left?.operation?.status} ${left?.operation?.lastError}")
                 }
                 synchronization.synchronize()
                 if (published() != MedKit.Publication.PUBLISHED) {
