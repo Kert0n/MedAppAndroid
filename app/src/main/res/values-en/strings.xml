@@ -536,8 +536,10 @@
     <string name="course_rejected_dose_missing">To start, set a dose.</string>
     <string name="course_rejected_form_missing">To start, set a dosage form.</string>
     <string name="course_rejected_total_doses_missing">To start, say how many intakes in total.</string>
-    <!-- The number is Prescription.MAX_TOTAL_DOSES. -->
-    <string name="course_rejected_total_doses_too_many">No more than 10,000 intakes.</string>
+    <plurals name="course_rejected_total_doses_too_many">
+        <item quantity="one">No more than %1$d intake.</item>
+        <item quantity="other">No more than %1$d intakes.</item>
+    </plurals>
     <string name="course_rejected_unit_mismatch">The attached drugs use a different unit — detach them first.</string>
     <string name="course_rejected_form_mismatch">The attached drugs have a different form — detach them first.</string>
     <string name="course_rejected_schedule_in_past">A new schedule can\'t start before today.</string>
