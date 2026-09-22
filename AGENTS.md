@@ -535,20 +535,26 @@ KSP (`kspCaches/debug/backups` — «NoSuchFileException», обе сборки 
 ```bash
 ./gradlew :app:assembleDebug :app:assembleDebugAndroidTest
 pids=(); rc=0
-for d in emulator-5554 emulator-5556; do
+for d in emulator-5554 emulator-5556 emulator-5558; do
   ( adb -s $d install -r -g app/build/outputs/apk/debug/app-debug.apk >/dev/null
     adb -s $d install -r -g app/build/outputs/apk/androidTest/debug/app-debug-androidTest.apk >/dev/null
     adb -s $d shell am instrument -w -e package com.kert0n.medapp.ui.course \
       com.kert0n.medapp.test/com.kert0n.medapp.HiltTestRunner > instr-$d.txt 2>&1 ) & pids+=($!)
 done
-# Сам по себе `wait` без номеров возвращает 0: упавшее устройство осталось бы незамеченным.
-for p in $pids; do wait $p || rc=1; done
+for p in $pids; do wait $p; done
+# Итог — из вывода, а не из кода возврата: `am instrument` отдаёт 0 и на «Tests run: 1,
+# Failures: 1», и на «Process crashed» (проверено). Нет строки `OK (` — считаем провалом:
+# оборвавшийся прогон не пишет вообще ничего, и молчание выглядело бы как успех.
+for d in emulator-5554 emulator-5556 emulator-5558; do
+  grep -q '^OK (' instr-$d.txt || { rc=1; echo "$d: "; tail -3 instr-$d.txt; }
+done
 grep -hE '^(OK|FAILURES|Tests run)' instr-*.txt
 exit $rc
 ```
 
-Итог читается из вывода инструментации (`OK (100 tests)` или `FAILURES!!!`), а не из XML: XML
-пишет Gradle, и при таком прогоне его нет.
+Итог читается из вывода инструментации (`OK (100 tests)`, `FAILURES!!!`, `Process crashed`), а не
+из XML: XML пишет Gradle, и при таком прогоне его нет. `BigScaled` в примере стоит вместе с
+остальными, но русских слов там не найдут — на нём гоняют наборы, от слов не зависящие.
 
 **Разом — только то, что живёт на устройстве.** Сеть у всех трёх одна, и боевая база одна: три
 прогона, которые ходят на сервер, тянут одни и те же полки и один и тот же каталог, и сервер
