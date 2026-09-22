@@ -526,7 +526,12 @@ Gradle, запущенные одновременно; отчёты не ста�
 Три устройства занимают столько же времени, сколько одно, и ждать их друг за другом незачем
 (указание владельца 2026-09-22):
 
+**Собрать сначала, разом — только прогон.** Две сборки в одном каталоге дерутся за кэш KSP
+(`app/build/kspCaches/.../backups` — «NoSuchFileException», и обе падают за секунды, не дойдя до
+устройства). Сборка одна, устройства потом:
+
 ```bash
+./gradlew :app:assembleDebug :app:assembleDebugAndroidTest
 for d in emulator-5554 emulator-5556 emulator-5558; do
   ANDROID_SERIAL=$d ./gradlew :app:connectedDebugAndroidTest ... &
 done; wait
