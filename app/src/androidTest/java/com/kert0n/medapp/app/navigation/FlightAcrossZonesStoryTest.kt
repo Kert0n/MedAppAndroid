@@ -28,6 +28,7 @@ import com.kert0n.medapp.fixture.packageRepository
 import com.kert0n.medapp.fixture.storySetting
 import com.kert0n.medapp.fixture.tablets
 import com.kert0n.medapp.fixture.treatmentStarted
+import com.kert0n.medapp.feature.connectivity.Connection
 import com.kert0n.medapp.platform.time.TimeShifts
 import com.kert0n.medapp.queue.Transactions
 import com.kert0n.medapp.storage.database.MedAppDatabase
@@ -72,6 +73,7 @@ class FlightAcrossZonesStoryTest {
     val compose = createAndroidComposeRule<HiltTestActivity>()
 
     @Inject lateinit var database: MedAppDatabase
+    @Inject lateinit var connection: Connection
     @Inject lateinit var reminders: ReminderStorageRepository
     @Inject lateinit var reconciliation: NotificationReconciliation
     @Inject lateinit var transactions: Transactions
@@ -88,7 +90,7 @@ class FlightAcrossZonesStoryTest {
         hilt.inject()
         // Новый телефон на Android 14: точные будильники приложению не разрешены.
         world.alarms.canBeExact = false
-        world.start(reminders, reconciliation, transactions, shifts, round, answering)
+        world.start(reminders, reconciliation, transactions, shifts, round, answering, connection)
         runBlocking {
             database.storySetting()
             database.packageRepository().add(pack(id = box, name = "Эналаприл", quantity = tablets("30"), form = TABLET_FORM))
