@@ -178,7 +178,7 @@ class DayOfIntakesStoryTest {
     /** Вечером она смотрит, что вообще было: разовый приём и приём по плану — в одной истории. */
     private fun andInTheEndSheReadsTheHistoryOfTheBox() {
         openTheBox()
-        compose.onNodeWithText("Приёмы из этой коробки").performScrollTo().performClick()
+        compose.onNodeWithText("История приёмов").performScrollTo().performClick()
 
         compose.waitUntil(WAIT) {
             compose.onAllNodesWithText("принят в", substring = true).fetchSemanticsNodes().isNotEmpty()

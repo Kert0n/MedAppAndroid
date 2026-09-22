@@ -277,7 +277,7 @@ class ClaimsOnTransferStoryTest {
 
         compose.waitUntil(WAIT) { shown("Куда перенести") }
         compose.onNodeWithText(
-            "На эту коробку заявили и другие. Кто не видит выбранную аптечку — потеряет свою бронь."
+            "На это лекарство заявили и другие. Кто не видит выбранную аптечку — потеряет свою бронь."
         ).assertIsDisplayed()
         compose.onNodeWithText(city.name).performClick()
         compose.onAllNodesWithText("Перенести").onLast().performClick()

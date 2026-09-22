@@ -72,7 +72,7 @@ class WriteContractTest {
     private infix fun Shape.by(signature: String) = Clause(this, signature)
 
     private val contract: Map<String, Clause> = mapOf(
-        // Упаковка
+        // Лекарство
         "PackageStorageRepository.observe" to (Shape.READ by "(Uuid): Flow<PackageProjection>"),
         "PackageStorageRepository.find" to (Shape.READ by "(Uuid): Package"),
         "PackageStorageRepository.projection" to (Shape.READ by "(Uuid): PackageProjection"),

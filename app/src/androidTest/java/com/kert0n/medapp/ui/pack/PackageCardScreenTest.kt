@@ -101,7 +101,7 @@ class PackageCardScreenTest {
     fun theCardWaitsAndThenSaysWhenTheBoxIsGone() {
         show(PackageCardUiState())
         compose.onNodeWithContentDescription("Загрузка").assertIsDisplayed()
-        compose.onNodeWithText("Этой упаковки больше нет.").assertDoesNotExist()
+        compose.onNodeWithText("Этого лекарства больше нет.").assertDoesNotExist()
     }
 
     /**
@@ -121,7 +121,7 @@ class PackageCardScreenTest {
     @Test
     fun aGoneBoxIsSaidOutLoud() {
         show(PackageCardUiState(isGone = true))
-        compose.onNodeWithText("Этой упаковки больше нет.").assertIsDisplayed()
+        compose.onNodeWithText("Этого лекарства больше нет.").assertIsDisplayed()
         compose.onNodeWithContentDescription("Выбросить").assertDoesNotExist()
     }
 
@@ -253,8 +253,8 @@ class PackageCardScreenTest {
     fun theConfirmationNamesWhatWillHappen() {
         show(card(asksToRemove = true))
 
-        compose.onNodeWithText("Выбросить упаковку?").assertIsDisplayed()
-        compose.onNodeWithText("Пачки больше не будет. Приёмы из неё останутся в истории.").assertIsDisplayed()
+        compose.onNodeWithText("Выбросить лекарство?").assertIsDisplayed()
+        compose.onNodeWithText("Лекарства больше не будет. Приёмы из него останутся в истории.").assertIsDisplayed()
         compose.onNodeWithText("Выбросить").performClick()
 
         assertEquals(1, confirmed)
@@ -307,7 +307,7 @@ class PackageCardScreenTest {
         show(card().copy(isRefusedByServer = true))
 
         compose.onNodeWithText("Сервер отклонил изменение").assertIsDisplayed()
-        compose.onNodeWithText("Пересчитайте коробку — спор о том, сколько в ней на самом деле").performClick()
+        compose.onNodeWithText("Пересчитайте остаток — спор о том, сколько здесь на самом деле").performClick()
 
         assertEquals(1, recounted)
     }

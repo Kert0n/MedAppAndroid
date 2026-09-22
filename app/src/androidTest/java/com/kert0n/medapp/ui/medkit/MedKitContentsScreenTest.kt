@@ -121,12 +121,12 @@ class MedKitContentsScreenTest {
         show(MedKitContentsUiState(isEverywhere = false))
 
         compose.onNodeWithContentDescription("Загрузка").assertIsDisplayed()
-        compose.onNodeWithText("Здесь пока ничего нет. Заведите упаковку — и она появится в списке.").assertDoesNotExist()
+        compose.onNodeWithText("Здесь пока ничего нет. Заведите лекарство — и оно появится в списке.").assertDoesNotExist()
     }
 
     /**
      * Полки у нас больше нет — её убрали у всех или нас из неё вывели, и перечитывание при открытии
-     * это записало (PLAN E4). Заводить в неё нечего: ни «Завести упаковку», ни плавающей кнопки, ни
+     * это записало (PLAN E4). Заводить в неё нечего: ни «Завести лекарство», ни плавающей кнопки, ни
      * меню полки — только слова.
      *
      * Красная проверка: полка, которой нет, читалась пустой полкой и звала завести в неё коробку.
@@ -135,8 +135,8 @@ class MedKitContentsScreenTest {
     fun aShelfThatIsNoLongerOursOffersNothingToAdd() {
         show(MedKitContentsUiState(isEverywhere = false, isAreaEmpty = true, today = today, isLoaded = true))
 
-        compose.onNodeWithText("Завести упаковку").assertDoesNotExist()
-        compose.onNodeWithContentDescription("Завести упаковку").assertDoesNotExist()
+        compose.onNodeWithText("Завести лекарство").assertDoesNotExist()
+        compose.onNodeWithContentDescription("Завести лекарство").assertDoesNotExist()
         compose.onNodeWithContentDescription("Что сделать с аптечкой").assertDoesNotExist()
         compose.onNodeWithText("Этой аптечки у вас больше нет.").assertIsDisplayed()
     }
@@ -152,11 +152,11 @@ class MedKitContentsScreenTest {
     fun anEmptyShelfTellsWhatToDoWithASingleButton() {
         show(contents(packages = emptyList()))
 
-        compose.onNodeWithText("Здесь пока ничего нет. Заведите упаковку — и она появится в списке.").assertIsDisplayed()
+        compose.onNodeWithText("Здесь пока ничего нет. Заведите лекарство — и оно появится в списке.").assertIsDisplayed()
         compose.onNodeWithText("Поиск по аптечке").assertDoesNotExist()
         compose.onNodeWithText("Просроченные").assertDoesNotExist()
-        compose.onNodeWithContentDescription("Завести упаковку").assertDoesNotExist()
-        compose.onNodeWithText("Завести упаковку").performClick()
+        compose.onNodeWithContentDescription("Завести лекарство").assertDoesNotExist()
+        compose.onNodeWithText("Завести лекарство").performClick()
 
         assertEquals(1, added)
     }
@@ -174,7 +174,7 @@ class MedKitContentsScreenTest {
         compose.onNodeWithText("Ничего не нашлось.").assertIsDisplayed()
         compose.onNodeWithText("Поиск по аптечке").assertIsDisplayed()
         compose.onNodeWithText("Просроченные").assertIsDisplayed()
-        compose.onNodeWithText("Завести упаковку").assertDoesNotExist()
+        compose.onNodeWithText("Завести лекарство").assertDoesNotExist()
         compose.onNodeWithText("Сбросить").performClick()
 
         assertEquals(1, reset)
@@ -187,7 +187,7 @@ class MedKitContentsScreenTest {
         show(contents(packages = emptyList(), everywhere = true))
 
         compose.onNodeWithText("Во всех аптечках пока пусто.").assertIsDisplayed()
-        compose.onNodeWithText("Завести упаковку").assertDoesNotExist()
+        compose.onNodeWithText("Завести лекарство").assertDoesNotExist()
     }
 
     /**
@@ -231,7 +231,7 @@ class MedKitContentsScreenTest {
 
         compose.onNodeWithText("Все лекарства").assertIsDisplayed()
         compose.onNodeWithText("Домашняя").assertIsDisplayed()
-        compose.onNodeWithContentDescription("Завести упаковку").assertDoesNotExist()
+        compose.onNodeWithContentDescription("Завести лекарство").assertDoesNotExist()
     }
 
     /** Внутри полки её имя на строках не повторяется: человек знает, куда пришёл, а повтор съедает строку. */
@@ -241,7 +241,7 @@ class MedKitContentsScreenTest {
 
         // Одно вхождение — заголовок; на строке имени нет.
         assertEquals(1, compose.onAllNodesWithText("Домашняя").fetchSemanticsNodes().size)
-        compose.onNodeWithContentDescription("Завести упаковку").assertIsDisplayed()
+        compose.onNodeWithContentDescription("Завести лекарство").assertIsDisplayed()
     }
 
     /**

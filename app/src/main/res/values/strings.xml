@@ -22,7 +22,7 @@
         заново по приглашению — но сначала нужно решить, заводить ли новую учётную запись.</string>
     <string name="setup_key_lost_stays">Останется</string>
     <string-array name="setup_key_lost_stays_items">
-        <item>Местные аптечки и коробки</item>
+        <item>Местные аптечки и лекарства</item>
         <item>Лечения и история приёмов</item>
     </string-array>
     <string name="setup_key_lost_goes">Пропадёт</string>
@@ -76,11 +76,11 @@
     <string name="field_required">обязательно</string>
 
     <!-- Упаковка: заведение и правка -->
-    <string name="pack_new">Новая упаковка</string>
-    <string name="pack_edit">Правка упаковки</string>
+    <string name="pack_new">Новое лекарство</string>
+    <string name="pack_edit">Правка лекарства</string>
     <string name="pack_med_kit">Аптечка</string>
     <string name="pack_med_kit_unknown">Аптечка не найдена</string>
-    <string name="pack_no_med_kits">Сначала заведите аптечку — упаковку кладут в неё.</string>
+    <string name="pack_no_med_kits">Сначала заведите аптечку — лекарство кладут в неё.</string>
     <string name="pack_name">Название</string>
     <string name="pack_amount">Количество</string>
     <string name="pack_recount">Пересчитать</string>
@@ -102,21 +102,21 @@
     <string name="pack_left">%1$s %2$s</string>
 
     <!-- Упаковка: отказы -->
-    <string name="pack_med_kit_missing">Выберите аптечку: упаковка лежит в каком-то одном месте.</string>
+    <string name="pack_med_kit_missing">Выберите аптечку: лекарство лежит в каком-то одном месте.</string>
     <string name="pack_med_kit_gone">Этой аптечки больше нет — выберите другую.</string>
     <string name="pack_med_kit_busy">Аптечка ждёт ответа сервера на другое решение — класть в неё пока рано.</string>
-    <string name="pack_name_empty">Название нужно: без него упаковку не найти ни поиском, ни глазами.</string>
+    <string name="pack_name_empty">Название нужно: без него лекарство не найти ни поиском, ни глазами.</string>
     <string name="pack_unit_missing">Выберите единицу: без неё количество ничего не меряет.</string>
-    <string name="pack_amount_is_zero">Пустую упаковку заводить незачем — укажите, сколько в ней есть.</string>
+    <string name="pack_amount_is_zero">Заводить нечего: укажите, сколько есть.</string>
     <string name="pack_hint_is_zero">Нулевой дозы не бывает.</string>
-    <string name="pack_form_clear_unsupported">У общей упаковки форму выпуска нельзя стереть — только заменить другой.</string>
+    <string name="pack_form_clear_unsupported">У общего лекарства форму выпуска нельзя стереть — только заменить другой.</string>
     <string name="pack_unknown_in_vocabulary">Этого значения нет в справочнике — выберите другое.</string>
-    <string name="pack_gone">Этой упаковки больше нет.</string>
+    <string name="pack_gone">Этого лекарства больше нет.</string>
     <string name="pack_suggestions_searching">Ищу в справочнике…</string>
     <string name="pack_suggestions_none">В справочнике не нашлось.</string>
     <string name="pack_suggestions_unavailable">Подсказок нет: %1$s</string>
     <string name="pack_suggestions_title">Из справочника</string>
-    <string name="pack_busy">Упаковка ждёт ответа сервера на другое решение — правку пока не записать.</string>
+    <string name="pack_busy">Лекарство ждёт ответа сервера на другое решение — правку пока не записать.</string>
     <plurals name="pack_too_long">
         <item quantity="one">Поле длиннее %1$d символа.</item>
         <item quantity="few">Поле длиннее %1$d символов.</item>
@@ -146,9 +146,9 @@
     <string name="contents_menu">Что сделать с аптечкой</string>
     <string name="contents_edit">Править</string>
     <string name="contents_remove">Убрать</string>
-    <string name="contents_add">Завести упаковку</string>
+    <string name="contents_add">Завести лекарство</string>
     <string name="contents_shelf_gone">Этой аптечки у вас больше нет.</string>
-    <string name="contents_empty_here">Здесь пока ничего нет. Заведите упаковку — и она появится в списке.</string>
+    <string name="contents_empty_here">Здесь пока ничего нет. Заведите лекарство — и оно появится в списке.</string>
     <string name="contents_empty_everywhere">Во всех аптечках пока пусто.</string>
     <string name="contents_nothing_found">Ничего не нашлось.</string>
     <string name="contents_reset">Сбросить</string>
@@ -188,7 +188,7 @@
     <string name="med_kit_removal_busy">Аптечка ждёт ответа сервера на другое решение — убрать её пока нельзя.</string>
     <string name="med_kit_removal_target_gone">Той аптечки больше нет — выберите другую.</string>
     <string name="med_kit_removal_target_busy">Та аптечка ждёт ответа сервера — переносить в неё пока рано.</string>
-    <string name="med_kit_removal_contents_busy">Одна из упаковок ждёт ответа сервера — дождитесь его и повторите.</string>
+    <string name="med_kit_removal_contents_busy">Одно из лекарств ждёт ответа сервера — дождитесь его и повторите.</string>
     <string name="med_kit_removal_not_shared">Эта аптечка только ваша — оставлять её некому.</string>
 
     <!-- Поделиться аптечкой (экран 20) -->
@@ -197,7 +197,7 @@
     <string name="med_kit_sharing_invite_menu">Пригласить</string>
     <string name="med_kit_sharing_becomes_shared">Станет общим</string>
     <string-array name="med_kit_sharing_becomes_shared_items">
-        <item>Название упаковки, количество и единица</item>
+        <item>Название лекарства, количество и единица</item>
         <item>Форма и категория</item>
         <item>Производитель, страна, описание</item>
     </string-array>
@@ -277,7 +277,7 @@
     <string name="permissions_camera">Камера</string>
     <string name="permissions_granted">Разрешено</string>
     <string name="permissions_denied">Выключено — исправить в настройках телефона</string>
-    <string name="permissions_absent">Нет на этом устройстве — коробки заводятся на полке</string>
+    <string name="permissions_absent">Нет на этом устройстве — лекарства заводятся на полке</string>
     <string name="permissions_not_needed">Не требуется на этой версии Android</string>
 
     <!-- Язык (экран 27). Названия языков — на своём языке, не переводятся. -->
@@ -291,7 +291,7 @@
     <string name="sync_refreshed_at">Последний обмен в %1$s</string>
     <string name="sync_never">Обмена ещё не было</string>
     <string name="sync_all_delivered">Всё доехало</string>
-    <string name="sync_recount">Пересчитать коробку</string>
+    <string name="sync_recount">Пересчитать остаток</string>
     <string name="sync_dismiss">Разобрал</string>
     <string name="sync_dismiss_gone">Этой строки уже нет — её закрыл обмен с сервером.</string>
     <string name="sync_dismiss_not_awaiting">Здесь нечего разбирать: строка ждёт отправки или уже применена.</string>
@@ -300,23 +300,23 @@
     <string name="sync_refused">Сервер отказал</string>
     <string name="sync_unreadable">Эту строку нечем прочитать</string>
     <string name="sync_about_named">%1$s: «%2$s»</string>
-    <string name="sync_about_package_created">Новая упаковка</string>
-    <string name="sync_about_package_changed">Изменение упаковки</string>
-    <string name="sync_about_package_moved">Перенос упаковки</string>
-    <string name="sync_about_package_removed">Удаление упаковки</string>
+    <string name="sync_about_package_created">Новое лекарство</string>
+    <string name="sync_about_package_changed">Изменение лекарства</string>
+    <string name="sync_about_package_moved">Перенос лекарства</string>
+    <string name="sync_about_package_removed">Удаление лекарства</string>
     <string name="sync_about_intake">Приём</string>
     <string name="sync_about_claim">Выделение лечению</string>
     <string name="sync_about_med_kit">Решение об аптечке</string>
     <string name="sync_about_unknown">Неизвестная операция</string>
     <string name="sync_reason_invalid">Сервер не принял данные</string>
     <string name="sync_reason_not_enough">На сервере осталось меньше, чем вы списали</string>
-    <string name="sync_reason_unit_changed">У коробки сменилась единица измерения</string>
-    <string name="sync_reason_stale">Коробку изменили раньше вас</string>
-    <string name="sync_reason_conflict">Коробку изменили раньше вас</string>
+    <string name="sync_reason_unit_changed">У лекарства сменилась единица измерения</string>
+    <string name="sync_reason_stale">Лекарство изменили раньше вас</string>
+    <string name="sync_reason_conflict">Лекарство изменили раньше вас</string>
     <string name="sync_reason_superseded">Отменено вместе с тем, от чего зависело</string>
 
     <!-- Карточка упаковки -->
-    <string name="pack_title">Упаковка</string>
+    <string name="pack_title">Лекарство</string>
     <string name="pack_how_much">Сколько есть</string>
     <string name="pack_available_to_me">Доступно мне</string>
     <string name="pack_free_for_anyone">Свободно любому</string>
@@ -324,13 +324,13 @@
     <string name="pack_held_by_course">Занято лечением «%1$s»</string>
     <string name="pack_unconfirmed">Изменение ещё не доехало до общей аптечки.</string>
     <string name="pack_removal_on_the_way">Удаление в пути: общая аптечка ещё не ответила.</string>
-    <string name="pack_lost">Из этой аптечки вышли — коробка ждёт ответа сервера.</string>
+    <string name="pack_lost">Из этой аптечки вышли — лекарство ждёт ответа сервера.</string>
     <!-- Те же пометки строкой списка: коротко, потому что строка не карточка -->
     <string name="pack_row_unconfirmed">Изменение в пути</string>
     <string name="pack_row_removal">Удаление в пути</string>
-    <string name="pack_row_lost">Коробка не у нас</string>
+    <string name="pack_row_lost">Лекарство не у нас</string>
     <string name="pack_refused_by_server">Сервер отклонил изменение</string>
-    <string name="pack_refused_by_server_explained">Пересчитайте коробку — спор о том, сколько в ней на самом деле</string>
+    <string name="pack_refused_by_server_explained">Пересчитайте остаток — спор о том, сколько здесь на самом деле</string>
     <string name="med_kit_publishing">Публикуется</string>
     <string name="med_kit_removing">Убирается</string>
     <string name="pack_what_it_is">Что это</string>
@@ -343,24 +343,24 @@
     <string name="pack_action_edit">Править сведения</string>
     <string name="pack_action_remove">Выбросить</string>
     <string name="pack_action_transfer">Перенести</string>
-    <string name="pack_remove_title">Выбросить упаковку?</string>
-    <string name="pack_remove_explained">Пачки больше не будет. Приёмы из неё останутся в истории.</string>
-    <string name="pack_remove_busy">Упаковка ждёт ответа сервера на другое решение — выбросить её пока нельзя.</string>
+    <string name="pack_remove_title">Выбросить лекарство?</string>
+    <string name="pack_remove_explained">Лекарства больше не будет. Приёмы из него останутся в истории.</string>
+    <string name="pack_remove_busy">Лекарство ждёт ответа сервера на другое решение — выбросить его пока нельзя.</string>
 
     <!-- Пересчёт -->
     <string name="recount_now">Сейчас записано: %1$s %2$s</string>
     <string name="recount_seen">Пересчитал и увидел</string>
     <string name="recount_explained">Назовите то, что видите целиком — вычитание сделает учёт.</string>
     <string name="recount_record">Записать</string>
-    <string name="recount_zero">Ноль — это выбросить упаковку: сделайте это с её карточки.</string>
-    <string name="recount_busy">Упаковка ждёт ответа сервера на другое решение — пересчёт пока не записать.</string>
+    <string name="recount_zero">Ноль — это выбросить лекарство: сделайте это с его карточки.</string>
+    <string name="recount_busy">Лекарство ждёт ответа сервера на другое решение — пересчёт пока не записать.</string>
 
-    <!-- Перенос упаковки -->
+    <!-- Перенос лекарства -->
     <string name="transfer_title">Куда перенести</string>
     <string name="transfer_shared">Общая аптечка</string>
-    <string name="transfer_claims_of_others">На эту коробку заявили и другие. Кто не видит выбранную аптечку — потеряет свою бронь.</string>
-    <string name="transfer_nowhere">Переносить некуда: другой аптечки пока нет. Заведите вторую — и коробку будет куда положить.</string>
-    <string name="transfer_busy">Упаковка ждёт ответа сервера на другое решение — перенести её пока нельзя.</string>
+    <string name="transfer_claims_of_others">На это лекарство заявили и другие. Кто не видит выбранную аптечку — потеряет свою бронь.</string>
+    <string name="transfer_nowhere">Переносить некуда: другой аптечки пока нет. Заведите вторую — и будет куда переложить.</string>
+    <string name="transfer_busy">Лекарство ждёт ответа сервера на другое решение — перенести его пока нельзя.</string>
     <string name="transfer_origin_busy">Аптечка, из которой несут, ждёт ответа сервера на своё решение.</string>
     <string name="transfer_target_gone">Выбранной аптечки больше нет — выберите другую.</string>
     <string name="transfer_target_busy">Выбранная аптечка ждёт ответа сервера — класть в неё пока рано.</string>
@@ -395,8 +395,8 @@
 
     <!-- Уведомления: тексты -->
     <string name="notice_intake_due_title">Пора принять: %1$s</string>
-    <string name="notice_intake_due_body">%1$s из коробки «%2$s»</string>
-    <string name="notice_intake_due_unsupplied">%1$s — коробки для этого приёма нет</string>
+    <string name="notice_intake_due_body">%1$s · %2$s</string>
+    <string name="notice_intake_due_unsupplied">%1$s — брать неоткуда</string>
     <string name="notice_intake_decision_title">Не записано: %1$s</string>
     <string name="notice_intake_decision_body">«Принял» не смог записать приём — откройте, чтобы решить, откуда взять дозу</string>
     <string name="notice_intake_missed_title">Пропущен приём: %1$s</string>
@@ -449,11 +449,11 @@
     <string name="intake_history_title">История приёмов</string>
     <string name="intake_history_empty">Отсюда ещё ничего не принимали</string>
     <string name="intake_history_no_amount">доза не записана</string>
-    <string name="intake_history_of_package">Приёмы из этой коробки</string>
+    <string name="intake_history_of_package">История приёмов</string>
     <string name="intake_history_of_course">Вся история</string>
     <string name="course_off_plan_action">Приёмы вне расписания</string>
     <string name="course_off_plan_beyond">Больше, чем лечению осталось: можно засчитать %1$s.</string>
-    <string name="course_off_plan_explained">Эти приёмы засчитываются лечению, но коробку не трогают и в историю не попадают.</string>
+    <string name="course_off_plan_explained">Эти приёмы засчитываются лечению, но остаток не трогают и в историю не попадают.</string>
     <string name="course_off_plan_less">На один меньше</string>
     <string name="course_off_plan_more">На один больше</string>
     <plurals name="course_off_plan_count">
@@ -466,9 +466,9 @@
     <string name="intake_card_gone">Этого приёма больше нет</string>
     <string name="intake_already_answered">На этот приём уже ответили.</string>
     <string name="intake_planned">Назначено на %1$s в %2$s: %3$s</string>
-    <string name="intake_from_package">Из коробки: %1$s</string>
-    <string name="intake_source">Из какой коробки</string>
-    <string name="intake_no_sources">У лечения нет подключённых коробок</string>
+    <string name="intake_from_package">Из: %1$s</string>
+    <string name="intake_source">Откуда принять</string>
+    <string name="intake_no_sources">У лечения нет подключённых препаратов</string>
     <string name="intake_amount">Сколько принято</string>
     <string name="intake_taken_on">В какой день</string>
     <string name="intake_taken_at">В котором часу</string>
@@ -505,12 +505,12 @@
     </plurals>
     <string name="course_shortage_from">%1$s с %2$s</string>
     <string name="course_shortage_what_to_do">Что можно сделать</string>
-    <string name="course_shortage_attach">Подключить ещё коробку</string>
+    <string name="course_shortage_attach">Подключить ещё препарат</string>
     <string name="course_shortage_attach_explained">Из тех, что подходят этому лечению</string>
     <string name="course_shortage_reallocate">Изменить выделения</string>
-    <string name="course_shortage_reallocate_explained">Переставить, сколько берётся из каждой коробки</string>
-    <string name="course_shortage_buy">Завести купленную коробку</string>
-    <string name="course_shortage_buy_explained">Добавить упаковку и подключить её к лечению</string>
+    <string name="course_shortage_reallocate_explained">Переставить, сколько берётся из каждого препарата</string>
+    <string name="course_shortage_buy">Завести купленный препарат</string>
+    <string name="course_shortage_buy_explained">Завести препарат и подключить к лечению</string>
     <string name="course_new">Новое лечение</string>
     <string name="course_edit">Черновик лечения</string>
     <string name="course_title">Название</string>
@@ -532,7 +532,7 @@
     <string name="course_gone">Этого черновика больше нет.</string>
     <string name="course_discard">Удалить черновик</string>
     <string name="course_discard_title">Удалить черновик?</string>
-    <string name="course_discard_explained">Записанное назначение и заметка пропадут. Пачки он не занимал.</string>
+    <string name="course_discard_explained">Записанное назначение и заметка пропадут. Препаратов он не занимал.</string>
     <string name="course_leave_title">Оставить черновик?</string>
     <string name="course_leave_explained">Чтобы подключить источники, лечение записалось в черновики. Назначение и заметку можно дописать позже.</string>
     <string name="course_leave_keep">Оставить</string>
@@ -559,16 +559,16 @@
     <string name="course_rejected_dose_missing">Чтобы начать, укажите дозу.</string>
     <string name="course_rejected_form_missing">Чтобы начать, укажите форму выпуска.</string>
     <string name="course_rejected_total_doses_missing">Чтобы начать, укажите, сколько всего приёмов.</string>
-    <string name="course_rejected_unit_mismatch">Под подключёнными пачками другая единица — сначала отвяжите их.</string>
-    <string name="course_rejected_form_mismatch">Под подключёнными пачками другая форма — сначала отвяжите их.</string>
+    <string name="course_rejected_unit_mismatch">У подключённых препаратов другая единица — сначала отвяжите их.</string>
+    <string name="course_rejected_form_mismatch">У подключённых препаратов другая форма — сначала отвяжите их.</string>
     <string name="course_rejected_schedule_in_past">Новое расписание не может начинаться раньше сегодняшнего дня.</string>
-    <string name="course_rejected_already_attached">Эта пачка уже подключена.</string>
-    <string name="course_rejected_package_unusable">Эту пачку выбрасывают или её полки больше нет — источником ей не быть.</string>
+    <string name="course_rejected_already_attached">Этот препарат уже подключён.</string>
+    <string name="course_rejected_package_unusable">Этот препарат выбрасывают или его полки больше нет — источником ему не быть.</string>
     <string name="course_missing">Этого лечения больше нет.</string>
     <string name="course_finished">Это лечение уже закончено.</string>
     <string name="course_sources">Источники</string>
     <string name="course_sources_open">Источники лечения</string>
-    <string name="course_sources_add">Подключить ещё коробку</string>
+    <string name="course_sources_add">Подключить ещё препарат</string>
     <string name="course_sources_supply">Обеспечение</string>
     <string name="course_sources_recorded">Записано</string>
     <string name="course_sources_with_edit">С правкой</string>
@@ -579,22 +579,22 @@
     <string name="intake_free_of_total">Свободно %1$s из %2$s</string>
     <string name="intake_taken_amount">Сколько принял</string>
     <string name="intake_record">Принять</string>
-    <string name="intake_not_enough">В коробке столько не наберётся.</string>
-    <string name="intake_package_unusable">Этой коробки больше нет.</string>
-    <string name="intake_unit_mismatch">Коробку считают в другой единице.</string>
+    <string name="intake_not_enough">Столько здесь не наберётся.</string>
+    <string name="intake_package_unusable">Этого лекарства больше нет.</string>
+    <string name="intake_unit_mismatch">Лекарство считают в другой единице.</string>
     <string name="intake_episode_closed">Лечение закончено: его план ответов больше не принимает.</string>
-    <string name="intake_not_a_source">Эта коробка не из источников лечения — запишите приём разовым.</string>
+    <string name="intake_not_a_source">Это лекарство не из источников лечения — запишите приём разовым.</string>
     <string name="course_sources_stale">Источники правили с другого экрана — список перечитан, повторите.</string>
-    <string name="course_sources_empty">Пачек пока нет — подключите первую.</string>
+    <string name="course_sources_empty">Препаратов пока нет — подключите первый.</string>
     <string name="course_source_detach">Отвязать</string>
-    <string name="course_source_detach_title">Отвязать пачку?</string>
-    <string name="course_source_detach_explained">Лечение останется, но эта коробка перестанет его обеспечивать, а её бронь снимется.</string>
+    <string name="course_source_detach_title">Отвязать препарат?</string>
+    <string name="course_source_detach_explained">Лечение останется, но этот препарат перестанет его обеспечивать, а его бронь снимется.</string>
     <string name="course_source_handle">Переставить: %1$s</string>
     <string name="course_source_move_up">Выше</string>
     <string name="course_source_move_down">Ниже</string>
     <string name="course_source_expired">Просрочена: годна до %1$s</string>
-    <string name="course_source_expired_title">Коробка просрочена</string>
-    <string name="course_source_expired_body">Лечение будет брать из коробки «%1$s» — она годна до %2$s. Решать вам; мы лишь предупреждаем.</string>
+    <string name="course_source_expired_title">Препарат просрочен</string>
+    <string name="course_source_expired_body">Лечение будет брать «%1$s» — срок до %2$s. Решать вам; мы лишь предупреждаем.</string>
     <string name="action_understood">Понятно</string>
     <string name="course_source_free">свободно %1$s %2$s</string>
     <string name="course_source_expires">годен до %1$s</string>
@@ -605,10 +605,10 @@
         <item quantity="other">выделено %d приёма</item>
     </plurals>
     <plurals name="course_source_beyond_limit">
-        <item quantity="one">Из этой пачки выйдет только %d приём.</item>
-        <item quantity="few">Из этой пачки выйдет только %d приёма.</item>
-        <item quantity="many">Из этой пачки выйдет только %d приёмов.</item>
-        <item quantity="other">Из этой пачки выйдет только %d приёма.</item>
+        <item quantity="one">Отсюда выйдет только %d приём.</item>
+        <item quantity="few">Отсюда выйдет только %d приёма.</item>
+        <item quantity="many">Отсюда выйдет только %d приёмов.</item>
+        <item quantity="other">Отсюда выйдет только %d приёма.</item>
     </plurals>
     <string name="course_change">Изменение лечения</string>
     <string name="course_start_treatment">Начать лечение</string>
@@ -616,7 +616,7 @@
     <string name="course_edit_action">Изменить</string>
     <string name="course_cancel_action">Отменить лечение</string>
     <string name="course_cancel_title">Отменить лечение?</string>
-    <string name="course_cancel_explained">Будущие приёмы уйдут, пачки освободятся. Принятое и пропущенное останется в истории.</string>
+    <string name="course_cancel_explained">Будущие приёмы уйдут, препараты освободятся. Принятое и пропущенное останется в истории.</string>
     <string name="course_reductions">Обеспечение сокращалось</string>
     <string name="course_reduction">Приёмы: было %1$d, стало %2$d</string>
     <string name="course_items">Приёмы</string>
@@ -638,34 +638,34 @@
     <string name="course_source_doses_of">из %1$d</string>
     <string name="course_source_no_limit">Укажите дозу и число приёмов — тогда будет что выделять.</string>
     <string name="course_source_gives_nothing">Целой дозы здесь уже не наберётся.</string>
-    <string name="course_source_gives_nothing_for">Одной дозы (%1$s %2$s) здесь не наберётся: доза берётся из одной коробки.</string>
-    <string name="course_source_fault_unit">Другая единица — снимите пачку или поправьте её сведения.</string>
-    <string name="course_source_fault_form">Другая форма — снимите пачку или поправьте её сведения.</string>
-    <string name="course_source_taken">Эта пачка занята другим лечением.</string>
-    <string name="course_source_taken_named">Коробка «%1$s» занята другим лечением.</string>
-    <string name="course_source_unusable">Эту пачку выбрасывают или её полки больше нет.</string>
-    <string name="course_source_unusable_named">Коробку «%1$s» выбрасывают, или её полки больше нет.</string>
-    <string name="course_picking">Подключить пачку</string>
+    <string name="course_source_gives_nothing_for">Одной дозы (%1$s %2$s) здесь не наберётся: доза берётся из одного препарата.</string>
+    <string name="course_source_fault_unit">Другая единица — снимите препарат или поправьте его сведения.</string>
+    <string name="course_source_fault_form">Другая форма — снимите препарат или поправьте его сведения.</string>
+    <string name="course_source_taken">Этот препарат занят другим лечением.</string>
+    <string name="course_source_taken_named">Препарат «%1$s» занят другим лечением.</string>
+    <string name="course_source_unusable">Этот препарат выбрасывают или его полки больше нет.</string>
+    <string name="course_source_unusable_named">Препарат «%1$s» выбрасывают, или его полки больше нет.</string>
+    <string name="course_picking">Подключить препарат</string>
     <string name="course_attach_already">Уже подключена к этому лечению.</string>
     <string name="course_attach_held">Занята другим лечением.</string>
     <string name="course_attach_held_named">Занята лечением «%1$s».</string>
-    <string name="course_attach_needs_form">Укажите форму выпуска у этой пачки, чтобы подключить её к курсу.</string>
+    <string name="course_attach_needs_form">Укажите форму выпуска у этого препарата, чтобы подключить его к курсу.</string>
     <string name="course_attach_other_form">Другая форма выпуска.</string>
     <string name="course_attach_other_unit">Другая единица измерения.</string>
     <string name="course_attach_unusable">Выброшена или утрачена — ждёт ответа.</string>
     <string name="course_attach_incomplete">Сначала укажите дозу и форму лечения.</string>
     <string name="course_picking_search">Поиск по названию</string>
     <string name="course_picking_nothing_found">Ничего не нашлось. Попробуйте другое название.</string>
-    <string name="course_picking_empty">Подходящих пачек нет: заведите коробку на полке или укажите ей форму.</string>
+    <string name="course_picking_empty">Подходящих препаратов нет: заведите лекарство на полке или укажите ему форму.</string>
     <string name="action_got_it">Понятно</string>
     <!-- Сканер (PLAN H3 №24) -->
     <string name="scanner_aim">Наведите на код с упаковки</string>
     <string name="scanner_preview">Изображение с камеры</string>
-    <string name="scanner_camera_denied">Чтобы читать коды с упаковок, приложению нужна камера. Без неё коробки заводятся на полке.</string>
+    <string name="scanner_camera_denied">Чтобы читать коды с упаковок, приложению нужна камера. Без неё лекарства заводятся на полке.</string>
     <string name="scanner_camera_allow">Разрешить камеру</string>
     <string name="scanner_camera_refused">Камера запрещена. Разрешить её можно в настройках приложения.</string>
     <string name="scanner_camera_settings">Открыть настройки</string>
-    <string name="scanner_camera_absent">На этом устройстве нет камеры. Заводите коробки на полке — там же, где и без кода.</string>
+    <string name="scanner_camera_absent">На этом устройстве нет камеры. Заводите лекарства на полке — там же, где и без кода.</string>
     <string name="scanner_unsupported">Этот код не поддерживается: на упаковках лекарств стоит DataMatrix.</string>
     <string name="pack_scan_asking">Спрашиваем «Честный знак» о коде с упаковки…</string>
     <string name="pack_scan_not_found">Реестр не знает этого кода — заполните поля сами.</string>

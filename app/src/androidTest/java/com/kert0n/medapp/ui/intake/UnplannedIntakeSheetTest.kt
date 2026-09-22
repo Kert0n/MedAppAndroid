@@ -109,7 +109,7 @@ class UnplannedIntakeSheetTest {
     fun theButtonStaysAliveAndTheRefusalIsInWords() {
         show(taking(error = UnplannedIntakeError.Rejected(IntakeRejected.Reason.INSUFFICIENT)))
 
-        compose.onNodeWithText("В коробке столько не наберётся.").assertIsDisplayed()
+        compose.onNodeWithText("Столько здесь не наберётся.").assertIsDisplayed()
         compose.onNodeWithText("Принять").performClick()
 
         assertEquals(1, recorded)

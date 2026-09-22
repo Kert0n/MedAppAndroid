@@ -80,7 +80,7 @@ class IntakeCardScreenTest {
         compose.onNodeWithText("Назначено на 10.03.2027 в 09:00: 2 таблетка").assertIsDisplayed()
         // Коробка выбирается из источников лечения, и плановая стоит выбранной. Имя «Нурофен»
         // здесь и в заголовке, и в поле, поэтому спрашивается само поле, а не текст вообще.
-        compose.onNodeWithText("Из какой коробки").assertIsDisplayed()
+        compose.onNodeWithText("Откуда принять").assertIsDisplayed()
         compose.onAllNodesWithText("Нурофен").assertCountEquals(2)
         compose.onNodeWithText("Принял").performClick()
         assertEquals(1, confirmed)
@@ -106,7 +106,7 @@ class IntakeCardScreenTest {
         compose.onNodeWithText("Принял").assertDoesNotExist()
         compose.onNodeWithText("Пропустил").assertDoesNotExist()
         // Выбирать отвеченному нечего: он говорит, откуда взяли на самом деле.
-        compose.onNodeWithText("Из коробки: Нурофен").assertIsDisplayed()
+        compose.onNodeWithText("Из: Нурофен").assertIsDisplayed()
     }
 
     /** Пункта больше нет — сказано словами: пустая карточка читается как поломка. */

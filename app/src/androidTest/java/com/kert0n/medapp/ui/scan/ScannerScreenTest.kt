@@ -51,7 +51,7 @@ class ScannerScreenTest {
     fun aDeviceWithoutACameraIsToldSoAndAsksForNothing() {
         show(ScannerUiState(camera = ScannerCamera.ABSENT))
 
-        compose.onNodeWithText("На этом устройстве нет камеры. Заводите коробки на полке — там же, где и без кода.")
+        compose.onNodeWithText("На этом устройстве нет камеры. Заводите лекарства на полке — там же, где и без кода.")
             .assertIsDisplayed()
         compose.onNodeWithText("Разрешить камеру").assertIsNotDisplayed()
     }

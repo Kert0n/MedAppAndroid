@@ -168,7 +168,7 @@ class ShelfClearingStoryTest {
     private fun sheThrowsOneAwayAndCorrectsAnother() {
         openFromPopup("Нурофен")
         compose.onNodeWithContentDescription("Выбросить").performClick()
-        compose.waitUntil(WAIT) { shown("Выбросить упаковку?") }
+        compose.waitUntil(WAIT) { shown("Выбросить лекарство?") }
         compose.onAllNodesWithText("Выбросить").onLast().performClick()
         compose.waitUntil(WAIT) { shown(EXPIRY) && !shown("Нурофен") }
 

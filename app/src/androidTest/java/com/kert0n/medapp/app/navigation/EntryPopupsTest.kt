@@ -175,7 +175,7 @@ class EntryPopupsTest {
         compose.onNodeWithText("Нурофен").performClick()
         compose.waitUntil(WAIT) { shown("Сколько есть") }
         compose.onNodeWithContentDescription("Выбросить").performClick()
-        compose.waitUntil(WAIT) { shown("Выбросить упаковку?") }
+        compose.waitUntil(WAIT) { shown("Выбросить лекарство?") }
         compose.onNodeWithText("Выбросить").performClick()
 
         // Вернулся: пропущенного нет — за вчера отвечено; в новости о сроке остался только Цетрин,

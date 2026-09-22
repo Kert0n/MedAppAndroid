@@ -104,7 +104,7 @@ class PackageTransferScreenTest {
     fun withNowhereToMoveTheScreenSaysSo() {
         show(transfer(places = emptyList()))
 
-        compose.onNodeWithText("Переносить некуда: другой аптечки пока нет. Заведите вторую — и коробку будет куда положить.").assertIsDisplayed()
+        compose.onNodeWithText("Переносить некуда: другой аптечки пока нет. Заведите вторую — и будет куда переложить.").assertIsDisplayed()
         compose.onNodeWithText("Перенести").assertDoesNotExist()
     }
 
@@ -124,7 +124,7 @@ class PackageTransferScreenTest {
     fun aBoxOthersClaimWarnsBeforeTheChoice() {
         show(transfer().copy(hasClaimsOfOthers = true))
 
-        compose.onNodeWithText("На эту коробку заявили и другие. Кто не видит выбранную аптечку — потеряет свою бронь.")
+        compose.onNodeWithText("На это лекарство заявили и другие. Кто не видит выбранную аптечку — потеряет свою бронь.")
             .assertIsDisplayed()
     }
 
@@ -139,6 +139,6 @@ class PackageTransferScreenTest {
     @Test
     fun aGoneBoxIsSaidOutLoud() {
         show(PackageTransferUiState(isGone = true, isLoaded = true))
-        compose.onNodeWithText("Этой упаковки больше нет.").assertIsDisplayed()
+        compose.onNodeWithText("Этого лекарства больше нет.").assertIsDisplayed()
     }
 }

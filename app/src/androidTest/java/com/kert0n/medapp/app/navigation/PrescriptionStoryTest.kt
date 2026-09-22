@@ -122,7 +122,7 @@ class PrescriptionStoryTest {
         compose.waitUntil(WAIT) { compose.onAllNodesWithText("Пока пусто").fetchSemanticsNodes().isNotEmpty() }
 
         compose.onNodeWithText("Домашняя").performClick()
-        compose.onNodeWithText("Завести упаковку").performClick()
+        compose.onNodeWithText("Завести лекарство").performClick()
         compose.onNodeWithText("Название").performTextInput("Нурофен")
         compose.onNodeWithText("Форма выпуска").performScrollTo().performClick()
         compose.onNodeWithText("таблетки").performClick()
@@ -182,9 +182,9 @@ class PrescriptionStoryTest {
     private fun sheAttachesTheBoxAndAllocatesDoses() {
         compose.onNodeWithText("Источники лечения").performScrollTo().performClick()
         compose.waitUntil(WAIT) {
-            compose.onAllNodesWithText("Подключить ещё коробку").fetchSemanticsNodes().isNotEmpty()
+            compose.onAllNodesWithText("Подключить ещё препарат").fetchSemanticsNodes().isNotEmpty()
         }
-        compose.onNodeWithText("Подключить ещё коробку").performClick()
+        compose.onNodeWithText("Подключить ещё препарат").performClick()
 
         compose.onNodeWithText("Сначала укажите дозу и форму лечения.").assertDoesNotExist()
         compose.onNodeWithText("Нурофен").performClick()

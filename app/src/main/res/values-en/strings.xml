@@ -22,7 +22,7 @@
         invitation — but first decide whether to start a new account.</string>
     <string name="setup_key_lost_stays">Stays</string>
     <string-array name="setup_key_lost_stays_items">
-        <item>Local kits and boxes</item>
+        <item>Local kits and medicines</item>
         <item>Treatments and intake history</item>
     </string-array>
     <string name="setup_key_lost_goes">Goes away</string>
@@ -72,11 +72,11 @@
     <string name="field_required">required</string>
 
     <!-- Package: add and edit -->
-    <string name="pack_new">New package</string>
-    <string name="pack_edit">Edit package</string>
+    <string name="pack_new">New medicine</string>
+    <string name="pack_edit">Edit medicine</string>
     <string name="pack_med_kit">Kit</string>
     <string name="pack_med_kit_unknown">Kit not found</string>
-    <string name="pack_no_med_kits">Add a kit first — packages are put into one.</string>
+    <string name="pack_no_med_kits">Add a kit first — medicines are put into one.</string>
     <string name="pack_name">Name</string>
     <string name="pack_amount">Quantity</string>
     <string name="pack_recount">Recount</string>
@@ -98,21 +98,21 @@
     <string name="pack_left">%1$s %2$s</string>
 
     <!-- Package: refusals -->
-    <string name="pack_med_kit_missing">Choose a kit: a package lies in one particular place.</string>
+    <string name="pack_med_kit_missing">Choose a kit: a medicine lies in one particular place.</string>
     <string name="pack_med_kit_gone">This kit no longer exists — choose another.</string>
     <string name="pack_med_kit_busy">The kit is waiting for the server\'s answer on another decision — it\'s too early to put anything in it.</string>
-    <string name="pack_name_empty">A name is needed: without it the package can\'t be found by search or by eye.</string>
+    <string name="pack_name_empty">A name is needed: without it the medicine can\'t be found by search or by eye.</string>
     <string name="pack_unit_missing">Choose a unit: without it the quantity measures nothing.</string>
-    <string name="pack_amount_is_zero">There\'s no point adding an empty package — say how much is in it.</string>
+    <string name="pack_amount_is_zero">Nothing to add: say how much there is.</string>
     <string name="pack_hint_is_zero">There is no such thing as a zero dose.</string>
-    <string name="pack_form_clear_unsupported">A shared package\'s dosage form can\'t be cleared — only replaced with another.</string>
+    <string name="pack_form_clear_unsupported">A shared medicine\'s dosage form can\'t be cleared — only replaced with another.</string>
     <string name="pack_unknown_in_vocabulary">This value is not in the vocabulary — choose another.</string>
-    <string name="pack_gone">This package no longer exists.</string>
+    <string name="pack_gone">This medicine no longer exists.</string>
     <string name="pack_suggestions_searching">Searching the catalogue…</string>
     <string name="pack_suggestions_none">Nothing found in the catalogue.</string>
     <string name="pack_suggestions_unavailable">No suggestions: %1$s</string>
     <string name="pack_suggestions_title">From the catalogue</string>
-    <string name="pack_busy">The package is waiting for the server\'s answer on another decision — the change can\'t be saved yet.</string>
+    <string name="pack_busy">The medicine is waiting for the server\'s answer on another decision — the change can\'t be saved yet.</string>
     <plurals name="pack_too_long">
         <item quantity="one">The field is longer than %1$d character.</item>
         <item quantity="other">The field is longer than %1$d characters.</item>
@@ -140,8 +140,8 @@
     <string name="contents_menu">What to do with the kit</string>
     <string name="contents_edit">Edit</string>
     <string name="contents_remove">Remove</string>
-    <string name="contents_add">Add a package</string>
-    <string name="contents_empty_here">Nothing here yet. Add a package — and it will appear in the list.</string>
+    <string name="contents_add">Add a medicine</string>
+    <string name="contents_empty_here">Nothing here yet. Add a medicine — and it will appear in the list.</string>
     <string name="contents_shelf_gone">You no longer have this kit.</string>
     <string name="contents_empty_everywhere">All kits are empty for now.</string>
     <string name="contents_nothing_found">Nothing found.</string>
@@ -180,7 +180,7 @@
     <string name="med_kit_removal_busy">The kit is waiting for the server\'s answer on another decision — it can\'t be removed yet.</string>
     <string name="med_kit_removal_target_gone">That kit no longer exists — choose another.</string>
     <string name="med_kit_removal_target_busy">That kit is waiting for the server\'s answer — it\'s too early to move anything into it.</string>
-    <string name="med_kit_removal_contents_busy">One of the packages is waiting for the server\'s answer — wait for it and try again.</string>
+    <string name="med_kit_removal_contents_busy">One of the medicines is waiting for the server\'s answer — wait for it and try again.</string>
     <string name="med_kit_removal_not_shared">This kit is yours alone — there is no one to leave it to.</string>
 
     <!-- Share a kit (screen 20) -->
@@ -189,7 +189,7 @@
     <string name="med_kit_sharing_invite_menu">Invite</string>
     <string name="med_kit_sharing_becomes_shared">Becomes shared</string>
     <string-array name="med_kit_sharing_becomes_shared_items">
-        <item>Package name, quantity and unit</item>
+        <item>Medicine name, quantity and unit</item>
         <item>Form and category</item>
         <item>Manufacturer, country, description</item>
     </string-array>
@@ -272,7 +272,7 @@
     <string name="permissions_camera">Camera</string>
     <string name="permissions_granted">Allowed</string>
     <string name="permissions_denied">Off — fix in the phone\'s settings</string>
-    <string name="permissions_absent">Not on this device — packages are added on a kit</string>
+    <string name="permissions_absent">Not on this device — medicines are added on a kit</string>
     <string name="permissions_not_needed">Not needed on this version of Android</string>
 
     <!-- Language (screen 27). Language names are in their own language and are not translated. -->
@@ -284,7 +284,7 @@
     <string name="sync_refreshed_at">Last sync at %1$s</string>
     <string name="sync_never">No sync yet</string>
     <string name="sync_all_delivered">Everything got through</string>
-    <string name="sync_recount">Recount the box</string>
+    <string name="sync_recount">Recount what\'s left</string>
     <string name="sync_dismiss">Resolved</string>
     <string name="sync_dismiss_gone">This row is already gone — the server sync closed it.</string>
     <string name="sync_dismiss_not_awaiting">Nothing to resolve here: the row is waiting to be sent or has already been applied.</string>
@@ -293,23 +293,23 @@
     <string name="sync_refused">The server refused</string>
     <string name="sync_unreadable">This row cannot be read</string>
     <string name="sync_about_named">%1$s: “%2$s”</string>
-    <string name="sync_about_package_created">New package</string>
-    <string name="sync_about_package_changed">Package change</string>
-    <string name="sync_about_package_moved">Package move</string>
-    <string name="sync_about_package_removed">Package removal</string>
+    <string name="sync_about_package_created">New medicine</string>
+    <string name="sync_about_package_changed">Medicine change</string>
+    <string name="sync_about_package_moved">Medicine move</string>
+    <string name="sync_about_package_removed">Medicine removal</string>
     <string name="sync_about_intake">Intake</string>
     <string name="sync_about_claim">Allocation to a treatment</string>
     <string name="sync_about_med_kit">Decision about a kit</string>
     <string name="sync_about_unknown">Unknown operation</string>
     <string name="sync_reason_invalid">The server did not accept the data</string>
     <string name="sync_reason_not_enough">The server has less left than you took</string>
-    <string name="sync_reason_unit_changed">The box\'s unit of measure has changed</string>
-    <string name="sync_reason_stale">The box was changed before you</string>
-    <string name="sync_reason_conflict">The box was changed before you</string>
+    <string name="sync_reason_unit_changed">The medicine\'s unit of measure has changed</string>
+    <string name="sync_reason_stale">The medicine was changed before you</string>
+    <string name="sync_reason_conflict">The medicine was changed before you</string>
     <string name="sync_reason_superseded">Cancelled together with what it depended on</string>
 
     <!-- Package card -->
-    <string name="pack_title">Package</string>
+    <string name="pack_title">Medicine</string>
     <string name="pack_how_much">How much there is</string>
     <string name="pack_available_to_me">Available to me</string>
     <string name="pack_free_for_anyone">Free for anyone</string>
@@ -317,13 +317,13 @@
     <string name="pack_held_by_course">Held by treatment “%1$s”</string>
     <string name="pack_unconfirmed">The change hasn\'t reached the shared kit yet.</string>
     <string name="pack_removal_on_the_way">Removal on its way: the shared kit hasn\'t answered yet.</string>
-    <string name="pack_lost">You left this kit — the box is waiting for the server\'s answer.</string>
+    <string name="pack_lost">You left this kit — the medicine is waiting for the server\'s answer.</string>
     <!-- The same marks as list rows: short, because a row is not a card -->
     <string name="pack_row_unconfirmed">Change on its way</string>
     <string name="pack_row_removal">Removal on its way</string>
-    <string name="pack_row_lost">Box not with us</string>
+    <string name="pack_row_lost">Medicine not with us</string>
     <string name="pack_refused_by_server">The server rejected the change</string>
-    <string name="pack_refused_by_server_explained">Recount the box — there is a dispute about how much is really in it</string>
+    <string name="pack_refused_by_server_explained">Recount what\'s left — there is a dispute about how much is really here</string>
     <string name="med_kit_publishing">Publishing</string>
     <string name="med_kit_removing">Removing</string>
     <string name="pack_what_it_is">What it is</string>
@@ -336,24 +336,24 @@
     <string name="pack_action_edit">Edit details</string>
     <string name="pack_action_remove">Throw away</string>
     <string name="pack_action_transfer">Move</string>
-    <string name="pack_remove_title">Throw the package away?</string>
-    <string name="pack_remove_explained">The package will be gone. Intakes from it will stay in history.</string>
-    <string name="pack_remove_busy">The package is waiting for the server\'s answer on another decision — it can\'t be thrown away yet.</string>
+    <string name="pack_remove_title">Throw the medicine away?</string>
+    <string name="pack_remove_explained">The medicine will be gone. Intakes from it will stay in history.</string>
+    <string name="pack_remove_busy">The medicine is waiting for the server\'s answer on another decision — it can\'t be thrown away yet.</string>
 
     <!-- Recount -->
     <string name="recount_now">Recorded now: %1$s %2$s</string>
     <string name="recount_seen">Counted and saw</string>
     <string name="recount_explained">Name what you see in total — the subtraction is done by the app.</string>
     <string name="recount_record">Record</string>
-    <string name="recount_zero">Zero means throwing the package away: do that from its card.</string>
-    <string name="recount_busy">The package is waiting for the server\'s answer on another decision — the recount can\'t be saved yet.</string>
+    <string name="recount_zero">Zero means throwing the medicine away: do that from its card.</string>
+    <string name="recount_busy">The medicine is waiting for the server\'s answer on another decision — the recount can\'t be saved yet.</string>
 
     <!-- Moving a package -->
     <string name="transfer_title">Where to move</string>
     <string name="transfer_shared">Shared kit</string>
-    <string name="transfer_claims_of_others">Others have claimed this box too. Whoever can\'t see the chosen kit will lose their claim.</string>
-    <string name="transfer_nowhere">Nowhere to move to: there is no other kit yet. Add a second one — and there will be somewhere to put the box.</string>
-    <string name="transfer_busy">The package is waiting for the server\'s answer on another decision — it can\'t be moved yet.</string>
+    <string name="transfer_claims_of_others">Others have claimed this medicine too. Whoever can\'t see the chosen kit will lose their claim.</string>
+    <string name="transfer_nowhere">Nowhere to move to: there is no other kit yet. Add a second one — and there will be somewhere to move it.</string>
+    <string name="transfer_busy">The medicine is waiting for the server\'s answer on another decision — it can\'t be moved yet.</string>
     <string name="transfer_origin_busy">The kit it\'s being taken from is waiting for the server\'s answer on its own decision.</string>
     <string name="transfer_target_gone">The chosen kit no longer exists — choose another.</string>
     <string name="transfer_target_busy">The chosen kit is waiting for the server\'s answer — it\'s too early to put anything in it.</string>
@@ -382,8 +382,8 @@
 
     <!-- Notifications: texts -->
     <string name="notice_intake_due_title">Time to take: %1$s</string>
-    <string name="notice_intake_due_body">%1$s from box “%2$s”</string>
-    <string name="notice_intake_due_unsupplied">%1$s — there is no box for this intake</string>
+    <string name="notice_intake_due_body">%1$s · %2$s</string>
+    <string name="notice_intake_due_unsupplied">%1$s — nowhere to take it from</string>
     <string name="notice_intake_decision_title">Not recorded: %1$s</string>
     <string name="notice_intake_decision_body">“Taken” could not record the intake — open to decide where to take the dose from</string>
     <string name="notice_intake_missed_title">Missed intake: %1$s</string>
@@ -436,11 +436,11 @@
     <string name="intake_history_title">Intake history</string>
     <string name="intake_history_empty">Nothing has been taken from here yet</string>
     <string name="intake_history_no_amount">dose not recorded</string>
-    <string name="intake_history_of_package">Intakes from this box</string>
+    <string name="intake_history_of_package">Intake history</string>
     <string name="intake_history_of_course">Full history</string>
     <string name="course_off_plan_action">Intakes outside the schedule</string>
     <string name="course_off_plan_beyond">More than the treatment has left: %1$s can be counted.</string>
-    <string name="course_off_plan_explained">These intakes count towards the treatment, but don\'t touch the box and don\'t go into history.</string>
+    <string name="course_off_plan_explained">These intakes count towards the treatment, but don\'t touch what\'s left and don\'t go into history.</string>
     <string name="course_off_plan_less">One fewer</string>
     <string name="course_off_plan_more">One more</string>
     <plurals name="course_off_plan_count">
@@ -451,9 +451,9 @@
     <string name="intake_card_gone">This intake no longer exists</string>
     <string name="intake_already_answered">This intake has already been answered.</string>
     <string name="intake_planned">Scheduled for %1$s at %2$s: %3$s</string>
-    <string name="intake_from_package">From box: %1$s</string>
-    <string name="intake_source">From which box</string>
-    <string name="intake_no_sources">The treatment has no boxes attached</string>
+    <string name="intake_from_package">From: %1$s</string>
+    <string name="intake_source">Where from</string>
+    <string name="intake_no_sources">The treatment has no drugs attached</string>
     <string name="intake_amount">How much was taken</string>
     <string name="intake_taken_on">On which day</string>
     <string name="intake_taken_at">At what time</string>
@@ -486,12 +486,12 @@
     </plurals>
     <string name="course_shortage_from">%1$s from %2$s</string>
     <string name="course_shortage_what_to_do">What can be done</string>
-    <string name="course_shortage_attach">Attach another box</string>
+    <string name="course_shortage_attach">Attach another drug</string>
     <string name="course_shortage_attach_explained">From those that suit this treatment</string>
     <string name="course_shortage_reallocate">Change allocations</string>
-    <string name="course_shortage_reallocate_explained">Rearrange how much is taken from each box</string>
-    <string name="course_shortage_buy">Add a box you bought</string>
-    <string name="course_shortage_buy_explained">Add a package and attach it to the treatment</string>
+    <string name="course_shortage_reallocate_explained">Rearrange how much is taken from each drug</string>
+    <string name="course_shortage_buy">Add a drug you bought</string>
+    <string name="course_shortage_buy_explained">Add a drug and attach it to the treatment</string>
     <string name="course_new">New treatment</string>
     <string name="course_edit">Treatment draft</string>
     <string name="course_title">Name</string>
@@ -509,7 +509,7 @@
     <string name="course_gone">This draft no longer exists.</string>
     <string name="course_discard">Delete the draft</string>
     <string name="course_discard_title">Delete the draft?</string>
-    <string name="course_discard_explained">The recorded prescription and note will be lost. It held no packages.</string>
+    <string name="course_discard_explained">The recorded prescription and note will be lost. It held no drugs.</string>
     <string name="course_leave_title">Keep the draft?</string>
     <string name="course_leave_explained">To attach sources, the treatment was saved as a draft. The prescription and note can be finished later.</string>
     <string name="course_leave_keep">Keep</string>
@@ -536,16 +536,16 @@
     <string name="course_rejected_dose_missing">To start, set a dose.</string>
     <string name="course_rejected_form_missing">To start, set a dosage form.</string>
     <string name="course_rejected_total_doses_missing">To start, say how many intakes in total.</string>
-    <string name="course_rejected_unit_mismatch">The attached packages use a different unit — detach them first.</string>
-    <string name="course_rejected_form_mismatch">The attached packages have a different form — detach them first.</string>
+    <string name="course_rejected_unit_mismatch">The attached drugs use a different unit — detach them first.</string>
+    <string name="course_rejected_form_mismatch">The attached drugs have a different form — detach them first.</string>
     <string name="course_rejected_schedule_in_past">A new schedule can\'t start before today.</string>
-    <string name="course_rejected_already_attached">This package is already attached.</string>
-    <string name="course_rejected_package_unusable">This package is being thrown away or its shelf is gone — it can\'t be a source.</string>
+    <string name="course_rejected_already_attached">This drug is already attached.</string>
+    <string name="course_rejected_package_unusable">This drug is being thrown away or its shelf is gone — it can\'t be a source.</string>
     <string name="course_missing">This treatment no longer exists.</string>
     <string name="course_finished">This treatment is already over.</string>
     <string name="course_sources">Sources</string>
     <string name="course_sources_open">Treatment sources</string>
-    <string name="course_sources_add">Attach another box</string>
+    <string name="course_sources_add">Attach another drug</string>
     <string name="course_sources_supply">Supply</string>
     <string name="course_sources_recorded">Saved</string>
     <string name="course_sources_with_edit">With the change</string>
@@ -556,21 +556,21 @@
     <string name="intake_free_of_total">%1$s of %2$s free</string>
     <string name="intake_taken_amount">How much was taken</string>
     <string name="intake_record">Take</string>
-    <string name="intake_not_enough">The box doesn\'t have that much.</string>
-    <string name="intake_package_unusable">This box no longer exists.</string>
-    <string name="intake_unit_mismatch">The box is counted in a different unit.</string>
+    <string name="intake_not_enough">There isn\'t that much here.</string>
+    <string name="intake_package_unusable">This medicine no longer exists.</string>
+    <string name="intake_unit_mismatch">The medicine is counted in a different unit.</string>
     <string name="intake_episode_closed">The treatment is over: its plan no longer accepts answers.</string>
-    <string name="intake_not_a_source">This box is not among the treatment\'s sources — record the intake as one-off.</string>
+    <string name="intake_not_a_source">This medicine is not among the treatment\'s sources — record the intake as one-off.</string>
     <string name="course_sources_stale">The sources were edited from another screen — the list was reread, try again.</string>
-    <string name="course_sources_empty">No packages yet — attach the first one.</string>
+    <string name="course_sources_empty">No drugs yet — attach the first one.</string>
     <string name="course_source_detach">Detach</string>
-    <string name="course_source_detach_title">Detach the package?</string>
-    <string name="course_source_detach_explained">The treatment will stay, but this box will stop supplying it and its claim will be released.</string>
+    <string name="course_source_detach_title">Detach the drug?</string>
+    <string name="course_source_detach_explained">The treatment will stay, but this drug will stop supplying it and its claim will be released.</string>
     <string name="course_source_handle">Reorder: %1$s</string>
     <string name="course_source_move_up">Up</string>
     <string name="course_source_move_down">Down</string>
     <string name="course_source_expired">Expired: good until %1$s</string>
-    <string name="course_source_expired_title">The box has expired</string>
+    <string name="course_source_expired_title">The drug has expired</string>
     <string name="course_source_expired_body">The treatment will take from “%1$s” — it was good until %2$s. It\'s your call; we only warn.</string>
     <string name="action_understood">Got it</string>
     <string name="course_source_free">%1$s %2$s free</string>
@@ -580,8 +580,8 @@
         <item quantity="other">%d intakes allocated</item>
     </plurals>
     <plurals name="course_source_beyond_limit">
-        <item quantity="one">This package only yields %d intake.</item>
-        <item quantity="other">This package only yields %d intakes.</item>
+        <item quantity="one">Only %d intake will come out of this.</item>
+        <item quantity="other">Only %d intakes will come out of this.</item>
     </plurals>
     <string name="course_change">Change of treatment</string>
     <string name="course_start_treatment">Start the treatment</string>
@@ -589,7 +589,7 @@
     <string name="course_edit_action">Change</string>
     <string name="course_cancel_action">Cancel the treatment</string>
     <string name="course_cancel_title">Cancel the treatment?</string>
-    <string name="course_cancel_explained">Future intakes will go, packages will be released. What was taken and missed stays in history.</string>
+    <string name="course_cancel_explained">Future intakes will go, drugs will be released. What was taken and missed stays in history.</string>
     <string name="course_reductions">Supply was reduced</string>
     <string name="course_reduction">Intakes: was %1$d, now %2$d</string>
     <string name="course_items">Intakes</string>
@@ -609,35 +609,35 @@
     <string name="course_source_doses_of">of %1$d</string>
     <string name="course_source_no_limit">Set the dose and the number of intakes — then there will be something to allocate.</string>
     <string name="course_source_gives_nothing">Not even a whole dose is left here.</string>
-    <string name="course_source_gives_nothing_for">Not even one dose (%1$s %2$s) is here: a dose is taken from a single box.</string>
-    <string name="course_source_fault_unit">Different unit — detach the package or fix its details.</string>
-    <string name="course_source_fault_form">Different form — detach the package or fix its details.</string>
-    <string name="course_source_taken">This package is held by another treatment.</string>
+    <string name="course_source_gives_nothing_for">Not even one dose (%1$s %2$s) is here: a dose is taken from a single drug.</string>
+    <string name="course_source_fault_unit">Different unit — detach the drug or fix its details.</string>
+    <string name="course_source_fault_form">Different form — detach the drug or fix its details.</string>
+    <string name="course_source_taken">This drug is held by another treatment.</string>
     <string name="course_source_taken_named">“%1$s” is held by another treatment.</string>
-    <string name="course_source_unusable">This package is being thrown away or its shelf is gone.</string>
+    <string name="course_source_unusable">This drug is being thrown away or its shelf is gone.</string>
     <string name="course_source_unusable_named">“%1$s” is being thrown away or its shelf is gone.</string>
-    <string name="course_picking">Attach a package</string>
+    <string name="course_picking">Attach a drug</string>
     <string name="course_attach_already">Already attached to this treatment.</string>
     <string name="course_attach_held">Held by another treatment.</string>
     <string name="course_attach_held_named">Held by treatment “%1$s”.</string>
-    <string name="course_attach_needs_form">Set this package\'s dosage form to attach it to a treatment.</string>
+    <string name="course_attach_needs_form">Set this drug\'s dosage form to attach it to a treatment.</string>
     <string name="course_attach_other_form">Different dosage form.</string>
     <string name="course_attach_other_unit">Different unit of measure.</string>
     <string name="course_attach_unusable">Thrown away or lost — waiting for an answer.</string>
     <string name="course_attach_incomplete">Set the treatment\'s dose and form first.</string>
     <string name="course_picking_search">Search by name</string>
     <string name="course_picking_nothing_found">Nothing found. Try a different name.</string>
-    <string name="course_picking_empty">No suitable packages: add a box on a shelf or set its form.</string>
+    <string name="course_picking_empty">No suitable drugs: add a medicine on a shelf or set its form.</string>
     <string name="action_got_it">Got it</string>
 
     <!-- Scanner -->
     <string name="scanner_aim">Point at the code on the package</string>
     <string name="scanner_preview">Camera image</string>
-    <string name="scanner_camera_denied">To read codes from packages, the app needs the camera. Without it, add packages on a kit.</string>
+    <string name="scanner_camera_denied">To read codes from packages, the app needs the camera. Without it, add medicines on a kit.</string>
     <string name="scanner_camera_allow">Allow the camera</string>
     <string name="scanner_camera_refused">The camera is not allowed. You can allow it in the app settings.</string>
     <string name="scanner_camera_settings">Open settings</string>
-    <string name="scanner_camera_absent">This device has no camera. Add packages on a kit — just as without a code.</string>
+    <string name="scanner_camera_absent">This device has no camera. Add medicines on a kit — just as without a code.</string>
     <string name="scanner_unsupported">This code is not supported: medicine packages carry a DataMatrix code.</string>
     <string name="pack_scan_asking">Asking the Chestny Znak registry about the code…</string>
     <string name="pack_scan_not_found">The registry does not know this code — fill in the fields yourself.</string>

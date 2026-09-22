@@ -235,7 +235,7 @@ class SharedShelfStoryTest {
         refreshFromOptions()
 
         compose.waitUntil(WAIT) { shown("На сервере осталось меньше, чем вы списали") }
-        compose.onNodeWithText("Пересчитать коробку").assertIsDisplayed()
+        compose.onNodeWithText("Пересчитать остаток").assertIsDisplayed()
     }
 
     /** К местам — возвратами: панели мест в глубине нет, она у мест (PLAN H3 «Оболочка»). */

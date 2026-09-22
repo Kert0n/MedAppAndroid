@@ -95,8 +95,8 @@ class SyncStatusScreenTest {
 
         compose.onNodeWithText("Приём: «Нурофен»").assertIsDisplayed()
         compose.onNodeWithText("Отправится, когда будет связь").assertIsDisplayed()
-        compose.onNodeWithText("Изменение упаковки: «Ибупрофен»").assertIsDisplayed()
-        compose.onNodeWithText("Коробку изменили раньше вас").assertIsDisplayed()
+        compose.onNodeWithText("Изменение лекарства: «Ибупрофен»").assertIsDisplayed()
+        compose.onNodeWithText("Лекарство изменили раньше вас").assertIsDisplayed()
         compose.onNodeWithText("Эту строку нечем прочитать").assertIsDisplayed()
     }
 
@@ -105,7 +105,7 @@ class SyncStatusScreenTest {
     fun aQuantityConflictLeadsToRecounting() {
         show(SyncStatusUiState(rows = listOf(refused()), isLoaded = true))
 
-        compose.onNodeWithText("Пересчитать коробку").performClick()
+        compose.onNodeWithText("Пересчитать остаток").performClick()
 
         assertEquals(pack, recounted)
     }

@@ -92,7 +92,7 @@ class SourcePickingScreenTest {
         compose.onNodeWithText("Нурофен").performClick()
 
         assertNull(attached)
-        compose.onNodeWithText("Укажите форму выпуска у этой пачки, чтобы подключить её к курсу.")
+        compose.onNodeWithText("Укажите форму выпуска у этого препарата, чтобы подключить его к курсу.")
             .assertIsDisplayed()
     }
 
@@ -119,7 +119,7 @@ class SourcePickingScreenTest {
     fun nothingToAttachIsExplained() {
         show(SourcePickingUiState())
 
-        compose.onNodeWithText("Подходящих пачек нет: заведите коробку на полке или укажите ей форму.")
+        compose.onNodeWithText("Подходящих препаратов нет: заведите лекарство на полке или укажите ему форму.")
             .assertIsDisplayed()
     }
 
@@ -149,7 +149,7 @@ class SourcePickingScreenTest {
             )
         )
 
-        compose.onNodeWithText("Коробка просрочена").assertIsDisplayed()
+        compose.onNodeWithText("Препарат просрочен").assertIsDisplayed()
         compose.onNodeWithText("Понятно").performClick()
 
         assertEquals(1, expiredSeen)
