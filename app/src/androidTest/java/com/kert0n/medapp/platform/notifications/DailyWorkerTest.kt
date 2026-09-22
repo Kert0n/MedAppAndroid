@@ -65,7 +65,7 @@ class DailyWorkerTest {
         TestListenableWorkerBuilder<DailyWorker>(context)
             .setWorkerFactory(object : WorkerFactory() {
                 override fun createWorker(appContext: Context, workerClassName: String, workerParameters: WorkerParameters): ListenableWorker =
-                    DailyWorker(appContext, workerParameters, scenarios.dailyRound, WorkManagerDailySchedule({ work }, clock), FakeSettingsStore())
+                    DailyWorker(appContext, workerParameters, scenarios.dailyRound, scenarios.reminderOutbox, WorkManagerDailySchedule({ work }, clock), FakeSettingsStore())
             })
             .build()
 
@@ -195,7 +195,7 @@ class DailyWorkerTest {
         val worker = TestListenableWorkerBuilder<DailyWorker>(context)
             .setWorkerFactory(object : WorkerFactory() {
                 override fun createWorker(appContext: Context, workerClassName: String, workerParameters: WorkerParameters): ListenableWorker =
-                    DailyWorker(appContext, workerParameters, Scenarios(database, now).dailyRound, schedule, settings)
+                    Scenarios(database, now).let { DailyWorker(appContext, workerParameters, it.dailyRound, it.reminderOutbox, schedule, settings) }
             })
             .build()
         assertEquals(ListenableWorker.Result.success(), worker.doWork())
