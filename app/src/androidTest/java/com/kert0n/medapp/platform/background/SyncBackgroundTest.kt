@@ -3,7 +3,6 @@ package com.kert0n.medapp.platform.background
 import android.content.Context
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import androidx.test.platform.app.InstrumentationRegistry
-import androidx.work.Configuration
 import androidx.work.ListenableWorker
 import androidx.work.NetworkType
 import androidx.work.WorkInfo
@@ -11,7 +10,6 @@ import androidx.work.WorkManager
 import androidx.work.WorkerFactory
 import androidx.work.WorkerParameters
 import androidx.work.testing.TestListenableWorkerBuilder
-import androidx.work.testing.WorkManagerTestInitHelper
 import androidx.work.workDataOf
 import com.kert0n.medapp.fixture.INTAKE
 import com.kert0n.medapp.fixture.settle
@@ -56,7 +54,11 @@ import org.junit.After
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
+import dagger.hilt.android.testing.HiltAndroidRule
+import dagger.hilt.android.testing.HiltAndroidTest
+import javax.inject.Inject
 import org.junit.Before
+import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
 
@@ -65,21 +67,28 @@ import org.junit.runner.RunWith
  * при связи, остаток очереди спрашивается у базы, а воркер делает то же, что вход в приложение
  * (PLAN E4).
  */
+@HiltAndroidTest
 @RunWith(AndroidJUnit4::class)
 class SyncBackgroundTest {
+
+    // Планировщик берётся из графа: настройка `WorkManager` — на весь процесс, и заводить её
+    // вторым местом значит снова отдать её порядку классов (`fixture/TestWorkModule`).
+    @get:Rule
+    val hilt = HiltAndroidRule(this)
+
+    @Inject
+    lateinit var work: WorkManager
 
     private val context: Context = InstrumentationRegistry.getInstrumentation().targetContext
     private val now: Instant = Instant.parse("2027-03-10T12:00:00Z")
     private val clock: Clock = Clock.fixed(now, ZoneOffset.UTC)
     private lateinit var database: MedAppDatabase
-    private lateinit var work: WorkManager
     private val snapshotReads = AtomicInteger()
 
     @Before
     fun setUp() {
+        hilt.inject()
         database = inMemoryDatabase()
-        WorkManagerTestInitHelper.initializeTestWorkManager(context, Configuration.Builder().build())
-        work = WorkManager.getInstance(context)
     }
 
     @After

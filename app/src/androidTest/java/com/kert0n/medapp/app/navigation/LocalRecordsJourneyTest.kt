@@ -65,6 +65,12 @@ class LocalRecordsJourneyTest {
             )
         }
         compose.setContent { MedAppTheme { MedAppShell() } }
+        // До первого чтения место **ждёт**, а не показывает пустоту: пока чтение не вернулось,
+        // «Завести аптечку» на экране нет, и нажатие падает «Failed to inject touch input».
+        // В одиночку проход успевал, а в полном прогоне под нагрузкой — нет.
+        compose.waitUntil(WAIT) {
+            compose.onAllNodesWithText("Завести аптечку").fetchSemanticsNodes().isNotEmpty()
+        }
     }
 
     /**

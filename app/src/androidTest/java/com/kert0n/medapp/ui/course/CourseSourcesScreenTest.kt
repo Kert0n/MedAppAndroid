@@ -219,6 +219,53 @@ class CourseSourcesScreenTest {
         compose.onNodeWithText("Понятно").assertIsDisplayed()
     }
 
+    /** Где стоит ручка строки: по ней и меряется, на сколько вести палец до соседа. */
+    private fun handleY(name: String): Float =
+        compose.onNodeWithContentDescription("Переставить: $name").fetchSemanticsNode().positionInRoot.y
+
+    /**
+     * Строку берут долгим нажатием **по самой карточке**, а не только по ручке: целиться в
+     * значок размером с ноготь человек не обязан, и тот, кто не знает про ручку, решит, что
+     * порядок вообще не меняется.
+     *
+     * Красная проверка: вернуть жест на один значок — нажатие по телу карточки не делает ничего.
+     */
+    @Test
+    fun aLongPressOnTheCardTakesTheRow() {
+        show(CourseSourcesUiState(sources = listOf(source(), source(OTHER_PACK, "Ибупрофен"))))
+        val step = handleY("Ибупрофен") - handleY("Нурофен")
+
+        compose.onNodeWithText("Нурофен").performTouchInput { down(center) }
+        compose.mainClock.advanceTimeBy(1_000)
+        compose.onNodeWithText("Нурофен").performTouchInput { moveBy(Offset(0f, step)) }
+        compose.onNodeWithText("Нурофен").performTouchInput { up() }
+
+        assertEquals(0 to 1, moved)
+    }
+
+    /**
+     * Соседи расступаются **пока палец ведёт**, а не после того, как его отпустили: человек
+     * должен видеть, куда строка встанет, прежде чем отпустить её. Утверждение проверяется до
+     * `up()` — именно поэтому оно и ловит прежнее устройство, где перестановка случалась в конце
+     * жеста и вслепую.
+     *
+     * Красная проверка: звать перестановку в конце жеста — до отпускания не случается ничего.
+     */
+    @Test
+    fun neighboursSwapWhileTheFingerIsStillDown() {
+        show(CourseSourcesUiState(sources = listOf(source(), source(OTHER_PACK, "Ибупрофен"))))
+        val step = handleY("Ибупрофен") - handleY("Нурофен")
+
+        compose.onNodeWithText("Нурофен").performTouchInput { down(center) }
+        compose.mainClock.advanceTimeBy(1_000)
+        compose.onNodeWithText("Нурофен").performTouchInput { moveBy(Offset(0f, step)) }
+        compose.waitForIdle()
+
+        assertEquals(0 to 1, moved)
+
+        compose.onNodeWithText("Нурофен").performTouchInput { up() }
+    }
+
     /** Ручка перестановки названа экранному чтецу: жест ему недоступен, а порядок менять нужно. */
     @Test
     fun theHandleIsNamedForAScreenReader() {
@@ -261,6 +308,25 @@ class CourseSourcesScreenTest {
 
         compose.onNodeWithContentDescription("Отвязать").assertDoesNotExist()
         compose.onNodeWithText("Подключить ещё препарат").assertDoesNotExist()
+    }
+
+    /**
+     * **Законченное лечение не переставляется — ни пальцем, ни голосом.** «Сохранить» у него нет,
+     * и записать новый порядок некуда: строка, уехавшая под пальцем, обещала бы правку, которой не
+     * будет. Ручка ≡ у такой карточки не рисуется вовсе — предлагать нечего.
+     */
+    @Test
+    fun aFinishedCourseIsNotReorderedByFingerNorByVoice() {
+        show(CourseSourcesUiState(sources = listOf(source(), source(OTHER_PACK, "Ибупрофен")), isFinished = true))
+
+        compose.onNodeWithContentDescription("Переставить: Нурофен").assertDoesNotExist()
+        compose.onNode(hasAnyDescendant(hasText("Нурофен")) and SemanticsMatcher.keyIsDefined(SemanticsActions.CustomActions))
+            .assertDoesNotExist()
+
+        compose.onNodeWithText("Нурофен").performTouchInput { down(center) }
+        compose.mainClock.advanceTimeBy(1_000)
+        compose.onNodeWithText("Нурофен").performTouchInput { moveBy(Offset(0f, 300f)); up() }
+        assertEquals(null, moved)
     }
 
     /**

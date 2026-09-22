@@ -6,6 +6,8 @@ import com.kert0n.medapp.network.account.AccountCredentials
 import com.kert0n.medapp.network.account.CredentialSource
 import com.kert0n.medapp.network.account.CredentialsSaved
 import com.kert0n.medapp.network.account.StoredAccount
+import com.kert0n.medapp.network.server.ApiFailure
+import com.kert0n.medapp.network.server.ApiResult
 import com.kert0n.medapp.network.server.MedAppApi
 import com.kert0n.medapp.network.server.medAppHttpClient
 import io.ktor.client.engine.okhttp.OkHttp
@@ -73,6 +75,17 @@ object ProbeAccounts {
     val viktor: MedAppApi? by lazy { viktorAccount?.let { api(it) } }
 
     val anonymous: MedAppApi? by lazy { baseUrl?.let { MedAppApi(medAppHttpClient(OkHttp.create(), it, tokens = null)) } }
+
+    /**
+     * **Сервер считает обращения с адреса.** Упершись в 429, проба не провалена — она не
+     * состоялась: сервер о предмете проверки ничего не сказал. Отличить одно от другого может
+     * только сам сервер, поэтому его и спрашивают лёгким чтением, и ответ 429 даёт пропуск с
+     * названной причиной, а не красный отчёт о работе, которой не было.
+     */
+    suspend fun throttled(): Boolean {
+        val result = anna?.quantityUnits() ?: return false
+        return result is ApiResult.Failure && result.failure is ApiFailure.TooManyRequests
+    }
 
     private fun api(account: AccountCredentials): MedAppApi? =
         baseUrl?.let { MedAppApi(medAppHttpClient(OkHttp.create(), it, tokens = AccessTokens(Fixed(account)))) }

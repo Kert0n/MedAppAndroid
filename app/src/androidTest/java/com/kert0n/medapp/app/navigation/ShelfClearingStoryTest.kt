@@ -35,6 +35,7 @@ import com.kert0n.medapp.fixture.tablets
 import com.kert0n.medapp.fixture.treatmentStarted
 import com.kert0n.medapp.network.pack.PackageSyncState
 import com.kert0n.medapp.network.server.ResourceVersion
+import com.kert0n.medapp.feature.connectivity.Connection
 import com.kert0n.medapp.platform.time.TimeShifts
 import com.kert0n.medapp.queue.Transactions
 import com.kert0n.medapp.storage.database.MedAppDatabase
@@ -77,6 +78,7 @@ class ShelfClearingStoryTest {
     val compose = createAndroidComposeRule<HiltTestActivity>()
 
     @Inject lateinit var database: MedAppDatabase
+    @Inject lateinit var connection: Connection
     @Inject lateinit var reminders: ReminderStorageRepository
     @Inject lateinit var reconciliation: NotificationReconciliation
     @Inject lateinit var transactions: Transactions
@@ -94,7 +96,7 @@ class ShelfClearingStoryTest {
     @Before
     fun setUp() {
         hilt.inject()
-        world.start(reminders, reconciliation, transactions, shifts, round, answering)
+        world.start(reminders, reconciliation, transactions, shifts, round, answering, connection)
         runBlocking {
             database.storySetting()
             server.shelf(SHARED_KIT)

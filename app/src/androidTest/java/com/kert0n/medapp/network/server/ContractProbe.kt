@@ -62,7 +62,18 @@ class ContractProbe {
             owner = requireNotNull(ProbeAccounts.anna)
             guest = requireNotNull(ProbeAccounts.boris)
             anonymous = requireNotNull(ProbeAccounts.anonymous)
-            unit = runBlocking { success(owner.quantityUnits()).first().id }
+            // Первое же чтение говорит, готов ли сервер вообще разговаривать. 429 — не провал
+            // пробы: сервер считает обращения с адреса и о контракте ничего не сказал. Проба
+            // откладывается с названной причиной, а не краснеет пятнадцатью строками подряд.
+            when (val units = runBlocking { owner.quantityUnits() }) {
+                is ApiResult.Success -> unit = units.value.first().id
+                is ApiResult.Failure -> {
+                    if (units.failure !is ApiFailure.TooManyRequests) {
+                        throw AssertionError("проба не смогла начать: $units")
+                    }
+                    skipReason = "боевой сервер считает обращения с адреса — проба отложена"
+                }
+            }
         }
 
         /** Готовый запрос очереди — примитивами, как его и шлёт `QueueHttpTransport`. */
@@ -100,6 +111,22 @@ class ContractProbe {
     private fun failure(result: ApiResult<*>): ApiFailure =
         (result as? ApiResult.Failure)?.failure ?: throw AssertionError("ожидался отказ: $result")
 
+    /**
+     * Отказ **по существу**: 429 — это не «пароль не принят», а «сервер о пароле не говорил».
+     * Он считает попытки входа с адреса, и счёт этот живёт дольше минуты — переждать его в
+     * проверке нечем, а повторять попытки значит его же и кормить. Поэтому проба не повторяет и
+     * не выдумывает: она откладывается с названной причиной, и в отчёте это пропуск, а не
+     * красная строка о работе, которой сервер не делал.
+     */
+    private suspend fun judged(call: suspend () -> ApiResult<*>): ApiFailure {
+        val failure = failure(call())
+        assumeTrue(
+            "боевой сервер считает попытки входа с адреса — проба отложена",
+            failure !is ApiFailure.TooManyRequests
+        )
+        return failure
+    }
+
     private suspend fun newKit(): Uuid {
         val id = Uuid.random()
         success(owner.createMedKit(MedKitPostNetworkDTO(id)))
@@ -136,18 +163,26 @@ class ContractProbe {
         }
     }
 
+    /**
+     * Токен сборки — единственное, чем сервер отличает наше приложение от чужого клиента. Прими
+     * он чужой, учётка завелась бы у любого, и выданный пропуск открыл бы чужие полки.
+     */
     @Test
     fun foreignRegistrationTokenIsRefusedWithoutAnAccount() = runBlocking {
         // Токен сборки проверяется первым: придуманные данные до учётки не доходят.
         val invented = AccountCredentials.random()
         assertEquals(ApiFailure.RegistrationRefused, failure(anonymous.register(invented, "not-the-build-token")))
-        assertEquals(ApiFailure.Unauthorized, failure(anonymous.token(invented)))
+        assertEquals(ApiFailure.Unauthorized, judged { anonymous.token(invented) })
     }
 
+    /**
+     * Пароль — всё, что стоит между чужим и аптечкой человека: имя учётки известно, а ключ нет.
+     * Выдай сервер пропуск по неверному паролю — и чужой читает и тратит чужие коробки.
+     */
     @Test
     fun wrongPasswordIsNotAccepted() = runBlocking {
         val wrong = AccountCredentials(ownerAccount.login, "not-the-password")
-        assertEquals(ApiFailure.Unauthorized, failure(anonymous.token(wrong)))
+        assertEquals(ApiFailure.Unauthorized, judged { anonymous.token(wrong) })
     }
 
     @Test

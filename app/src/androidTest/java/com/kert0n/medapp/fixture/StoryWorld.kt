@@ -11,6 +11,8 @@ import com.kert0n.medapp.feature.notification.NotificationReconciliation
 import com.kert0n.medapp.feature.notification.NotificationUpkeep
 import com.kert0n.medapp.feature.notification.ReminderAnswering
 import com.kert0n.medapp.feature.notification.ReminderOutbox
+import androidx.test.platform.app.InstrumentationRegistry
+import com.kert0n.medapp.feature.connectivity.Connection
 import com.kert0n.medapp.platform.time.TimeShifts
 import com.kert0n.medapp.queue.Transactions
 import com.kert0n.medapp.storage.notification.ReminderStorageRepository
@@ -22,7 +24,9 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.cancel
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.runBlocking
+import kotlinx.coroutines.withTimeout
 
 /**
  * Мир истории человека (`docs/истории.md`): часы, которые двигает рассказ, шторка, в которой видно
@@ -71,8 +75,10 @@ class StoryWorld private constructor(start: Instant, zone: ZoneId) {
         transactions: Transactions,
         shifts: TimeShifts,
         round: DailyRound,
-        answering: ReminderAnswering
+        answering: ReminderAnswering,
+        connection: Connection
     ) {
+        takeTheNetworkAway(connection)
         this.shifts = shifts
         this.round = round
         this.answering = answering
@@ -138,7 +144,25 @@ class StoryWorld private constructor(start: Instant, zone: ZoneId) {
         return response
     }
 
+    /**
+     * **Связь отнимается на всю историю.** История живёт при сервере в памяти, а приложение
+     * настроено на боевой адрес и под `-Pprobe` входит настоящей пробной учёткой — оставь ему
+     * связь, и настоящий снимок уносит засеянные полки у истории из-под рук. Так `ShelfClearing`
+     * терял коробки с дачи: список семи истекающих на глазах становился списком четырёх.
+     *
+     * Поддельному серверу отнятая связь не мешает: у него свой транспорт, а не порт устройства.
+     */
+    private fun takeTheNetworkAway(connection: Connection) {
+        val automation = InstrumentationRegistry.getInstrumentation().uiAutomation
+        automation.executeShellCommand("svc wifi disable").close()
+        automation.executeShellCommand("svc data disable").close()
+        runBlocking { withTimeout(30_000) { connection.online.first { !it } } }
+    }
+
     fun end() {
+        val automation = InstrumentationRegistry.getInstrumentation().uiAutomation
+        automation.executeShellCommand("svc wifi enable").close()
+        automation.executeShellCommand("svc data enable").close()
         scope.cancel()
         TestPermissions.reset()
         TestLanguages.reset()
