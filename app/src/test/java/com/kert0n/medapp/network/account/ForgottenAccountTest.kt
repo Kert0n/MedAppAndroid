@@ -4,6 +4,7 @@ package com.kert0n.medapp.network.account
 
 import com.kert0n.medapp.network.server.REGISTRATION_TOKEN_HEADER
 import com.kert0n.medapp.network.server.medAppHttpClient
+import com.kert0n.medapp.network.server.MedAppApi
 import io.ktor.client.HttpClient
 import io.ktor.client.engine.mock.MockEngine
 import io.ktor.client.engine.mock.respond
@@ -13,7 +14,10 @@ import io.ktor.http.HttpStatusCode
 import io.ktor.http.headersOf
 import java.util.Base64
 import java.util.concurrent.atomic.AtomicInteger
+import javax.inject.Provider
 import kotlin.uuid.Uuid
+import kotlinx.coroutines.async
+import kotlinx.coroutines.awaitAll
 import kotlinx.coroutines.test.runTest
 import org.junit.Assert.assertEquals
 import org.junit.Test
@@ -31,7 +35,7 @@ class ForgottenAccountTest {
 
     private val account = AccountCredentials(
         login = Uuid.parse("00000000-0000-4000-8000-000000000071"),
-        password = "k3y-придуман-устройством"
+        password = "k3y-invented-by-the-device-0123456789abcdef"
     )
 
     /** Хранилище учётки, которое считает каждую запись: «не переписываются» проверяется счётом. */
@@ -121,7 +125,17 @@ class ForgottenAccountTest {
         else -> error("тело регистрации неожиданного вида: $this")
     }
 
-    private fun tokens(stored: Stored): AccessTokens = AccessTokens(stored)
+    /**
+     * Клиент, как его собирает граф: выдача пропуска возвращает забытую учётку настоящей
+     * регистрацией, а регистрация ходит через этот же клиент.
+     */
+    private fun client(server: Server, stored: Stored): HttpClient {
+        lateinit var registration: AccountRegistration
+        val tokens = AccessTokens(stored, Provider<AccountReclaim> { registration })
+        val client = client(server, tokens)
+        registration = AccountRegistration(MedAppApi(client), stored, "build-token", tokens)
+        return client
+    }
 
     /**
      * **Сервер забыл учётку** — устройство регистрирует её заново **теми же** логином и паролем и
@@ -135,7 +149,7 @@ class ForgottenAccountTest {
         val server = Server()
         val stored = Stored(StoredAccount.Present(account))
 
-        val response = client(server, tokens(stored)).get("/v1/users/me")
+        val response = client(server, stored).get("/v1/users/me")
 
         assertEquals(HttpStatusCode.OK, response.status)
         assertEquals(listOf(account.login.toString() to account.password), server.registered)
@@ -152,7 +166,7 @@ class ForgottenAccountTest {
     fun anExpiredPassIsReissuedWithoutRegistration() = runTest {
         val server = Server().apply { known[account.login.toString()] = account.password }
         val stored = Stored(StoredAccount.Present(account))
-        val client = client(server, tokens(stored))
+        val client = client(server, stored)
         assertEquals(HttpStatusCode.OK, client.get("/v1/users/me").status)
         server.validTokens.clear()
 
@@ -173,7 +187,7 @@ class ForgottenAccountTest {
             val server = Server().apply { tokenFailure = status }
             val stored = Stored(StoredAccount.Present(account))
 
-            kotlin.runCatching { client(server, tokens(stored)).get("/v1/users/me") }
+            kotlin.runCatching { client(server, stored).get("/v1/users/me") }
 
             assertEquals("выдача ответила $status", 0, server.registerCalls.get())
             assertEquals("выдача ответила $status", 0, stored.saves.get() + stored.forgets.get())
@@ -192,11 +206,82 @@ class ForgottenAccountTest {
             val server = Server()
             val stored = Stored(account)
 
-            kotlin.runCatching { client(server, tokens(stored)).get("/v1/users/me") }
+            kotlin.runCatching { client(server, stored).get("/v1/users/me") }
 
             assertEquals("учётка $account", 0, server.registerCalls.get())
             assertEquals("учётка $account", 0, stored.saves.get() + stored.forgets.get())
             assertEquals(account, stored.account)
         }
+    }
+
+    /**
+     * Сработавшая ветка: всплеск запросов, упёршихся в забытую учётку, регистрирует её **один**
+     * раз — выдача пропуска одна на всех ждавших, и возврат идёт под её замком.
+     */
+    @Test
+    fun aBurstOfForgottenRequestsRegistersOnce() = runTest {
+        val server = Server()
+        val client = client(server, Stored(StoredAccount.Present(account)))
+
+        val statuses = (1..8).map { async { client.get("/v1/med-kits").status } }.awaitAll()
+
+        assertEquals(List(8) { HttpStatusCode.OK }, statuses)
+        assertEquals(1, server.registerCalls.get())
+    }
+
+    /**
+     * Сработавшая ветка: регистрация не удалась — учётка остаётся отвергнутой, как прежде, и в том
+     * же процессе по кругу к регистрации не ходят: ни следующим запросом, ни следующей выдачей.
+     */
+    @Test
+    fun aFailedReclaimIsNotRetriedInCircles() = runTest {
+        val server = Server().apply { registerFailure = HttpStatusCode.InternalServerError }
+        val stored = Stored(StoredAccount.Present(account))
+        val client = client(server, stored)
+
+        assertEquals(HttpStatusCode.Unauthorized, client.get("/v1/users/me").status)
+        assertEquals(HttpStatusCode.Unauthorized, client.get("/v1/med-kits").status)
+
+        assertEquals(1, server.registerCalls.get())
+        assertEquals(1, server.tokenCalls.get())
+        assertEquals(0, stored.saves.get() + stored.forgets.get())
+        assertEquals(StoredAccount.Present(account), stored.account)
+    }
+
+    /**
+     * Сработавшая ветка: логин уже занят **другим** паролем — 409, и пропуск по нашим данным не
+     * выдаётся. Учётка не наша; ничего не пишется и не стирается, придумывать новые данные поверх
+     * — решение человека, а не этой ветки.
+     */
+    @Test
+    fun aLoginTakenByOthersIsNotOverwritten() = runTest {
+        val server = Server().apply { known[account.login.toString()] = "чужой пароль" }
+        val stored = Stored(StoredAccount.Present(account))
+
+        val response = client(server, stored).get("/v1/users/me")
+
+        assertEquals(HttpStatusCode.Unauthorized, response.status)
+        assertEquals(1, server.registerCalls.get())
+        assertEquals("чужой пароль", server.known[account.login.toString()])
+        assertEquals(0, stored.saves.get() + stored.forgets.get())
+        assertEquals(StoredAccount.Present(account), stored.account)
+    }
+
+    /**
+     * Сработавшая ветка бросила — здесь данными, которые сетевая форма регистрации не примет. Это
+     * «не вернулась», и запрос кончается так же, как кончался до ветки: отказом, а не исключением.
+     */
+    @Test
+    fun aReclaimThatThrowsLeavesTheOldPath() = runTest {
+        val server = Server()
+        val short = AccountCredentials(account.login, "короткий")
+        val stored = Stored(StoredAccount.Present(short))
+
+        val response = client(server, stored).get("/v1/users/me")
+
+        assertEquals(HttpStatusCode.Unauthorized, response.status)
+        assertEquals(0, server.registerCalls.get())
+        assertEquals(0, stored.saves.get() + stored.forgets.get())
+        assertEquals(StoredAccount.Present(short), stored.account)
     }
 }

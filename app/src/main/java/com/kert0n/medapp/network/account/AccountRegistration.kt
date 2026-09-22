@@ -27,7 +27,7 @@ class AccountRegistration @Inject constructor(
     private val credentials: CredentialSource,
     @RegistrationToken private val registrationToken: String,
     private val tokens: AccessTokens
-) {
+) : AccountReclaim {
 
     sealed interface Outcome {
 
@@ -66,6 +66,18 @@ class AccountRegistration @Inject constructor(
         }
         known()
     }
+
+    /**
+     * Сервер забыл учётку: те же данные регистрируются заново тем же путём, что недописанная
+     * учётка (201 — наша снова; 409 — проверка пропуском). Сохранённое не трогается: если процесс
+     * умрёт посередине, следующий 401 придёт сюда же, и 409 с пропуском подтвердит, что учётка наша.
+     *
+     * Без [mutex]: возврат зовёт выдача пропуска под своим замком, а [replaceUnreadable] под этим
+     * замком зовёт `AccessTokens.forget` — взятые в обратном порядке, два замка ждали бы друг друга.
+     * Одна регистрация на всплеск держится замком выдачи; совпавшая с ней настройка регистрирует те
+     * же данные и получает 409, который разрешается пропуском.
+     */
+    override suspend fun reclaim(account: AccountCredentials): Boolean = register(account) == Outcome.Ready
 
     private suspend fun known(): Outcome =
         when (val stored = credentials.read()) {
