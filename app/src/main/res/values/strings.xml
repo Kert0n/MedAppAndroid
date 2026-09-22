@@ -702,7 +702,7 @@
         <item quantity="many">%d доз</item>
         <item quantity="other">%d дозы</item>
     </plurals>
-    <string name="reports_mode_spent">Истрачено</string>
+    <string name="reports_mode_spent">Принято</string>
     <string name="reports_spent_period">С %1$s по %2$s</string>
     <string name="reports_spent_by_course">По лечениям</string>
     <string name="reports_spent_one_off">Разовые приёмы</string>

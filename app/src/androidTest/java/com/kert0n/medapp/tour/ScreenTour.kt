@@ -437,7 +437,7 @@ class ReportsTour : ScreenTour() {
         tap("Расход")
         see("если все приёмы состоятся")
         snap("26-reports/future")
-        tap("Истрачено")
+        tap("Принято")
         see("По лечениям")
         snap("26-reports/spent")
         tap("Год")

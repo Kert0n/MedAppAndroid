@@ -667,7 +667,7 @@
         <item quantity="one">%d dose</item>
         <item quantity="other">%d doses</item>
     </plurals>
-    <string name="reports_mode_spent">Spent</string>
+    <string name="reports_mode_spent">Taken</string>
     <string name="reports_spent_period">%1$s — %2$s</string>
     <string name="reports_spent_by_course">By treatment</string>
     <string name="reports_spent_one_off">One-off intakes</string>
