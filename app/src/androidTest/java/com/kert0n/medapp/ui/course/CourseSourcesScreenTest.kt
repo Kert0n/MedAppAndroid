@@ -26,6 +26,7 @@ import com.kert0n.medapp.presentation.course.CourseEstimatePresentationDTO
 import com.kert0n.medapp.presentation.course.CourseSourcePresentationDTO
 import com.kert0n.medapp.presentation.course.CourseSourcesMessage
 import com.kert0n.medapp.presentation.course.CourseSourcesUiState
+import com.kert0n.medapp.presentation.course.Detaching
 import com.kert0n.medapp.presentation.value.QuantityPresentationDTO
 import com.kert0n.medapp.presentation.value.toPresentationDTO
 import com.kert0n.medapp.ui.theme.MedAppTheme
@@ -182,10 +183,29 @@ class CourseSourcesScreenTest {
         assertEquals(0, confirmed)
     }
 
+    /**
+     * **У последней коробки вопрос свой.** Отвязав её, человек остаётся с лечением, которому
+     * нечем обеспечиваться, и записывается это сразу — «Сохранить» после неё не будет. Тот же
+     * вопрос, что у обычной отвязки, об этой цене молчал бы.
+     */
+    @Test
+    fun theLastSourceIsAskedAboutInItsOwnWords() {
+        show(CourseSourcesUiState(sources = listOf(source()), asksToDetach = Detaching(PACK, isLast = true)))
+
+        compose.onNodeWithText("Отвязать последний препарат?").assertIsDisplayed()
+        compose.onNodeWithText("Обеспечивать лечение станет нечем: коробка освободится, бронь снимется. Это записывается сразу.")
+            .assertIsDisplayed()
+    }
+
     /** Ответив на вопрос, человек подтверждает отвязку — и только тогда она уходит в сценарий. */
     @Test
     fun theQuestionIsAnsweredByTheSameWord() {
-        show(CourseSourcesUiState(sources = listOf(source()), asksToDetach = PACK))
+        show(
+            CourseSourcesUiState(
+                sources = listOf(source(), source(OTHER_PACK, "Ибупрофен")),
+                asksToDetach = Detaching(PACK, isLast = false)
+            )
+        )
 
         compose.onNodeWithText("Отвязать препарат?").assertIsDisplayed()
         compose.onNodeWithText("Лечение останется, но этот препарат перестанет его обеспечивать, а его бронь снимется.")
@@ -199,7 +219,12 @@ class CourseSourcesScreenTest {
      */
     @Test
     fun theAnswerReachesTheScenario() {
-        show(CourseSourcesUiState(sources = listOf(source()), asksToDetach = PACK))
+        show(
+            CourseSourcesUiState(
+                sources = listOf(source(), source(OTHER_PACK, "Ибупрофен")),
+                asksToDetach = Detaching(PACK, isLast = false)
+            )
+        )
 
         compose.onNode(hasText("Отвязать") and hasAnyAncestor(isDialog())).performClick()
 

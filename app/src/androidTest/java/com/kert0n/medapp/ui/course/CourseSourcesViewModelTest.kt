@@ -135,6 +135,39 @@ class CourseSourcesViewModelTest {
         return saved.draft.id
     }
 
+    /** Черновик с одной коробкой. */
+    private suspend fun draftOfOneBox(): Uuid {
+        val created = scenarios.courseDrafting.create("Ибупрофен")
+        val saved = scenarios.courseDrafting.edit(
+            created.id, created.revision,
+            listOf(
+                CourseDrafting.Edit.SetDose(dose("2")),
+                CourseDrafting.Edit.SetForm(TABLET_FORM),
+                CourseDrafting.Edit.SetSchedule(schedule(start = start)),
+                CourseDrafting.Edit.SetTotalDoses(Doses(10)),
+                CourseDrafting.Edit.Attach(PACK, Doses(3))
+            )
+        ) as CourseDrafting.Outcome.Saved
+        return saved.draft.id
+    }
+
+    /** Идущее лечение с **одной** коробкой: на нём видно, что бывает, когда снимают последнюю. */
+    private suspend fun startedWithOneBox(): Uuid {
+        val created = scenarios.courseDrafting.create("Ибупрофен")
+        val saved = scenarios.courseDrafting.edit(
+            created.id, created.revision,
+            listOf(
+                CourseDrafting.Edit.SetDose(dose("2")),
+                CourseDrafting.Edit.SetForm(TABLET_FORM),
+                CourseDrafting.Edit.SetSchedule(schedule(start = start)),
+                CourseDrafting.Edit.SetTotalDoses(Doses(10)),
+                CourseDrafting.Edit.Attach(PACK, Doses(3))
+            )
+        ) as CourseDrafting.Outcome.Saved
+        scenarios.courseActivation.activate(saved.draft.id, saved.draft.revision)
+        return saved.draft.id
+    }
+
     private suspend fun started(): Uuid {
         val id = draft()
         val draft = requireNotNull(database.courseRepository().findDraft(id))
@@ -210,7 +243,7 @@ class CourseSourcesViewModelTest {
         watching(model.state) { state ->
             state.awaiting(PATIENTLY) { it.sources.size == 2 && !it.isDraft }
             model.askToDetach(PACK)
-            val asked = state.awaiting(PATIENTLY) { it.asksToDetach == PACK }
+            val asked = state.awaiting(PATIENTLY) { it.asksToDetach?.packageId == PACK }
             // Пока человек не ответил, состав цел: вопрос стоит до сценария.
             assertEquals(2, asked.sources.size)
             model.detach()
@@ -220,6 +253,52 @@ class CourseSourcesViewModelTest {
         }
 
         assertEquals(listOf(OTHER_PACK), requireNotNull(database.courseRepository().findPlan(id)).sources.map { it.pkg.id })
+    }
+
+    /**
+     * **Последнюю коробку отпускают одним решением.** Снять её и остаться без «Сохранить» нельзя:
+     * кнопка живёт в списке, а список пуст — записать правку было бы нечем, и отвязать последний
+     * препарат стало бы невозможно вовсе. Поэтому у последней коробки ответ на вопрос и есть
+     * запись: человек подтвердил — состав записан пустым, лечение осталось без обеспечения.
+     */
+    @Test
+    fun theLastBoxIsLetGoByTheAnswerItself() = runBlocking {
+        val id = startedWithOneBox()
+        val model = model(id)
+
+        watching(model.state) { state ->
+            state.awaiting(PATIENTLY) { it.sources.size == 1 && !it.isDraft }
+            model.askToDetach(PACK)
+            state.awaiting(PATIENTLY) { it.asksToDetach != null }
+            model.detach()
+            state.awaiting(PATIENTLY) { it.sources.isEmpty() && !it.hasUnsavedChanges && !it.isWriting }
+        }
+
+        assertEquals(emptyList<Uuid>(), requireNotNull(database.courseRepository().findPlan(id)).sources.map { it.pkg.id })
+    }
+
+    /**
+     * **У черновика тоже спрашивают — о последней.** Обычную отвязку черновик не спрашивает: он
+     * ничего не занимал. Но после последней коробки назначение остаётся ни с чем, и цена эта та
+     * же, что у идущего лечения.
+     */
+    @Test
+    fun evenADraftIsAskedAboutItsLastBox() = runBlocking {
+        val id = draftOfOneBox()
+        val model = model(id)
+
+        watching(model.state) { state ->
+            state.awaiting(PATIENTLY) { it.sources.size == 1 && it.isDraft }
+            model.askToDetach(PACK)
+            val asked = state.awaiting(PATIENTLY) { it.asksToDetach != null }
+            assertEquals(true, asked.asksToDetach?.isLast)
+            // Пока человек не ответил, состав цел.
+            assertEquals(1, asked.sources.size)
+            model.detach()
+            state.awaiting(PATIENTLY) { it.sources.isEmpty() && !it.hasUnsavedChanges && !it.isWriting }
+        }
+
+        assertEquals(emptyList<Uuid>(), requireNotNull(database.courseRepository().findDraft(id)).sources.map { it.pkg.id })
     }
 
     /**

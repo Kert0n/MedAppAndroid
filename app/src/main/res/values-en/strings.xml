@@ -566,6 +566,8 @@
     <string name="course_source_detach">Detach</string>
     <string name="course_source_detach_title">Detach the drug?</string>
     <string name="course_source_detach_explained">The treatment will stay, but this drug will stop supplying it and its claim will be released.</string>
+    <string name="course_source_detach_last_title">Detach the last drug?</string>
+    <string name="course_source_detach_last_explained">Nothing will supply the treatment any more: the box is freed and its claim released. This is saved right away.</string>
     <string name="course_source_handle">Reorder: %1$s</string>
     <string name="course_source_move_up">Up</string>
     <string name="course_source_move_down">Down</string>

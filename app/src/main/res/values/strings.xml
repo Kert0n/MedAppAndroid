@@ -589,6 +589,8 @@
     <string name="course_source_detach">Отвязать</string>
     <string name="course_source_detach_title">Отвязать препарат?</string>
     <string name="course_source_detach_explained">Лечение останется, но этот препарат перестанет его обеспечивать, а его бронь снимется.</string>
+    <string name="course_source_detach_last_title">Отвязать последний препарат?</string>
+    <string name="course_source_detach_last_explained">Обеспечивать лечение станет нечем: коробка освободится, бронь снимется. Это записывается сразу.</string>
     <string name="course_source_handle">Переставить: %1$s</string>
     <string name="course_source_move_up">Выше</string>
     <string name="course_source_move_down">Ниже</string>

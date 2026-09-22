@@ -193,20 +193,31 @@ class CourseSourcesViewModel @AssistedInject constructor(
     /**
      * Отвязка у идущего лечения спрашивается: записанная, она освободит коробку и снимет бронь
      * (H3). У черновика спрашивать нечего — он ничего не занимал.
+     *
+     * **Последняя коробка — случай особый**, и спрашивают о ней всегда, даже у черновика: после
+     * неё лечению нечем обеспечиваться, а ответ и есть запись ([detach]).
      */
     fun askToDetach(packageId: Uuid) {
-        if (state.value.isDraft) detach(packageId)
-        else writing.value = writing.value.copy(asksToDetach = packageId)
+        val shown = editing.value?.sources.orEmpty()
+        val isLast = shown.size == 1 && shown.single().pkg.id == packageId
+        if (state.value.isDraft && !isLast) detach(packageId)
+        else writing.value = writing.value.copy(asksToDetach = Detaching(packageId, isLast))
     }
 
     fun dismissDetach() {
         writing.value = writing.value.copy(asksToDetach = null)
     }
 
+    /**
+     * Ответ на вопрос. У последней коробки он же и записывает: «Сохранить» живёт **в списке**, а
+     * списка после неё не останется — правку стало бы нечем записать, и отвязать последний
+     * препарат было бы нельзя вовсе (дефект, найденный владельцем 2026-09-22).
+     */
     fun detach() {
-        val packageId = writing.value.asksToDetach ?: return
+        val asked = writing.value.asksToDetach ?: return
         writing.value = writing.value.copy(asksToDetach = null)
-        detach(packageId)
+        detach(asked.packageId)
+        if (asked.isLast) save()
     }
 
     private fun detach(packageId: Uuid) {
@@ -348,7 +359,7 @@ class CourseSourcesViewModel @AssistedInject constructor(
 
     private data class Writing(
         val busy: Boolean = false,
-        val asksToDetach: Uuid? = null,
+        val asksToDetach: Detaching? = null,
         val message: CourseSourcesMessage? = null
     )
 }
@@ -357,6 +368,12 @@ class CourseSourcesViewModel @AssistedInject constructor(
  * Что показывает экран источников. [hasUnsavedChanges] — правка есть, но не записана: сводка
  * обеспечения тогда говорит о записанном составе, и экран признаёт это словами.
  */
+/**
+ * Вопрос об отвязке. Признак живёт **в вопросе**, а не рядом с ним: цена ответа у последней
+ * коробки другая — лечение останется ни с чем, — и поведение различает ровно эти два случая.
+ */
+data class Detaching(val packageId: Uuid, val isLast: Boolean)
+
 data class CourseSourcesUiState(
     val title: String? = null,
     /** Чем меряют выделения: одна доза лечения. `null` — у черновика её ещё не назвали. */
@@ -371,7 +388,7 @@ data class CourseSourcesUiState(
     val isFinished: Boolean = false,
     val isWriting: Boolean = false,
     val hasUnsavedChanges: Boolean = false,
-    /** Какую коробку человек собрался отвязать у идущего лечения; `null` — вопроса нет. */
-    val asksToDetach: Uuid? = null,
+    /** Что человек собрался отвязать; `null` — вопроса нет. */
+    val asksToDetach: Detaching? = null,
     val message: CourseSourcesMessage? = null
 )
