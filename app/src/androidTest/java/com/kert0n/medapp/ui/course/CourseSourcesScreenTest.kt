@@ -311,6 +311,25 @@ class CourseSourcesScreenTest {
     }
 
     /**
+     * **Законченное лечение не переставляется — ни пальцем, ни голосом.** «Сохранить» у него нет,
+     * и записать новый порядок некуда: строка, уехавшая под пальцем, обещала бы правку, которой не
+     * будет. Ручка ≡ у такой карточки не рисуется вовсе — предлагать нечего.
+     */
+    @Test
+    fun aFinishedCourseIsNotReorderedByFingerNorByVoice() {
+        show(CourseSourcesUiState(sources = listOf(source(), source(OTHER_PACK, "Ибупрофен")), isFinished = true))
+
+        compose.onNodeWithContentDescription("Переставить: Нурофен").assertDoesNotExist()
+        compose.onNode(hasAnyDescendant(hasText("Нурофен")) and SemanticsMatcher.keyIsDefined(SemanticsActions.CustomActions))
+            .assertDoesNotExist()
+
+        compose.onNodeWithText("Нурофен").performTouchInput { down(center) }
+        compose.mainClock.advanceTimeBy(1_000)
+        compose.onNodeWithText("Нурофен").performTouchInput { moveBy(Offset(0f, 300f)); up() }
+        assertEquals(null, moved)
+    }
+
+    /**
      * Во время движения ползунка не зовётся ничего, по отпусканию — ровно один раз (C1
      * «Ползунок»): иначе каждая дрожь пальца была бы отдельным решением человека.
      */

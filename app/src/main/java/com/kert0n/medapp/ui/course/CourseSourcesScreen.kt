@@ -173,6 +173,10 @@ private fun Sources(
         }
     }
     val count = state.sources.size
+    // У законченного лечения «Сохранить» нет, и записать новый порядок некуда: строка, уехавшая
+    // под пальцем, обещала бы правку, которой не будет. Поэтому перестановки у него нет вовсе —
+    // ни пальцем, ни голосом, — и ручка ≡ не рисуется: предлагать нечего.
+    val canReorder = !state.isFinished
     Column(modifier.fillMaxSize()) {
         LazyColumn(Modifier.weight(1f), state = rows, contentPadding = PaddingValues(bottom = 8.dp)) {
             // Первым — обеспечение: ради него сюда и приходят (PLAN H3 №16).
@@ -192,18 +196,18 @@ private fun Sources(
                         isFinished = state.isFinished,
                         onAllocate = onAllocate,
                         onDetach = { onDetach(source.packageId) },
-                        onMoveUp = if (index > 0) { { onMove(index, index - 1) } } else null,
-                        onMoveDown = if (index < count - 1) { { onMove(index, index + 1) } } else null,
+                        onMoveUp = if (canReorder && index > 0) { { onMove(index, index - 1) } } else null,
+                        onMoveDown = if (canReorder && index < count - 1) { { onMove(index, index + 1) } } else null,
                         held = held,
                         // Берётся вся карточка: целиться в значок размером с ноготь человек не
                         // обязан (решение владельца 2026-09-22). Поле числа, ползунок и
                         // «Отвязать» свои нажатия по-прежнему забирают себе.
-                        modifier = Modifier.longPressDraggableHandle(
+                        modifier = if (!canReorder) Modifier else Modifier.longPressDraggableHandle(
                             onDragStarted = { haptics.performHapticFeedback(HapticFeedbackType.LongPress) },
                             onDragStopped = { haptics.performHapticFeedback(HapticFeedbackType.GestureEnd) }
                         ),
                         // Ручка берёт строку сразу, без долгого нажатия: она и нарисована ради этого.
-                        handleModifier = Modifier.draggableHandle(
+                        handleModifier = if (!canReorder) null else Modifier.draggableHandle(
                             onDragStarted = { haptics.performHapticFeedback(HapticFeedbackType.LongPress) },
                             onDragStopped = { haptics.performHapticFeedback(HapticFeedbackType.GestureEnd) }
                         )
@@ -302,7 +306,8 @@ private fun SourceRow(
     onMoveDown: (() -> Unit)?,
     held: Boolean,
     modifier: Modifier,
-    handleModifier: Modifier
+    /** `null` — переставлять нечего: ручка не рисуется, и место её не занимает. */
+    handleModifier: Modifier?
 ) {
     val up = stringResource(R.string.course_source_move_up)
     val down = stringResource(R.string.course_source_move_down)
@@ -313,21 +318,30 @@ private fun SourceRow(
             // Приглушена и отключённая коробка, и уходящая: обе ничего не дают.
             .alpha(if (source.fault == null && source.leaving == null) 1f else 0.6f)
             .semantics {
-                customActions = listOfNotNull(
+                // Пустой список — не «действий нет», а «действия объявлены и их ноль»: чтец
+                // докладывает о них, и человек ищет то, чего у строки не бывает.
+                val moves = listOfNotNull(
                     onMoveUp?.let { move -> CustomAccessibilityAction(up) { move(); true } },
                     onMoveDown?.let { move -> CustomAccessibilityAction(down) { move(); true } }
                 )
+                if (moves.isNotEmpty()) customActions = moves
             },
         // Поднятая карточка видна тенью.
         elevation = CardDefaults.elevatedCardElevation(defaultElevation = if (held) 8.dp else 1.dp)
     ) {
         Column(Modifier.padding(top = 4.dp, bottom = 12.dp)) {
             Row(verticalAlignment = Alignment.CenterVertically) {
-                Icon(
-                    painterResource(R.drawable.ic_drag_handle),
-                    contentDescription = stringResource(R.string.course_source_handle, source.name),
-                    modifier = handleModifier.padding(12.dp)
-                )
+                if (handleModifier != null) {
+                    Icon(
+                        painterResource(R.drawable.ic_drag_handle),
+                        contentDescription = stringResource(R.string.course_source_handle, source.name),
+                        modifier = handleModifier.padding(12.dp)
+                    )
+                } else {
+                    // Отступ остаётся за ручку: без него название законченного лечения встало бы
+                    // левее, чем у идущего, и строки в списке разъехались бы.
+                    Spacer(Modifier.width(48.dp))
+                }
                 Text(source.name, style = MaterialTheme.typography.titleMedium, modifier = Modifier.weight(1f))
                 if (!isFinished) {
                     IconButton(onClick = onDetach) {
