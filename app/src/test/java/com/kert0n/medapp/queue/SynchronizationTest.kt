@@ -204,6 +204,32 @@ class SynchronizationTest {
         assertEquals(1, calls.count { it == "снимок" })
     }
 
+    /**
+     * Заход не принадлежит тому, кто позвал первым. Анна нажала «Обновить» и ушла с экрана — её
+     * ожидание кончилось, а напоминание, вставшее ждать того же захода, получает его итог.
+     *
+     * Красная проверка: первый позвавший вёл заход в своём контексте, его отмена завершала заход
+     * `CancellationException`, и присоединившийся получал её как свою — так останавливался цикл
+     * владельца доставки уведомлений.
+     */
+    @Test
+    fun aCancelledFirstCallerDoesNotCancelThoseWhoJoined() = kotlinx.coroutines.runBlocking {
+        val calls = java.util.Collections.synchronizedList(ArrayList<String>())
+        val gate = CompletableDeferred<Unit>()
+        val scope = kotlinx.coroutines.CoroutineScope(kotlinx.coroutines.SupervisorJob() + kotlinx.coroutines.Dispatchers.Default)
+        val synchronization = synchronization(calls, gate = gate, scope = scope)
+        val screen = kotlinx.coroutines.CoroutineScope(kotlinx.coroutines.Job() + kotlinx.coroutines.Dispatchers.Default)
+
+        screen.async { synchronization.synchronize() }
+        while ("снимок" !in calls) kotlinx.coroutines.delay(10)
+        val reminder = async(start = kotlinx.coroutines.CoroutineStart.UNDISPATCHED) { synchronization.synchronize() }
+        screen.cancel()
+        gate.complete(Unit)
+
+        assertEquals(now, reminder.await().finishedAt)
+        scope.cancel()
+    }
+
     /** Не прочитали — кэш прежний, и время последнего успешного чтения не сдвигается (PLAN E4). */
     @Test
     fun aRoundThatCouldNotReadKeepsTheLastRefreshTime() = runTest {

@@ -120,6 +120,31 @@ class OutboxLoopTest {
         assertNull(loop.state.value.lastFailure)
     }
 
+    /**
+     * Проход бросил отмену, а сам цикл никто не отменял: это сбой прохода, а не остановка. Отмена
+     * пришла от чужой работы — например, от захода, который ждал проход, — и цикл живёт дальше.
+     *
+     * Красная проверка: цикл пробрасывал любую `CancellationException` и завершался навсегда — до
+     * смерти процесса сигналы больше никто не слушал.
+     */
+    @Test
+    fun aForeignCancellationFromAPassIsAFailureAndTheLoopLives() = runTest {
+        var passes = 0
+        val loop = OutboxLoop(ready(), Duration.ofMinutes(1), Clock.fixed(now, ZoneOffset.UTC), backgroundScope) {
+            passes++
+            if (passes == 1) throw kotlinx.coroutines.CancellationException("заход, которого ждал проход, отменили")
+            null
+        }
+        loop.start()
+        runCurrent()
+
+        signals.emit(Unit)
+        runCurrent()
+
+        assertEquals("после чужой отмены цикл не слушает сигналы", 2, passes)
+        assertNotNull(loop.state.value.lastFailure)
+    }
+
     @Test
     fun thePassNamesWhenToComeBackAndTheTimerObeys() = runTest {
         val clock = TestClock(now)
