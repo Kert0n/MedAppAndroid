@@ -1,6 +1,8 @@
 package com.kert0n.medapp.presentation.course
 
 import com.kert0n.medapp.domain.course.CourseRecord
+import com.kert0n.medapp.domain.course.CourseRejected
+import com.kert0n.medapp.domain.course.Prescription
 import com.kert0n.medapp.domain.course.CourseSchedule
 import com.kert0n.medapp.domain.value.Doses
 import com.kert0n.medapp.fixture.MILLILITRES
@@ -175,6 +177,21 @@ class CourseFormMapperTest {
         assertEquals(ParsedInput.Rejected(CourseFormError.Input.TOTAL_DOSES_INVALID), full().copy(totalDoses = "1.5").parsed(VOCABULARY))
         val blank = full().copy(totalDoses = " ").parsed(VOCABULARY) as ParsedInput.Parsed
         assertEquals(null, blank.value.totalDoses)
+    }
+
+    /**
+     * Сверх того, что назначают, форма отвечает на наборе тем же отказом, каким ответил бы домен, —
+     * и конца для такого числа не показывает: лечения такого не будет.
+     */
+    @Test
+    fun moreDosesThanAPrescriptionAllowsIsTheDomainRefusalAlready() {
+        val over = (Prescription.MAX_TOTAL_DOSES + 1).toString()
+        assertEquals(
+            ParsedInput.Rejected(CourseFormError.Rejected(CourseRejected.Reason.TOTAL_DOSES_TOO_MANY)),
+            full().copy(totalDoses = over).parsed(VOCABULARY)
+        )
+        assertEquals(CourseFormError.Field.TOTAL_DOSES, CourseFormError.Rejected(CourseRejected.Reason.TOTAL_DOSES_TOO_MANY).field)
+        assertEquals(null, full().copy(totalDoses = over).expectedEnd())
     }
 
     /** «Дата конца» читается, а не вводится: семь приёмов по два в день с понедельника кончаются в четверг. */

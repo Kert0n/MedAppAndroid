@@ -57,7 +57,7 @@ class CourseDrafting @Inject constructor(
                 is Edit.SetDose -> edited.setDose(edit.dose, now).getOrElse { return@run rejected(it) }
                 is Edit.SetForm -> edited.setForm(edit.form, now).getOrElse { return@run rejected(it) }
                 is Edit.SetSchedule -> edited.setSchedule(edit.schedule, now)
-                is Edit.SetTotalDoses -> edited.setTotalDoses(edit.totalDoses, now)
+                is Edit.SetTotalDoses -> edited.setTotalDoses(edit.totalDoses, now).getOrElse { return@run rejected(it) }
                 is Edit.Attach -> {
                     // Источник — только коробка, которая у человека есть и которой можно пользоваться.
                     val pkg = packages.find(edit.packageId)?.takeIf { it.status.allowsUse }

@@ -23,6 +23,7 @@ data class Prescription(
 ) {
     init {
         require(!totalDoses.isNone) { "лечение без единой дозы — не лечение" }
+        require(allows(totalDoses)) { "лечение длиннее $MAX_TOTAL_DOSES доз не назначают: $totalDoses" }
     }
 
     /** Число доз меняется — назначение остаётся тем же лечением с другой длиной. */
@@ -30,4 +31,16 @@ data class Prescription(
 
     /** Годится ли пачка под это назначение; `null` — годится (PLAN D5). */
     fun faultOf(pkg: PackageRef): CourseSource.Fault? = CourseSource.Fault.between(pkg, dose, form)
+
+    companion object {
+        /**
+         * Сколько доз лечение может назначить (решение владельца 2026-09-23): девять лет по три
+         * приёма в день. Всё, что считает оставшиеся дозы, — обеспечение, конец, окно пунктов, —
+         * считает их поштучно на каждое изменение базы, и назначение сверх меры роняло бы расчёт.
+         */
+        const val MAX_TOTAL_DOSES = 10_000
+
+        /** Назначают ли столько доз: черновик и идущее лечение спрашивают это здесь, а не решают сами. */
+        fun allows(totalDoses: Doses): Boolean = totalDoses.count <= MAX_TOTAL_DOSES
+    }
 }

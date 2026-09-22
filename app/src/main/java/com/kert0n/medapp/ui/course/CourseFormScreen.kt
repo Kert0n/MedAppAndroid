@@ -364,6 +364,7 @@ internal val CourseRejected.Reason.text: Int
         CourseRejected.Reason.DOSE_MISSING -> R.string.course_rejected_dose_missing
         CourseRejected.Reason.FORM_MISSING -> R.string.course_rejected_form_missing
         CourseRejected.Reason.TOTAL_DOSES_MISSING -> R.string.course_rejected_total_doses_missing
+        CourseRejected.Reason.TOTAL_DOSES_TOO_MANY -> R.string.course_rejected_total_doses_too_many
         CourseRejected.Reason.UNIT_MISMATCH -> R.string.course_rejected_unit_mismatch
         CourseRejected.Reason.FORM_MISMATCH -> R.string.course_rejected_form_mismatch
         CourseRejected.Reason.SCHEDULE_IN_PAST -> R.string.course_rejected_schedule_in_past

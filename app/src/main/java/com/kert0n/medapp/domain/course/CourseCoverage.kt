@@ -5,6 +5,7 @@ import com.kert0n.medapp.domain.value.Doses
 import com.kert0n.medapp.domain.value.Quantity
 import java.time.Instant
 import java.time.ZoneId
+import java.time.temporal.ChronoUnit
 import java.util.Objects
 
 /**
@@ -59,9 +60,12 @@ class CourseCoverage(
         val today = at.atZone(zone).toLocalDate()
         // День исчерпания — первым: при пороге 0 обе даты совпадают, и сказать надо то, что
         // ближе к правде, — «заканчивается», а не «скоро закончится».
-        return when (today) {
-            uncoveredOn -> Notice.END
-            uncoveredOn.minusDays(thresholdDays) -> Notice.AHEAD
+        // Разность дней, а не `uncoveredOn.minusDays(порог)`: порог набирает человек, и вычитание
+        // любого набранного числа из даты переполнялось бы раньше, чем дало ответ.
+        val daysLeft = ChronoUnit.DAYS.between(today, uncoveredOn)
+        return when (daysLeft) {
+            0L -> Notice.END
+            thresholdDays -> Notice.AHEAD
             else -> null
         }
     }

@@ -559,6 +559,8 @@
     <string name="course_rejected_dose_missing">Чтобы начать, укажите дозу.</string>
     <string name="course_rejected_form_missing">Чтобы начать, укажите форму выпуска.</string>
     <string name="course_rejected_total_doses_missing">Чтобы начать, укажите, сколько всего приёмов.</string>
+    <!-- Число — Prescription.MAX_TOTAL_DOSES. -->
+    <string name="course_rejected_total_doses_too_many">Приёмов не больше 10 000.</string>
     <string name="course_rejected_unit_mismatch">У подключённых препаратов другая единица — сначала отвяжите их.</string>
     <string name="course_rejected_form_mismatch">У подключённых препаратов другая форма — сначала отвяжите их.</string>
     <string name="course_rejected_schedule_in_past">Новое расписание не может начинаться раньше сегодняшнего дня.</string>

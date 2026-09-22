@@ -95,9 +95,37 @@ class CourseTest {
         val formed = course().setForm(TABLET_FORM, at = LATER).getOrThrow()
         assertEquals(TABLET_FORM, formed.form)
         assertEquals(Revision(1), formed.revision)
-        val counted = formed.setTotalDoses(10.doses, at = LATER)
+        val counted = formed.setTotalDoses(10.doses, at = LATER).getOrThrow()
         assertEquals(10.doses, counted.totalDoses)
         assertEquals(Revision(2), counted.revision)
+    }
+
+    /**
+     * Сколько доз назначают, ограничивает назначение, и спрашивает его и черновик, и начало, и
+     * идущее лечение: сверх меры — отказ с причиной, а не исключение и не молча записанное число.
+     * Черновик, записанный до правила, начатым не становится.
+     */
+    @Test
+    fun noMoreDosesThanAPrescriptionAllowsAnywhere() {
+        val limit = Prescription.MAX_TOTAL_DOSES
+        val formed = course().setForm(TABLET_FORM, at = LATER).getOrThrow()
+        assertEquals(limit.doses, formed.setTotalDoses(limit.doses, at = LATER).getOrThrow().totalDoses)
+        assertEquals(
+            CourseRejected.Reason.TOTAL_DOSES_TOO_MANY,
+            (formed.setTotalDoses((limit + 1).doses, at = LATER).exceptionOrNull() as CourseRejected).reason
+        )
+
+        val storedBeforeTheRule = course(dose = dose("1"), form = TABLET_FORM, schedule = schedule(), totalDoses = limit + 1)
+        assertEquals(
+            CourseRejected.Reason.TOTAL_DOSES_TOO_MANY,
+            (storedBeforeTheRule.activate(LATER).exceptionOrNull() as CourseRejected).reason
+        )
+
+        val running = activeCourse()
+        assertEquals(
+            CourseRejected.Reason.TOTAL_DOSES_TOO_MANY,
+            (running.setTotalDoses((limit + 1).doses, LATER).exceptionOrNull() as CourseRejected).reason
+        )
     }
 
     @Test

@@ -128,7 +128,7 @@ class CourseMedicineTest {
         assertEquals(CourseRejected.Reason.FORM_MISSING, dosed.activate(LATER).rejection())
         val formed = dosed.setForm(TABLET_FORM, LATER).getOrThrow()
         assertEquals(CourseRejected.Reason.TOTAL_DOSES_MISSING, formed.activate(LATER).rejection())
-        val counted = formed.setTotalDoses(7.doses, LATER)
+        val counted = formed.setTotalDoses(7.doses, LATER).getOrThrow()
         // Пачки не нужно: лечение начинается и без лекарства на руках. Активация удалась — и
         // повторить её нечем: у плана этого перехода нет.
         assertTrue(counted.activate(LATER).isSuccess)
