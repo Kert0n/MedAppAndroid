@@ -282,7 +282,8 @@ class CoursesJourneyTest {
         assertEquals(listOf("Ибупрофен", "Нурофен"), sourcesOnScreen())
         compose.onNodeWithText("Нурофен").performTouchInput { up() }
 
-        // «Сохранить» записывает новую очередь одним решением — до него база о ней не знает.
+        // Правка местная: палец отпущен, а в базе очередь прежняя — её записывает «Сохранить».
+        assertEquals(listOf(PACK, second), savedOrder(course))
         compose.onNodeWithText("Сохранить").performClick()
         compose.waitUntil(WAIT) { savedOrder(course) == listOf(second, PACK) }
     }
