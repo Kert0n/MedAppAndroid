@@ -8,6 +8,7 @@ import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performScrollTo
 import androidx.compose.ui.test.performTextInput
+import androidx.compose.ui.test.performTouchInput
 import androidx.test.espresso.Espresso.closeSoftKeyboard
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import com.kert0n.medapp.HiltTestActivity
@@ -26,12 +27,15 @@ import com.kert0n.medapp.fixture.medKit
 import com.kert0n.medapp.fixture.TABLETS
 import com.kert0n.medapp.fixture.TABLET_FORM
 import com.kert0n.medapp.fixture.pack
+import com.kert0n.medapp.fixture.courseRepository
 import com.kert0n.medapp.fixture.packageRepository
 import com.kert0n.medapp.fixture.tablets
+import androidx.compose.ui.geometry.Offset
 import com.kert0n.medapp.storage.database.MedAppDatabase
 import java.time.ZoneId
 import java.time.Instant
 import java.time.LocalDate
+import kotlin.uuid.Uuid
 import com.kert0n.medapp.storage.medkit.toStorageEntity as toMedKitStorageEntity
 import com.kert0n.medapp.storage.value.toStorageEntity
 import com.kert0n.medapp.ui.theme.MedAppTheme
@@ -39,6 +43,7 @@ import dagger.hilt.android.testing.HiltAndroidRule
 import dagger.hilt.android.testing.HiltAndroidTest
 import javax.inject.Inject
 import kotlinx.coroutines.runBlocking
+import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Before
@@ -229,4 +234,68 @@ class CoursesJourneyTest {
             compose.onAllNodesWithText("Лечений пока нет.", substring = true).fetchSemanticsNodes().isNotEmpty()
         }
     }
+
+    /**
+     * **Очередь источников переставляется всей карточкой.** Человек кладёт палец на название
+     * строки — мимо значка ручки, — держит и ведёт вниз: очередь становится другой ещё под
+     * пальцем, а «Сохранить» записывает её. Проверка идёт через настоящую оболочку, а не через
+     * один экран: жест спорит с тем, что нажимается **внутри** карточки, и этого спора на
+     * отдельно взятом экране не видно.
+     */
+    @Test
+    fun theQueueOfSourcesIsReorderedByDraggingTheWholeCard() {
+        val second = Uuid.random()
+        val scenarios = Scenarios(database, Instant.now(), ZoneId.systemDefault())
+        val course: Uuid
+        runBlocking {
+            val boxes = database.packageRepository()
+            boxes.add(pack(id = PACK, name = "Нурофен", quantity = tablets("20"), form = TABLET_FORM))
+            boxes.add(pack(id = second, name = "Ибупрофен", quantity = tablets("20"), form = TABLET_FORM))
+            val created = scenarios.courseDrafting.create("Спина")
+            course = created.id
+            val written = scenarios.courseDrafting.edit(
+                created.id, created.revision,
+                listOf(
+                    CourseDrafting.Edit.SetDose(dose("1")),
+                    CourseDrafting.Edit.SetForm(TABLET_FORM),
+                    CourseDrafting.Edit.SetSchedule(schedule(start = LocalDate.now(zone))),
+                    CourseDrafting.Edit.SetTotalDoses(Doses(4)),
+                    CourseDrafting.Edit.Attach(PACK, Doses(2)),
+                    CourseDrafting.Edit.Attach(second, Doses(2))
+                )
+            )
+            assertTrue("завязка не записалась: $written", written is CourseDrafting.Outcome.Saved)
+        }
+
+        compose.waitUntil(WAIT) { compose.onAllNodesWithText("Черновики").fetchSemanticsNodes().isNotEmpty() }
+        compose.onNodeWithText("Спина").performClick()
+        compose.onNodeWithText("Источники лечения").performScrollTo().performClick()
+        compose.waitUntil(WAIT) { compose.onAllNodesWithText("Ибупрофен").fetchSemanticsNodes().isNotEmpty() }
+        assertEquals(listOf("Нурофен", "Ибупрофен"), sourcesOnScreen())
+
+        // Палец ложится на название — мимо значка — и держит дольше долгого нажатия.
+        val step = rowTop("Ибупрофен") - rowTop("Нурофен")
+        compose.onNodeWithText("Нурофен").performTouchInput { down(center) }
+        compose.mainClock.advanceTimeBy(1_000)
+        compose.onNodeWithText("Нурофен").performTouchInput { moveBy(Offset(0f, step)) }
+        // Очередь другая ещё под пальцем: человек видит, куда строка встанет, а не узнаёт после.
+        assertEquals(listOf("Ибупрофен", "Нурофен"), sourcesOnScreen())
+        compose.onNodeWithText("Нурофен").performTouchInput { up() }
+
+        // «Сохранить» записывает новую очередь одним решением — до него база о ней не знает.
+        compose.onNodeWithText("Сохранить").performClick()
+        compose.waitUntil(WAIT) { savedOrder(course) == listOf(second, PACK) }
+    }
+
+    /** Очередь, записанная в базу: из чего лечение возьмёт раньше. Лечение ещё черновик. */
+    private fun savedOrder(course: Uuid): List<Uuid>? =
+        runBlocking { database.courseRepository().findDraft(course) }?.sources?.map { it.pkg.id }
+
+    /** Названия источников сверху вниз — то, что человек видит очередью. */
+    private fun sourcesOnScreen(): List<String> =
+        listOf("Нурофен", "Ибупрофен").sortedBy { rowTop(it) }
+
+    /** Где строка начинается: порядок читается по положению, а не по номеру в дереве. */
+    private fun rowTop(name: String): Float =
+        compose.onNodeWithText(name).fetchSemanticsNode().positionInRoot.y
 }
