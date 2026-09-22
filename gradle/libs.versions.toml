@@ -13,6 +13,7 @@ ktor = "3.5.2"
 kotlinxSerialization = "1.11.0"
 kotlinxCoroutines = "1.11.0"
 navigation3 = "1.1.7"
+reorderable = "3.1.0"
 savedstate = "1.4.0"
 work = "2.11.2"
 datastore = "1.2.1"
@@ -47,6 +48,7 @@ androidx-compose-ui-tooling-preview = { group = "androidx.compose.ui", name = "u
 androidx-compose-ui-test-manifest = { group = "androidx.compose.ui", name = "ui-test-manifest" }
 androidx-compose-ui-test-junit4 = { group = "androidx.compose.ui", name = "ui-test-junit4" }
 androidx-compose-material3 = { group = "androidx.compose.material3", name = "material3" }
+reorderable = { group = "sh.calvin.reorderable", name = "reorderable", version.ref = "reorderable" }
 
 # Плагин KSP закрепляется через buildscript, а не через plugins-блок: AGP 9 объявляет свою
 # зависимость на KSP и понижает версию до 2.2.10-2.0.2, если её не зафиксировать раньше.

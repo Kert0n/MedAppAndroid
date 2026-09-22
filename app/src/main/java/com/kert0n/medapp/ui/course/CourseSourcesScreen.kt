@@ -7,7 +7,6 @@ import androidx.compose.material3.ElevatedCard
 import androidx.compose.material3.CardDefaults
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.gestures.detectDragGesturesAfterLongPress
 import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.layout.Arrangement
@@ -21,6 +20,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
@@ -36,8 +36,6 @@ import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableFloatStateOf
-import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
@@ -45,11 +43,8 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.focus.onFocusChanged
-import androidx.compose.ui.graphics.graphicsLayer
-import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.input.KeyboardType
-import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.pluralStringResource
@@ -58,7 +53,8 @@ import androidx.compose.ui.semantics.CustomAccessibilityAction
 import androidx.compose.ui.semantics.customActions
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.zIndex
+import androidx.compose.ui.hapticfeedback.HapticFeedbackType
+import androidx.compose.ui.platform.LocalHapticFeedback
 import com.kert0n.medapp.R
 import com.kert0n.medapp.ui.DAY
 import com.kert0n.medapp.domain.course.CourseSource
@@ -76,10 +72,13 @@ import com.kert0n.medapp.ui.LoadingState
 import com.kert0n.medapp.presentation.value.toPresentationDTO
 import kotlin.math.roundToInt
 import kotlin.uuid.Uuid
+import sh.calvin.reorderable.ReorderableItem
+import sh.calvin.reorderable.rememberReorderableLazyListState
 
 /**
  * Источники лечения (PLAN H3 №16): стек коробок в порядке расходования. Порядок меняется
- * перетаскиванием за ручку и теми же двумя действиями у экранного чтеца — жест ему недоступен.
+ * перетаскиванием: берётся **вся карточка** долгим нажатием, ручка ≡ — сразу. Экранному чтецу
+ * жест недоступен, ему остаются действия «Выше» и «Ниже» на той же строке.
  *
  * **Правка местная, записывает её «Сохранить»**: ползунок двигают пальцем, и предел под ним
  * экран считает сам — ждать базу между движениями нельзя. Пока не записано, сводка обеспечения
@@ -157,12 +156,25 @@ private fun Sources(
     onSave: () -> Unit,
     modifier: Modifier = Modifier
 ) {
-    var dragging by remember { mutableStateOf<Int?>(null) }
-    var shift by remember { mutableFloatStateOf(0f) }
-    var rowHeight by remember { mutableIntStateOf(0) }
+    // Перестановку держит библиотека: живой обмен соседями по ходу пальца, анимация соседей и
+    // прокрутка у краёв. Руками это было недоделано — соседи не двигались вовсе, а место броска
+    // считалось делением сдвига на высоту одной строки, хотя строки разной высоты.
+    val haptics = LocalHapticFeedback.current
+    val rows = rememberLazyListState()
+    val reordering = rememberReorderableLazyListState(rows) { from, to ->
+        // Позиции приходят от списка целиком, а в нём кроме источников лежат обеспечение, строка
+        // порядка и «Подключить ещё препарат». Считать заголовки числом нельзя — их состав
+        // зависит от состояния экрана; переводим по ключу строки.
+        val movedFrom = state.sources.indexOfFirst { it.packageId == from.key }
+        val movedTo = state.sources.indexOfFirst { it.packageId == to.key }
+        if (movedFrom >= 0 && movedTo >= 0) {
+            onMove(movedFrom, movedTo)
+            haptics.performHapticFeedback(HapticFeedbackType.SegmentFrequentTick)
+        }
+    }
     val count = state.sources.size
     Column(modifier.fillMaxSize()) {
-        LazyColumn(Modifier.weight(1f), contentPadding = PaddingValues(bottom = 8.dp)) {
+        LazyColumn(Modifier.weight(1f), state = rows, contentPadding = PaddingValues(bottom = 8.dp)) {
             // Первым — обеспечение: ради него сюда и приходят (PLAN H3 №16).
             item(key = "supply") { Supply(state, Modifier.padding(horizontal = 16.dp, vertical = 8.dp)) }
             item(key = "order") {
@@ -173,40 +185,30 @@ private fun Sources(
                 )
             }
             itemsIndexed(state.sources, key = { _, source -> source.packageId }) { index, source ->
-                val held = dragging == index
-                SourceRow(
-                    source = source,
-                    dose = state.dose,
-                    isFinished = state.isFinished,
-                    onAllocate = onAllocate,
-                    onDetach = { onDetach(source.packageId) },
-                    onMoveUp = if (index > 0) { { onMove(index, index - 1) } } else null,
-                    onMoveDown = if (index < count - 1) { { onMove(index, index + 1) } } else null,
-                    held = held,
-                    modifier = Modifier
-                        .zIndex(if (held) 1f else 0f)
-                        .graphicsLayer { translationY = if (held) shift else 0f }
-                        .onSizeChanged { if (it.height > 0) rowHeight = it.height },
-                    handleModifier = Modifier.pointerInput(index, count, rowHeight) {
-                        detectDragGesturesAfterLongPress(
-                            onDragStart = { dragging = index; shift = 0f },
-                            onDrag = { change, amount ->
-                                change.consume()
-                                shift += amount.y
-                            },
-                            onDragEnd = {
-                                // Куда строка уехала: шаг — высота соседней строки, и она же
-                                // говорит, через сколько соседей человек её перенёс.
-                                val moved = if (rowHeight > 0) (shift / rowHeight).roundToInt() else 0
-                                val target = (index + moved).coerceIn(0, count - 1)
-                                dragging = null
-                                shift = 0f
-                                if (target != index) onMove(index, target)
-                            },
-                            onDragCancel = { dragging = null; shift = 0f }
+                ReorderableItem(reordering, key = source.packageId) { held ->
+                    SourceRow(
+                        source = source,
+                        dose = state.dose,
+                        isFinished = state.isFinished,
+                        onAllocate = onAllocate,
+                        onDetach = { onDetach(source.packageId) },
+                        onMoveUp = if (index > 0) { { onMove(index, index - 1) } } else null,
+                        onMoveDown = if (index < count - 1) { { onMove(index, index + 1) } } else null,
+                        held = held,
+                        // Берётся вся карточка: целиться в значок размером с ноготь человек не
+                        // обязан (решение владельца 2026-09-22). Поле числа, ползунок и
+                        // «Отвязать» свои нажатия по-прежнему забирают себе.
+                        modifier = Modifier.longPressDraggableHandle(
+                            onDragStarted = { haptics.performHapticFeedback(HapticFeedbackType.LongPress) },
+                            onDragStopped = { haptics.performHapticFeedback(HapticFeedbackType.GestureEnd) }
+                        ),
+                        // Ручка берёт строку сразу, без долгого нажатия: она и нарисована ради этого.
+                        handleModifier = Modifier.draggableHandle(
+                            onDragStarted = { haptics.performHapticFeedback(HapticFeedbackType.LongPress) },
+                            onDragStopped = { haptics.performHapticFeedback(HapticFeedbackType.GestureEnd) }
                         )
-                    }
-                )
+                    )
+                }
             }
             // Подключить — строка в конце списка, а не вторая кнопка рядом с «Сохранить»: две кнопки
             // разного веса подряд читались как выбор между ними.
