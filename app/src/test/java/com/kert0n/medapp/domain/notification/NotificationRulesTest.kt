@@ -90,6 +90,20 @@ class NotificationRulesTest {
         assertNull(covered.noticeOn(moscowMidnight(uncoveredOn)))
     }
 
+    /**
+     * Порог — число, которое человек набрал в настройках, и любое набранное число отвечает, а не
+     * роняет сверку: упавшая сверка повторяется каждую минуту и молчит обо всём остальном.
+     *
+     * Красная проверка: `uncoveredOn.minusDays(Long.MAX_VALUE)` бросал `DateTimeException`.
+     */
+    @Test
+    fun anAbsurdThresholdDoesNotCrashTheCoverageNotice() {
+        val course = activeCourse(schedule = schedule(start = LocalDate.of(2027, 3, 10), times = listOf(LocalTime.of(1, 0))), totalDoses = 7, sources = listOf(source(PACK, 3)))
+        val coverage = course.coverage(CourseProgress.none, availability(PACK to tablets("20")))
+
+        coverage.noticeOn(LocalDate.of(2027, 3, 11).atStartOfDay(MOSCOW).toInstant(), thresholdDays = Long.MAX_VALUE)
+    }
+
     @Test
     fun onlyTheIntakeReminderIsExact() {
         assertTrue(NotificationKind.INTAKE_DUE.exact)
