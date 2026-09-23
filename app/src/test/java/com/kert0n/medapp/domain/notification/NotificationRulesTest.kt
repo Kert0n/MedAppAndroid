@@ -29,13 +29,18 @@ class NotificationRulesTest {
     private val lastDay = LocalDate.of(2027, 3, 31)
     private val expiry = ExpiryDate(lastDay)
 
+    /**
+     * Этап — окно календарных дней: «заранее» — три или два дня, «завтра» — день, «сегодня» —
+     * последний день. Пропущенный день «−3» не оставляет без предупреждения: «−2» — тот же этап.
+     */
     @Test
     fun expiryStagesAreCalendarDaysNotHours() {
         assertEquals(ExpiryDate.Stage.SOURCE_3D, expiry.stageOn(lastDay.minusDays(3)))
+        assertEquals(ExpiryDate.Stage.SOURCE_3D, expiry.stageOn(lastDay.minusDays(2)))
         assertEquals(ExpiryDate.Stage.SOURCE_1D, expiry.stageOn(lastDay.minusDays(1)))
         assertEquals(ExpiryDate.Stage.TODAY, expiry.stageOn(lastDay))
-        assertNull(expiry.stageOn(lastDay.minusDays(2)))
         assertNull(expiry.stageOn(lastDay.minusDays(4)))
+        assertEquals(2L, expiry.daysLeftOn(lastDay.minusDays(2)))
         // Просроченной этапов нет: у неё статус, а не предупреждение.
         assertNull(expiry.stageOn(lastDay.plusDays(1)))
     }
@@ -80,7 +85,9 @@ class NotificationRulesTest {
         fun moscowMidnight(day: LocalDate) = day.atStartOfDay(MOSCOW).toInstant()
         assertEquals(CourseCoverage.Notice.AHEAD, coverage.noticeOn(moscowMidnight(uncoveredOn.minusDays(3))))
         assertEquals(CourseCoverage.Notice.END, coverage.noticeOn(moscowMidnight(uncoveredOn)))
-        assertNull(coverage.noticeOn(moscowMidnight(uncoveredOn.minusDays(1))))
+        // «Заранее» — окно до порога: и за день ещё предупреждение заранее, а за четыре — рано.
+        assertEquals(CourseCoverage.Notice.AHEAD, coverage.noticeOn(moscowMidnight(uncoveredOn.minusDays(1))))
+        assertNull(coverage.noticeOn(moscowMidnight(uncoveredOn.minusDays(4))))
         // По UTC этот миг — ещё 12 марта; по зоне курса — уже день исчерпания.
         assertEquals(CourseCoverage.Notice.END, coverage.noticeOn(uncoveredOn.atStartOfDay(MOSCOW).toInstant()))
         // Порог 0 — «только в день»: день исчерпания остаётся исчерпанием, а не «скоро».
