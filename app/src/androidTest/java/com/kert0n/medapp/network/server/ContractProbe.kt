@@ -297,6 +297,9 @@ class ContractProbe {
         success(guest.joinMedKit(MembershipPostNetworkDTO(success(owner.createInvitation(kit)).key)))
         success(guest.createClaim(ClaimPostNetworkDTO(pack.id, "8", success(guest.packageSnapshot(pack.id)).claims.version)))
         val claimed = success(owner.packageSnapshot(pack.id))
+        // Расход готовится по картине, где восемь заняты гостем, а своих броней у владельца нет.
+        assertEquals(0, BigDecimal("8").compareTo(BigDecimal(claimed.claims.total)))
+        assertNull(claimed.claims.mine)
 
         // Шесть из десяти, хотя восемь заявил гость: расход из чужой брони принят.
         val left = requireNotNull(
