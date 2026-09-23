@@ -49,7 +49,7 @@ class CourseRejected(val reason: Reason) : IllegalStateException(reason.name) {
         /** Доз больше, чем лечение может назначить ([Prescription.MAX_TOTAL_DOSES]). */
         TOTAL_DOSES_TOO_MANY,
 
-        /** Новое расписание начинается раньше сегодняшнего дня: пункты в прошлом не заводят. */
+        /** Расписание начинается раньше сегодняшнего дня: пункты в прошлом не заводят. */
         SCHEDULE_IN_PAST
     }
 }

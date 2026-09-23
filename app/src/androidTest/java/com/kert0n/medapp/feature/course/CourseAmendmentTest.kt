@@ -76,8 +76,10 @@ class CourseAmendmentTest {
         }
         val shelf = if (shared) medKit(id = SHARED_KIT, publication = MedKit.Publication.PUBLISHED).ref else medKit().ref
         database.packageRepository().add(pack(id = PACK, medKit = shelf, quantity = tablets("20"), form = TABLET_FORM))
-        val created = scenarios.courseDrafting.create("Ибупрофен")
-        val draft = (scenarios.courseDrafting.edit(
+        // Лечение с прошедшего дня не начинают: его начали в первый день, а время прошло потом.
+        val beginning = Scenarios(database, Instant.parse("2027-03-08T05:00:00Z"))
+        val created = beginning.courseDrafting.create("Ибупрофен")
+        val draft = (beginning.courseDrafting.edit(
             created.id, created.revision,
             listOf(
                 CourseDrafting.Edit.SetDose(dose("2")),
@@ -87,7 +89,7 @@ class CourseAmendmentTest {
                 CourseDrafting.Edit.Attach(PACK, Doses(5))
             )
         ) as CourseDrafting.Outcome.Saved).draft
-        scenarios.courseActivation.activate(draft.id, draft.revision)
+        beginning.courseActivation.activate(draft.id, draft.revision)
         scenarios.courseUpkeep.keepUp()
         val today = items(draft.id).first { it.slot.localDate == LocalDate.of(2027, 3, 10) }
         scenarios.intakeConfirmation.confirm(today.id, PACK, dose("2"), now).confirmed()

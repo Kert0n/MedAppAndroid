@@ -572,7 +572,7 @@
     </plurals>
     <string name="course_rejected_unit_mismatch">У подключённых препаратов другая единица — сначала отвяжите их.</string>
     <string name="course_rejected_form_mismatch">У подключённых препаратов другая форма — сначала отвяжите их.</string>
-    <string name="course_rejected_schedule_in_past">Новое расписание не может начинаться раньше сегодняшнего дня.</string>
+    <string name="course_rejected_schedule_in_past">Лечение не начинается раньше сегодняшнего дня — выберите дату заново.</string>
     <string name="course_rejected_already_attached">Этот препарат уже подключён.</string>
     <string name="course_rejected_package_unusable">Этот препарат выбрасывают или его полки больше нет — источником ему не быть.</string>
     <string name="course_missing">Этого лечения больше нет.</string>

@@ -52,12 +52,14 @@ import com.kert0n.medapp.presentation.course.CourseFormUiState
 import com.kert0n.medapp.presentation.course.suggestingUnit
 import com.kert0n.medapp.presentation.course.withForm
 import com.kert0n.medapp.ui.DateField
+import com.kert0n.medapp.ui.daysFrom
 import com.kert0n.medapp.ui.Form
 import com.kert0n.medapp.ui.ErrorMessage
 import com.kert0n.medapp.ui.LoadingState
 import com.kert0n.medapp.ui.PickerField
 import com.kert0n.medapp.ui.QuantityField
 import com.kert0n.medapp.ui.text
+import java.time.LocalDate
 import java.time.DayOfWeek
 import java.time.LocalTime
 
@@ -137,7 +139,7 @@ fun CourseFormScreen(
     BackHandler(enabled = editing?.mode == CourseFormUiState.Mode.UNASKED_DRAFT, onBack = onBack)
 }
 
-@OptIn(ExperimentalLayoutApi::class)
+@OptIn(ExperimentalMaterial3Api::class, ExperimentalLayoutApi::class)
 @Composable
 private fun Fields(
     state: CourseFormUiState.Editing,
@@ -234,7 +236,10 @@ private fun Fields(
         DateField(
             label = stringResource(R.string.course_start),
             value = form.start,
-            onPick = { onEdit(form.copy(start = it)) }
+            onPick = { onEdit(form.copy(start = it)) },
+            isError = field == CourseFormError.Field.START,
+            // Дня модель не отдаёт только по ошибке — и тогда не предлагается ничего, а не всё.
+            selectable = daysFrom(state.today ?: LocalDate.MAX)
         )
         Text(stringResource(R.string.course_days), style = MaterialTheme.typography.labelLarge)
         FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {

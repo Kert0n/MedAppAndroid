@@ -1,5 +1,7 @@
 package com.kert0n.medapp.presentation.course
 
+import com.kert0n.medapp.fixture.QuietClock
+import com.kert0n.medapp.feature.time.Today
 import com.kert0n.medapp.domain.course.Revision
 import com.kert0n.medapp.feature.course.CourseActivation
 import com.kert0n.medapp.feature.course.CourseAmendment
@@ -74,6 +76,8 @@ class CourseFormViewModelTest {
             renaming = CourseRenaming(courses, transactions),
             courses = courses,
             vocabulary = FakeVocabulary(),
+            today = Today(clock, QuietClock),
+            clock = clock,
             courseId = courseId
         )
 
@@ -425,5 +429,16 @@ class CourseFormViewModelTest {
         }
 
         assertEquals(LocalDate.of(2027, 3, 3), (state as CourseFormUiState.Editing).expectedEnd)
+    }
+
+    /**
+     * Граница календаря известна с первого же состояния и считается в зоне расписания, как у
+     * домена: иначе до первого оборота потока календарь предлагал бы и прошедшие дни.
+     */
+    @Test
+    fun theStartBoundaryIsKnownFromTheFirstStateInTheScheduleZone() {
+        val first = viewModel().state.value as CourseFormUiState.Editing
+
+        assertEquals(clock.instant().atZone(first.form.zone).toLocalDate(), first.today)
     }
 }

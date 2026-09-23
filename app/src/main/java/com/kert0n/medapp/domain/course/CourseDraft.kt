@@ -102,10 +102,13 @@ class CourseDraft(
 
     /**
      * Расписание черновика; у начатого лечения его меняет `Course.changeSchedule`. Редакция растёт,
-     * потому что меняется состав будущих пунктов.
+     * потому что меняется состав будущих пунктов. С прошедшего дня лечение не начинают
+     * ([CourseSchedule.startsBefore]) — ни сейчас, ни при запуске, когда дата уже могла пройти.
      */
-    fun setSchedule(schedule: CourseSchedule, at: Instant): CourseDraft =
-        changed(schedule = schedule, revision = revision.next(), updatedAt = at)
+    fun setSchedule(schedule: CourseSchedule, at: Instant): Result<CourseDraft> {
+        if (schedule.startsBefore(at)) return rejected(CourseRejected.Reason.SCHEDULE_IN_PAST)
+        return Result.success(changed(schedule = schedule, revision = revision.next(), updatedAt = at))
+    }
 
     /**
      * Сколько всего приёмов. Число правится и после начала — но уже у курса. Ноль здесь не
@@ -208,6 +211,8 @@ class CourseDraft(
      */
     fun activate(at: Instant): Result<Activation> {
         val schedule = schedule ?: return rejected(CourseRejected.Reason.SCHEDULE_MISSING)
+        // Черновик, заполненный в понедельник датой «сегодня», в среду с понедельника не начинают.
+        if (schedule.startsBefore(at)) return rejected(CourseRejected.Reason.SCHEDULE_IN_PAST)
         val dose = dose ?: return rejected(CourseRejected.Reason.DOSE_MISSING)
         val form = form ?: return rejected(CourseRejected.Reason.FORM_MISSING)
         val totalDoses = totalDoses?.takeUnless { it.isNone }

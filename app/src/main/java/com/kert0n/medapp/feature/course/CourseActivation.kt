@@ -49,7 +49,7 @@ class CourseActivation @Inject constructor(
         // Выделение — намерение человека, но больше, чем пачка даёт, его не бывает (PLAN D5).
         val course = started.course.let { it.clamped(it.totalDoses, packages.availabilityFor(it), now) }
         courses.activate(CourseDraft.Activation(course, started.record))
-        // Лечение начали задним числом — прошедшие дни сразу пропуски, а не ждущие пункты.
+        // Лечение начали сегодня позже первого времени — прошедшие пункты сразу пропуски, а не ждущие.
         calendar.catchUp(course, now)
         // Бронь — разницей от «ничего не выделено»: ставит её единственный владелец (PLAN D5, E2).
         following.announceClaims(course.unallocated(), course, now)

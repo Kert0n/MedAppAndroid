@@ -147,14 +147,11 @@ class Course(
 
     /**
      * Другое расписание — в том числе другая зона — то же лечение, и будущие пункты перестраиваются
-     * по нему. Прошлое уже случилось: новое расписание не начинается раньше сегодняшнего дня своей
-     * зоны, иначе в нём завелись бы пункты, на которые отвечать поздно (PLAN D5).
+     * по нему — но не с прошедшего дня ([CourseSchedule.startsBefore]).
      */
     fun changeSchedule(schedule: CourseSchedule, at: Instant): Result<Course> {
         if (schedule == this.schedule) return Result.success(this)
-        if (schedule.start.isBefore(at.atZone(schedule.zone).toLocalDate())) {
-            return rejected(CourseRejected.Reason.SCHEDULE_IN_PAST)
-        }
+        if (schedule.startsBefore(at)) return rejected(CourseRejected.Reason.SCHEDULE_IN_PAST)
         return Result.success(changed(prescription = prescription.copy(schedule = schedule), revision = revision.next(), updatedAt = at))
     }
 

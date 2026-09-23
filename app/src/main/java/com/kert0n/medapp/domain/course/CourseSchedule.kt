@@ -50,6 +50,13 @@ class CourseSchedule(
         }
     }
 
+    /**
+     * Начинается ли календарь раньше дня, на который приходится [at] в своей зоне. Прошлое уже
+     * случилось: лечение, начатое или перестроенное таким календарём, завело бы пункты, на которые
+     * отвечать поздно (PLAN D5).
+     */
+    fun startsBefore(at: Instant): Boolean = start.isBefore(at.atZone(zone).toLocalDate())
+
     /** Момент, с которого календарь читается с самого начала: полночь первого дня в своей зоне. */
     val beginning: Instant get() = start.atStartOfDay(zone).toInstant()
 

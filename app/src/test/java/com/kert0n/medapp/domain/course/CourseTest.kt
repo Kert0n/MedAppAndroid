@@ -23,6 +23,7 @@ import com.kert0n.medapp.fixture.MILLILITRES
 import java.math.BigDecimal
 import java.time.Instant
 import java.time.LocalDate
+import com.kert0n.medapp.fixture.MOSCOW
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNull
@@ -147,7 +148,7 @@ class CourseTest {
     fun settingTheDraftScheduleRaisesTheRevision() {
         // Расписание меняет состав будущих пунктов, поэтому редакция растёт — в отличие от
         // переименования.
-        val planned = course().setSchedule(schedule(), at = LATER)
+        val planned = course().setSchedule(schedule(), at = LATER).getOrThrow()
         assertEquals(schedule(), planned.schedule)
         assertEquals(Revision(1), planned.revision)
     }
@@ -265,5 +266,43 @@ class CourseTest {
 
         assertEquals(LocalDate.of(2027, 3, 11), tomorrow.schedule.start)
         assertEquals(CourseRejected.Reason.SCHEDULE_IN_PAST, (yesterday.exceptionOrNull() as CourseRejected).reason)
+    }
+
+    /** Черновик тоже не начинают с прошедшего дня: правило одно и у лечения, и у его заготовки. */
+    @Test
+    fun aDraftScheduleDoesNotStartInThePastEither() {
+        val at = Instant.parse("2027-03-10T12:00:00Z")
+
+        val today = course().setSchedule(schedule(start = LocalDate.of(2027, 3, 10)), at).getOrThrow()
+        val yesterday = course().setSchedule(schedule(start = LocalDate.of(2027, 3, 9)), at)
+
+        assertEquals(LocalDate.of(2027, 3, 10), today.schedule?.start)
+        assertEquals(CourseRejected.Reason.SCHEDULE_IN_PAST, (yesterday.exceptionOrNull() as CourseRejected).reason)
+    }
+
+    /**
+     * Черновик, заполненный в понедельник датой «сегодня», в среду с понедельника не начинают: дата
+     * была верна, когда её ставили, и прошла, пока черновик лежал. Иначе два дня стали бы
+     * пропусками, которых не было.
+     */
+    @Test
+    fun aDraftWhoseStartHasPassedIsNotStarted() {
+        val monday = LocalDate.of(2027, 3, 8)
+        val draft = prescribedDraft(schedule = schedule(start = monday), totalDoses = 7)
+
+        val onMonday = draft.activate(Instant.parse("2027-03-08T12:00:00Z"))
+        val onWednesday = draft.activate(Instant.parse("2027-03-10T12:00:00Z"))
+
+        assertEquals(monday, onMonday.getOrThrow().course.schedule.start)
+        assertEquals(CourseRejected.Reason.SCHEDULE_IN_PAST, (onWednesday.exceptionOrNull() as CourseRejected).reason)
+    }
+
+    /** «Сегодня» — в зоне расписания: в Москве уже вторник, хотя по Гринвичу ещё понедельник. */
+    @Test
+    fun todayIsTheScheduleZonesToday() {
+        val moscowTuesday = Instant.parse("2027-03-08T22:30:00Z")
+
+        assertTrue(schedule(start = LocalDate.of(2027, 3, 8), zone = MOSCOW).startsBefore(moscowTuesday))
+        assertFalse(schedule(start = LocalDate.of(2027, 3, 9), zone = MOSCOW).startsBefore(moscowTuesday))
     }
 }

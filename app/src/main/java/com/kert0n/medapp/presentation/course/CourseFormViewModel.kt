@@ -9,6 +9,7 @@ import com.kert0n.medapp.feature.course.CourseActivation
 import com.kert0n.medapp.feature.course.CourseAmendment
 import com.kert0n.medapp.feature.course.CourseDrafting
 import com.kert0n.medapp.feature.course.CourseRenaming
+import com.kert0n.medapp.feature.time.Today
 import com.kert0n.medapp.presentation.ParsedInput
 import com.kert0n.medapp.presentation.value.FormPresentationDTO
 import com.kert0n.medapp.presentation.value.UnitPresentationDTO
@@ -19,6 +20,7 @@ import dagger.assisted.Assisted
 import dagger.assisted.AssistedFactory
 import dagger.assisted.AssistedInject
 import dagger.hilt.android.lifecycle.HiltViewModel
+import java.time.Clock
 import java.time.LocalDate
 import kotlin.uuid.Uuid
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -48,6 +50,8 @@ class CourseFormViewModel @AssistedInject constructor(
     private val renaming: CourseRenaming,
     private val courses: CourseStorageRepository,
     private val vocabulary: VocabularyStorageRepository,
+    private val today: Today,
+    private val clock: Clock,
     @Assisted private val courseId: Uuid?
 ) : ViewModel() {
 
@@ -61,19 +65,34 @@ class CourseFormViewModel @AssistedInject constructor(
         else CourseFormUiState.Loading
     )
 
-    /** Из чего человек выбирает: словарь. Приходит к форме, а не в неё — редактор её не пишет. */
+    /**
+     * Из чего человек выбирает: словарь и дни, с которых можно начать. Приходит к форме, а не в
+     * неё — редактор её не пишет.
+     */
     val state: StateFlow<CourseFormUiState> = combine(
         editing,
         vocabulary.observeUnits(),
-        vocabulary.observeForms()
-    ) { state, units, forms ->
+        vocabulary.observeForms(),
+        // День — только повод пересчитать границу: считается она в зоне расписания, а не телефона.
+        today.observe()
+    ) { state, units, forms, _ ->
         if (state is CourseFormUiState.Editing) {
             val known = units.map { it.toPresentationDTO() }
             // Единицу подсказывает форма выпуска — и при выборе формы, и здесь: у записанного
             // черновика её негде хранить, пока нет числа, а открывается он с готовой формой.
-            state.copy(form = state.form.suggestingUnit(known), units = known, forms = forms.map { it.toPresentationDTO() })
+            state.copy(
+                form = state.form.suggestingUnit(known),
+                units = known,
+                forms = forms.map { it.toPresentationDTO() }
+            ).dated()
         } else state
-    }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), editing.value)
+    }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), editing.value.let { if (it is CourseFormUiState.Editing) it.dated() else it })
+
+    /**
+     * Сегодня в зоне расписания — там же, где его считает домен (`CourseSchedule.startsBefore`):
+     * у записанного курса зона своя, и граница по телефону расходилась бы с отказом около полуночи.
+     */
+    private fun CourseFormUiState.Editing.dated() = copy(today = clock.instant().atZone(form.zone).toLocalDate())
 
     init {
         if (courseId != null) viewModelScope.launch { open(courseId) }
@@ -396,6 +415,12 @@ sealed interface CourseFormUiState {
         val record: CourseRecordProjection? = null,
         val units: List<UnitPresentationDTO> = emptyList(),
         val forms: List<FormPresentationDTO> = emptyList(),
+        /**
+         * Сегодня в зоне расписания: раньше него лечение не начинают. Отказывает домен, а календарь
+         * прошедших дней не предлагает, чтобы человек не выбирал дату, которую отвергнут. Состояние
+         * правки без него не выходит из модели.
+         */
+        val today: LocalDate? = null,
         /** Когда ожидается последний приём по тому, что набрано; нечего считать — `null`. */
         val expectedEnd: LocalDate? = null,
         val error: CourseFormError? = null,

@@ -1,5 +1,8 @@
 package com.kert0n.medapp.ui.course
 
+import java.time.Clock
+import com.kert0n.medapp.fixture.QuietClock
+import com.kert0n.medapp.feature.time.Today
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import androidx.test.ext.junit.runners.AndroidJUnit4
@@ -78,13 +81,17 @@ class CourseAmendmentTest {
         renaming = scenarios.courseRenaming,
         courses = database.courseRepository(),
         vocabulary = FakeVocabulary(),
+        today = Today(Clock.fixed(scenarios.now, scenarios.zone), QuietClock),
+        clock = Clock.fixed(scenarios.now, scenarios.zone),
         courseId = courseId
     ).also { opened += it }
 
     /** Лечение, начатое вчера: два приёма в день, восемь приёмов, коробка на сорок таблеток. */
     private suspend fun started(): Uuid {
-        val created = scenarios.courseDrafting.create("Нурофен", "по 2 после еды")
-        val saved = scenarios.courseDrafting.edit(
+        // Лечение с прошедшего дня не начинают: его начали в первый день, а время прошло потом.
+        val beginning = Scenarios(database, yesterday.atTime(8, 0).atZone(MOSCOW).toInstant())
+        val created = beginning.courseDrafting.create("Нурофен", "по 2 после еды")
+        val saved = beginning.courseDrafting.edit(
             created.id, created.revision,
             listOf(
                 CourseDrafting.Edit.SetDose(dose("2")),
@@ -96,7 +103,8 @@ class CourseAmendmentTest {
                 CourseDrafting.Edit.Attach(PACK, Doses(8))
             )
         ) as CourseDrafting.Outcome.Saved
-        scenarios.courseActivation.activate(saved.draft.id, saved.draft.revision)
+        beginning.courseActivation.activate(saved.draft.id, saved.draft.revision)
+        scenarios.courseUpkeep.keepUp()
         return saved.draft.id
     }
 
