@@ -103,10 +103,12 @@ class ForgottenAccountTest {
                     server.registered += login to password
                     respond("", HttpStatusCode.Created)
                 }
-                else -> {
+                // Ресурсы, о которых спрашивают проверки; всё прочее — ошибка самой проверки.
+                "/v1/users/me", "/v1/med-kits" -> {
                     val bearer = request.headers[HttpHeaders.Authorization]?.removePrefix("Bearer ")
                     respond("", if (bearer in server.validTokens) HttpStatusCode.OK else HttpStatusCode.Unauthorized)
                 }
+                else -> error("подделка сервера не знает пути ${request.url.encodedPath}")
             }
         },
         "https://medapp.test",
