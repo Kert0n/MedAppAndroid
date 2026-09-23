@@ -150,6 +150,7 @@ class ShellNavigationTest {
 
         failures.report()
 
-        compose.waitUntil(WAIT) { compose.onAllNodesWithText("Не получилось. Попробуйте ещё раз.").fetchSemanticsNodes().isNotEmpty() }
+        val told = androidx.test.platform.app.InstrumentationRegistry.getInstrumentation().targetContext.getString(com.kert0n.medapp.R.string.failure_action)
+        compose.waitUntil(WAIT) { compose.onAllNodesWithText(told).fetchSemanticsNodes().isNotEmpty() }
     }
 }

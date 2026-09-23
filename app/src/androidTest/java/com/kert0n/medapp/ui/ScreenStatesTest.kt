@@ -95,11 +95,13 @@ class ScreenStatesTest {
         var back = 0
         compose.setContent { MedAppTheme { Readable(reading, onBack = { back++ }) { androidx.compose.material3.Text("Содержимое") } } }
 
-        compose.onNodeWithText("Не удалось обратиться к данным на устройстве.").assertIsDisplayed()
-        compose.onNodeWithContentDescription("Назад").performClick()
+        // Слова — из ресурсов: экран смотрят и на английском крупном BigScaled.
+        val words = androidx.test.platform.app.InstrumentationRegistry.getInstrumentation().targetContext
+        compose.onNodeWithText(words.getString(com.kert0n.medapp.R.string.failure_device_storage)).assertIsDisplayed()
+        compose.onNodeWithContentDescription(words.getString(com.kert0n.medapp.R.string.action_back)).performClick()
         assertEquals(1, back)
 
-        compose.onNodeWithText("Повторить").performClick()
+        compose.onNodeWithText(words.getString(com.kert0n.medapp.R.string.action_retry)).performClick()
         compose.waitUntil(5_000) { compose.onAllNodesWithText("Содержимое").fetchSemanticsNodes().isNotEmpty() }
         assertEquals(2, reads)
     }
