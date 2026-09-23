@@ -8,9 +8,8 @@ import java.time.Duration
 import java.time.Instant
 import javax.inject.Inject
 import javax.inject.Singleton
-import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.CoroutineScope
-import kotlinx.coroutines.NonCancellable
+import kotlinx.coroutines.Deferred
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -20,13 +19,17 @@ import kotlinx.coroutines.withTimeoutOrNull
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
-import kotlinx.coroutines.withContext
 
 /**
  * Заход синхронизации: отдать серверу своё и прочитать у него правду (PLAN E4). Поводов много —
  * запуск, вход в приложение, появившаяся связь, ручное обновление, регулярный фоновый заход, остаток
  * очереди, — а заход один, и повторные поводы **объединяются**: пришедший, пока заход идёт, ждёт его
  * и получает его же итог, а не заводит второе чтение того же снимка.
+ *
+ * **Заход принадлежит этому классу, а не тому, кто позвал первым**: он живёт в области приложения, а
+ * вызывающие только ждут его итога. Ушёл с экрана тот, кто нажал «Обновить», — кончилось его
+ * ожидание, а заход доживает, и итог получают остальные. Отменить заход может только конец области
+ * приложения; его сбой ждущие получают сбоем, а не отменой.
  *
  * Порядок — сначала очередь, потом снимок. Отданное до чтения снимок уже видит, и коробок с
  * запросом в полёте, которые он пропускает, на обычном пути не остаётся (E1).
@@ -46,34 +49,24 @@ class Synchronization @Inject constructor(
 ) : Freshness {
 
     private val guard = Mutex()
-    private var running: CompletableDeferred<Round>? = null
+
+    /** Идущий заход; законченный — повод начать новый. Читается и заводится под [guard]. */
+    private var running: Deferred<Round>? = null
 
     private val _state = MutableStateFlow(State())
 
     /** Что с синхронизацией — для экрана её состояния (PLAN H3 №28). */
     val state: StateFlow<State> = _state.asStateFlow()
 
-    /** Заход — или присоединение к идущему. Итог один на всех, кто пришёл за время захода. */
+    /**
+     * Заход — или присоединение к идущему. Итог один на всех, кто пришёл за время захода. Отмена
+     * вызывающего снимает только его ожидание: заход живёт в области приложения.
+     */
     suspend fun synchronize(): Round {
-        val mine = CompletableDeferred<Round>()
-        var joined: CompletableDeferred<Round>? = null
-        guard.withLock {
-            joined = running
-            if (joined == null) running = mine
+        val round = guard.withLock {
+            running?.takeUnless { it.isCompleted } ?: scope.async { roundTrip() }.also { running = it }
         }
-        joined?.let { return it.await() }
-        try {
-            mine.complete(roundTrip())
-        } catch (failure: Throwable) {
-            mine.completeExceptionally(failure)
-        } finally {
-            // Отмена, пришедшая, пока замок занят, не должна оставить законченный заход «идущим»:
-            // все следующие поводы присоединялись бы к нему навсегда.
-            withContext(NonCancellable) {
-                guard.withLock { if (running === mine) running = null }
-            }
-        }
-        return mine.await()
+        return round.await()
     }
 
     /** Повод без ожидания: вход в приложение, появившаяся связь. Итог — в [state]. */
@@ -91,10 +84,8 @@ class Synchronization @Inject constructor(
     }
 
     /** То же, но с итогом — проверкам важно, дождались ли захода. */
-    suspend fun awaitBriefly(within: Duration): Round? {
-        val round = scope.async { attempt { synchronize() }.getOrNull() }
-        return withTimeoutOrNull(within.toMillis()) { round.await() }
-    }
+    suspend fun awaitBriefly(within: Duration): Round? =
+        withTimeoutOrNull(within.toMillis()) { attempt { synchronize() }.getOrNull() }
 
     private suspend fun roundTrip(): Round {
         _state.update { it.copy(running = true) }
@@ -102,7 +93,8 @@ class Synchronization @Inject constructor(
             val queue = worker.drain()
             val snapshot = snapshots.refresh()
             val now = clock.instant()
-            val left = backlog.dueAt(now)?.let { maxOf(it, now) }
+            // Пропущенные заходом строки — нечитаемые — ожиданием не доставить: за ними не приходят.
+            val left = backlog.dueAt(now, except = queue.skipped.mapTo(HashSet()) { it.id })?.let { maxOf(it, now) }
             left?.let(schedule::comeBackFor)
             val round = Round(queue, snapshot, backlogDueAt = left, finishedAt = now)
             _state.update {

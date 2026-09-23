@@ -8,6 +8,8 @@ import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.channels.Channel
+import kotlinx.coroutines.currentCoroutineContext
+import kotlinx.coroutines.ensureActive
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -24,7 +26,9 @@ import kotlinx.coroutines.launch
  *
  * Проход отвечает, **когда прийти снова** — срок из базы или `null`, если ждать нечего, — и цикл
  * ставит на него таймер. Сбой прохода — тоже срок: он записан в [state], и цикл возвращается не
- * позже [retryAfterFailure], а не молчит до следующего сигнала. Что переживёт смерть процесса —
+ * позже [retryAfterFailure], а не молчит до следующего сигнала. Отмена, которую бросил проход, а не
+ * сама область цикла, — тоже сбой: её принесла чужая работа, которую проход ждал, и останавливать
+ * цикл ей нечем. Что переживёт смерть процесса —
  * будильник, планировщик — ставит сам владелец: цикл живёт с процессом.
  *
  * [ready] — наблюдатель сигналов встал: запись, сделанная раньше, сигнала не даст, и тому, кто
@@ -91,12 +95,12 @@ class OutboxLoop(
                 _state.update { it.copy(passes = it.passes + 1, lastFailure = null, nextRunAt = at) }
                 at
             } catch (cancelled: CancellationException) {
-                throw cancelled
+                // Своя отмена — конец цикла, и `ensureActive` бросает именно её. Чужая — исход
+                // чужой работы, которую ждал проход: это сбой прохода, и цикл живёт дальше.
+                currentCoroutineContext().ensureActive()
+                failed(cancelled)
             } catch (failure: Exception) {
-                // Сбой прохода не роняет процесс и не оставляет цикл ждать неизвестно чего.
-                val at = clock.instant().plus(retryAfterFailure)
-                _state.update { it.copy(passes = it.passes + 1, lastFailure = failure.toString(), nextRunAt = at) }
-                at
+                failed(failure)
             }
             timer = next?.let { at ->
                 scope.launch {
@@ -105,6 +109,13 @@ class OutboxLoop(
                 }
             }
         }
+    }
+
+    /** Сбой прохода не роняет процесс и не оставляет цикл ждать неизвестно чего: он записан, и срок назначен. */
+    private fun failed(failure: Exception): Instant {
+        val at = clock.instant().plus(retryAfterFailure)
+        _state.update { it.copy(passes = it.passes + 1, lastFailure = failure.toString(), nextRunAt = at) }
+        return at
     }
 
     /** Сколько проходов было, чем кончился последний (`null` — удачно) и когда следующий по сроку. */

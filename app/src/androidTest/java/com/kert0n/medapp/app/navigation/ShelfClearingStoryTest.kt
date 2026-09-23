@@ -24,6 +24,8 @@ import com.kert0n.medapp.fixture.MOSCOW
 import com.kert0n.medapp.fixture.SHARED_KIT
 import com.kert0n.medapp.fixture.Scenarios
 import com.kert0n.medapp.fixture.StoryWorld
+import com.kert0n.medapp.domain.notification.NotificationTarget
+import com.kert0n.medapp.domain.notification.NotificationKind
 import com.kert0n.medapp.fixture.TABLET_FORM
 import com.kert0n.medapp.fixture.intakeOn
 import com.kert0n.medapp.fixture.medKit
@@ -108,6 +110,8 @@ class ShelfClearingStoryTest {
             home("Смекта", saturday.plusDays(1))
             home("Парацетамол", saturday.plusDays(1))
             home("Мирамистин", saturday.plusDays(2))
+            // Кагоцел — источник следующего лечения, срок до пятницы: его «за три дня» — вторник.
+            home("Кагоцел", saturday.plusDays(6))
             // На даче, общей с мужем, — ещё две со сроком сегодня.
             for (name in listOf("Уголь", "Лоратадин")) {
                 val id = Uuid.random().also { boxes[name] = it }
@@ -122,6 +126,11 @@ class ShelfClearingStoryTest {
                 moscow(saturday.minusDays(1), 20, 0), "Амоксиклав", boxes.getValue("Амоксиклав"),
                 saturday.minusDays(1), listOf(LocalTime.of(21, 0))
             )
+            // Следующее лечение начнётся после истории: пропусков и строк в попапах оно не даёт.
+            database.treatmentStarted(
+                moscow(saturday.minusDays(1), 20, 0), "Кагоцел", boxes.getValue("Кагоцел"),
+                saturday.plusDays(7), listOf(LocalTime.of(9, 0))
+            )
         }
         compose.setContent {
             MedAppTheme { MedAppShell(opening = world.opening.value, onOpened = { world.opening.value = null }) }
@@ -135,11 +144,14 @@ class ShelfClearingStoryTest {
      * 23:40, суббота. Сначала попап пропущенного — вчерашний приём, — потом семь коробок в новости о
      * сроке. Нурофен выброшен, у Цетрина исправлен срок, Лоратадин выбросил муж на даче, полночь
      * застаёт Нину на карточке. Воскресенье — свои коробки, крестик; понедельник — новость
-     * приходит, хоть попап и закрывали; во вторник Нина не входит, в среду вчерашней новости нет.
+     * приходит, хоть попап и закрывали; во вторник Нина не входит, в среду вчерашней новости нет, а
+     * источник следующего лечения, чей день «за три» пришёлся на пропущенный вторник, всё равно
+     * предупреждён заранее.
      *
      * Стережёт: сначала пропуски, потом срок; попап не заслоняет карточку и ждёт возвращения;
      * содержимое живое — выброс, правка, чужой снимок; после полуночи попап не врёт про вчера;
-     * закрытое помнится ключами, а не флагом.
+     * закрытое помнится ключами, а не флагом; предупреждение заранее не пропадает вместе с
+     * пропущенным днём.
      */
     @Test
     fun ninaClearsTheShelvesOnSaturdayNightAndTheNewsStaysTrue() {
@@ -149,6 +161,7 @@ class ShelfClearingStoryTest {
         midnightFindsHerOnACard()
         mondaysNewsComesThoughSheClosedTheSundayOne()
         onWednesdayYesterdaysNewsIsGone()
+        tuesdayWasMissedAndTheSourceIsStillWarnedAhead()
     }
 
     private fun firstTheMissedIntakeThenTheExpiryNews() {
@@ -241,6 +254,17 @@ class ShelfClearingStoryTest {
         runBlocking { world.settle() }
         compose.waitForIdle()
         compose.onNodeWithText(EXPIRY).assertDoesNotExist()
+    }
+
+    /**
+     * Вторник был пропущен — а он и был днём «за три» у Кагоцела. В среду до конца срока два дня, и
+     * шторка предупреждает заранее: купить ещё успеют. Прежде этап считался только в точный день, и
+     * пропущенный вторник съедал предупреждение до последнего дня.
+     */
+    private fun tuesdayWasMissedAndTheSourceIsStillWarnedAhead() {
+        val kagocel = boxes.getValue("Кагоцел")
+        val warned = world.shade.shown.filter { (it.target as? NotificationTarget.PackageCard)?.packageId == kagocel }
+        assertEquals(listOf(NotificationKind.EXPIRY_SOURCE_3D), warned.map { it.kind })
     }
 
     private fun home(name: String, expiresOn: LocalDate) {
