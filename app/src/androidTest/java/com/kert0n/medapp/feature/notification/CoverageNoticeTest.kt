@@ -79,7 +79,11 @@ class CoverageNoticeTest {
 
     private fun kinds(due: List<Reminder>) = due.map { it.kind }
 
-    /** Пересчёт до 8 таблеток: 4 дозы из 10 — «за три дня» на седьмой день, «в день» — на восьмой. */
+    /**
+     * Пересчёт до 8 таблеток: 4 дозы из 10, первый необеспеченный пункт — 14 марта. «Заранее» — окно с
+     * 11-го по 13-е (опоздавшая сверка всё ещё предупреждает, а ключ тот же, и второй раз оно не
+     * скажется), «в день» — 14-го.
+     */
     @Test
     fun theGapIsAnnouncedByItsDate() = runTest {
         treated()
@@ -87,11 +91,17 @@ class CoverageNoticeTest {
 
         scenarios.packageAdjusting.adjust(PACK, PackageAdjusting.Action.Recount(seen = tablets("20"), actual = tablets("8")))
 
-        // Первый необеспеченный — пятый пункт, 14 марта: за три дня — 11-го, в день — 14-го.
+        // Первый необеспеченный — пятый пункт, 14 марта: заранее — с 11-го по 13-е, в день — 14-го.
         assertEquals(emptyList<NotificationKind>(), kinds(planning.coverageDue(now)))
         assertEquals(listOf(NotificationKind.COVERAGE_3D), kinds(planning.coverageDue(now.plus(Duration.ofDays(1)))))
-        assertEquals(emptyList<NotificationKind>(), kinds(planning.coverageDue(now.plus(Duration.ofDays(2)))))
+        assertEquals(listOf(NotificationKind.COVERAGE_3D), kinds(planning.coverageDue(now.plus(Duration.ofDays(2)))))
+        assertEquals(listOf(NotificationKind.COVERAGE_3D), kinds(planning.coverageDue(now.plus(Duration.ofDays(3)))))
         assertEquals(listOf(NotificationKind.COVERAGE_END), kinds(planning.coverageDue(now.plus(Duration.ofDays(4)))))
+        // Ключ «заранее» один на всё окно: сказанное 11-го 12-го не повторяется.
+        assertEquals(
+            planning.coverageDue(now.plus(Duration.ofDays(1))).single().key,
+            planning.coverageDue(now.plus(Duration.ofDays(2))).single().key
+        )
     }
 
     /**

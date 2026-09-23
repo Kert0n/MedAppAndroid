@@ -388,7 +388,10 @@
     <string name="notice_intake_decision_body">“Taken” could not record the intake — open to decide where to take the dose from</string>
     <string name="notice_intake_missed_title">Missed intake: %1$s</string>
     <string name="notice_intake_missed_body">Yesterday\'s intake of %1$s was left unanswered</string>
-    <string name="notice_expiry_3d_title">Expires in three days: %1$s</string>
+    <plurals name="notice_expiry_ahead_title">
+        <item quantity="one">Expires in %1$d day: %2$s</item>
+        <item quantity="other">Expires in %1$d days: %2$s</item>
+    </plurals>
     <string name="notice_expiry_1d_title">Expires tomorrow: %1$s</string>
     <string name="notice_expiry_today_title">Expires today: %1$s</string>
     <string name="notice_expiry_body">Good until %1$s</string>

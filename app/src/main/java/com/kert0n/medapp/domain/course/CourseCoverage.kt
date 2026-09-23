@@ -5,6 +5,7 @@ import com.kert0n.medapp.domain.value.Doses
 import com.kert0n.medapp.domain.value.Quantity
 import java.time.Instant
 import java.time.ZoneId
+import java.time.temporal.ChronoUnit
 import java.util.Objects
 
 /**
@@ -49,8 +50,8 @@ class CourseCoverage(
     val missingDoses: Doses get() = requiredDoses - coveredDoses
 
     /**
-     * Какое предупреждение о нехватке наступает в момент [at] (PLAN D8): за три календарных дня до
-     * первого необеспеченного пункта и в его день. День считается **в зоне курса** — той же, в
+     * Какое предупреждение о нехватке идёт в момент [at] (PLAN D8): заранее — от порога и ближе к
+     * первому необеспеченному пункту, и в его день. День считается **в зоне курса** — той же, в
      * которой стоит пункт: день устройства у полуночи может быть уже другим. Обеспеченному курсу
      * предупреждать нечего.
      */
@@ -59,9 +60,13 @@ class CourseCoverage(
         val today = at.atZone(zone).toLocalDate()
         // День исчерпания — первым: при пороге 0 обе даты совпадают, и сказать надо то, что
         // ближе к правде, — «заканчивается», а не «скоро закончится».
-        return when (today) {
-            uncoveredOn -> Notice.END
-            uncoveredOn.minusDays(thresholdDays) -> Notice.AHEAD
+        // Разность дней, а не вычитание порога из даты: порог набирает человек. «Заранее» — окно до
+        // порога, а не точный день: нехватка могла появиться ближе порога, или сверки в тот день не
+        // было, — и предупредить всё ещё стоит.
+        val daysLeft = ChronoUnit.DAYS.between(today, uncoveredOn)
+        return when {
+            daysLeft == 0L -> Notice.END
+            daysLeft in 1..thresholdDays -> Notice.AHEAD
             else -> null
         }
     }
