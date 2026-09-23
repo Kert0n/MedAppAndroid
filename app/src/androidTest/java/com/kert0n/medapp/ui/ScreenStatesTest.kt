@@ -105,4 +105,25 @@ class ScreenStatesTest {
         compose.waitUntil(5_000) { compose.onAllNodesWithText("Содержимое").fetchSemanticsNodes().isNotEmpty() }
         assertEquals(2, reads)
     }
+
+    /**
+     * Системный «назад» на экране, который не прочитался, ведёт туда же, куда стрелка. У листа
+     * разового приёма стрелка закрывает лист, а системный «назад» без своего обработчика уходил бы
+     * с карточки коробки целиком — одно действие, два разных исхода.
+     */
+    @Test
+    fun systemBackOnAScreenThatCouldNotReadGoesWhereTheArrowGoes() {
+        val reading = com.kert0n.medapp.presentation.ScreenReading()
+        kotlinx.coroutines.runBlocking {
+            reading.load(kotlinx.coroutines.CoroutineScope(kotlinx.coroutines.SupervisorJob())) { throw IllegalStateException("disk I/O error") }.join()
+        }
+        var back = 0
+        compose.setContent { MedAppTheme { Readable(reading, onBack = { back++ }) { androidx.compose.material3.Text("Содержимое") } } }
+        compose.waitForIdle()
+
+        androidx.test.espresso.Espresso.pressBackUnconditionally()
+        compose.waitForIdle()
+
+        assertEquals(1, back)
+    }
 }

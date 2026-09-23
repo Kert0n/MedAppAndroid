@@ -1,5 +1,7 @@
 package com.kert0n.medapp.ui.plan
 
+import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.async
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import androidx.test.ext.junit.runners.AndroidJUnit4
@@ -80,15 +82,19 @@ class MissedIntakesTest {
 
     private fun scenarios(at: Instant = clock.now) = Scenarios(database, at)
 
-    private fun model() = scenarios().let { scenarios ->
+    private fun model(
+        failures: com.kert0n.medapp.presentation.ScreenFailures = com.kert0n.medapp.presentation.ScreenFailures(),
+        outbox: (Scenarios) -> com.kert0n.medapp.feature.notification.ReminderOutbox = { it.reminderOutbox }
+    ) = scenarios().let { scenarios ->
         MissedIntakesViewModel(
-            outbox = scenarios.reminderOutbox,
+            outbox = outbox(scenarios),
             confirmation = scenarios.intakeConfirmation,
             today = Today(clock, shifts),
             reminders = scenarios.reminderStore,
             intakes = database.intakeRepository(),
             courses = database.courseRepository(),
-            packages = database.packageRepository()
+            packages = database.packageRepository(),
+            failures = failures
         ).also { opened += it }
     }
 
@@ -270,5 +276,40 @@ class MissedIntakesTest {
 
     private companion object {
         val PATIENTLY = 15.seconds
+    }
+
+    /** Отметку показа пишет доставка, а база ей отказывает — полный диск. */
+    private fun outboxThatCannotWrite(scenarios: Scenarios) = com.kert0n.medapp.feature.notification.ReminderOutbox(
+        object : com.kert0n.medapp.storage.notification.ReminderStorageRepository by scenarios.reminderStore {
+            override suspend fun findAll(keys: Collection<com.kert0n.medapp.domain.notification.NotificationKey>) =
+                throw IllegalStateException("database or disk is full")
+        },
+        scenarios.notifier, scenarios.reminders, scenarios.freshness, scenarios.transactions,
+        java.time.Clock.fixed(scenarios.now, java.time.ZoneOffset.UTC),
+        kotlinx.coroutines.CoroutineScope(kotlinx.coroutines.SupervisorJob() + kotlinx.coroutines.Dispatchers.Unconfined)
+    )
+
+    /**
+     * Крестик нажат, а отметка показа не записалась: пропуски возвращаются в попап, и закрыть его
+     * можно снова. Без этого строки пропадают до перезапуска, а потом приходят снова — и человек
+     * не понимает, закрыл он их или нет.
+     */
+    @Test
+    fun aCrossThatCouldNotBeWrittenBringsTheRowsBack(): Unit = runBlocking {
+        startedTwoDaysAgo()
+        scenarios().dailyRound.run()
+        val failures = com.kert0n.medapp.presentation.ScreenFailures()
+        val model = model(failures) { outboxThatCannotWrite(it) }
+
+        watching(model.state) { state ->
+            val told = state.awaiting(PATIENTLY) { it.rows.size == 2 }.told
+            val failed = async(start = kotlinx.coroutines.CoroutineStart.UNDISPATCHED) { failures.failures.first() }
+            model.dismiss(told)
+            kotlinx.coroutines.withTimeout(5_000) { failed.await() }
+            // Состояние пересчитывается следом за крестиком: смотрят на него, когда оно устоялось,
+            // иначе прочли бы ещё не спрятанный попап и позеленели зря.
+            kotlinx.coroutines.delay(1_000)
+            state.awaiting(PATIENTLY) { it.rows.size == 2 }
+        }
     }
 }

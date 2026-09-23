@@ -1,5 +1,7 @@
 package com.kert0n.medapp.ui.notification
 
+import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.async
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import androidx.test.ext.junit.runners.AndroidJUnit4
@@ -64,10 +66,14 @@ class ExpiringTodayTest {
         database.close()
     }
 
-    private fun model() = ExpiringTodayViewModel(
-        outbox = scenarios.reminderOutbox,
+    private fun model(
+        outbox: com.kert0n.medapp.feature.notification.ReminderOutbox = scenarios.reminderOutbox,
+        failures: com.kert0n.medapp.presentation.ScreenFailures = com.kert0n.medapp.presentation.ScreenFailures()
+    ) = ExpiringTodayViewModel(
+        outbox = outbox,
         reminders = scenarios.reminderStore,
-        packages = database.packageRepository()
+        packages = database.packageRepository(),
+        failures = failures
     ).also { opened += it }
 
     /** Обязательство сказать о сроке этой коробки — как его заводит сверка (PLAN D8). */
@@ -159,5 +165,39 @@ class ExpiringTodayTest {
 
     private companion object {
         val PATIENTLY: Duration = 15.seconds
+    }
+
+    /** Отметку показа пишет доставка, а база ей отказывает — полный диск. */
+    private fun outboxThatCannotWrite(scenarios: Scenarios) = com.kert0n.medapp.feature.notification.ReminderOutbox(
+        object : com.kert0n.medapp.storage.notification.ReminderStorageRepository by scenarios.reminderStore {
+            override suspend fun findAll(keys: Collection<com.kert0n.medapp.domain.notification.NotificationKey>) =
+                throw IllegalStateException("database or disk is full")
+        },
+        scenarios.notifier, scenarios.reminders, scenarios.freshness, scenarios.transactions,
+        java.time.Clock.fixed(scenarios.now, java.time.ZoneOffset.UTC),
+        kotlinx.coroutines.CoroutineScope(kotlinx.coroutines.SupervisorJob() + kotlinx.coroutines.Dispatchers.Unconfined)
+    )
+
+    /**
+     * Крестик нажат, а отметка показа не записалась: попап возвращается, и закрыть его можно снова.
+     * Без этого попап пропадает вместе с крестиком, а весть — нет: она придёт после перезапуска, и
+     * человеку нечем её закрыть сейчас.
+     */
+    @Test
+    fun aCrossThatCouldNotBeWrittenBringsThePopupBack(): Unit = runBlocking {
+        promised()
+        val failures = com.kert0n.medapp.presentation.ScreenFailures()
+        val model = model(outboxThatCannotWrite(scenarios), failures)
+
+        watching(model.state) { state ->
+            val told = state.awaiting(PATIENTLY) { !it.isEmpty }.told
+            val failed = async(start = kotlinx.coroutines.CoroutineStart.UNDISPATCHED) { failures.failures.first() }
+            model.dismiss(told)
+            kotlinx.coroutines.withTimeout(5_000) { failed.await() }
+            // Состояние пересчитывается следом за крестиком: смотрят на него, когда оно устоялось,
+            // иначе прочли бы ещё не спрятанный попап и позеленели зря.
+            kotlinx.coroutines.delay(1_000)
+            state.awaiting(PATIENTLY) { !it.isEmpty }
+        }
     }
 }
