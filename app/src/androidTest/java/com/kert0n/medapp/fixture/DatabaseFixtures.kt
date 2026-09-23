@@ -86,7 +86,7 @@ fun MedAppDatabase.medKitRepository() = com.kert0n.medapp.storage.medkit.MedKitR
 )
 
 /** Взятие в отправку над настоящей базой — той же транзакцией Room, что у работника. */
-fun MedAppDatabase.taking() = com.kert0n.medapp.queue.Taking(queueStorage(), transactions())
+fun MedAppDatabase.taking() = com.kert0n.medapp.queue.Taking(queueStorage(), transactions(), com.kert0n.medapp.network.delivery.MedAppPacking())
 
 /** Уход с серверных полок, когда учётку заменили, — над настоящей базой. */
 fun MedAppDatabase.abandonment() =

@@ -8,6 +8,7 @@ import com.kert0n.medapp.domain.value.Vocabulary
 import com.kert0n.medapp.fixture.DirectTransactions
 import com.kert0n.medapp.network.delivery.CourierDoor
 import com.kert0n.medapp.network.delivery.MedAppCourier
+import com.kert0n.medapp.network.delivery.MedAppPacking
 import com.kert0n.medapp.network.pack.PackageSnapshotNetworkDTO
 import com.kert0n.medapp.network.pack.PackageSnapshotResolver
 import com.kert0n.medapp.network.server.ApiFailure
@@ -120,7 +121,7 @@ class SynchronizationTest {
         val storage = EmptyQueue(calls)
         val vocabulary = VocabularyResolver(Store(), api)
         val resolver = PackageSnapshotResolver(vocabulary, storage)
-        val worker = QueueWorker(storage, MedAppCourier(NoTransport, vocabulary, resolver, clock), DirectTransactions, clock)
+        val worker = QueueWorker(storage, MedAppCourier(NoTransport, vocabulary, resolver, clock), MedAppPacking(), DirectTransactions, clock)
         val snapshots = SnapshotApplier(api, Nothing(), vocabulary, resolver, clock)
         return Synchronization(worker, snapshots, backlog, schedule, clock, scope)
     }
@@ -263,7 +264,7 @@ class SynchronizationTest {
         val vocabulary = VocabularyResolver(Store(), api)
         val resolver = PackageSnapshotResolver(vocabulary, storage)
         val failing = Synchronization(
-            QueueWorker(storage, MedAppCourier(NoTransport, vocabulary, resolver, clock), DirectTransactions, clock),
+            QueueWorker(storage, MedAppCourier(NoTransport, vocabulary, resolver, clock), MedAppPacking(), DirectTransactions, clock),
             SnapshotApplier(api, Nothing(), vocabulary, resolver, clock),
             Backlog(null), Schedule(), clock, scope
         )

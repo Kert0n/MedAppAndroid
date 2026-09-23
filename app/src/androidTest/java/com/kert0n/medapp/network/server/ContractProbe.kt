@@ -5,6 +5,7 @@ import com.kert0n.medapp.domain.value.Quantity
 import com.kert0n.medapp.domain.value.QuantityUnit
 import com.kert0n.medapp.fixture.ProbeAccounts
 import com.kert0n.medapp.network.account.AccountCredentials
+import com.kert0n.medapp.network.delivery.toPreparedRequest
 import com.kert0n.medapp.network.medkit.MedKitPostNetworkDTO
 import com.kert0n.medapp.network.medkit.MembershipPostNetworkDTO
 import com.kert0n.medapp.network.pack.ClaimPatchNetworkDTO
@@ -17,7 +18,6 @@ import com.kert0n.medapp.queue.PreparedRequest
 import com.kert0n.medapp.queue.ResourceVersion
 import com.kert0n.medapp.queue.pack.PackageSyncCommand
 import com.kert0n.medapp.queue.pack.PackageSyncState
-import com.kert0n.medapp.queue.pack.toPreparedRequest
 import java.math.BigDecimal
 import java.time.Instant
 import kotlin.uuid.Uuid

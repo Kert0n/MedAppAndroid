@@ -1,11 +1,9 @@
 package com.kert0n.medapp.queue
 
 import com.kert0n.medapp.queue.medkit.MedKitSyncCommand
-import com.kert0n.medapp.queue.medkit.toPreparedRequest
 import com.kert0n.medapp.queue.pack.PackageSnapshot
 import com.kert0n.medapp.queue.pack.PackageSyncCommand
 import com.kert0n.medapp.queue.pack.prepare
-import com.kert0n.medapp.queue.pack.toPreparedRequest
 import java.time.Instant
 import javax.inject.Inject
 import kotlin.uuid.Uuid
@@ -13,11 +11,12 @@ import kotlin.uuid.Uuid
 /**
  * Взятие операции в отправку: решение очереди, записанное хранением. Подготовку по свежему
  * состоянию делает очередь, а не хранилище, — хранение только кладёт снимок, отдаёт пачку и
- * пишет решённое (PLAN E2, E3, F5).
+ * пишет решённое; посылку по решению собирает упаковка ([Packing]) (PLAN E2, E3, F5).
  */
 class Taking @Inject constructor(
     private val storage: QueueStorage,
-    private val transactions: Transactions
+    private val transactions: Transactions,
+    private val packing: Packing
 ) {
 
     /**
@@ -41,18 +40,18 @@ class Taking @Inject constructor(
                 // Снимают по версии полки, а её подтверждённое число запоминается в запросе: из него
                 // и из сделанного дома сложится остаток, когда полка ответит (PLAN E6).
                 is PackageSyncCommand.Withdraw if fresh != null ->
-                    command.toPreparedRequest(operation.id, fresh.sync, confirmed = fresh.pack.quantity, mine = null, at = at)
+                    packing.pack(operation.id, command, fresh.sync, Preparation.Send(confirmed = fresh.pack.quantity, mine = null), at)
                 is PackageSyncCommand -> {
                     val known = storage.knownPackage(command.packageId)
                         ?: return@run closedByPreparation(operation, Delivery.AccessLost, at)
-                    when (val prepared = command.prepare(operation.id, known.pack, known.sync, at)) {
-                        is Preparation.Request -> prepared.request
+                    when (val prepared = command.prepare(known.pack, known.sync)) {
+                        is Preparation.Send -> packing.pack(operation.id, command, known.sync, prepared, at)
                         is Preparation.Refuse ->
                             return@run closedByPreparation(operation, Delivery.Refused(prepared.reason, PackageState.None), at)
                         Preparation.AlreadyApplied -> return@run closedByPreparation(operation, Delivery.Applied(PackageState.None), at)
                     }
                 }
-                is MedKitSyncCommand -> command.toPreparedRequest(at)
+                is MedKitSyncCommand -> packing.pack(command, at)
                 else -> command.unknownRoot()
             }
             operation.taken(request)

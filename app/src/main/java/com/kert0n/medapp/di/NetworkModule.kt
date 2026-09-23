@@ -12,12 +12,14 @@ import com.kert0n.medapp.network.account.ServerDeviceAccount
 import com.kert0n.medapp.network.delivery.CourierDoor
 import com.kert0n.medapp.network.delivery.MedAppCourier
 import com.kert0n.medapp.network.delivery.MedAppDoor
+import com.kert0n.medapp.network.delivery.MedAppPacking
 import com.kert0n.medapp.network.medkit.ServerMedKitInvitations
 import com.kert0n.medapp.network.server.MedAppApi
 import com.kert0n.medapp.network.server.crptHttpClient
 import com.kert0n.medapp.network.server.medAppHttpClient
 import com.kert0n.medapp.network.value.ServerVocabularyLibrary
 import com.kert0n.medapp.queue.Courier
+import com.kert0n.medapp.queue.Packing
 import dagger.Module
 import dagger.Provides
 import dagger.hilt.InstallIn
@@ -102,6 +104,10 @@ object NetworkModule {
     @Provides
     @Singleton
     fun courier(implementation: MedAppCourier): Courier = implementation
+
+    /** Упаковка поручений в посылки — форма провода; очередь её носит, не читая. */
+    @Provides
+    fun packing(implementation: MedAppPacking): Packing = implementation
 
     /**
      * Доменные порты, которые выполняет сеть: знакомство устройства с сервером и пополнение

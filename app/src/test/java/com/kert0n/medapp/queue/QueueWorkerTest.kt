@@ -22,6 +22,8 @@ import com.kert0n.medapp.fixture.pack
 import com.kert0n.medapp.fixture.tablets
 import com.kert0n.medapp.network.delivery.CourierDoor
 import com.kert0n.medapp.network.delivery.MedAppCourier
+import com.kert0n.medapp.network.delivery.MedAppPacking
+import com.kert0n.medapp.network.delivery.toPreparedRequest
 import com.kert0n.medapp.network.pack.PackageSnapshotNetworkDTO
 import com.kert0n.medapp.network.pack.PackageSnapshotResolver
 import com.kert0n.medapp.network.pack.toDomain
@@ -35,12 +37,10 @@ import com.kert0n.medapp.network.value.VocabularyMiss
 import com.kert0n.medapp.network.value.VocabularyResolver
 import com.kert0n.medapp.network.value.VocabularyStore
 import com.kert0n.medapp.queue.medkit.MedKitSyncCommand
-import com.kert0n.medapp.queue.medkit.toPreparedRequest
 import com.kert0n.medapp.queue.pack.PackageSnapshot
 import com.kert0n.medapp.queue.pack.PackageSyncCommand
 import com.kert0n.medapp.queue.pack.PackageSyncState
 import com.kert0n.medapp.queue.pack.prepare
-import com.kert0n.medapp.queue.pack.toPreparedRequest
 import io.ktor.client.engine.mock.MockEngine
 import io.ktor.client.engine.mock.respond
 import io.ktor.http.HttpHeaders
@@ -335,7 +335,7 @@ class QueueWorkerTest {
         Transport(answer).also { it.fresh = ApiResult.Success(fresh) }
 
     private fun worker(storage: Storage, transport: CourierDoor, online: Boolean = true, clock: Clock = this.clock) =
-        QueueWorker(storage, MedAppCourier(transport, resolver(online), PackageSnapshotResolver(resolver(online), storage), clock), DirectTransactions, clock)
+        QueueWorker(storage, MedAppCourier(transport, resolver(online), PackageSnapshotResolver(resolver(online), storage), clock), MedAppPacking(), DirectTransactions, clock)
 
     /** Снимок, каким его положит хранение: разрешённый, с домашней аптечкой. */
     private fun resolved(dto: PackageSnapshotNetworkDTO): PackageSnapshot =

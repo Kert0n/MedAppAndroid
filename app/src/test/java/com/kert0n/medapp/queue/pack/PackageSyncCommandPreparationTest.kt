@@ -12,6 +12,7 @@ import com.kert0n.medapp.fixture.dose
 import com.kert0n.medapp.fixture.millilitres
 import com.kert0n.medapp.fixture.pack
 import com.kert0n.medapp.fixture.tablets
+import com.kert0n.medapp.network.delivery.toPreparedRequest
 import com.kert0n.medapp.queue.Expected
 import com.kert0n.medapp.queue.Preparation
 import com.kert0n.medapp.queue.RefusalReason
@@ -52,23 +53,23 @@ class PackageSyncCommandPreparationTest {
         val syrup = pack(quantity = millilitres("100"))
         assertEquals(
             Preparation.Refuse(RefusalReason.UNIT_CHANGED),
-            PackageSyncCommand.Consume(PACK, dose("3"), INTAKE).prepare(INTAKE, syrup, sync, EARLIER)
+            PackageSyncCommand.Consume(PACK, dose("3"), INTAKE).prepare(syrup, sync)
         )
         // Бронь и пересчёт тоже везут голое число: сервер прочёл бы таблетки миллилитрами.
         assertEquals(
             Preparation.Refuse(RefusalReason.UNIT_CHANGED),
-            PackageSyncCommand.SetClaim(PACK, tablets("6")).prepare(INTAKE, syrup, sync, EARLIER)
+            PackageSyncCommand.SetClaim(PACK, tablets("6")).prepare(syrup, sync)
         )
         assertEquals(
             Preparation.Refuse(RefusalReason.UNIT_CHANGED),
-            PackageSyncCommand.CorrectStock(PACK, tablets("20"), tablets("17")).prepare(INTAKE, syrup, sync, EARLIER)
+            PackageSyncCommand.CorrectStock(PACK, tablets("20"), tablets("17")).prepare(syrup, sync)
         )
         val claimed = pack(quantity = tablets("20"), claims = Claims(BigDecimal("6"), BigDecimal("6")))
-        assertEquals(Preparation.AlreadyApplied, PackageSyncCommand.SetClaim(PACK, tablets("6")).prepare(INTAKE, claimed, sync, EARLIER))
-        assertTrue(PackageSyncCommand.SetClaim(PACK, tablets("7")).prepare(INTAKE, claimed, sync, EARLIER) is Preparation.Request)
+        assertEquals(Preparation.AlreadyApplied, PackageSyncCommand.SetClaim(PACK, tablets("6")).prepare(claimed, sync))
+        assertTrue(PackageSyncCommand.SetClaim(PACK, tablets("7")).prepare(claimed, sync) is Preparation.Send)
         val unclaimed = pack(quantity = tablets("20"), claims = Claims(BigDecimal("2"), null))
-        assertEquals(Preparation.AlreadyApplied, PackageSyncCommand.ReleaseClaim(PACK).prepare(INTAKE, unclaimed, sync, EARLIER))
-        assertTrue(PackageSyncCommand.ReleaseClaim(PACK).prepare(INTAKE, claimed, sync, EARLIER) is Preparation.Request)
+        assertEquals(Preparation.AlreadyApplied, PackageSyncCommand.ReleaseClaim(PACK).prepare(unclaimed, sync))
+        assertTrue(PackageSyncCommand.ReleaseClaim(PACK).prepare(claimed, sync) is Preparation.Send)
     }
 
     @Test
@@ -106,9 +107,9 @@ class PackageSyncCommandPreparationTest {
         assertNull(toZero.body)
         assertEquals(
             Preparation.Refuse(RefusalReason.CONFLICT),
-            recount.prepare(INTAKE, pack(quantity = tablets("2")), sync, EARLIER)
+            recount.prepare(pack(quantity = tablets("2")), sync)
         )
-        assertTrue(recount.prepare(INTAKE, pack(quantity = tablets("3")), sync, EARLIER) is Preparation.Request)
+        assertTrue(recount.prepare(pack(quantity = tablets("3")), sync) is Preparation.Send)
     }
 
     /**
@@ -121,16 +122,17 @@ class PackageSyncCommandPreparationTest {
         val facts = PackageSharedFacts("Парацетамол", TABLET_FORM)
         val describe = PackageSyncCommand.Describe(PACK, facts, facts.copy(category = "жар"))
         val renamed = pack(name = "Панадол", form = TABLET_FORM)
-        val preparation = describe.prepare(INTAKE, renamed, sync, EARLIER) as Preparation.Request
-        assertTrue(preparation.request.body!!.contains("\"category\":\"жар\""))
-        assertFalse(preparation.request.body.contains("name"))
+        val preparation = describe.prepare(renamed, sync) as Preparation.Send
+        val request = describe.toPreparedRequest(INTAKE, sync, preparation.confirmed, preparation.mine, EARLIER, preparation.known)
+        assertTrue(request.body!!.contains("\"category\":\"жар\""))
+        assertFalse(request.body.contains("name"))
         assertEquals(
             Preparation.AlreadyApplied,
-            describe.prepare(INTAKE, pack(category = "жар", form = TABLET_FORM), sync, EARLIER)
+            describe.prepare(pack(category = "жар", form = TABLET_FORM), sync)
         )
         assertEquals(
             Preparation.Refuse(RefusalReason.CONFLICT),
-            describe.prepare(INTAKE, pack(category = "боль", form = TABLET_FORM), sync, EARLIER)
+            describe.prepare(pack(category = "боль", form = TABLET_FORM), sync)
         )
     }
 

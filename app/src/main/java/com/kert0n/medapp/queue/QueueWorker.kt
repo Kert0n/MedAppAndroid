@@ -42,6 +42,7 @@ import kotlinx.coroutines.sync.withLock
 class QueueWorker @Inject constructor(
     private val storage: QueueStorage,
     private val courier: Courier,
+    private val packing: Packing,
     private val transactions: Transactions,
     private val clock: Clock
 ) {
@@ -53,7 +54,7 @@ class QueueWorker @Inject constructor(
     private val single = Mutex()
 
     /** Взятие в отправку — своей транзакцией, по свежему состоянию. */
-    private val taking = Taking(storage, transactions)
+    private val taking = Taking(storage, transactions, packing)
 
     /**
      * Поездка курьера текущего прохода: промах словаря дочитывается один раз на проход, а не на

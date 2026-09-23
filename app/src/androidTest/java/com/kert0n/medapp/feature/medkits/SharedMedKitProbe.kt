@@ -38,6 +38,7 @@ import com.kert0n.medapp.fixture.snapshotStorage
 import com.kert0n.medapp.fixture.transactions
 import com.kert0n.medapp.network.delivery.MedAppCourier
 import com.kert0n.medapp.network.delivery.MedAppDoor
+import com.kert0n.medapp.network.delivery.MedAppPacking
 import com.kert0n.medapp.network.medkit.MembershipPostNetworkDTO
 import com.kert0n.medapp.network.medkit.ServerMedKitInvitations
 import com.kert0n.medapp.network.pack.PackageSnapshotResolver
@@ -607,7 +608,7 @@ class SharedMedKitProbe {
         private val snapshots = PackageSnapshotResolver(vocabulary, database.queueStorage())
         private val reading = SnapshotApplier(api, database.snapshotStorage(), vocabulary, snapshots, clock)
         private val joining = MedKitJoining(reading)
-        private val worker = QueueWorker(database.queueStorage(), MedAppCourier(MedAppDoor(api), vocabulary, snapshots, clock), RoomTransactions(database), clock)
+        private val worker = QueueWorker(database.queueStorage(), MedAppCourier(MedAppDoor(api), vocabulary, snapshots, clock), MedAppPacking(), RoomTransactions(database), clock)
         val packages = database.packageRepository()
         private val courses = database.courseRepository()
         private val queue = database.queueService()

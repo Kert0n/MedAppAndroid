@@ -11,6 +11,7 @@ import com.kert0n.medapp.fixture.PACK
 import com.kert0n.medapp.fixture.dose
 import com.kert0n.medapp.network.delivery.CourierDoor
 import com.kert0n.medapp.network.delivery.MedAppCourier
+import com.kert0n.medapp.network.delivery.MedAppPacking
 import com.kert0n.medapp.network.pack.PackageSnapshotNetworkDTO
 import com.kert0n.medapp.network.pack.PackageSnapshotResolver
 import com.kert0n.medapp.network.server.ApiFailure
@@ -128,7 +129,7 @@ class QueueOutboxTest {
             Store(),
             MedAppApi(medAppHttpClient(MockEngine { throw java.io.IOException("связи нет") }, "https://medapp.test", retryDelay = { delayMillis(false) { 0L } }))
         )
-        return QueueWorker(storage, MedAppCourier(transport, vocabulary, PackageSnapshotResolver(vocabulary, storage), clock), DirectTransactions, clock)
+        return QueueWorker(storage, MedAppCourier(transport, vocabulary, PackageSnapshotResolver(vocabulary, storage), clock), MedAppPacking(), DirectTransactions, clock)
     }
 
     /** Запрос, замороженный раньше: работник шлёт его как есть, чтения перед подготовкой нет. */
@@ -183,7 +184,7 @@ class QueueOutboxTest {
             }
         }
         val vocabulary = VocabularyResolver(Store(), MedAppApi(medAppHttpClient(MockEngine { throw java.io.IOException("связи нет") }, "https://medapp.test", retryDelay = { delayMillis(false) { 0L } })))
-        val worker = QueueWorker(storage, MedAppCourier(slow, vocabulary, PackageSnapshotResolver(vocabulary, storage), Clock.fixed(now, ZoneOffset.UTC)), DirectTransactions, Clock.fixed(now, ZoneOffset.UTC))
+        val worker = QueueWorker(storage, MedAppCourier(slow, vocabulary, PackageSnapshotResolver(vocabulary, storage), Clock.fixed(now, ZoneOffset.UTC)), MedAppPacking(), DirectTransactions, Clock.fixed(now, ZoneOffset.UTC))
         val outbox = QueueOutbox(worker, storage, Clock.fixed(now, ZoneOffset.UTC), backgroundScope)
         outbox.start()
         runCurrent()

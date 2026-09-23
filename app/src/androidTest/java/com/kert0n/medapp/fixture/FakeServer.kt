@@ -2,6 +2,7 @@ package com.kert0n.medapp.fixture
 
 import com.kert0n.medapp.network.delivery.MedAppCourier
 import com.kert0n.medapp.network.delivery.MedAppDoor
+import com.kert0n.medapp.network.delivery.MedAppPacking
 import com.kert0n.medapp.network.pack.PackageSnapshotResolver
 import com.kert0n.medapp.network.server.MedAppApi
 import com.kert0n.medapp.network.server.medAppHttpClient
@@ -164,7 +165,7 @@ class FakeServer {
         val vocabulary = VocabularyResolver(VocabularyRoomRepository(database.vocabulary()), api)
         val resolver = PackageSnapshotResolver(vocabulary, database.queueStorage())
         return Synchronization(
-            com.kert0n.medapp.queue.QueueWorker(database.queueStorage(), MedAppCourier(MedAppDoor(api), vocabulary, resolver, clock), RoomTransactions(database), clock),
+            com.kert0n.medapp.queue.QueueWorker(database.queueStorage(), MedAppCourier(MedAppDoor(api), vocabulary, resolver, clock), MedAppPacking(), RoomTransactions(database), clock),
             SnapshotApplier(api, database.snapshotStorage(), vocabulary, resolver, clock),
             QueueBacklogRoomStorage(database.syncOperations()),
             schedule,
