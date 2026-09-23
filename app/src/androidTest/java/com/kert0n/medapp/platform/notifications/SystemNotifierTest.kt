@@ -110,7 +110,11 @@ class SystemNotifierTest {
         val shown = requireNotNull(awaitShown(planned.key.subject)) { "уведомление не показано" }
         assertEquals(NotificationKind.EXPIRY_SOURCE_3D.ordinal, shown.id)
         assertEquals(NotificationChannel.EXPIRY.id, shown.notification.channelId)
-        assertTrue(shown.notification.extras.getCharSequence(android.app.Notification.EXTRA_TITLE).toString().contains("Парацетамол"))
+        // Заранее говорится числом дней на день показа: срок 31-го, показ 28-го — три дня.
+        assertEquals(
+            context.resources.getQuantityString(com.kert0n.medapp.R.plurals.notice_expiry_ahead_title, 3, 3, "Парацетамол"),
+            shown.notification.extras.getCharSequence(android.app.Notification.EXTRA_TITLE).toString()
+        )
 
         notifier.dismiss(planned.key)
         assertNull(awaitShown(planned.key.subject, expected = false))
