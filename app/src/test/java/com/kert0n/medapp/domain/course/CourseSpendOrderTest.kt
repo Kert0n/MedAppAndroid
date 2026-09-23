@@ -91,7 +91,7 @@ class CourseSpendOrderTest {
         // Одно правило, два ответа: сколько доз обеспечено и из чего они возьмутся. Пока это было
         // написано порознь, разойтись они могли молча.
         val course = activeCourse(sources = listOf(source(PACK, 5), source(OTHER_PACK, 4)))
-        val remaining = course.remainingOccurrences(CourseProgress.none)
+        val remaining = course.remainingOccurrences(CourseProgress.none).toList()
         val covered = course.coverage(CourseProgress.none, availability).coveredDoses
         val supplied = course.spendOrder(remaining.size.doses, availability).count { it != null }
         assertEquals(covered, supplied.doses)

@@ -7,6 +7,7 @@ import java.time.LocalDateTime
 import java.time.LocalTime
 import java.time.ZoneId
 import java.util.Objects
+import java.util.PriorityQueue
 
 /**
  * Календарное намерение человека: с какого числа, в какие дни недели, в какое время и в какой
@@ -112,29 +113,37 @@ class CourseSchedule(
      * раскладывает их по дням, пропуская занятые места. Последний из них — ожидаемый конец
      * лечения: пропуск сдвигает его вперёд, поздний ответ по пропущенному — назад. Отвеченный
      * пункт узнаётся по назначенным дате и времени — это его тождество (PLAN F4).
+     *
+     * Пункты считаются по мере чтения: кто смотрит на день, берёт день, а не всё лечение, и
+     * вперёд под [count] ничего не раскладывается. Каждый проход считает заново.
      */
-    fun next(from: Instant, count: Int, except: Set<ScheduledOccurrence> = emptySet()): List<ScheduledOccurrence> {
+    fun next(from: Instant, count: Int, except: Set<ScheduledOccurrence> = emptySet()): Sequence<ScheduledOccurrence> {
         require(count >= 0) { "число пунктов не бывает отрицательным: $count" }
-        if (count == 0) return emptyList()
+        if (count == 0) return emptySequence()
         val taken = except.mapTo(HashSet()) { it.slot }
-        // Без заранее выделенного места: сколько пунктов просят, решает вызывающий, и вперёд под
-        // это число память не занимается.
-        val found = ArrayList<ScheduledOccurrence>()
+        return places(from).filter { it.slot !in taken }.take(count)
+    }
+
+    /**
+     * Все места календаря с [from] без конца, по возрастанию момента. День раскладывается целиком,
+     * но отдаётся только то, что раньше его начала: перевод часов сдвигает момент на часы, а не на
+     * сутки, и пункт следующих дней раньше этой границы не встанет.
+     */
+    private fun places(from: Instant): Sequence<ScheduledOccurrence> = sequence {
+        val waiting = PriorityQueue(compareBy<ScheduledOccurrence> { it.at }.thenBy { it.localDate }.thenBy { it.localTime })
         // Сутки запаса назад: момент зависит от перехода часов, отбор идёт по моменту.
         var date = maxOf(start, from.atZone(zone).toLocalDate().minusDays(1))
-        while (found.size < count) {
+        while (true) {
             if (date.dayOfWeek in daysOfWeek) {
                 for (time in times) {
-                    if ((date to time) in taken) continue
                     val at = momentOf(date, time)
-                    if (!at.isBefore(from)) found += ScheduledOccurrence(date, time, at)
+                    if (!at.isBefore(from)) waiting += ScheduledOccurrence(date, time, at)
                 }
             }
+            val settled = date.atStartOfDay(zone).toInstant()
+            while (waiting.isNotEmpty() && waiting.peek()!!.at.isBefore(settled)) yield(waiting.poll()!!)
             date = date.plusDays(1)
         }
-        return found
-            .sortedWith(compareBy<ScheduledOccurrence> { it.at }.thenBy { it.localDate }.thenBy { it.localTime })
-            .take(count)
     }
 
     /**

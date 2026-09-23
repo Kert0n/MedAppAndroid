@@ -119,7 +119,7 @@ class CourseRoomRepositoryTest {
         assertEquals(7.doses, first.maxDoses)
         // Вторая даёт 2, потребность сверх первой оставляет 4: граница — 2.
         assertEquals(2.doses, found.perSource[1].maxDoses)
-        val slots = requireNotNull(database.courseRepository().findPlan(id)).schedule.let { it.next(it.beginning, 10) }
+        val slots = requireNotNull(database.courseRepository().findPlan(id)).schedule.let { it.next(it.beginning, 10).toList() }
         assertEquals(slots[8].at, found.firstUncoveredAt)
         assertEquals(found, database.courseRepository().observeCoverages().first().getValue(id))
     }

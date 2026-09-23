@@ -127,25 +127,27 @@ class CourseMedicine(sources: List<CourseSource> = emptyList()) {
     val firstFault: CourseSource.Fault? get() = sources.firstNotNullOfOrNull { it.fault }
 
     /**
-     * Обеспечение [remaining] пунктов, данных в календарном порядке. Пачка покрывает не больше
-     * выделенного и не больше целых доз, что в ней есть; остаток меньше дозы виден в её строке и
-     * в следующую не переливается.
+     * Обеспечение [required] оставшихся доз, чьи пункты идут в календарном порядке в [remaining].
+     * Пачка покрывает не больше выделенного и не больше целых доз, что в ней есть; остаток меньше
+     * дозы виден в её строке и в следующую не переливается. Из пунктов читаются только покрытые и
+     * первый непокрытый — дальше обеспечению смотреть незачем.
      */
     internal fun coverage(
         dose: Dose,
-        remaining: List<ScheduledOccurrence>,
+        required: Doses,
+        remaining: Sequence<ScheduledOccurrence>,
         availability: Availability,
         zone: java.time.ZoneId
     ): CourseCoverage {
         val capacities = capacities(dose, availability).associateBy { it.pkg }
-        val required = Doses(remaining.size)
         val supplied = capacities.values.fold(0.doses) { total, it -> total + it.covers }
         val covered = minOf(required, supplied)
+        val edge = remaining.take(covered.count + 1).toList()
         return CourseCoverage(
             requiredDoses = required,
             coveredDoses = covered,
-            coveredUntil = remaining.getOrNull(covered.count - 1)?.at,
-            firstUncoveredAt = remaining.getOrNull(covered.count)?.at,
+            coveredUntil = edge.getOrNull(covered.count - 1)?.at,
+            firstUncoveredAt = edge.getOrNull(covered.count)?.at,
             zone = zone,
             // Отключённый источник — строкой с причиной: ничего не даёт, но виден (PLAN D5).
             perSource = sources.map { source ->

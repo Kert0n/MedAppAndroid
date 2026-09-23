@@ -68,7 +68,7 @@ class CourseScheduleTest {
     @Test
     fun fourteenDosesTwiceADayTakeAWeek() {
         val twiceADay = schedule(start = monday, times = listOf(LocalTime.of(9, 0), LocalTime.of(21, 0)))
-        val found = twiceADay.next(twiceADay.beginning, 14)
+        val found = twiceADay.next(twiceADay.beginning, 14).toList()
         assertEquals(14, found.size)
         assertEquals(monday.plusDays(6), found.last().localDate)
         assertEquals(LocalTime.of(21, 0), found.last().localTime)
@@ -81,7 +81,7 @@ class CourseScheduleTest {
             daysOfWeek = setOf(DayOfWeek.MONDAY, DayOfWeek.WEDNESDAY),
             times = listOf(LocalTime.of(9, 0), LocalTime.of(21, 0))
         )
-        assertEquals(monday.plusDays(9), twoWeekdays.next(twoWeekdays.beginning, 8).last().localDate)
+        assertEquals(monday.plusDays(9), twoWeekdays.next(twoWeekdays.beginning, 8).toList().last().localDate)
     }
 
     @Test
@@ -89,7 +89,7 @@ class CourseScheduleTest {
         val mondays = schedule(start = monday, daysOfWeek = setOf(DayOfWeek.MONDAY))
         assertEquals(
             listOf(monday, monday.plusDays(7)),
-            mondays.next(mondays.beginning, 2).map { it.localDate }
+            mondays.next(mondays.beginning, 2).toList().map { it.localDate }
         )
     }
 
@@ -99,12 +99,12 @@ class CourseScheduleTest {
         // а сдвигает конец.
         val week = schedule(start = monday)
         val thursday = monday.plusDays(3).atStartOfDay(MOSCOW).toInstant()
-        assertEquals(monday.plusDays(9), week.next(thursday, 7).last().localDate)
+        assertEquals(monday.plusDays(9), week.next(thursday, 7).toList().last().localDate)
     }
 
     @Test
     fun nothingIsNeededWhenNothingRemains() {
-        assertTrue(schedule().next(schedule().beginning, 0).isEmpty())
+        assertTrue(schedule().next(schedule().beginning, 0).toList().isEmpty())
     }
 
     @Test
