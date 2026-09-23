@@ -7,8 +7,6 @@ import com.kert0n.medapp.domain.pack.PackageFacts
 import com.kert0n.medapp.domain.pack.PackageSharedFacts
 import com.kert0n.medapp.domain.value.Quantity
 import com.kert0n.medapp.domain.value.Vocabulary
-import com.kert0n.medapp.network.value.formOrMiss
-import com.kert0n.medapp.network.value.unitOrMiss
 import com.kert0n.medapp.queue.pack.PackageSnapshot
 import com.kert0n.medapp.queue.pack.PackageSyncState
 import java.math.BigDecimal

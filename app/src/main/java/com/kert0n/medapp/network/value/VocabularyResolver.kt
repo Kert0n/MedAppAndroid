@@ -1,6 +1,8 @@
 package com.kert0n.medapp.network.value
 
 import com.kert0n.medapp.domain.value.Vocabulary
+import com.kert0n.medapp.domain.value.VocabularyMiss
+import com.kert0n.medapp.domain.value.VocabularyStore
 import com.kert0n.medapp.network.server.ApiFailure
 import com.kert0n.medapp.network.server.ApiResult
 import com.kert0n.medapp.network.server.MedAppApi

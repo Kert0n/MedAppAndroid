@@ -3,7 +3,7 @@ package com.kert0n.medapp.storage.operation
 import androidx.room.Embedded
 import androidx.room.Relation
 import com.kert0n.medapp.domain.value.Vocabulary
-import com.kert0n.medapp.network.value.VocabularyMiss
+import com.kert0n.medapp.domain.value.VocabularyMiss
 import com.kert0n.medapp.queue.Receipt
 import com.kert0n.medapp.queue.StoredSyncOperation
 import com.kert0n.medapp.queue.SyncOperation

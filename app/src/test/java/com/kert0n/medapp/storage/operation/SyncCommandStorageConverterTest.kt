@@ -1,27 +1,27 @@
 package com.kert0n.medapp.storage.operation
 
 import com.kert0n.medapp.domain.pack.PackageSharedFacts
+import com.kert0n.medapp.domain.value.Vocabulary
+import com.kert0n.medapp.domain.value.VocabularyMiss
 import com.kert0n.medapp.fixture.HOME_KIT
 import com.kert0n.medapp.fixture.INTAKE
+import com.kert0n.medapp.fixture.MILLILITRES
 import com.kert0n.medapp.fixture.OTHER_PACK
 import com.kert0n.medapp.fixture.PACK
 import com.kert0n.medapp.fixture.SHARED_KIT
+import com.kert0n.medapp.fixture.TABLETS
 import com.kert0n.medapp.fixture.TABLET_FORM
+import com.kert0n.medapp.fixture.VOCABULARY
 import com.kert0n.medapp.fixture.dose
+import com.kert0n.medapp.fixture.millilitres
 import com.kert0n.medapp.fixture.tablets
+import com.kert0n.medapp.queue.SyncCommand
 import com.kert0n.medapp.queue.medkit.MedKitSyncCommand
 import com.kert0n.medapp.queue.pack.PackageSyncCommand
-import com.kert0n.medapp.queue.SyncCommand
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
-import com.kert0n.medapp.fixture.VOCABULARY
-import com.kert0n.medapp.domain.value.Vocabulary
-import com.kert0n.medapp.fixture.MILLILITRES
-import com.kert0n.medapp.fixture.TABLETS
-import com.kert0n.medapp.fixture.millilitres
-import com.kert0n.medapp.network.value.VocabularyMiss
 
 /**
  * Круговой тест по **всем двенадцати** видам команд: исчерпывающего `when` по обоим корням

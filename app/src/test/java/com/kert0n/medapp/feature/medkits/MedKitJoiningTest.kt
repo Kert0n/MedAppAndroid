@@ -7,6 +7,7 @@ import com.kert0n.medapp.domain.medkit.MedKitRef
 import com.kert0n.medapp.domain.value.DosageForm
 import com.kert0n.medapp.domain.value.QuantityUnit
 import com.kert0n.medapp.domain.value.Vocabulary
+import com.kert0n.medapp.domain.value.VocabularyStore
 import com.kert0n.medapp.fixture.HOME_KIT
 import com.kert0n.medapp.fixture.SHARED_KIT
 import com.kert0n.medapp.fixture.TABLETS
@@ -17,7 +18,6 @@ import com.kert0n.medapp.network.server.MedAppApi
 import com.kert0n.medapp.network.server.RawResponse
 import com.kert0n.medapp.network.server.medAppHttpClient
 import com.kert0n.medapp.network.value.VocabularyResolver
-import com.kert0n.medapp.network.value.VocabularyStore
 import com.kert0n.medapp.queue.QueueStorage
 import com.kert0n.medapp.queue.QueuedCommand
 import com.kert0n.medapp.queue.Receipt

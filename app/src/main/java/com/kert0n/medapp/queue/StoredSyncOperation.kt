@@ -1,6 +1,6 @@
 package com.kert0n.medapp.queue
 
-import com.kert0n.medapp.network.value.VocabularyMiss
+import com.kert0n.medapp.domain.value.VocabularyMiss
 import kotlin.uuid.Uuid
 
 /**

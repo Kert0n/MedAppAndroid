@@ -10,8 +10,6 @@ import com.kert0n.medapp.network.account.asUnavailability
 import com.kert0n.medapp.network.server.ApiResult
 import com.kert0n.medapp.network.server.MedAppApi
 import com.kert0n.medapp.network.value.VocabularyResolver
-import com.kert0n.medapp.network.value.formOrMiss
-import com.kert0n.medapp.network.value.unitOrMiss
 import javax.inject.Inject
 
 /**

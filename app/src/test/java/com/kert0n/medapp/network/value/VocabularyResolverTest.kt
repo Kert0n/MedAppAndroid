@@ -3,6 +3,8 @@ package com.kert0n.medapp.network.value
 import com.kert0n.medapp.domain.value.DosageForm
 import com.kert0n.medapp.domain.value.QuantityUnit
 import com.kert0n.medapp.domain.value.Vocabulary
+import com.kert0n.medapp.domain.value.VocabularyMiss
+import com.kert0n.medapp.domain.value.VocabularyStore
 import com.kert0n.medapp.fixture.MILLILITRES
 import com.kert0n.medapp.fixture.TABLETS
 import com.kert0n.medapp.fixture.TABLET_FORM

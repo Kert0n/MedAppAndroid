@@ -1,6 +1,7 @@
 package com.kert0n.medapp.network.pack
 
 import com.kert0n.medapp.domain.value.Vocabulary
+import com.kert0n.medapp.domain.value.VocabularyMiss
 import com.kert0n.medapp.fixture.EARLIER
 import com.kert0n.medapp.fixture.HOME_KIT
 import com.kert0n.medapp.fixture.LATER
@@ -12,7 +13,6 @@ import com.kert0n.medapp.fixture.VOCABULARY
 import com.kert0n.medapp.fixture.medKit
 import com.kert0n.medapp.fixture.tablets
 import com.kert0n.medapp.network.server.ResourceVersionNetworkDTO
-import com.kert0n.medapp.network.value.VocabularyMiss
 import com.kert0n.medapp.queue.ResourceVersion
 import java.math.BigDecimal
 import org.junit.Assert.assertEquals

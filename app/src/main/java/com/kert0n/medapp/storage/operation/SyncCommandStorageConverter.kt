@@ -5,9 +5,7 @@ import com.kert0n.medapp.domain.pack.PackageSharedFacts
 import com.kert0n.medapp.domain.value.Dose
 import com.kert0n.medapp.domain.value.Quantity
 import com.kert0n.medapp.domain.value.Vocabulary
-import com.kert0n.medapp.network.value.VocabularyMiss
-import com.kert0n.medapp.network.value.formOrMiss
-import com.kert0n.medapp.network.value.unitOrMiss
+import com.kert0n.medapp.domain.value.VocabularyMiss
 import com.kert0n.medapp.queue.SyncCommand
 import com.kert0n.medapp.queue.medkit.MedKitSyncCommand
 import com.kert0n.medapp.queue.pack.PackageSyncCommand
