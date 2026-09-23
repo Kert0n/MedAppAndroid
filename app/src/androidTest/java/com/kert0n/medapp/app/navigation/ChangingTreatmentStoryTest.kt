@@ -1,5 +1,6 @@
 package com.kert0n.medapp.app.navigation
 
+import com.kert0n.medapp.fixture.pressAfterTyping
 import androidx.compose.ui.semantics.SemanticsProperties
 import androidx.compose.ui.semantics.SemanticsActions
 import androidx.compose.ui.test.SemanticsNodeInteraction
@@ -17,7 +18,6 @@ import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performScrollTo
 import androidx.compose.ui.test.performTextReplacement
-import androidx.test.espresso.Espresso.closeSoftKeyboard
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import com.kert0n.medapp.HiltTestActivity
 import com.kert0n.medapp.domain.value.Doses
@@ -145,8 +145,7 @@ class ChangingTreatmentStoryTest {
         compose.waitUntil(WAIT) { compose.onAllNodesWithText("Черновики").fetchSemanticsNodes().isNotEmpty() }
         compose.onNodeWithText("Ибупрофен").performClick()
         // Подвал уходит на время ввода: человек убирает клавиатуру, чтобы нажать.
-        closeSoftKeyboard()
-        compose.onNodeWithText("Начать лечение").performClick()
+        compose.pressAfterTyping("Начать лечение")
 
         compose.waitUntil(WAIT) {
             compose.onAllNodesWithText("обеспечен", substring = true).fetchSemanticsNodes().isNotEmpty()
@@ -171,8 +170,7 @@ class ChangingTreatmentStoryTest {
             hasAnyDescendant(hasText("Дачная пачка")) and SemanticsMatcher.keyIsDefined(SemanticsActions.CustomActions)
         ).moveIt("Выше")
         // Подвал уходит на время ввода: человек убирает клавиатуру, чтобы нажать.
-        closeSoftKeyboard()
-        compose.onNodeWithText("Сохранить").performClick()
+        compose.pressAfterTyping("Сохранить")
 
         compose.waitUntil(WAIT) {
             compose.onAllNodesWithText("С правкой").fetchSemanticsNodes().isEmpty()
@@ -193,8 +191,7 @@ class ChangingTreatmentStoryTest {
         compose.waitUntil(WAIT) { compose.onAllNodesWithText("Доза").fetchSemanticsNodes().isNotEmpty() }
         compose.onNodeWithText("Доза").performScrollTo().performTextReplacement("3")
         // Подвал уходит на время ввода: человек убирает клавиатуру, чтобы нажать.
-        closeSoftKeyboard()
-        compose.onNodeWithText("Сохранить").performClick()
+        compose.pressAfterTyping("Сохранить")
 
         // Карточка показывает назначение словами — и новая доза стоит в нём, а эпизод тот же.
         compose.waitUntil(WAIT) {
@@ -215,14 +212,12 @@ class ChangingTreatmentStoryTest {
 
         compose.onNodeWithText("Всего приёмов").performScrollTo().performTextReplacement("100000")
         // Подвал уходит на время ввода: человек убирает клавиатуру, чтобы нажать.
-        closeSoftKeyboard()
-        compose.onNodeWithText("Сохранить").performClick()
+        compose.pressAfterTyping("Сохранить")
         compose.waitUntil(WAIT) { compose.onAllNodesWithText("Приёмов не больше 10000.").fetchSemanticsNodes().isNotEmpty() }
 
         compose.onNodeWithText("Всего приёмов").performScrollTo().performTextReplacement("10000")
         compose.waitUntil(WAIT) { compose.onAllNodesWithText("Последний приём —", substring = true).fetchSemanticsNodes().isNotEmpty() }
-        closeSoftKeyboard()
-        compose.onNodeWithText("Сохранить").performClick()
+        compose.pressAfterTyping("Сохранить")
         compose.waitUntil(WAIT) { compose.onAllNodesWithText("нужно 10000 приёмов", substring = true).fetchSemanticsNodes().isNotEmpty() }
 
         // «День» не раскладывает все десять тысяч, чтобы найти сегодняшний приём.
@@ -247,8 +242,7 @@ class ChangingTreatmentStoryTest {
         compose.onNodeWithText("Отвязать препарат?").assertIsDisplayed()
         compose.onNode(hasText("Отвязать") and hasAnyAncestor(isDialog())).performClick()
         // Подвал уходит на время ввода: человек убирает клавиатуру, чтобы нажать.
-        closeSoftKeyboard()
-        compose.onNodeWithText("Сохранить").performClick()
+        compose.pressAfterTyping("Сохранить")
     }
 
     /** И наконец — отмена: с вопросом, и карточка после неё говорит, чем лечение кончилось. */

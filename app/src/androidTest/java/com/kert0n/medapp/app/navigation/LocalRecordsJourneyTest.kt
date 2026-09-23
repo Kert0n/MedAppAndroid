@@ -1,5 +1,6 @@
 package com.kert0n.medapp.app.navigation
 
+import com.kert0n.medapp.fixture.pressAfterTyping
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.junit4.v2.createAndroidComposeRule
 import androidx.compose.ui.test.onAllNodesWithText
@@ -8,7 +9,6 @@ import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performScrollTo
 import androidx.compose.ui.test.performTextInput
-import androidx.test.espresso.Espresso.closeSoftKeyboard
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import com.kert0n.medapp.HiltTestActivity
 import com.kert0n.medapp.fixture.CAPSULE_FORM
@@ -85,8 +85,7 @@ class LocalRecordsJourneyTest {
         compose.onNodeWithText("Название").performTextInput("Домашняя")
         compose.onNodeWithText("Место хранения (необязательно)").performTextInput("В ванной")
         // Подвал уходит на время ввода: человек убирает клавиатуру, чтобы нажать.
-        closeSoftKeyboard()
-        compose.onNodeWithText("Сохранить").performClick()
+        compose.pressAfterTyping("Сохранить")
 
         // Записанное уводит с формы само: человек заводил полку, а не форму.
         compose.waitUntil(WAIT) {
@@ -108,12 +107,10 @@ class LocalRecordsJourneyTest {
         aShelfWithABox()
 
         // Подвал уходит на время ввода: человек убирает клавиатуру, чтобы нажать.
-        closeSoftKeyboard()
-        compose.onNodeWithText("Пересчитать").performClick()
+        compose.pressAfterTyping("Пересчитать")
         compose.waitUntil(WAIT) { compose.onAllNodesWithText("Сейчас записано: 20 таблетка").fetchSemanticsNodes().isNotEmpty() }
         compose.onNodeWithText("Пересчитал и увидел").performTextInput("17")
-        closeSoftKeyboard()
-        compose.onNodeWithText("Записать").performClick()
+        compose.pressAfterTyping("Записать")
 
         compose.waitUntil(WAIT) { compose.onAllNodesWithText("17 таблетка").fetchSemanticsNodes().isNotEmpty() }
         compose.onNodeWithText("Сколько есть").assertIsDisplayed()
@@ -125,12 +122,10 @@ class LocalRecordsJourneyTest {
         aShelfWithABox()
 
         // Подвал уходит на время ввода: человек убирает клавиатуру, чтобы нажать.
-        closeSoftKeyboard()
-        compose.onNodeWithText("Пересчитать").performClick()
+        compose.pressAfterTyping("Пересчитать")
         compose.waitUntil(WAIT) { compose.onAllNodesWithText("Сейчас записано: 20 таблетка").fetchSemanticsNodes().isNotEmpty() }
         compose.onNodeWithText("Пересчитал и увидел").performTextInput("0")
-        closeSoftKeyboard()
-        compose.onNodeWithText("Записать").performClick()
+        compose.pressAfterTyping("Записать")
 
         compose.waitUntil(WAIT) { compose.onAllNodesWithText("Ноль — это выбросить лекарство: сделайте это с его карточки.").fetchSemanticsNodes().isNotEmpty() }
         // Экран остался пересчётом: ни ухода, ни вопроса — отказ и та же форма.
@@ -148,8 +143,7 @@ class LocalRecordsJourneyTest {
         aShelfWithABox()
 
         // Подвал уходит на время ввода: человек убирает клавиатуру, чтобы нажать.
-        closeSoftKeyboard()
-        compose.onNodeWithText("Перенести").performClick()
+        compose.pressAfterTyping("Перенести")
         compose.waitUntil(WAIT) { compose.onAllNodesWithText("Куда перенести").fetchSemanticsNodes().isNotEmpty() }
         compose.onNodeWithText("Переносить некуда", substring = true).assertIsDisplayed()
         back()
@@ -178,8 +172,7 @@ class LocalRecordsJourneyTest {
         compose.onNodeWithText("Завести аптечку").performClick()
         compose.onNodeWithText("Название").performTextInput("Домашняя")
         // Подвал уходит на время ввода: человек убирает клавиатуру, чтобы нажать.
-        closeSoftKeyboard()
-        compose.onNodeWithText("Сохранить").performClick()
+        compose.pressAfterTyping("Сохранить")
         compose.waitUntil(WAIT) { compose.onAllNodesWithText("Пока пусто").fetchSemanticsNodes().isNotEmpty() }
         compose.onNodeWithText("Домашняя").performClick()
         compose.onNodeWithText("Завести лекарство").performClick()
@@ -192,8 +185,7 @@ class LocalRecordsJourneyTest {
         compose.onNodeWithText("Reckitt").performScrollTo().assertIsDisplayed()
         compose.onNodeWithText("Количество").performScrollTo().performTextInput("20")
         // Подвал уходит на время ввода: человек убирает клавиатуру, чтобы нажать.
-        closeSoftKeyboard()
-        compose.onNodeWithText("Сохранить").performClick()
+        compose.pressAfterTyping("Сохранить")
         compose.waitUntil(WAIT) { compose.onAllNodesWithText("Сколько есть").fetchSemanticsNodes().isNotEmpty() }
         compose.onNodeWithText("Reckitt").performScrollTo().assertIsDisplayed()
     }
@@ -203,8 +195,7 @@ class LocalRecordsJourneyTest {
         compose.onNodeWithText("Завести аптечку").performClick()
         compose.onNodeWithText("Название").performTextInput("Домашняя")
         // Подвал уходит на время ввода: человек убирает клавиатуру, чтобы нажать.
-        closeSoftKeyboard()
-        compose.onNodeWithText("Сохранить").performClick()
+        compose.pressAfterTyping("Сохранить")
         compose.waitUntil(WAIT) { compose.onAllNodesWithText("Пока пусто").fetchSemanticsNodes().isNotEmpty() }
 
         compose.onNodeWithText("Домашняя").performClick()
@@ -214,8 +205,7 @@ class LocalRecordsJourneyTest {
         compose.onNodeWithText("Единица").performScrollTo().performClick()
         compose.onNodeWithText("таблетка").performClick()
         // Подвал уходит на время ввода: человек убирает клавиатуру, чтобы нажать.
-        closeSoftKeyboard()
-        compose.onNodeWithText("Сохранить").performClick()
+        compose.pressAfterTyping("Сохранить")
 
         // Заведённая коробка открывается карточкой: человек заводил её, чтобы посмотреть.
         compose.waitUntil(WAIT) { compose.onAllNodesWithText("Сколько есть").fetchSemanticsNodes().isNotEmpty() }

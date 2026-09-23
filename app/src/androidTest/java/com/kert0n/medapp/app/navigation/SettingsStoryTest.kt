@@ -1,5 +1,6 @@
 package com.kert0n.medapp.app.navigation
 
+import com.kert0n.medapp.fixture.pressAfterTyping
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.assertIsSelected
 import androidx.compose.ui.test.hasText
@@ -10,7 +11,6 @@ import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performTextReplacement
 import androidx.lifecycle.Lifecycle
-import androidx.test.espresso.Espresso.closeSoftKeyboard
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import com.kert0n.medapp.HiltTestActivity
 import com.kert0n.medapp.feature.settings.SettingsStore
@@ -74,8 +74,7 @@ class SettingsStoryTest {
         see("Предупреждать о нехватке за, дней")
         compose.onNodeWithText("Предупреждать о нехватке за, дней").performTextReplacement("5")
         compose.onNodeWithText("Отложить на, мин").performTextReplacement("20")
-        closeSoftKeyboard()
-        compose.onNodeWithText("Сохранить").performClick()
+        compose.pressAfterTyping("Сохранить")
         see("Опции")
         val saved = runBlocking { settings.current() }
         assertEquals(5L, saved.notifications.coverageThresholdDays)

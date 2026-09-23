@@ -229,7 +229,7 @@ class ReportsScreenTest {
     fun aFailedReadingIsToldAsFailure() {
         show(ReportsUiState(summary = ScreenState.Failed(Unavailability.DEVICE_STORAGE)))
 
-        compose.onNodeWithText("Не удалось сохранить данные на устройстве.").assertIsDisplayed()
+        compose.onNodeWithText("Не удалось обратиться к данным на устройстве.").assertIsDisplayed()
     }
 
     /** Крупный шрифт не режет ни переключателя отчётов, ни чипов срока: они переносятся строкой. */

@@ -1,5 +1,6 @@
 package com.kert0n.medapp.app.navigation
 
+import com.kert0n.medapp.fixture.pressAfterTyping
 import com.kert0n.medapp.domain.pack.ExpiryDate
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.junit4.v2.createAndroidComposeRule
@@ -12,7 +13,6 @@ import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performScrollTo
 import androidx.compose.ui.test.performTextReplacement
-import androidx.test.espresso.Espresso.closeSoftKeyboard
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import com.kert0n.medapp.HiltTestActivity
 import com.kert0n.medapp.domain.value.Doses
@@ -165,8 +165,7 @@ class DayOfIntakesStoryTest {
         compose.onNodeWithContentDescription("Принять").performClick()
         compose.waitUntil(WAIT) { compose.onAllNodesWithText("Сколько принял").fetchSemanticsNodes().isNotEmpty() }
         compose.onNodeWithText("Сколько принял").performTextReplacement("1")
-        closeSoftKeyboard()
-        compose.onNodeWithText("Принять").performClick()
+        compose.pressAfterTyping("Принять")
         theExpiredBoxIsAskedAbout()
         compose.waitUntil(WAIT) { compose.onAllNodesWithText("Сколько принял").fetchSemanticsNodes().isEmpty() }
         // В места приложения человек возвращается назад: на карточке коробки нижних мест нет.
