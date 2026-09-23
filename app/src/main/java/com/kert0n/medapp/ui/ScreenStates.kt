@@ -1,5 +1,12 @@
 package com.kert0n.medapp.ui
 
+import androidx.activity.compose.BackHandler
+import com.kert0n.medapp.presentation.ScreenReading
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import androidx.compose.material3.TopAppBar
+import androidx.compose.material3.Scaffold
+import androidx.compose.material3.IconButton
+import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.annotation.DrawableRes
 import androidx.annotation.StringRes
 import androidx.compose.foundation.layout.Arrangement
@@ -165,3 +172,41 @@ internal val Unavailability.text: Int
 /** Повтор тем же осмыслен не всегда: отказ в пропуске им не лечится (PLAN G2). */
 private val Unavailability.isWorthRetrying: Boolean
     get() = this != Unavailability.SERVER_REFUSED_US
+
+/**
+ * Экран, чьё чтение может не удаться. Прочиталось — показан он сам; не прочиталось — вместо него
+ * сказано, что данные устройства недоступны, и предложено повторить. [onBack] есть у экранов в
+ * глубине: уйти с экрана, которому нечего показать, человек должен так же, как с любого другого.
+ */
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+fun Readable(
+    vararg readings: ScreenReading,
+    onBack: (() -> Unit)? = null,
+    content: @Composable () -> Unit
+) {
+    val failed = readings.map { it.failed.collectAsStateWithLifecycle().value }.firstOrNull { it != null }
+    if (failed == null) {
+        content()
+        return
+    }
+    // Системный «назад» ведёт туда же, куда стрелка: у листа приёма это закрыть лист, а не уйти с
+    // карточки целиком.
+    if (onBack != null) BackHandler(onBack = onBack)
+    Scaffold(
+        topBar = {
+            if (onBack != null) {
+                TopAppBar(
+                    title = {},
+                    navigationIcon = {
+                        IconButton(onClick = onBack) {
+                            Icon(painterResource(R.drawable.ic_arrow_back), contentDescription = stringResource(R.string.action_back))
+                        }
+                    }
+                )
+            }
+        }
+    ) { padding ->
+        ErrorMessage(failed, Modifier.padding(padding), onRetry = { readings.forEach { it.retry() } })
+    }
+}

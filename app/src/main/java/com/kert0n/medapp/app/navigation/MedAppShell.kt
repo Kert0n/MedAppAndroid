@@ -1,5 +1,8 @@
 package com.kert0n.medapp.app.navigation
 
+import com.kert0n.medapp.presentation.ScreenFailuresViewModel
+import androidx.compose.material3.SnackbarHostState
+import androidx.compose.material3.SnackbarHost
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.setValue
 import androidx.compose.animation.ContentTransform
@@ -26,6 +29,7 @@ import com.kert0n.medapp.presentation.course.CourseListViewModel
 import com.kert0n.medapp.presentation.course.CoursePresentationDTO
 import com.kert0n.medapp.presentation.course.CourseSourcesViewModel
 import com.kert0n.medapp.presentation.course.SourcePickingViewModel
+import com.kert0n.medapp.ui.Readable
 import com.kert0n.medapp.ui.course.CourseCardScreen
 import com.kert0n.medapp.ui.course.CourseFormScreen
 import com.kert0n.medapp.ui.course.CourseSourcesScreen
@@ -154,11 +158,18 @@ fun MedAppShell(
         }
         onOpened()
     }
+    // Нажатие, которое не сработало из-за телефона, говорится здесь, над любым экраном: исправить
+    // его человек может только повтором, и место у кнопки ему для этого не нужно (ТЗ 4.3).
+    val snackbars = remember { SnackbarHostState() }
+    val failures: ScreenFailuresViewModel = hiltViewModel()
+    val failed = stringResource(R.string.failure_action)
+    LaunchedEffect(failures) { failures.failures.collect { snackbars.showSnackbar(failed) } }
     Scaffold(
         modifier = modifier.fillMaxSize(),
         // Панель мест — у мест: в глубине человек занят одним делом, и пять соседних комнат
         // ему не нужны. Появляется и исчезает вместе с экраном, без своего движения.
-        bottomBar = { if (stacks.screen in PLACES) Places(stacks) }
+        bottomBar = { if (stacks.screen in PLACES) Places(stacks) },
+        snackbarHost = { SnackbarHost(snackbars) }
     ) { padding ->
         NavDisplay(
             entries = stacks.entries(remember(stacks, planMode, scanned, reportsMode) { screens(stacks, planMode, scanned, reportsMode) }),
@@ -218,60 +229,66 @@ private fun screens(
 ) = entryProvider<NavKey> {
     entry(Screen.MedKits) {
         val model: MedKitListViewModel = hiltViewModel()
-        MedKitListScreen(
-            state = model.state.collectAsStateWithLifecycle().value,
-            onOpen = { stacks.go(Screen.MedKitContents(it)) },
-            onAdd = { stacks.go(Screen.MedKitForm()) },
-            onJoin = { stacks.go(Screen.MedKitJoining) },
-            // Ища лекарство, человек не помнит, в какой оно аптечке: поиск ведёт в область
-            // «везде», то есть в тот же экран без названной полки.
-            onSearch = { stacks.go(Screen.MedKitContents()) }
-        )
+        Readable(model.reading, onBack = null) {
+            MedKitListScreen(
+                state = model.state.collectAsStateWithLifecycle().value,
+                onOpen = { stacks.go(Screen.MedKitContents(it)) },
+                onAdd = { stacks.go(Screen.MedKitForm()) },
+                onJoin = { stacks.go(Screen.MedKitJoining) },
+                // Ища лекарство, человек не помнит, в какой оно аптечке: поиск ведёт в область
+                // «везде», то есть в тот же экран без названной полки.
+                onSearch = { stacks.go(Screen.MedKitContents()) }
+            )
+        }
     }
     entry<Screen.MedKitForm> { key ->
         val model = hiltViewModel<MedKitFormViewModel, MedKitFormViewModel.Factory>(
             key = key.toString(),
             creationCallback = { factory -> factory.create(key.medKitId) }
         )
-        val state = model.state.collectAsStateWithLifecycle().value
-        // Записанное — повод уйти: человек заводил полку, а не форму, и возвращаться ему в неё
-        // незачем.
-        LaunchedEffect(state) { if (state is MedKitFormUiState.Editing && state.isSaved) stacks.back() }
-        MedKitFormScreen(
-            state = state,
-            onEdit = model::edit,
-            onSave = model::save,
-            onCancel = stacks::back
-        )
+        Readable(model.reading, onBack = stacks::back) {
+            val state = model.state.collectAsStateWithLifecycle().value
+            // Записанное — повод уйти: человек заводил полку, а не форму, и возвращаться ему в неё
+            // незачем.
+            LaunchedEffect(state) { if (state is MedKitFormUiState.Editing && state.isSaved) stacks.back() }
+            MedKitFormScreen(
+                state = state,
+                onEdit = model::edit,
+                onSave = model::save,
+                onCancel = stacks::back
+            )
+        }
     }
     entry<Screen.MedKitContents> { key ->
         val model = hiltViewModel<MedKitContentsViewModel, MedKitContentsViewModel.Factory>(
             key = key.toString(),
             creationCallback = { factory -> factory.create(key.medKitId) }
         )
-        val state = model.state.collectAsStateWithLifecycle().value
-        // Полки больше нет — смотреть её содержимое незачем. Дождалась ли она сервера или
-        // ушла сразу, видно в списке: там она либо исчезла, либо помечена.
-        LaunchedEffect(state.isRemoved) { if (state.isRemoved) stacks.back() }
-        MedKitContentsScreen(
-            state = state,
-            onSearch = model::search,
-            onNarrow = model::narrow,
-            onOrder = model::order,
-            onReset = model::reset,
-            onOpen = { stacks.go(Screen.PackageCard(it)) },
-            onAdd = { stacks.go(Screen.PackageForm(medKitId = key.medKitId)) },
-            onEdit = { stacks.go(Screen.MedKitForm(key.medKitId)) },
-            // Делиться можно только названной полкой: у «всех лекарств» её нет, и меню там не
-            // показывается вовсе.
-            onShare = { key.medKitId?.let { stacks.go(Screen.MedKitSharing(it)) } },
-            onAskToRemove = model::askToRemove,
-            onPickTarget = model::pickTarget,
-            onDismissRemoval = model::dismissRemoval,
-            onRemove = model::remove,
-            onLeave = model::leave,
-            onBack = stacks::back
-        )
+        Readable(model.reading, onBack = stacks::back) {
+            val state = model.state.collectAsStateWithLifecycle().value
+            // Полки больше нет — смотреть её содержимое незачем. Дождалась ли она сервера или
+            // ушла сразу, видно в списке: там она либо исчезла, либо помечена.
+            LaunchedEffect(state.isRemoved) { if (state.isRemoved) stacks.back() }
+            MedKitContentsScreen(
+                state = state,
+                onSearch = model::search,
+                onNarrow = model::narrow,
+                onOrder = model::order,
+                onReset = model::reset,
+                onOpen = { stacks.go(Screen.PackageCard(it)) },
+                onAdd = { stacks.go(Screen.PackageForm(medKitId = key.medKitId)) },
+                onEdit = { stacks.go(Screen.MedKitForm(key.medKitId)) },
+                // Делиться можно только названной полкой: у «всех лекарств» её нет, и меню там не
+                // показывается вовсе.
+                onShare = { key.medKitId?.let { stacks.go(Screen.MedKitSharing(it)) } },
+                onAskToRemove = model::askToRemove,
+                onPickTarget = model::pickTarget,
+                onDismissRemoval = model::dismissRemoval,
+                onRemove = model::remove,
+                onLeave = model::leave,
+                onBack = stacks::back
+            )
+        }
     }
     entry(Screen.MedKitJoining) {
         val model: MedKitJoiningViewModel = hiltViewModel()
@@ -313,16 +330,18 @@ private fun screens(
             key = key.toString(),
             creationCallback = { factory -> factory.create(key.medKitId) }
         )
-        MedKitSharingScreen(
-            state = model.state.collectAsStateWithLifecycle().value,
-            onAsk = model::ask,
-            onDismissAsking = model::dismissAsking,
-            onPublish = model::publish,
-            onInvite = model::invite,
-            onShowFullScreen = model::showFullScreen,
-            onHideFullScreen = model::hideFullScreen,
-            onBack = stacks::back
-        )
+        Readable(model.reading, onBack = stacks::back) {
+            MedKitSharingScreen(
+                state = model.state.collectAsStateWithLifecycle().value,
+                onAsk = model::ask,
+                onDismissAsking = model::dismissAsking,
+                onPublish = model::publish,
+                onInvite = model::invite,
+                onShowFullScreen = model::showFullScreen,
+                onHideFullScreen = model::hideFullScreen,
+                onBack = stacks::back
+            )
+        }
     }
     entry<Screen.PackageForm> { key ->
         val model = hiltViewModel<PackageFormViewModel, PackageFormViewModel.Factory>(
@@ -333,73 +352,81 @@ private fun screens(
                 )
             }
         )
-        val state = model.state.collectAsStateWithLifecycle().value
-        // Заведённая коробка открывается карточкой: человек заводил её, чтобы посмотреть.
-        // Поправленная — нет: её карточка и так лежит под формой.
-        LaunchedEffect(state.saved) {
-            val saved = state.saved ?: return@LaunchedEffect
-            stacks.back()
-            if (key.packageId == null) stacks.go(Screen.PackageCard(saved))
+        Readable(model.reading, onBack = stacks::back) {
+            val state = model.state.collectAsStateWithLifecycle().value
+            // Заведённая коробка открывается карточкой: человек заводил её, чтобы посмотреть.
+            // Поправленная — нет: её карточка и так лежит под формой.
+            LaunchedEffect(state.saved) {
+                val saved = state.saved ?: return@LaunchedEffect
+                stacks.back()
+                if (key.packageId == null) stacks.go(Screen.PackageCard(saved))
+            }
+            PackageFormScreen(
+                state = state,
+                onEdit = model::edit,
+                onPick = model::pick,
+                onDismissSuggestions = model::dismiss,
+                onSave = model::save,
+                onCancel = stacks::back,
+                // Количество здесь показано, но не правится: у пересчёта свой экран (H3 №8).
+                onRecount = { key.packageId?.let { stacks.go(Screen.PackageRecount(it)) } }
+            )
         }
-        PackageFormScreen(
-            state = state,
-            onEdit = model::edit,
-            onPick = model::pick,
-            onDismissSuggestions = model::dismiss,
-            onSave = model::save,
-            onCancel = stacks::back,
-            // Количество здесь показано, но не правится: у пересчёта свой экран (H3 №8).
-            onRecount = { key.packageId?.let { stacks.go(Screen.PackageRecount(it)) } }
-        )
     }
     entry<Screen.PackageCard> { key ->
         val model = hiltViewModel<PackageCardViewModel, PackageCardViewModel.Factory>(
             key = key.toString(),
             creationCallback = { factory -> factory.create(key.packageId) }
         )
-        val state = model.state.collectAsStateWithLifecycle().value
-        // Выброшенной коробке карточки нет: уходим туда, откуда пришли.
-        LaunchedEffect(state.isRemoved) { if (state.isRemoved) stacks.back() }
-        // Разовый приём — лист над карточкой (H3 №10): своего места в стопке у него нет, и
-        // коробку из виду человек не теряет.
-        var taking by rememberSaveable { mutableStateOf(false) }
-        PackageCardScreen(
-            state = state,
-            onEdit = { stacks.go(Screen.PackageForm(packageId = key.packageId)) },
-            onTake = { taking = true },
-            onHistory = { stacks.go(Screen.IntakeHistory(packageId = key.packageId)) },
-            onRecount = { stacks.go(Screen.PackageRecount(key.packageId)) },
-            onTransfer = { stacks.go(Screen.PackageTransfer(key.packageId)) },
-            onAskToRemove = model::askToRemove,
-            onConfirmRemoval = model::remove,
-            onDismissRemoval = model::dismissRemoval,
-            onBack = stacks::back
-        )
-        if (taking) {
-            val intake = hiltViewModel<UnplannedIntakeViewModel, UnplannedIntakeViewModel.Factory>(
-                key = "intake-${key.packageId}",
-                creationCallback = { factory -> factory.create(key.packageId) }
+        Readable(model.reading, onBack = stacks::back) {
+            val state = model.state.collectAsStateWithLifecycle().value
+            // Выброшенной коробке карточки нет: уходим туда, откуда пришли.
+            LaunchedEffect(state.isRemoved) { if (state.isRemoved) stacks.back() }
+            // Разовый приём — лист над карточкой (H3 №10): своего места в стопке у него нет, и
+            // коробку из виду человек не теряет.
+            var taking by rememberSaveable { mutableStateOf(false) }
+            PackageCardScreen(
+                state = state,
+                onEdit = { stacks.go(Screen.PackageForm(packageId = key.packageId)) },
+                onTake = { taking = true },
+                onHistory = { stacks.go(Screen.IntakeHistory(packageId = key.packageId)) },
+                onRecount = { stacks.go(Screen.PackageRecount(key.packageId)) },
+                onTransfer = { stacks.go(Screen.PackageTransfer(key.packageId)) },
+                onAskToRemove = model::askToRemove,
+                onConfirmRemoval = model::remove,
+                onDismissRemoval = model::dismissRemoval,
+                onBack = stacks::back
             )
-            val taken = intake.state.collectAsStateWithLifecycle().value
-            // Записано — лист закрывается: человек сказал, что хотел, а новое число покажет
-            // карточка. Разговор при этом забывается: следующее «Принять» начинает новый приём, и
-            // без этого лист открылся бы уже закрытым (разбор 2026-09-16).
-            LaunchedEffect(taken.isRecorded, taken.isGone) {
-                if (!taken.isRecorded && !taken.isGone) return@LaunchedEffect
-                taking = false
-                intake.forgetTheIntake()
-            }
-            UnplannedIntakeSheet(
-                state = taken,
-                onEdit = intake::edit,
-                onRecord = { intake.record() },
-                onAcknowledge = { intake.record(acknowledged = true) },
-                onDismissQuestions = intake::dismissQuestions,
-                onDismiss = {
+            if (taking) {
+                val intake = hiltViewModel<UnplannedIntakeViewModel, UnplannedIntakeViewModel.Factory>(
+                    key = "intake-${key.packageId}",
+                    creationCallback = { factory -> factory.create(key.packageId) }
+                )
+                val taken = intake.state.collectAsStateWithLifecycle().value
+                // Записано — лист закрывается: человек сказал, что хотел, а новое число покажет
+                // карточка. Разговор при этом забывается: следующее «Принять» начинает новый приём, и
+                // без этого лист открылся бы уже закрытым (разбор 2026-09-16).
+                LaunchedEffect(taken.isRecorded, taken.isGone) {
+                    if (!taken.isRecorded && !taken.isGone) return@LaunchedEffect
                     taking = false
                     intake.forgetTheIntake()
                 }
-            )
+                // Лист читает свою коробку сам: не прочиталось — сказано на месте листа, и
+                // «назад» закрывает его, как закрыл бы сам лист.
+                Readable(intake.reading, onBack = { taking = false; intake.forgetTheIntake() }) {
+                    UnplannedIntakeSheet(
+                        state = taken,
+                        onEdit = intake::edit,
+                        onRecord = { intake.record() },
+                        onAcknowledge = { intake.record(acknowledged = true) },
+                        onDismissQuestions = intake::dismissQuestions,
+                        onDismiss = {
+                            taking = false
+                            intake.forgetTheIntake()
+                        }
+                    )
+                }
+            }
         }
     }
     entry<Screen.PackageRecount> { key ->
@@ -407,217 +434,237 @@ private fun screens(
             key = key.toString(),
             creationCallback = { factory -> factory.create(key.packageId) }
         )
-        val state = model.state.collectAsStateWithLifecycle().value
-        // Записано — уходим: кончившейся коробке карточки нет, а у оставшейся число покажет она сама.
-        LaunchedEffect(state.isDone) { if (state.isDone) stacks.back() }
-        PackageRecountScreen(
-            state = state,
-            onEdit = model::edit,
-            onSubmit = model::submit,
-            onCancel = stacks::back
-        )
+        Readable(model.reading, onBack = stacks::back) {
+            val state = model.state.collectAsStateWithLifecycle().value
+            // Записано — уходим: кончившейся коробке карточки нет, а у оставшейся число покажет она сама.
+            LaunchedEffect(state.isDone) { if (state.isDone) stacks.back() }
+            PackageRecountScreen(
+                state = state,
+                onEdit = model::edit,
+                onSubmit = model::submit,
+                onCancel = stacks::back
+            )
+        }
     }
     entry<Screen.PackageTransfer> { key ->
         val model = hiltViewModel<PackageTransferViewModel, PackageTransferViewModel.Factory>(
             key = key.toString(),
             creationCallback = { factory -> factory.create(key.packageId) }
         )
-        val state = model.state.collectAsStateWithLifecycle().value
-        // Переехала или поехала — решение принято, и экран уходит: новое место покажет карточка.
-        LaunchedEffect(state.isDone) { if (state.isDone) stacks.back() }
-        PackageTransferScreen(
-            state = state,
-            onChoose = model::choose,
-            onTransfer = model::transfer,
-            onBack = stacks::back
-        )
+        Readable(model.reading, onBack = stacks::back) {
+            val state = model.state.collectAsStateWithLifecycle().value
+            // Переехала или поехала — решение принято, и экран уходит: новое место покажет карточка.
+            LaunchedEffect(state.isDone) { if (state.isDone) stacks.back() }
+            PackageTransferScreen(
+                state = state,
+                onChoose = model::choose,
+                onTransfer = model::transfer,
+                onBack = stacks::back
+            )
+        }
     }
     entry(Screen.Plan) {
         val model: CourseListViewModel = hiltViewModel()
         val days: DayPlanViewModel = hiltViewModel()
-        // Режим — состояние места: он переживает уход в другую комнату и возвращение, как и
-        // всё, что держит стопка (rememberSaveable под своим ключом маршрута).
-        val context = LocalContext.current
-        // Разрешения человек меняет у системы: вернулся — спрашиваем заново, своего мнения о них
-        // приложение не держит (PLAN H3 «Уведомления на экране»).
-        LifecycleResumeEffect(days) {
-            days.refreshPermissions()
-            onPauseOrDispose { }
+        Readable(model.reading, days.reading, onBack = null) {
+            // Режим — состояние места: он переживает уход в другую комнату и возвращение, как и
+            // всё, что держит стопка (rememberSaveable под своим ключом маршрута).
+            val context = LocalContext.current
+            // Разрешения человек меняет у системы: вернулся — спрашиваем заново, своего мнения о них
+            // приложение не держит (PLAN H3 «Уведомления на экране»).
+            LifecycleResumeEffect(days) {
+                days.refreshPermissions()
+                onPauseOrDispose { }
+            }
+            PlanScreen(
+                mode = planMode.value,
+                onMode = { planMode.value = it },
+                courses = model.state.collectAsStateWithLifecycle().value,
+                // Чтение спрашивается у той страницы, которой оно принадлежит: сдвиг называет вёрстка
+                // страницы, а не оболочка.
+                dayPage = { daysAhead -> days.page(daysAhead).collectAsStateWithLifecycle().value },
+                // Нажатие на строку ведёт на карточку пункта; у дозы за окном календаря записи ещё
+                // нет, и открывать по ней нечего.
+                onOpenIntake = { item -> item.intakeId?.let { stacks.go(Screen.IntakeCard(it)) } },
+                onConfirmIntake = days::confirm,
+                onDeclineIntake = days::decline,
+                onDismissDayMessage = days::dismissMessage,
+                onAcknowledgeDayQuestion = days::acknowledge,
+                onDismissDayQuestion = days::dismissQuestion,
+                onFixNotifications = context::openNotificationSettings,
+                onFixAlarms = context::openExactAlarmSettings,
+                dayPermissions = days.permissions.collectAsStateWithLifecycle().value,
+                // Черновик открывается редактором, идущее и законченное лечение — карточкой.
+                onOpenCourse = { course ->
+                    stacks.go(
+                        if (course.kind == CoursePresentationDTO.Kind.DRAFT) Screen.CourseForm(course.id)
+                        else Screen.CourseCard(course.id)
+                    )
+                },
+                onAddCourse = { stacks.go(Screen.CourseForm()) }
+            )
         }
-        PlanScreen(
-            mode = planMode.value,
-            onMode = { planMode.value = it },
-            courses = model.state.collectAsStateWithLifecycle().value,
-            // Чтение спрашивается у той страницы, которой оно принадлежит: сдвиг называет вёрстка
-            // страницы, а не оболочка.
-            dayPage = { daysAhead -> days.page(daysAhead).collectAsStateWithLifecycle().value },
-            // Нажатие на строку ведёт на карточку пункта; у дозы за окном календаря записи ещё
-            // нет, и открывать по ней нечего.
-            onOpenIntake = { item -> item.intakeId?.let { stacks.go(Screen.IntakeCard(it)) } },
-            onConfirmIntake = days::confirm,
-            onDeclineIntake = days::decline,
-            onDismissDayMessage = days::dismissMessage,
-            onAcknowledgeDayQuestion = days::acknowledge,
-            onDismissDayQuestion = days::dismissQuestion,
-            onFixNotifications = context::openNotificationSettings,
-            onFixAlarms = context::openExactAlarmSettings,
-            dayPermissions = days.permissions.collectAsStateWithLifecycle().value,
-            // Черновик открывается редактором, идущее и законченное лечение — карточкой.
-            onOpenCourse = { course ->
-                stacks.go(
-                    if (course.kind == CoursePresentationDTO.Kind.DRAFT) Screen.CourseForm(course.id)
-                    else Screen.CourseCard(course.id)
-                )
-            },
-            onAddCourse = { stacks.go(Screen.CourseForm()) }
-        )
     }
     entry<Screen.IntakeCard> { key ->
         val model = hiltViewModel<IntakeCardViewModel, IntakeCardViewModel.Factory>(
             key = key.toString(),
             creationCallback = { factory -> factory.create(key.intakeId) }
         )
-        val state = model.state.collectAsStateWithLifecycle().value
-        // Ответ дан — карточка уходит: человек отвечал на приём, а не заполнял форму.
-        LaunchedEffect(state.isDone) { if (state.isDone) stacks.back() }
-        IntakeCardScreen(
-            state = state,
-            onEdit = model::edit,
-            onConfirm = { model.confirm() },
-            onDecline = model::decline,
-            onAcknowledge = { model.confirm(acknowledged = true) },
-            onDismissQuestions = model::dismissQuestions,
-            onBack = stacks::back
-        )
+        Readable(model.reading, onBack = stacks::back) {
+            val state = model.state.collectAsStateWithLifecycle().value
+            // Ответ дан — карточка уходит: человек отвечал на приём, а не заполнял форму.
+            LaunchedEffect(state.isDone) { if (state.isDone) stacks.back() }
+            IntakeCardScreen(
+                state = state,
+                onEdit = model::edit,
+                onConfirm = { model.confirm() },
+                onDecline = model::decline,
+                onAcknowledge = { model.confirm(acknowledged = true) },
+                onDismissQuestions = model::dismissQuestions,
+                onBack = stacks::back
+            )
+        }
     }
     entry<Screen.IntakeHistory> { key ->
         val model = hiltViewModel<IntakeHistoryViewModel, IntakeHistoryViewModel.Factory>(
             key = key.toString(),
             creationCallback = { factory -> factory.create(key.courseId, key.packageId) }
         )
-        IntakeHistoryScreen(
-            state = model.state.collectAsStateWithLifecycle().value,
-            onBack = stacks::back
-        )
+        Readable(model.reading, onBack = stacks::back) {
+            IntakeHistoryScreen(
+                state = model.state.collectAsStateWithLifecycle().value,
+                onBack = stacks::back
+            )
+        }
     }
     entry<Screen.CourseForm> { key ->
         val model = hiltViewModel<CourseFormViewModel, CourseFormViewModel.Factory>(
             key = key.toString(),
             creationCallback = { factory -> factory.create(key.courseId) }
         )
-        val state = model.state.collectAsStateWithLifecycle().value
-        val askAboutNotifications = rememberNotificationPermissionRequest()
-        // Записанное или удалённое — повод уйти: человек заводил лечение, а не форму. Начатое
-        // ведёт дальше, к карточке: с этого мига у лечения есть что показывать. За источниками
-        // ведёт записанный черновик — до записи подключать коробки не к чему.
-        LaunchedEffect(state) {
-            if (state !is CourseFormUiState.Editing) return@LaunchedEffect
-            val started = state.startedId
-            val sources = state.sourcesOf
-            when {
-                started != null -> {
-                    // Лечение только что завело напоминания — вот и повод спросить разрешение:
-                    // польза видна в этот же миг (PLAN H3 «Уведомления на экране»).
-                    askAboutNotifications()
-                    stacks.back()
-                    stacks.go(Screen.CourseCard(started))
+        Readable(model.reading, onBack = stacks::back) {
+            val state = model.state.collectAsStateWithLifecycle().value
+            val askAboutNotifications = rememberNotificationPermissionRequest()
+            // Записанное или удалённое — повод уйти: человек заводил лечение, а не форму. Начатое
+            // ведёт дальше, к карточке: с этого мига у лечения есть что показывать. За источниками
+            // ведёт записанный черновик — до записи подключать коробки не к чему.
+            LaunchedEffect(state) {
+                if (state !is CourseFormUiState.Editing) return@LaunchedEffect
+                val started = state.startedId
+                val sources = state.sourcesOf
+                when {
+                    started != null -> {
+                        // Лечение только что завело напоминания — вот и повод спросить разрешение:
+                        // польза видна в этот же миг (PLAN H3 «Уведомления на экране»).
+                        askAboutNotifications()
+                        stacks.back()
+                        stacks.go(Screen.CourseCard(started))
+                    }
+                    sources != null -> {
+                        model.sourcesOpened()
+                        stacks.go(Screen.CourseSources(sources))
+                    }
+                    state.isSaved || state.isDiscarded || state.isLeft -> stacks.back()
                 }
-                sources != null -> {
-                    model.sourcesOpened()
-                    stacks.go(Screen.CourseSources(sources))
-                }
-                state.isSaved || state.isDiscarded || state.isLeft -> stacks.back()
             }
+            CourseFormScreen(
+                state = state,
+                onEdit = model::edit,
+                onSave = model::save,
+                onAskToDiscard = model::askToDiscard,
+                onConfirmDiscard = model::discard,
+                onDismissDiscard = model::dismissDiscard,
+                onKeep = model::keep,
+                onDismissLeaving = model::dismissLeaving,
+                // Источники есть у любого лечения: новый черновик по этой кнопке сначала запишется.
+                onSources = model::openSources,
+                onStart = model::start.takeIf { state !is CourseFormUiState.Editing || state.mode != CourseFormUiState.Mode.RUNNING },
+                // Уходит с формы не оболочка, а редактор: записанный ради источников черновик спросит.
+                onBack = model::leave
+            )
         }
-        CourseFormScreen(
-            state = state,
-            onEdit = model::edit,
-            onSave = model::save,
-            onAskToDiscard = model::askToDiscard,
-            onConfirmDiscard = model::discard,
-            onDismissDiscard = model::dismissDiscard,
-            onKeep = model::keep,
-            onDismissLeaving = model::dismissLeaving,
-            // Источники есть у любого лечения: новый черновик по этой кнопке сначала запишется.
-            onSources = model::openSources,
-            onStart = model::start.takeIf { state !is CourseFormUiState.Editing || state.mode != CourseFormUiState.Mode.RUNNING },
-            // Уходит с формы не оболочка, а редактор: записанный ради источников черновик спросит.
-            onBack = model::leave
-        )
     }
     entry<Screen.CourseCard> { key ->
         val model = hiltViewModel<CourseCardViewModel, CourseCardViewModel.Factory>(
             key = key.toString(),
             creationCallback = { factory -> factory.create(key.courseId) }
         )
-        CourseCardScreen(
-            state = model.state.collectAsStateWithLifecycle().value,
-            onEdit = { stacks.go(Screen.CourseForm(key.courseId)) },
-            onSources = { stacks.go(Screen.CourseSources(key.courseId)) },
-            // Три выхода из нехватки ведут туда, где они делаются: подключить — выбор источника,
-            // переставить выделения — сами источники, докупить — заведение упаковки.
-            onAttachSource = { stacks.go(Screen.SourcePicking(key.courseId)) },
-            onAddPackage = { stacks.go(Screen.PackageForm()) },
-            onHistory = { stacks.go(Screen.IntakeHistory(courseId = key.courseId)) },
-            onAskOffPlan = model::askToCountOffPlan,
-            onCountOffPlan = model::countOffPlan,
-            onDismissOffPlan = model::dismissOffPlan,
-            onAskToCancel = model::askToCancel,
-            onConfirmCancel = model::cancel,
-            onDismissCancel = model::dismissCancel,
-            onDismissMessage = model::dismissMessage,
-            onBack = stacks::back
-        )
+        Readable(model.reading, onBack = stacks::back) {
+            CourseCardScreen(
+                state = model.state.collectAsStateWithLifecycle().value,
+                onEdit = { stacks.go(Screen.CourseForm(key.courseId)) },
+                onSources = { stacks.go(Screen.CourseSources(key.courseId)) },
+                // Три выхода из нехватки ведут туда, где они делаются: подключить — выбор источника,
+                // переставить выделения — сами источники, докупить — заведение упаковки.
+                onAttachSource = { stacks.go(Screen.SourcePicking(key.courseId)) },
+                onAddPackage = { stacks.go(Screen.PackageForm()) },
+                onHistory = { stacks.go(Screen.IntakeHistory(courseId = key.courseId)) },
+                onAskOffPlan = model::askToCountOffPlan,
+                onCountOffPlan = model::countOffPlan,
+                onDismissOffPlan = model::dismissOffPlan,
+                onAskToCancel = model::askToCancel,
+                onConfirmCancel = model::cancel,
+                onDismissCancel = model::dismissCancel,
+                onDismissMessage = model::dismissMessage,
+                onBack = stacks::back
+            )
+        }
     }
     entry<Screen.CourseSources> { key ->
         val model = hiltViewModel<CourseSourcesViewModel, CourseSourcesViewModel.Factory>(
             key = key.toString(),
             creationCallback = { factory -> factory.create(key.courseId) }
         )
-        CourseSourcesScreen(
-            state = model.state.collectAsStateWithLifecycle().value,
-            onMove = model::move,
-            onAllocate = model::allocate,
-            onDetach = model::askToDetach,
-            onConfirmDetach = model::detach,
-            onDismissDetach = model::dismissDetach,
-            onDismissMessage = model::dismissMessage,
-            onAdd = { stacks.go(Screen.SourcePicking(key.courseId)) },
-            onSave = model::save,
-            onBack = stacks::back
-        )
+        Readable(model.reading, onBack = stacks::back) {
+            CourseSourcesScreen(
+                state = model.state.collectAsStateWithLifecycle().value,
+                onMove = model::move,
+                onAllocate = model::allocate,
+                onDetach = model::askToDetach,
+                onConfirmDetach = model::detach,
+                onDismissDetach = model::dismissDetach,
+                onDismissMessage = model::dismissMessage,
+                onAdd = { stacks.go(Screen.SourcePicking(key.courseId)) },
+                onSave = model::save,
+                onBack = stacks::back
+            )
+        }
     }
     entry<Screen.SourcePicking> { key ->
         val model = hiltViewModel<SourcePickingViewModel, SourcePickingViewModel.Factory>(
             key = key.toString(),
             creationCallback = { factory -> factory.create(key.courseId) }
         )
-        val state = model.state.collectAsStateWithLifecycle().value
-        // Подключённая коробка ждёт человека в стеке: там он и решит, сколько из неё брать.
-        // Просроченную прежде называют — один раз (PLAN C1 «Просрочка при планировании»).
-        LaunchedEffect(state.isDone) { if (state.isDone) stacks.back() }
-        SourcePickingScreen(
-            state = state,
-            onAttach = model::attach,
-            onExpiredSeen = model::expiredSourceSeen,
-            onSearch = model::search,
-            onBack = stacks::back
-        )
+        Readable(model.reading, onBack = stacks::back) {
+            val state = model.state.collectAsStateWithLifecycle().value
+            // Подключённая коробка ждёт человека в стеке: там он и решит, сколько из неё брать.
+            // Просроченную прежде называют — один раз (PLAN C1 «Просрочка при планировании»).
+            LaunchedEffect(state.isDone) { if (state.isDone) stacks.back() }
+            SourcePickingScreen(
+                state = state,
+                onAttach = model::attach,
+                onExpiredSeen = model::expiredSourceSeen,
+                onSearch = model::search,
+                onBack = stacks::back
+            )
+        }
     }
     entry(Screen.Options) {
         val model: OptionsViewModel = hiltViewModel()
-        // Разрешения и язык хранит система: вернулся — спрашиваем заново (PLAN H3 №27).
-        LifecycleResumeEffect(model) {
-            model.refresh()
-            onPauseOrDispose { }
+        Readable(model.reading, onBack = null) {
+            // Разрешения и язык хранит система: вернулся — спрашиваем заново (PLAN H3 №27).
+            LifecycleResumeEffect(model) {
+                model.refresh()
+                onPauseOrDispose { }
+            }
+            OptionsScreen(
+                state = model.state.collectAsStateWithLifecycle().value,
+                onSyncStatus = { stacks.go(Screen.SyncStatus) },
+                onSettings = { stacks.go(Screen.Settings) },
+                onPermissions = { stacks.go(Screen.Permissions) },
+                onLanguage = { stacks.go(Screen.Language) }
+            )
         }
-        OptionsScreen(
-            state = model.state.collectAsStateWithLifecycle().value,
-            onSyncStatus = { stacks.go(Screen.SyncStatus) },
-            onSettings = { stacks.go(Screen.Settings) },
-            onPermissions = { stacks.go(Screen.Permissions) },
-            onLanguage = { stacks.go(Screen.Language) }
-        )
     }
     entry(Screen.Language) {
         val model: LanguageViewModel = hiltViewModel()
@@ -644,28 +691,32 @@ private fun screens(
     }
     entry(Screen.Settings) {
         val model: SettingsViewModel = hiltViewModel()
-        val state = model.state.collectAsStateWithLifecycle().value
-        // Записанное — повод уйти: человек менял настройки, а не заполнял форму навсегда.
-        LaunchedEffect(state) { if (state is SettingsUiState.Editing && state.isSaved) stacks.back() }
-        SettingsScreen(
-            state = state,
-            onEdit = model::edit,
-            onSave = model::save,
-            onBack = stacks::back
-        )
+        Readable(model.reading, onBack = stacks::back) {
+            val state = model.state.collectAsStateWithLifecycle().value
+            // Записанное — повод уйти: человек менял настройки, а не заполнял форму навсегда.
+            LaunchedEffect(state) { if (state is SettingsUiState.Editing && state.isSaved) stacks.back() }
+            SettingsScreen(
+                state = state,
+                onEdit = model::edit,
+                onSave = model::save,
+                onBack = stacks::back
+            )
+        }
     }
     entry(Screen.SyncStatus) {
         val model: SyncStatusViewModel = hiltViewModel()
-        SyncStatusScreen(
-            state = model.state.collectAsStateWithLifecycle().value,
-            onRefresh = model::refresh,
-            // Расхождение по числу лечится пересчётом — тем же экраном, что и обычный пересчёт
-            // (REQ-045): второго места для одного дела не заводится.
-            onRecount = { stacks.go(Screen.PackageRecount(it)) },
-            onDismiss = model::dismiss,
-            onDismissMessage = model::dismissMessage,
-            onBack = stacks::back
-        )
+        Readable(model.reading, onBack = stacks::back) {
+            SyncStatusScreen(
+                state = model.state.collectAsStateWithLifecycle().value,
+                onRefresh = model::refresh,
+                // Расхождение по числу лечится пересчётом — тем же экраном, что и обычный пересчёт
+                // (REQ-045): второго места для одного дела не заводится.
+                onRecount = { stacks.go(Screen.PackageRecount(it)) },
+                onDismiss = model::dismiss,
+                onDismissMessage = model::dismissMessage,
+                onBack = stacks::back
+            )
+        }
     }
     entry(Screen.Scanner) {
         val model: ScannerViewModel = hiltViewModel()
@@ -707,18 +758,20 @@ private fun screens(
     }
     entry(Screen.Reports) {
         val model: ReportsViewModel = hiltViewModel()
-        ReportsScreen(
-            state = model.state.collectAsStateWithLifecycle().value,
-            mode = reportsMode.value,
-            onMode = { reportsMode.value = it },
-            onHorizonPreset = model::choose,
-            onHorizonUntil = model::chooseUntil,
-            onPeriodPreset = model::choose,
-            onPeriod = model::choosePeriod,
-            // Строка лечения ведёт на его карточку: запись эпизода вечна, и карточка умеет
-            // закончившееся лечение (PLAN C1).
-            onCourse = { stacks.go(Screen.CourseCard(it)) }
-        )
+        Readable(model.reading, onBack = null) {
+            ReportsScreen(
+                state = model.state.collectAsStateWithLifecycle().value,
+                mode = reportsMode.value,
+                onMode = { reportsMode.value = it },
+                onHorizonPreset = model::choose,
+                onHorizonUntil = model::chooseUntil,
+                onPeriodPreset = model::choose,
+                onPeriod = model::choosePeriod,
+                // Строка лечения ведёт на его карточку: запись эпизода вечна, и карточка умеет
+                // закончившееся лечение (PLAN C1).
+                onCourse = { stacks.go(Screen.CourseCard(it)) }
+            )
+        }
     }
 }
 

@@ -1,5 +1,7 @@
 package com.kert0n.medapp.presentation.report
 
+import com.kert0n.medapp.presentation.stateInScreen
+import com.kert0n.medapp.presentation.ScreenReading
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.kert0n.medapp.domain.attempt
@@ -46,6 +48,9 @@ class ReportsViewModel @Inject constructor(
     today: Today
 ) : ViewModel() {
 
+    /** Что экран читает из базы; не прочиталось — говорит об этом и предлагает повторить. */
+    val reading = ScreenReading()
+
     /**
      * Нынешний день человека — от него считаются пресеты, и им же проверяется своя дата: второго
      * мнения о том, какое сегодня число, у модели нет.
@@ -60,7 +65,7 @@ class ReportsViewModel @Inject constructor(
      */
     private val day: StateFlow<Day?> = today.observe()
         .distinctUntilChanged()
-        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), null)
+        .stateInScreen(viewModelScope, reading, null)
 
     private val horizon = MutableStateFlow(HorizonChoice.DEFAULT)
 
@@ -81,7 +86,7 @@ class ReportsViewModel @Inject constructor(
 
     val state: StateFlow<ReportsUiState> = combine(summary, future, spent) { summary, future, spent ->
         ReportsUiState(summary = summary, future = future, spent = spent)
-    }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), ReportsUiState())
+    }.stateInScreen(viewModelScope, reading, ReportsUiState())
 
     /** Срок одним нажатием: считается от нынешнего дня и незаконным не бывает. */
     fun choose(preset: HorizonPreset) {

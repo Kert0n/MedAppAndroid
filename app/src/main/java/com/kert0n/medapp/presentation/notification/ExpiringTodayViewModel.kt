@@ -1,5 +1,9 @@
 package com.kert0n.medapp.presentation.notification
 
+import com.kert0n.medapp.presentation.act
+import com.kert0n.medapp.presentation.ScreenFailures
+import com.kert0n.medapp.presentation.stateInScreen
+import com.kert0n.medapp.presentation.ScreenReading
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.kert0n.medapp.domain.notification.NoticeDelivery
@@ -41,8 +45,12 @@ import kotlinx.coroutines.launch
 class ExpiringTodayViewModel @Inject constructor(
     private val outbox: ReminderOutbox,
     private val reminders: ReminderStorageRepository,
-    private val packages: PackageStorageRepository
+    private val packages: PackageStorageRepository,
+    private val failures: ScreenFailures = ScreenFailures()
 ) : ViewModel() {
+
+    /** Что экран читает из базы; не прочиталось — говорит об этом и предлагает повторить. */
+    val reading = ScreenReading()
 
     /**
      * Что человек закрыл крестиком — **ключами** обязательств, а не флагом «попап закрыт». Закрытое
@@ -67,7 +75,7 @@ class ExpiringTodayViewModel @Inject constructor(
         else combine(ids.map { packages.observe(it) }) { boxes ->
             ExpiringTodayUiState(boxes = boxes.filterNotNull().map { it.toPresentationDTO() }, told = keys)
         }
-    }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), ExpiringTodayUiState())
+    }.stateInScreen(viewModelScope, reading, ExpiringTodayUiState())
 
     /**
      * Закрыт крестиком: обязательства помечаются сказанными, и сегодня попап больше не придёт.
@@ -78,7 +86,7 @@ class ExpiringTodayViewModel @Inject constructor(
      */
     fun dismiss(told: Set<NotificationKey>) {
         dismissed.update { it + told }
-        viewModelScope.launch { outbox.bannerShown(told) }
+        act(failures, undo = { dismissed.update { it - told } }) { outbox.bannerShown(told) }
     }
 
 }

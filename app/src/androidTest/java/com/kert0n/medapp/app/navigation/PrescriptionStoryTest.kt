@@ -1,5 +1,6 @@
 package com.kert0n.medapp.app.navigation
 
+import com.kert0n.medapp.fixture.pressAfterTyping
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.isDialog
 import androidx.compose.ui.test.hasText
@@ -145,8 +146,7 @@ class PrescriptionStoryTest {
         compose.onNodeWithText("Название").performTextInput("Нурофен")
         compose.onNodeWithText("Заметка (необязательно)").performTextInput("по 2 после еды, купить")
         // Подвал уходит на время ввода: человек убирает клавиатуру, чтобы нажать.
-        closeSoftKeyboard()
-        compose.onNodeWithText("Сохранить").performClick()
+        compose.pressAfterTyping("Сохранить")
 
         compose.waitUntil(WAIT) { compose.onAllNodesWithText("Черновики").fetchSemanticsNodes().isNotEmpty() }
         // Строка черновика говорит тем, что записано: заметкой, раз назначения ещё нет.
@@ -160,8 +160,7 @@ class PrescriptionStoryTest {
         compose.onNodeWithText("Завести аптечку").performClick()
         compose.onNodeWithText("Название").performTextInput("Домашняя")
         // Подвал уходит на время ввода: человек убирает клавиатуру, чтобы нажать.
-        closeSoftKeyboard()
-        compose.onNodeWithText("Сохранить").performClick()
+        compose.pressAfterTyping("Сохранить")
         compose.waitUntil(WAIT) { compose.onAllNodesWithText("Пока пусто").fetchSemanticsNodes().isNotEmpty() }
 
         compose.onNodeWithText("Домашняя").performClick()
@@ -171,8 +170,7 @@ class PrescriptionStoryTest {
         compose.onNodeWithText("таблетки").performClick()
         compose.onNodeWithText("Количество").performScrollTo().performTextInput("20")
         // Подвал уходит на время ввода: человек убирает клавиатуру, чтобы нажать.
-        closeSoftKeyboard()
-        compose.onNodeWithText("Сохранить").performClick()
+        compose.pressAfterTyping("Сохранить")
         compose.waitUntil(WAIT) { compose.onAllNodesWithText("Сколько есть").fetchSemanticsNodes().isNotEmpty() }
         // Заведённая коробка открылась карточкой; в места приложения человек возвращается назад.
         back()
@@ -251,8 +249,7 @@ class PrescriptionStoryTest {
         compose.onNodeWithContentDescription("Приёмов из 10").assertExists()
         compose.onNode(hasSetTextAction()).performTextReplacement("7")
         // Подвал уходит на время ввода: человек убирает клавиатуру, чтобы нажать.
-        closeSoftKeyboard()
-        compose.onNodeWithText("Сохранить").performClick()
+        compose.pressAfterTyping("Сохранить")
         compose.waitUntil(WAIT) {
             compose.onAllNodesWithText("выделено 7 приёмов", substring = true).fetchSemanticsNodes().isNotEmpty()
         }

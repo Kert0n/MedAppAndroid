@@ -1,5 +1,9 @@
 package com.kert0n.medapp.presentation.pack
 
+import com.kert0n.medapp.presentation.act
+import com.kert0n.medapp.presentation.ScreenFailures
+import com.kert0n.medapp.presentation.stateInScreen
+import com.kert0n.medapp.presentation.ScreenReading
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.kert0n.medapp.feature.operation.Freshening
@@ -44,8 +48,12 @@ class PackageTransferViewModel @AssistedInject constructor(
     packages: PackageStorageRepository,
     medKits: MedKitStorageRepository,
     today: Today,
-    @Assisted private val packageId: Uuid
+    @Assisted private val packageId: Uuid,
+    private val failures: ScreenFailures = ScreenFailures()
 ) : ViewModel() {
+
+    /** Что экран читает из базы; не прочиталось — говорит об этом и предлагает повторить. */
+    val reading = ScreenReading()
 
     @AssistedFactory
     interface Factory {
@@ -57,7 +65,7 @@ class PackageTransferViewModel @AssistedInject constructor(
     private val progress = MutableStateFlow(Progress())
 
     /** Коробка, прочитанная после перечитывания (PLAN E4): её чужие брони решают предупреждение. */
-    private val fresh = viewModelScope.readAfter({ freshening.pack(packageId) }) { packages.observe(packageId) }
+    private val fresh = viewModelScope.readAfter(reading, { freshening.pack(packageId) }) { packages.observe(packageId) }
 
     val state: StateFlow<PackageTransferUiState> = combine(
         fresh,
@@ -78,7 +86,7 @@ class PackageTransferViewModel @AssistedInject constructor(
             isDone = progress.done,
             isLoaded = fresh is Fresh.Read
         )
-    }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), PackageTransferUiState())
+    }.stateInScreen(viewModelScope, reading, PackageTransferUiState())
 
     /** Выбор снимает прежний отказ: человек уже отвечает на него. */
     fun choose(medKitId: Uuid) {
@@ -96,7 +104,7 @@ class PackageTransferViewModel @AssistedInject constructor(
         val now = progress.value
         if (now.working || now.done) return
         progress.value = Progress(working = true)
-        viewModelScope.launch {
+        act(failures, undo = { progress.value = Progress() }) {
             progress.value = when (relocation.move(packageId, target)) {
                 PackageRelocation.Outcome.MOVED, PackageRelocation.Outcome.MARKED -> Progress(done = true)
                 PackageRelocation.Outcome.GONE -> Progress(refusal = PackageTransferRefusal.PACKAGE_GONE)

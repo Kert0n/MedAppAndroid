@@ -1,5 +1,9 @@
 package com.kert0n.medapp.presentation.course
 
+import com.kert0n.medapp.presentation.act
+import com.kert0n.medapp.presentation.ScreenFailures
+import com.kert0n.medapp.presentation.stateInScreen
+import com.kert0n.medapp.presentation.ScreenReading
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.kert0n.medapp.domain.course.CourseSource
@@ -51,8 +55,12 @@ class SourcePickingViewModel @AssistedInject constructor(
     packages: PackageStorageRepository,
     medKits: MedKitStorageRepository,
     today: Today,
-    @Assisted private val courseId: Uuid
+    @Assisted private val courseId: Uuid,
+    private val failures: ScreenFailures = ScreenFailures()
 ) : ViewModel() {
+
+    /** Что экран читает из базы; не прочиталось — говорит об этом и предлагает повторить. */
+    val reading = ScreenReading()
 
     @AssistedFactory
     interface Factory {
@@ -117,7 +125,7 @@ class SourcePickingViewModel @AssistedInject constructor(
             isAttaching = attaching.busy,
             message = attaching.message
         )
-    }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), SourcePickingUiState(isLoading = true))
+    }.stateInScreen(viewModelScope, reading, SourcePickingUiState(isLoading = true))
 
     /** Искать по названию: пустая строка — снова все коробки. */
     fun search(text: String) {
@@ -125,7 +133,7 @@ class SourcePickingViewModel @AssistedInject constructor(
     }
 
     init {
-        viewModelScope.launch { stored.collect { latest.value = Reading(it) } }
+        reading.listen(viewModelScope, stored) { latest.value = Reading(it) }
     }
 
     /**
@@ -140,10 +148,10 @@ class SourcePickingViewModel @AssistedInject constructor(
         val expired = state.value.packages.firstOrNull { it.packageId == packageId }
             ?.let { pack -> pack.expiredOn?.let { ExpiredSourcePresentationDTO(pack.name, it) } }
         this.attaching.value = attaching.copy(busy = true)
-        viewModelScope.launch {
+        act(failures, undo = { this.attaching.value = attaching }) {
             // Ждём чтение, а не проверяем его наличие: нажатие до первого чтения иначе пропало бы.
             val stored = latest.filterNotNull().first().stored
-                ?: return@launch run { this@SourcePickingViewModel.attaching.value = Attaching() }
+                ?: return@act run { this@SourcePickingViewModel.attaching.value = Attaching() }
             val outcome = if (stored.isDraft) {
                 told(drafting.edit(courseId, stored.revision, listOf(CourseDrafting.Edit.Attach(packageId, 0.doses))), expired)
             } else {

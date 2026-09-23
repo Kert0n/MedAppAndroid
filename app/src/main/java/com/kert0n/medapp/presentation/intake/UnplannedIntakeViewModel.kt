@@ -1,5 +1,9 @@
 package com.kert0n.medapp.presentation.intake
 
+import com.kert0n.medapp.presentation.act
+import com.kert0n.medapp.presentation.ScreenFailures
+import com.kert0n.medapp.presentation.stateInScreen
+import com.kert0n.medapp.presentation.ScreenReading
 import com.kert0n.medapp.presentation.value.ExpiryDatePresentationDTO
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
@@ -45,8 +49,12 @@ class UnplannedIntakeViewModel @AssistedInject constructor(
     private val clock: Clock,
     freshening: Freshening,
     packages: PackageStorageRepository,
-    @Assisted private val packageId: Uuid
+    @Assisted private val packageId: Uuid,
+    private val failures: ScreenFailures = ScreenFailures()
 ) : ViewModel() {
+
+    /** Что экран читает из базы; не прочиталось — говорит об этом и предлагает повторить. */
+    val reading = ScreenReading()
 
     @AssistedFactory
     interface Factory {
@@ -59,7 +67,7 @@ class UnplannedIntakeViewModel @AssistedInject constructor(
     private val recorded = MutableStateFlow(Recording())
 
     /** Коробка, прочитанная после перечитывания (PLAN E4): до него — ожидание. */
-    private val fresh = viewModelScope.readAfter({ freshening.pack(packageId) }) { packages.observe(packageId) }
+    private val fresh = viewModelScope.readAfter(reading, { freshening.pack(packageId) }) { packages.observe(packageId) }
 
     val state: StateFlow<UnplannedIntakeUiState> = combine(fresh, typed, recorded) { fresh, typed, recorded ->
         val pack = (fresh as? Fresh.Read)?.value
@@ -89,7 +97,7 @@ class UnplannedIntakeViewModel @AssistedInject constructor(
                 isRecorded = recorded.recorded
             )
         }
-    }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), UnplannedIntakeUiState(isLoading = true))
+    }.stateInScreen(viewModelScope, reading, UnplannedIntakeUiState(isLoading = true))
 
     /** Правка поля: набранное человеком не затирается ничем, что дочитано из базы (U1). */
     fun edit(form: UnplannedIntakePresentationDTO) {
@@ -109,7 +117,7 @@ class UnplannedIntakeViewModel @AssistedInject constructor(
         // поток, и торопливый палец записал бы подсказку коробки вместо своего числа.
         val form = typed.value ?: state.form
         recorded.value = Recording(busy = true)
-        viewModelScope.launch {
+        act(failures, undo = { recorded.value = Recording() }) {
             when (val parsed = form.parsed(unit, vocabulary.snapshot())) {
                 is ParsedInput.Rejected -> recorded.value = Recording(error = parsed.error)
                 is ParsedInput.Parsed ->

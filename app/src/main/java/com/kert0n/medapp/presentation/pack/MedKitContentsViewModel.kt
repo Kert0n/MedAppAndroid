@@ -1,5 +1,9 @@
 package com.kert0n.medapp.presentation.pack
 
+import com.kert0n.medapp.presentation.act
+import com.kert0n.medapp.presentation.ScreenFailures
+import com.kert0n.medapp.presentation.stateInScreen
+import com.kert0n.medapp.presentation.ScreenReading
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.kert0n.medapp.domain.pack.ExpiryDate
@@ -51,8 +55,12 @@ class MedKitContentsViewModel @AssistedInject constructor(
     medKits: MedKitStorageRepository,
     courses: CourseStorageRepository,
     today: Today,
-    @Assisted private val medKitId: Uuid?
+    @Assisted private val medKitId: Uuid?,
+    private val failures: ScreenFailures = ScreenFailures()
 ) : ViewModel() {
+
+    /** Что экран читает из базы; не прочиталось — говорит об этом и предлагает повторить. */
+    val reading = ScreenReading()
 
     @AssistedFactory
     interface Factory {
@@ -114,9 +122,9 @@ class MedKitContentsViewModel @AssistedInject constructor(
             // Сборка состояния на тысяче коробок стоит около 90 мс (J1) — на главном потоке это
             // пять кадров при каждом открытии. Считается вне его, показывается на нём.
             .flowOn(Dispatchers.Default)
-            .stateIn(
+            .stateInScreen(
                 viewModelScope,
-                SharingStarted.WhileSubscribed(5_000),
+                reading,
                 // Область известна до первого чтения: она пришла ключом. Не сказать её сразу —
                 // показать на миг чужой заголовок.
                 MedKitContentsUiState(isEverywhere = medKitId == null)
@@ -177,7 +185,7 @@ class MedKitContentsViewModel @AssistedInject constructor(
         val now = removing.value
         if (now.step == null || now.working) return
         removing.value = now.copy(working = true)
-        viewModelScope.launch {
+        act(failures, undo = { removing.value = now }) {
             removing.value = when (removal.remove(medKitId, fate)) {
                 MedKitRemoval.Outcome.REMOVED, MedKitRemoval.Outcome.MARKED,
                 MedKitRemoval.Outcome.MED_KIT_GONE -> Removing(removed = true)

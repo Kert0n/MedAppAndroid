@@ -1,5 +1,9 @@
 package com.kert0n.medapp.presentation.operation
 
+import com.kert0n.medapp.presentation.act
+import com.kert0n.medapp.presentation.ScreenFailures
+import com.kert0n.medapp.presentation.stateInScreen
+import com.kert0n.medapp.presentation.ScreenReading
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.kert0n.medapp.feature.operation.OperationDismissing
@@ -27,8 +31,12 @@ import kotlinx.coroutines.launch
 class SyncStatusViewModel @Inject constructor(
     private val refreshing: Refreshing,
     private val dismissing: OperationDismissing,
-    operations: SyncOperationStorageRepository
+    operations: SyncOperationStorageRepository,
+    private val failures: ScreenFailures = ScreenFailures()
 ) : ViewModel() {
+
+    /** Что экран читает из базы; не прочиталось — говорит об этом и предлагает повторить. */
+    val reading = ScreenReading()
 
     private val working = MutableStateFlow(false)
 
@@ -45,7 +53,7 @@ class SyncStatusViewModel @Inject constructor(
                 isOffline = sync.isOffline,
                 isLoaded = true
             )
-        }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), SyncStatusUiState())
+        }.stateInScreen(viewModelScope, reading, SyncStatusUiState())
 
     /**
      * Обновить — это **заход целиком**, а не отправка одной строки: очередь едет вся, и просить
@@ -54,7 +62,7 @@ class SyncStatusViewModel @Inject constructor(
     fun refresh() {
         if (working.value) return
         working.value = true
-        viewModelScope.launch {
+        act(failures) {
             try {
                 refreshing.now()
             } finally {
@@ -70,7 +78,7 @@ class SyncStatusViewModel @Inject constructor(
     fun dismiss(operationId: Uuid) {
         if (working.value) return
         working.value = true
-        viewModelScope.launch {
+        act(failures) {
             try {
                 // Каждый исход сказан, а не проглочен: «разобрано» видно тем, что строка ушла, а
                 // два других человеку объясняются — иначе нажатие выглядит бездействием.

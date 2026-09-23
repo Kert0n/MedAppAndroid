@@ -1,5 +1,7 @@
 package com.kert0n.medapp.presentation.medkit
 
+import com.kert0n.medapp.presentation.act
+import com.kert0n.medapp.presentation.ScreenFailures
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.kert0n.medapp.domain.Unavailability
@@ -28,7 +30,8 @@ import kotlinx.coroutines.launch
  */
 @HiltViewModel
 class MedKitJoiningViewModel @Inject constructor(
-    private val joining: MedKitJoining
+    private val joining: MedKitJoining,
+    private val failures: ScreenFailures = ScreenFailures()
 ) : ViewModel() {
 
     private val _state = MutableStateFlow(MedKitJoiningUiState())
@@ -89,7 +92,7 @@ class MedKitJoiningViewModel @Inject constructor(
             is ParsedInput.Rejected -> _state.value = now.copy(refusal = parsed.error)
             is ParsedInput.Parsed -> {
                 _state.value = now.copy(isWorking = true, refusal = null)
-                viewModelScope.launch { enter(parsed.value) }
+                act(failures, undo = { _state.value = _state.value.copy(isWorking = false) }) { enter(parsed.value) }
             }
         }
     }

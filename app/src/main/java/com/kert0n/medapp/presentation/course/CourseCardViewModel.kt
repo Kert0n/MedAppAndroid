@@ -1,5 +1,9 @@
 package com.kert0n.medapp.presentation.course
 
+import com.kert0n.medapp.presentation.act
+import com.kert0n.medapp.presentation.ScreenFailures
+import com.kert0n.medapp.presentation.stateInScreen
+import com.kert0n.medapp.presentation.ScreenReading
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.kert0n.medapp.domain.course.CourseCoverage
@@ -39,8 +43,12 @@ class CourseCardViewModel @AssistedInject constructor(
     private val offPlanCounting: CourseOffPlanCounting,
     courses: CourseStorageRepository,
     intakes: IntakeStorageRepository,
-    @Assisted private val courseId: Uuid
+    @Assisted private val courseId: Uuid,
+    private val failures: ScreenFailures = ScreenFailures()
 ) : ViewModel() {
+
+    /** Что экран читает из базы; не прочиталось — говорит об этом и предлагает повторить. */
+    val reading = ScreenReading()
 
     @AssistedFactory
     interface Factory {
@@ -65,7 +73,7 @@ class CourseCardViewModel @AssistedInject constructor(
     ) { (record, plan), coverage, reductions, intakes, working ->
         if (record == null) CourseCardUiState(isGone = true)
         else record.toCardUiState(plan, coverage, reductions, intakes, working.first, working.second)
-    }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), CourseCardUiState(isLoading = true))
+    }.stateInScreen(viewModelScope, reading, CourseCardUiState(isLoading = true))
 
     /** Отмена спрашивается: будущие приёмы уйдут, а пачки освободятся (H3, список подтверждений). */
     fun askToCancel() {
@@ -86,7 +94,7 @@ class CourseCardViewModel @AssistedInject constructor(
         val now = cancelling.value
         if (!now.asking || now.working) return
         cancelling.value = now.copy(asking = false, working = true)
-        viewModelScope.launch {
+        act(failures, undo = { cancelling.value = now }) {
             cancelling.value = told(cancellation.cancel(courseId))
         }
     }
@@ -124,7 +132,7 @@ class CourseCardViewModel @AssistedInject constructor(
             return
         }
         counting.value = now.copy(asking = false, working = true)
-        viewModelScope.launch {
+        act(failures, undo = { counting.value = now }) {
             counting.value = told(offPlanCounting.set(courseId, revision, Doses(total)))
         }
     }

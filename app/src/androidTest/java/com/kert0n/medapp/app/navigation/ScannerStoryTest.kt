@@ -1,5 +1,6 @@
 package com.kert0n.medapp.app.navigation
 
+import com.kert0n.medapp.fixture.pressAfterTyping
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.junit4.v2.createAndroidComposeRule
 import androidx.compose.ui.test.onAllNodesWithText
@@ -7,7 +8,6 @@ import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performScrollTo
 import androidx.compose.ui.test.performTextInput
-import androidx.test.espresso.Espresso.closeSoftKeyboard
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import com.kert0n.medapp.HiltTestActivity
 import com.kert0n.medapp.domain.scan.PackageCodes
@@ -134,8 +134,7 @@ class ScannerStoryTest {
         compose.onNodeWithText("Единица").performScrollTo().performClick()
         compose.onNodeWithText("таблетка").performClick()
         compose.onNodeWithText("Количество").performScrollTo().performTextInput("20")
-        closeSoftKeyboard()
-        compose.onNodeWithText("Сохранить").performClick()
+        compose.pressAfterTyping("Сохранить")
     }
 
     /** Заведённая коробка открывается карточкой и лежит на полке — там, где Артём её будет искать. */

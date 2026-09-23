@@ -21,7 +21,6 @@ import com.kert0n.medapp.presentation.ScreenState
 import com.kert0n.medapp.presentation.report.HorizonPreset
 import com.kert0n.medapp.presentation.report.PeriodPreset
 import com.kert0n.medapp.presentation.report.ReportsUiState
-import com.kert0n.medapp.ui.ErrorMessage
 import com.kert0n.medapp.ui.LoadingState
 import java.time.LocalDate
 import kotlin.uuid.Uuid
@@ -86,15 +85,11 @@ fun ReportsScreen(
     }
 }
 
-/**
- * Три вида одного показа: ожидание, отказ и содержимое. Отказ у местных чтений не случается, но
- * показать его есть чем — молчать о нём значило бы оставить человека перед вечным кружком.
- */
+/** Два вида одного показа: ожидание и содержимое. Отказ чтения показывает обёртка оболочки (`Readable`). */
 @Composable
 private fun <T> Report(state: ScreenState<T>, content: @Composable (T) -> Unit) {
     when (state) {
         ScreenState.Loading -> LoadingState()
-        is ScreenState.Failed -> ErrorMessage(state.reason)
         is ScreenState.Ready -> content(state.value)
     }
 }

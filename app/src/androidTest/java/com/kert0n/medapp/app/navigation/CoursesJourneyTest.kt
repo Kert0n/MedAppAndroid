@@ -1,5 +1,6 @@
 package com.kert0n.medapp.app.navigation
 
+import com.kert0n.medapp.fixture.pressAfterTyping
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.junit4.v2.createAndroidComposeRule
 import androidx.compose.ui.test.onAllNodesWithText
@@ -9,7 +10,6 @@ import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performScrollTo
 import androidx.compose.ui.test.performTextInput
 import androidx.compose.ui.test.performTouchInput
-import androidx.test.espresso.Espresso.closeSoftKeyboard
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import com.kert0n.medapp.HiltTestActivity
 import com.kert0n.medapp.fixture.allowNotifications
@@ -116,8 +116,7 @@ class CoursesJourneyTest {
         compose.onNodeWithText("Название").performTextInput("Нурофен")
         compose.onNodeWithText("Заметка (необязательно)").performTextInput("по 2 после еды")
         // Подвал уходит на время ввода: человек убирает клавиатуру, чтобы нажать.
-        closeSoftKeyboard()
-        compose.onNodeWithText("Сохранить").performClick()
+        compose.pressAfterTyping("Сохранить")
 
         // Записанное уводит с формы само: человек заводил лечение, а не форму.
         compose.waitUntil(WAIT) { compose.onAllNodesWithText("Черновики").fetchSemanticsNodes().isNotEmpty() }
@@ -140,8 +139,7 @@ class CoursesJourneyTest {
         compose.onNodeWithText("Название").performTextInput("Нурофен")
         compose.onNodeWithText("Заметка (необязательно)").performTextInput("купить завтра")
         // Подвал уходит на время ввода: человек убирает клавиатуру, чтобы нажать.
-        closeSoftKeyboard()
-        compose.onNodeWithText("Сохранить").performClick()
+        compose.pressAfterTyping("Сохранить")
         compose.waitUntil(WAIT) { compose.onAllNodesWithText("Черновики").fetchSemanticsNodes().isNotEmpty() }
 
         compose.onNodeWithText("Нурофен").performClick()
@@ -184,8 +182,7 @@ class CoursesJourneyTest {
         compose.waitUntil(WAIT) { compose.onAllNodesWithText("Черновики").fetchSemanticsNodes().isNotEmpty() }
         compose.onNodeWithText("Нурофен").performClick()
         // Подвал уходит на время ввода: человек убирает клавиатуру, чтобы нажать.
-        closeSoftKeyboard()
-        compose.onNodeWithText("Начать лечение").performClick()
+        compose.pressAfterTyping("Начать лечение")
 
         // Начатое ведёт на карточку, и первое, что там сказано, — чем лечение обеспечено.
         compose.waitUntil(WAIT) {
@@ -200,8 +197,7 @@ class CoursesJourneyTest {
         compose.onNodeWithText("Записать лечение").performClick()
         compose.onNodeWithText("Название").performTextInput("Нурофен")
         // Подвал уходит на время ввода: человек убирает клавиатуру, чтобы нажать.
-        closeSoftKeyboard()
-        compose.onNodeWithText("Сохранить").performClick()
+        compose.pressAfterTyping("Сохранить")
         compose.waitUntil(WAIT) { compose.onAllNodesWithText("Черновики").fetchSemanticsNodes().isNotEmpty() }
 
         compose.onNodeWithText("Нурофен").performClick()

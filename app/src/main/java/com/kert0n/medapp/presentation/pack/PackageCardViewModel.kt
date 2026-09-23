@@ -1,5 +1,9 @@
 package com.kert0n.medapp.presentation.pack
 
+import com.kert0n.medapp.presentation.act
+import com.kert0n.medapp.presentation.ScreenFailures
+import com.kert0n.medapp.presentation.stateInScreen
+import com.kert0n.medapp.presentation.ScreenReading
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.kert0n.medapp.domain.medkit.MedKitProjection
@@ -52,8 +56,12 @@ class PackageCardViewModel @AssistedInject constructor(
     courses: CourseStorageRepository,
     operations: SyncOperationStorageRepository,
     today: Today,
-    @Assisted private val packageId: Uuid
+    @Assisted private val packageId: Uuid,
+    private val failures: ScreenFailures = ScreenFailures()
 ) : ViewModel() {
+
+    /** Что экран читает из базы; не прочиталось — говорит об этом и предлагает повторить. */
+    val reading = ScreenReading()
 
     @AssistedFactory
     interface Factory {
@@ -63,7 +71,7 @@ class PackageCardViewModel @AssistedInject constructor(
     private val removing = MutableStateFlow(Removing())
 
     /** Коробка, прочитанная после перечитывания (PLAN E4): до него — ожидание. */
-    private val fresh = viewModelScope.readAfter({ freshening.pack(packageId) }) { packages.observe(packageId) }
+    private val fresh = viewModelScope.readAfter(reading, { freshening.pack(packageId) }) { packages.observe(packageId) }
 
     private val days = today.observe()
 
@@ -114,7 +122,7 @@ class PackageCardViewModel @AssistedInject constructor(
             isBusy = removing.busy,
             isRemoved = removing.removed
         )
-    }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), PackageCardUiState())
+    }.stateInScreen(viewModelScope, reading, PackageCardUiState())
 
     fun askToRemove() {
         if (removing.value.working) return
@@ -136,7 +144,7 @@ class PackageCardViewModel @AssistedInject constructor(
         val now = removing.value
         if (!now.asking || now.working) return
         removing.value = now.copy(working = true)
-        viewModelScope.launch {
+        act(failures, undo = { removing.value = now }) {
             removing.value = when (removal.remove(packageId)) {
                 PackageRemoval.Outcome.REMOVED, PackageRemoval.Outcome.GONE -> Removing(removed = true)
                 PackageRemoval.Outcome.MARKED -> Removing()

@@ -1,5 +1,9 @@
 package com.kert0n.medapp.presentation.pack
 
+import com.kert0n.medapp.presentation.act
+import com.kert0n.medapp.presentation.ScreenFailures
+import com.kert0n.medapp.presentation.stateInScreen
+import com.kert0n.medapp.presentation.ScreenReading
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.kert0n.medapp.domain.scan.CodeFormat
@@ -74,8 +78,12 @@ class PackageFormViewModel @AssistedInject constructor(
     private val vocabulary: VocabularyStorageRepository,
     medKits: MedKitStorageRepository,
     today: Today,
-    @Assisted private val opened: Opened
+    @Assisted private val opened: Opened,
+    private val failures: ScreenFailures = ScreenFailures()
 ) : ViewModel() {
+
+    /** Что экран читает из базы; не прочиталось — говорит об этом и предлагает повторить. */
+    val reading = ScreenReading()
 
     /**
      * Откуда экран открыт: с полки (тогда она подставлена), у названной коробки или из сканера — и
@@ -171,9 +179,9 @@ class PackageFormViewModel @AssistedInject constructor(
             isAsking = answers.asking,
             silence = answers.silence
         )
-    }.stateIn(
+    }.stateInScreen(
         viewModelScope,
-        SharingStarted.WhileSubscribed(5_000),
+        reading,
         PackageFormUiState(
             form = form.value,
             isEditing = opened.packageId != null,
@@ -182,9 +190,10 @@ class PackageFormViewModel @AssistedInject constructor(
     )
 
     init {
-        opened.packageId?.let { packageId -> viewModelScope.launch { open(packageId) } }
+        opened.packageId?.let { packageId -> reading.load(viewModelScope) { open(packageId) } }
         opened.scannedCode?.takeIf { it.isNotEmpty() }
-            ?.let { code -> viewModelScope.launch { ask(code) } }
+            // Реестр не ответил из-за телефона — форма остаётся обычной пустой: человек печатает сам.
+            ?.let { code -> act(failures) { ask(code) } }
     }
 
     /**
@@ -263,7 +272,7 @@ class PackageFormViewModel @AssistedInject constructor(
         val now = progress.value
         if (now.isSaving || now.saved != null) return
         progress.value = Progress(isSaving = true)
-        viewModelScope.launch { write() }
+        act(failures, undo = { progress.value = Progress() }) { write() }
     }
 
     private suspend fun open(packageId: Uuid) {

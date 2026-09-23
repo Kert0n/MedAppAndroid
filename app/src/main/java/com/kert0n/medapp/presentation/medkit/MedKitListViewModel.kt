@@ -1,5 +1,7 @@
 package com.kert0n.medapp.presentation.medkit
 
+import com.kert0n.medapp.presentation.stateInScreen
+import com.kert0n.medapp.presentation.ScreenReading
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.kert0n.medapp.presentation.ScreenState
@@ -40,8 +42,11 @@ class MedKitListViewModel @Inject constructor(
     today: Today
 ) : ViewModel() {
 
+    /** Что экран читает из базы; не прочиталось — говорит об этом и предлагает повторить. */
+    val reading = ScreenReading()
+
     /** Список, прочитанный после перечитывания: до него — ожидание. */
-    private val kits = viewModelScope.readAfter(freshening::medKits) {
+    private val kits = viewModelScope.readAfter(reading, freshening::medKits) {
         today.observe().flatMapLatest { day -> medKits.observeAll(day.date) }
     }
 
@@ -52,5 +57,5 @@ class MedKitListViewModel @Inject constructor(
                 is Fresh.Read -> ScreenState.Ready(kits.value.map { it.toPresentationDTO() })
             }
         }
-        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), ScreenState.Loading)
+        .stateInScreen(viewModelScope, reading, ScreenState.Loading)
 }

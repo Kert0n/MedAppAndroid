@@ -1,12 +1,12 @@
 package com.kert0n.medapp.ui.pack
 
+import com.kert0n.medapp.fixture.pressAfterTyping
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.junit4.v2.createComposeRule
 import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performTextInput
-import androidx.test.espresso.Espresso.closeSoftKeyboard
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import com.kert0n.medapp.fixture.PACK
 import com.kert0n.medapp.fixture.pack
@@ -85,8 +85,7 @@ class PackageRecountScreenTest {
 
         compose.onNodeWithText("Пересчитал и увидел").performTextInput("17")
         // Подвал уходит на время ввода: человек убирает клавиатуру, чтобы нажать (H3 «Дизайн»).
-        closeSoftKeyboard()
-        compose.onNodeWithText("Записать").performClick()
+        compose.pressAfterTyping("Записать")
 
         assertEquals(PackageRecountPresentationDTO("17"), edited)
         assertEquals(1, submitted)

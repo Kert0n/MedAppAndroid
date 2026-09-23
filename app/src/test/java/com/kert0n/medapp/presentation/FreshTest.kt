@@ -24,7 +24,7 @@ class FreshTest {
         val base = MutableStateFlow(3)
         var opened = false
 
-        val reading = backgroundScope.readAfter({ answered.await() }) { base.onStart { opened = true } }
+        val reading = backgroundScope.readAfter(ScreenReading(), { answered.await() }) { base.onStart { opened = true } }
         runCurrent()
 
         assertEquals(Fresh.Waiting, reading.value)

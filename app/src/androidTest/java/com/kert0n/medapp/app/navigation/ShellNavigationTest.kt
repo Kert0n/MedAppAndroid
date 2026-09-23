@@ -133,4 +133,24 @@ class ShellNavigationTest {
             compose.waitUntil(WAIT) { compose.onAllNodesWithText(shown).fetchSemanticsNodes().isNotEmpty() }
         }
     }
+
+    @javax.inject.Inject
+    lateinit var failures: com.kert0n.medapp.presentation.ScreenFailures
+
+    /**
+     * Нажатие, которое не сработало из-за телефона, сказано над любым экраном: человек знает, что
+     * не записалось, и повторяет. Без этого он думает, что записал, — или видит закрытое
+     * приложение (ТЗ 4.3).
+     */
+    @Test
+    fun aPressThatDidNotWorkIsToldOverTheScreen() {
+        hilt.inject()
+        compose.setContent { MedAppTheme { MedAppShell() } }
+        compose.waitForIdle()
+
+        failures.report()
+
+        val told = androidx.test.platform.app.InstrumentationRegistry.getInstrumentation().targetContext.getString(com.kert0n.medapp.R.string.failure_action)
+        compose.waitUntil(WAIT) { compose.onAllNodesWithText(told).fetchSemanticsNodes().isNotEmpty() }
+    }
 }

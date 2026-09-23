@@ -1,5 +1,9 @@
 package com.kert0n.medapp.presentation.plan
 
+import com.kert0n.medapp.presentation.act
+import com.kert0n.medapp.presentation.ScreenFailures
+import com.kert0n.medapp.presentation.stateInScreen
+import com.kert0n.medapp.presentation.ScreenReading
 import com.kert0n.medapp.presentation.intake.toPresentationDTO
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
@@ -53,8 +57,12 @@ class MissedIntakesViewModel @Inject constructor(
     reminders: ReminderStorageRepository,
     intakes: IntakeStorageRepository,
     courses: CourseStorageRepository,
-    packages: PackageStorageRepository
+    packages: PackageStorageRepository,
+    private val failures: ScreenFailures = ScreenFailures()
 ) : ViewModel() {
+
+    /** Что экран читает из базы; не прочиталось — говорит об этом и предлагает повторить. */
+    val reading = ScreenReading()
 
     /** Закрытое крестиком — ключами, а не флагом: пропуск следующего дня приходит сам. */
     private val dismissed = MutableStateFlow<Set<NotificationKey>>(emptySet())
@@ -119,7 +127,7 @@ class MissedIntakesViewModel @Inject constructor(
             told = lines.mapTo(HashSet()) { it.key },
             planned = lines.mapNotNull { line -> line.answer?.let { answer -> line.row.intakeId?.let { it to answer } } }.toMap()
         )
-    }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), MissedIntakesUiState())
+    }.stateInScreen(viewModelScope, reading, MissedIntakesUiState())
 
     /**
      * «Принял» за прошлый день: плановая пачка и доза, в момент пункта — тот же сценарий, что
@@ -147,7 +155,7 @@ class MissedIntakesViewModel @Inject constructor(
     private fun answer(intakeId: Uuid, planned: MissedIntakesUiState.Planned, acknowledged: Boolean) {
         if (intakeId in answering.value) return
         answering.update { it + intakeId }
-        viewModelScope.launch {
+        act(failures) {
             try {
                 when (val outcome = confirmation.confirm(intakeId, planned.packageId, planned.amount, planned.at, acknowledged)) {
                     is IntakeConfirmation.Outcome.Confirmed -> Unit
@@ -172,7 +180,7 @@ class MissedIntakesViewModel @Inject constructor(
      */
     fun dismiss(told: Set<NotificationKey>) {
         dismissed.update { it + told }
-        viewModelScope.launch { outbox.bannerShown(told) }
+        act(failures, undo = { dismissed.update { it - told } }) { outbox.bannerShown(told) }
     }
 
     private data class Line(val key: NotificationKey, val row: DayItemPresentationDTO, val answer: MissedIntakesUiState.Planned?)

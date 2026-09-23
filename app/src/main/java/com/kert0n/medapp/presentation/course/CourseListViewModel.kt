@@ -1,5 +1,7 @@
 package com.kert0n.medapp.presentation.course
 
+import com.kert0n.medapp.presentation.stateInScreen
+import com.kert0n.medapp.presentation.ScreenReading
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.kert0n.medapp.presentation.ScreenState
@@ -23,6 +25,9 @@ import kotlinx.coroutines.flow.stateIn
 @HiltViewModel
 class CourseListViewModel @Inject constructor(courses: CourseStorageRepository) : ViewModel() {
 
+    /** Что экран читает из базы; не прочиталось — говорит об этом и предлагает повторить. */
+    val reading = ScreenReading()
+
     val state: StateFlow<ScreenState<CourseListPresentationDTO>> = combine(
         courses.observeRecords(),
         courses.observeDrafts(),
@@ -36,5 +41,5 @@ class CourseListViewModel @Inject constructor(courses: CourseStorageRepository) 
                 finished = closed.sortedByDescending { it.closedAt }.map { it.toPresentationDTO(coverage = null) }
             )
         )
-    }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), ScreenState.Loading)
+    }.stateInScreen(viewModelScope, reading, ScreenState.Loading)
 }

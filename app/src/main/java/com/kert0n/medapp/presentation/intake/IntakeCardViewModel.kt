@@ -1,5 +1,9 @@
 package com.kert0n.medapp.presentation.intake
 
+import com.kert0n.medapp.presentation.act
+import com.kert0n.medapp.presentation.ScreenFailures
+import com.kert0n.medapp.presentation.stateInScreen
+import com.kert0n.medapp.presentation.ScreenReading
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.kert0n.medapp.domain.course.CourseSource
@@ -68,8 +72,12 @@ class IntakeCardViewModel @AssistedInject constructor(
     courses: CourseStorageRepository,
     intakes: IntakeStorageRepository,
     packages: PackageStorageRepository,
-    @Assisted private val intakeId: Uuid
+    @Assisted private val intakeId: Uuid,
+    private val failures: ScreenFailures = ScreenFailures()
 ) : ViewModel() {
+
+    /** Что экран читает из базы; не прочиталось — говорит об этом и предлагает повторить. */
+    val reading = ScreenReading()
 
     @AssistedFactory
     interface Factory {
@@ -96,7 +104,7 @@ class IntakeCardViewModel @AssistedInject constructor(
         }
 
     /** Пункт с источниками, прочитанный после перечитывания их коробок (PLAN E4). */
-    private val fresh = viewModelScope.readAfter({
+    private val fresh = viewModelScope.readAfter(reading, {
         val sources = episode.first().second?.second.orEmpty()
         freshening.packs(sources.mapTo(HashSet()) { it.pkg.id })
     }) { episode }
@@ -138,7 +146,7 @@ class IntakeCardViewModel @AssistedInject constructor(
         // Пункта нет — расписание перестроили, пока карточку держали открытой: показывать нечего.
         if (intake == null || title == null) IntakeCardUiState(isGone = true)
         else intake.card(title, episode.second.orEmpty(), day.zone, typed, writing, expiries).copy(isLoading = !freshened)
-    }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), IntakeCardUiState(isLoading = true))
+    }.stateInScreen(viewModelScope, reading, IntakeCardUiState(isLoading = true))
 
     fun edit(form: IntakeCardPresentationDTO) {
         typed.value = form
@@ -162,7 +170,7 @@ class IntakeCardViewModel @AssistedInject constructor(
         val form = typed.value ?: shown.form
         val pkg = form.packageId?.takeIf { id -> id == shown.packageId || shown.sources.any { it.id == id } } ?: return
         writing.value = Writing(busy = true)
-        viewModelScope.launch {
+        act(failures, undo = { writing.value = Writing() }) {
             val known = vocabulary.snapshot()
             when (val parsed = QuantityPresentationDTO(form.amount, unit).toDomain(known)) {
                 is ParsedInput.Rejected -> writing.value = Writing(error = IntakeCardError.Amount(parsed.error))
@@ -197,7 +205,7 @@ class IntakeCardViewModel @AssistedInject constructor(
         if (!shown.canDecline) return
         val form = typed.value ?: shown.form
         writing.value = Writing(busy = true)
-        viewModelScope.launch {
+        act(failures, undo = { writing.value = Writing() }) {
             val at = moment(form, today.observe().first().zone)
             writing.value = told(declining.decline(intakeId, at))
         }

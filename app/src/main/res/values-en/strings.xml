@@ -7,7 +7,8 @@
     <string name="failure_no_connection">No connection to the server. Check your network.</string>
     <string name="failure_server_unavailable">The server is not responding. Try again later.</string>
     <string name="failure_not_authorized">The server did not accept this device\'s account.</string>
-    <string name="failure_device_storage">Could not save data on this device.</string>
+    <string name="failure_device_storage">Could not reach the data on this device.</string>
+    <string name="failure_action">That did not work. Please try again.</string>
 
     <!-- Bottom navigation: labels of up to seven letters (PLAN H3) -->
     <string name="tab_med_kits">Kits</string>

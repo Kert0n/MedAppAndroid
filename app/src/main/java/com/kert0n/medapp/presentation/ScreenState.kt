@@ -1,11 +1,10 @@
 package com.kert0n.medapp.presentation
 
-import com.kert0n.medapp.domain.Unavailability
-
 /**
- * Что экран показывает вместо содержимого, пока содержимого нет. Случая три, и человек различает
- * их по тому, что может сделать: при [Loading] — ждать, при [Failed] — нажать «повторить», при
- * [Ready] — читать и действовать.
+ * Что экран показывает, пока содержимого нет и когда оно есть. Случая два, и человек различает их
+ * по тому, что может сделать: при [Loading] — ждать, при [Ready] — читать и действовать. Отказ
+ * чтения здесь не живёт: у него свой владелец — `ScreenReading`, и экран показывает его обёрткой
+ * оболочки, одинаковой для всех экранов.
  *
  * «Пусто» отдельным случаем не заводится: пустой список — это [Ready] с пустым содержимым, и
  * различает их экран, а не состояние. Завести четвёртый случай значило бы спрашивать у каждого
@@ -14,9 +13,6 @@ import com.kert0n.medapp.domain.Unavailability
 sealed interface ScreenState<out T> {
 
     data object Loading : ScreenState<Nothing>
-
-    /** Не вышло, и названа причина: текст по ней берёт экран из `R.string.*`. */
-    data class Failed(val reason: Unavailability) : ScreenState<Nothing>
 
     data class Ready<T>(val value: T) : ScreenState<T>
 }

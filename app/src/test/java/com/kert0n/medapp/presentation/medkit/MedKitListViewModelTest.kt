@@ -79,4 +79,35 @@ class MedKitListViewModelTest {
 
         assertEquals(listOf("/v1/med-kits"), server.asked)
     }
+
+    /**
+     * База не прочиталась — испорченный файл, диск, отказавший на чтении, — и экран говорит, что
+     * данные устройства не читаются, предлагая повторить, а приложение остаётся открытым (ТЗ 4.3).
+     *
+     * Красная проверка: сбой потока базы улетает из `viewModelScope` необработанным — на телефоне
+     * это падение процесса, а список так и ждёт.
+     */
+    @Test
+    fun aListThatCannotBeReadSaysSoAndTheAppStays() {
+        val broken = object : com.kert0n.medapp.storage.medkit.MedKitStorageRepository by medKits {
+            override fun observeAll(today: java.time.LocalDate) =
+                kotlinx.coroutines.flow.flow<List<com.kert0n.medapp.domain.medkit.MedKitProjection>> { throw IllegalStateException("file is not a database") }
+        }
+        val escaped = mutableListOf<Throwable>()
+        val before = Thread.getDefaultUncaughtExceptionHandler()
+        Thread.setDefaultUncaughtExceptionHandler { _, e -> escaped += e }
+        val failed = try {
+            val model = MedKitListViewModel(
+                com.kert0n.medapp.fixture.offlineFreshening(com.kert0n.medapp.fixture.FakePackages(), clock),
+                broken,
+                Today(clock, QuietClock)
+            )
+            watching(model.state) { model.reading.failed.awaiting(timeout = kotlin.time.Duration.parse("2s")) { it != null } }
+        } finally {
+            Thread.setDefaultUncaughtExceptionHandler(before)
+        }
+
+        assertEquals("сбой улетел мимо экрана: $escaped", emptyList<Throwable>(), escaped)
+        assertEquals(com.kert0n.medapp.domain.Unavailability.DEVICE_STORAGE, failed)
+    }
 }
