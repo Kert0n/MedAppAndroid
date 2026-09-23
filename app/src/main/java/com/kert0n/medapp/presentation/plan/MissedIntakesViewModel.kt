@@ -197,8 +197,8 @@ data class MissedIntakesUiState(
     /** Плановое строк, у которых есть быстрый ответ, — по номеру пункта. */
     val planned: Map<Uuid, Planned> = emptyMap()
 ) {
-    /** Сказать нечего: ни строк, ни ответа, который человек ещё не прочёл. */
-    val isEmpty: Boolean get() = rows.isEmpty() && message == null
+    /** Сказать нечего: ни строк, ни ответа, который человек ещё не прочёл, ни открытого вопроса. */
+    val isEmpty: Boolean get() = rows.isEmpty() && message == null && question == null
 
     /** Что записывает «Принял»: плановая пачка и доза, в момент пункта. */
     data class Planned(val packageId: Uuid, val amount: Dose, val at: Instant)
