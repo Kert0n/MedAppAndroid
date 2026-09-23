@@ -111,6 +111,27 @@ class PackageQueryDaoTest {
         assertEquals(emptyList<String>(), names(PackageQuery(text = "аспирин")))
     }
 
+    /**
+     * Человек ищет название, как его помнит: «мед» и «мёд» для него одно слово, а «5%» — текст с
+     * упаковки, а не шаблон. Поиск находит то, что человек имел в виду, а не всё подряд.
+     *
+     * Красная проверка: текст шёл в `LIKE` как есть — `%` и `_` работали шаблонами, и «5%» находил
+     * всё, где есть пятёрка; «ё» и «е» сравнивались как разные буквы.
+     */
+    @Test
+    fun searchTakesTheTypedTextLiterallyAndYoIsYe() = runTest {
+        packages.save(pack(id = id(11), name = "Мёд с лимоном", quantity = tablets("10")))
+        packages.save(pack(id = id(12), name = "Раствор 5%", quantity = tablets("10")))
+        packages.save(pack(id = id(13), name = "Магний 50 мг", quantity = tablets("10")))
+        packages.save(pack(id = id(14), name = "Ёжик-витамин", quantity = tablets("10")))
+
+        assertEquals(listOf("Раствор 5%"), names(PackageQuery(text = "5%")))
+        assertEquals(emptyList<String>(), names(PackageQuery(text = "_агний")))
+        assertEquals(listOf("Мёд с лимоном"), names(PackageQuery(text = "мед")))
+        assertEquals(listOf("Мёд с лимоном"), names(PackageQuery(text = "Мёд")))
+        assertEquals(listOf("Ёжик-витамин"), names(PackageQuery(text = "ежик")))
+    }
+
     @Test
     fun everyFilterSelectsItsOwn() = runTest {
         assertEquals(
