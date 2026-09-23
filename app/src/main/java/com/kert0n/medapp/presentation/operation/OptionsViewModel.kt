@@ -1,5 +1,7 @@
 package com.kert0n.medapp.presentation.operation
 
+import com.kert0n.medapp.presentation.stateInScreen
+import com.kert0n.medapp.presentation.ScreenReading
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.kert0n.medapp.domain.notification.NotificationReadiness
@@ -30,12 +32,15 @@ class OptionsViewModel @Inject constructor(
     private val languages: AppLanguages
 ) : ViewModel() {
 
+    /** Что экран читает из базы; не прочиталось — говорит об этом и предлагает повторить. */
+    val reading = ScreenReading()
+
     private val system = MutableStateFlow(readSystem())
 
     val state: StateFlow<OptionsPresentationDTO> =
         combine(operations.observeTroubles(), system) { troubles, (trouble, language) ->
             OptionsPresentationDTO(outstanding = troubles.size, permissionsTrouble = trouble, language = language)
-        }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), OptionsPresentationDTO())
+        }.stateInScreen(viewModelScope, reading, OptionsPresentationDTO())
 
     /** Человек вернулся — из системных настроек или с экрана языка: спрашиваем систему заново. */
     fun refresh() {

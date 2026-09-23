@@ -1,5 +1,9 @@
 package com.kert0n.medapp.presentation.medkit
 
+import com.kert0n.medapp.presentation.act
+import com.kert0n.medapp.presentation.ScreenFailures
+import com.kert0n.medapp.presentation.stateInScreen
+import com.kert0n.medapp.presentation.ScreenReading
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.kert0n.medapp.domain.Unavailability
@@ -44,8 +48,12 @@ class MedKitSharingViewModel @AssistedInject constructor(
     private val invitations: MedKitInvitation,
     medKits: MedKitStorageRepository,
     today: Today,
-    @Assisted private val medKitId: Uuid
+    @Assisted private val medKitId: Uuid,
+    private val failures: ScreenFailures = ScreenFailures()
 ) : ViewModel() {
+
+    /** Что экран читает из базы; не прочиталось — говорит об этом и предлагает повторить. */
+    val reading = ScreenReading()
 
     @AssistedFactory
     interface Factory {
@@ -60,7 +68,7 @@ class MedKitSharingViewModel @AssistedInject constructor(
 
     val state: StateFlow<MedKitSharingUiState> = combine(shelf, own) { (zone, shelf), own ->
         shelf?.let { own.over(it, zone) } ?: MedKitSharingUiState.Gone
-    }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), MedKitSharingUiState.Loading)
+    }.stateInScreen(viewModelScope, reading, MedKitSharingUiState.Loading)
 
     /** Спросить перед необратимым: и публикация, и выдача ключа спрашивают (PLAN H3). */
     fun ask() {
@@ -78,7 +86,7 @@ class MedKitSharingViewModel @AssistedInject constructor(
     fun publish() {
         if (own.value.isWorking) return
         own.value = own.value.copy(isAsking = false, isWorking = true, refusal = null)
-        viewModelScope.launch {
+        act(failures, undo = { own.value = own.value.copy(isWorking = false) }) {
             own.value = when (publishing.publish(medKitId)) {
                 // Полка помечена, и её новое состояние принесёт чтение: показывать его отсюда
                 // значило бы завести второй источник правды о той же полке.
@@ -103,7 +111,7 @@ class MedKitSharingViewModel @AssistedInject constructor(
     fun invite() {
         if (own.value.isWorking) return
         own.value = own.value.copy(isAsking = false, isWorking = true, refusal = null)
-        viewModelScope.launch {
+        act(failures, undo = { own.value = own.value.copy(isWorking = false) }) {
             own.value = when (val outcome = invitations.invite(medKitId)) {
                 is MedKitInvitation.Outcome.Invited -> own.value.settled().copy(invitation = outcome.invitation)
                 MedKitInvitation.Outcome.MedKitGone -> own.value.settled()

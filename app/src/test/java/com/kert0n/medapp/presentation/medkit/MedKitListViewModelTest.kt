@@ -96,18 +96,18 @@ class MedKitListViewModelTest {
         val escaped = mutableListOf<Throwable>()
         val before = Thread.getDefaultUncaughtExceptionHandler()
         Thread.setDefaultUncaughtExceptionHandler { _, e -> escaped += e }
-        val state = try {
+        val failed = try {
             val model = MedKitListViewModel(
                 com.kert0n.medapp.fixture.offlineFreshening(com.kert0n.medapp.fixture.FakePackages(), clock),
                 broken,
                 Today(clock, QuietClock)
             )
-            watching(model.state) { it.awaiting(timeout = kotlin.time.Duration.parse("2s")) { s -> s !is ScreenState.Loading } }
+            watching(model.state) { model.reading.failed.awaiting(timeout = kotlin.time.Duration.parse("2s")) { it != null } }
         } finally {
             Thread.setDefaultUncaughtExceptionHandler(before)
         }
 
         assertEquals("сбой улетел мимо экрана: $escaped", emptyList<Throwable>(), escaped)
-        assertEquals(ScreenState.Failed(com.kert0n.medapp.domain.Unavailability.DEVICE_STORAGE), state)
+        assertEquals(com.kert0n.medapp.domain.Unavailability.DEVICE_STORAGE, failed)
     }
 }

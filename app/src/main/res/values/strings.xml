@@ -7,7 +7,8 @@
     <string name="failure_no_connection">Нет связи с сервером. Проверьте подключение.</string>
     <string name="failure_server_unavailable">Сервер не отвечает. Попробуйте позже.</string>
     <string name="failure_not_authorized">Сервер не принял учётную запись этого устройства.</string>
-    <string name="failure_device_storage">Не удалось сохранить данные на устройстве.</string>
+    <string name="failure_device_storage">Не удалось обратиться к данным на устройстве.</string>
+    <string name="failure_action">Не получилось. Попробуйте ещё раз.</string>
 
     <!-- Нижняя навигация -->
     <string name="tab_med_kits">Аптечки</string>

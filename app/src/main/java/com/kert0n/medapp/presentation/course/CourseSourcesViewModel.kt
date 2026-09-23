@@ -1,5 +1,9 @@
 package com.kert0n.medapp.presentation.course
 
+import com.kert0n.medapp.presentation.act
+import com.kert0n.medapp.presentation.ScreenFailures
+import com.kert0n.medapp.presentation.stateInScreen
+import com.kert0n.medapp.presentation.ScreenReading
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.kert0n.medapp.domain.course.CourseCoverage
@@ -58,8 +62,12 @@ class CourseSourcesViewModel @AssistedInject constructor(
     packages: PackageStorageRepository,
     medKits: MedKitStorageRepository,
     today: Today,
-    @Assisted private val courseId: Uuid
+    @Assisted private val courseId: Uuid,
+    private val failures: ScreenFailures = ScreenFailures()
 ) : ViewModel() {
+
+    /** Что экран читает из базы; не прочиталось — говорит об этом и предлагает повторить. */
+    val reading = ScreenReading()
 
     @AssistedFactory
     interface Factory {
@@ -149,11 +157,10 @@ class CourseSourcesViewModel @AssistedInject constructor(
                 message = writing.message
             )
         }
-    }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), CourseSourcesUiState(isLoading = true))
+    }.stateInScreen(viewModelScope, reading, CourseSourcesUiState(isLoading = true))
 
     init {
-        viewModelScope.launch {
-            stored.collect { fresh ->
+        reading.listen(viewModelScope, stored) { fresh ->
                 latest.value = Reading(fresh)
                 // Состав сменился — правка начинается заново: она была о прежнем составе, и
                 // после нашей же записи, и после чужой. **Вопрос уходит вместе с ней**: он был о
@@ -164,7 +171,6 @@ class CourseSourcesViewModel @AssistedInject constructor(
                     editing.value = fresh?.let { Editing(it.revision, it.sources) }
                     writing.value = writing.value.copy(asksToDetach = null)
                 }
-            }
         }
     }
 
@@ -239,13 +245,13 @@ class CourseSourcesViewModel @AssistedInject constructor(
     fun save() {
         if (writing.value.busy) return
         writing.value = writing.value.copy(busy = true, message = null)
-        viewModelScope.launch {
+        act(failures, undo = { writing.value = writing.value.copy(busy = false) }) {
             val reading = latest.filterNotNull().first()
             val stored = reading.stored
             val wanted = editing.value?.sources
             if (stored == null || wanted == null || wanted == stored.sources) {
                 writing.value = writing.value.copy(busy = false)
-                return@launch
+                return@act
             }
             val outcome = if (stored.isDraft) {
                 told(drafting.edit(courseId, stored.revision, editsFrom(stored.sources, wanted)))

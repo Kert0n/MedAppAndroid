@@ -1,5 +1,9 @@
 package com.kert0n.medapp.presentation.pack
 
+import com.kert0n.medapp.presentation.act
+import com.kert0n.medapp.presentation.ScreenFailures
+import com.kert0n.medapp.presentation.stateInScreen
+import com.kert0n.medapp.presentation.ScreenReading
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.kert0n.medapp.feature.operation.Freshening
@@ -42,8 +46,12 @@ class PackageRecountViewModel @AssistedInject constructor(
     freshening: Freshening,
     private val vocabulary: VocabularyStorageRepository,
     packages: PackageStorageRepository,
-    @Assisted private val packageId: Uuid
+    @Assisted private val packageId: Uuid,
+    private val failures: ScreenFailures = ScreenFailures()
 ) : ViewModel() {
+
+    /** Что экран читает из базы; не прочиталось — говорит об этом и предлагает повторить. */
+    val reading = ScreenReading()
 
     @AssistedFactory
     interface Factory {
@@ -60,7 +68,7 @@ class PackageRecountViewModel @AssistedInject constructor(
      * то, что уже было величиной. Прочитана или ещё нет — часть ответа: `null` внутри [Fresh.Read]
      * значит «коробки нет», а само отсутствие чтения не значит ничего.
      */
-    private val seen = viewModelScope.readAfter({ freshening.pack(packageId) }) { packages.observe(packageId) }
+    private val seen = viewModelScope.readAfter(reading, { freshening.pack(packageId) }) { packages.observe(packageId) }
 
     val state: StateFlow<PackageRecountUiState> = combine(seen, form, progress) { reading, form, progress ->
         val pack = (reading as? Fresh.Read)?.value
@@ -72,7 +80,7 @@ class PackageRecountViewModel @AssistedInject constructor(
             error = progress.error,
             isDone = progress.done
         )
-    }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), PackageRecountUiState())
+    }.stateInScreen(viewModelScope, reading, PackageRecountUiState())
 
     /** Ввод снимает отказ: человек уже правит то, на что ему указали. */
     fun edit(edited: PackageRecountPresentationDTO) {
@@ -89,7 +97,7 @@ class PackageRecountViewModel @AssistedInject constructor(
         val now = progress.value
         if (now.working || now.done) return
         progress.value = Progress(working = true)
-        viewModelScope.launch {
+        act(failures, undo = { progress.value = Progress() }) {
             progress.value = when (val parsed = parse()) {
                 is ParsedInput.Rejected -> Progress(error = parsed.error)
                 is ParsedInput.Parsed -> when (adjusting.adjust(packageId, parsed.value)) {

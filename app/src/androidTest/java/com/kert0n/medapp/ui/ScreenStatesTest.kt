@@ -1,5 +1,6 @@
 package com.kert0n.medapp.ui
 
+import androidx.compose.ui.test.onAllNodesWithText
 import androidx.compose.ui.test.assertHasClickAction
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.junit4.v2.createComposeRule
@@ -74,5 +75,32 @@ class ScreenStatesTest {
         compose.onNodeWithText("Завести").performClick()
 
         assertEquals(1, created)
+    }
+
+    /**
+     * Экран, чьё чтение не удалось, заменён словами о причине, «Повторить» и «Назад»: без этого
+     * человек смотрит на вечную загрузку и выйти может только из приложения. Повтор возвращает
+     * экран, как только чтение прошло.
+     */
+    @Test
+    fun aScreenThatCouldNotReadSaysSoAndComesBackOnRetry() {
+        val reading = com.kert0n.medapp.presentation.ScreenReading()
+        var reads = 0
+        kotlinx.coroutines.runBlocking {
+            reading.load(kotlinx.coroutines.CoroutineScope(kotlinx.coroutines.SupervisorJob())) {
+                reads++
+                if (reads == 1) throw IllegalStateException("disk I/O error")
+            }.join()
+        }
+        var back = 0
+        compose.setContent { MedAppTheme { Readable(reading, onBack = { back++ }) { androidx.compose.material3.Text("Содержимое") } } }
+
+        compose.onNodeWithText("Не удалось обратиться к данным на устройстве.").assertIsDisplayed()
+        compose.onNodeWithContentDescription("Назад").performClick()
+        assertEquals(1, back)
+
+        compose.onNodeWithText("Повторить").performClick()
+        compose.waitUntil(5_000) { compose.onAllNodesWithText("Содержимое").fetchSemanticsNodes().isNotEmpty() }
+        assertEquals(2, reads)
     }
 }

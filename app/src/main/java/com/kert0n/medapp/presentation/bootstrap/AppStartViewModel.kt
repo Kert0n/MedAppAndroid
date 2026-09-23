@@ -1,5 +1,8 @@
 package com.kert0n.medapp.presentation.bootstrap
 
+import com.kert0n.medapp.presentation.act
+import com.kert0n.medapp.presentation.ScreenFailures
+import com.kert0n.medapp.domain.Unavailability
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.kert0n.medapp.feature.account.AccountReplacement
@@ -28,7 +31,8 @@ import kotlinx.coroutines.launch
 @HiltViewModel
 class AppStartViewModel @Inject constructor(
     private val start: AppStart,
-    private val replacement: AccountReplacement
+    private val replacement: AccountReplacement,
+    private val failures: ScreenFailures = ScreenFailures()
 ) : ViewModel() {
 
     private val _state = MutableStateFlow<AppStartState>(AppStartState.Checking)
@@ -53,7 +57,9 @@ class AppStartViewModel @Inject constructor(
 
     private fun attempt(outcome: suspend () -> AppStart.Outcome) {
         if (attempt?.isActive == true) return
-        attempt = viewModelScope.launch {
+        // Устройство не прочитало или не записало учётку — это тот же отказ, что у ненайденного
+        // ключа: сказать причину и дать повторить, а не закрыть приложение (ТЗ 4.3).
+        attempt = act(failures, undo = { _state.value = AppStartState.Setup(Unavailability.DEVICE_STORAGE) }) {
             _state.value = AppStartState.Checking
             _state.value = outcome().toAppStartState()
         }

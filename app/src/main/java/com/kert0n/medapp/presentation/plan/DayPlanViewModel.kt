@@ -1,5 +1,9 @@
 package com.kert0n.medapp.presentation.plan
 
+import com.kert0n.medapp.presentation.act
+import com.kert0n.medapp.presentation.ScreenFailures
+import com.kert0n.medapp.presentation.stateInScreen
+import com.kert0n.medapp.presentation.ScreenReading
 import com.kert0n.medapp.presentation.intake.toPresentationDTO
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
@@ -51,8 +55,12 @@ class DayPlanViewModel @Inject constructor(
     private val declining: IntakeDeclining,
     private val devicePermissions: DevicePermissions,
     private val readiness: NotificationReadiness,
-    private val clock: Clock
+    private val clock: Clock,
+    private val failures: ScreenFailures = ScreenFailures()
 ) : ViewModel() {
+
+    /** Что экран читает из базы; не прочиталось — говорит об этом и предлагает повторить. */
+    val reading = ScreenReading()
 
     private val readings = mutableMapOf<Int, StateFlow<Reading?>>()
 
@@ -107,7 +115,7 @@ class DayPlanViewModel @Inject constructor(
         combine(reading(daysAhead), answering, message, question) { reading, answering, message, question ->
             if (reading == null) ScreenState.Loading
             else ScreenState.Ready(reading.plan.toPresentationDTO(daysAhead, reading.zone, answering, message).copy(question = question))
-        }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), ScreenState.Loading)
+        }.stateInScreen(viewModelScope, reading, ScreenState.Loading)
     }
 
     /**
@@ -121,7 +129,7 @@ class DayPlanViewModel @Inject constructor(
         // коробку на карточке. Кнопки у такой строки нет вовсе — нажимать нечего.
         val planned = plannedOf(intakeId) ?: return
         answering.value = answering.value + intakeId
-        viewModelScope.launch {
+        act(failures) {
             try {
                 told(planned, confirmation.confirm(intakeId, planned.packageId, planned.amount, clock.instant(), acknowledged))
             } finally {
@@ -142,7 +150,7 @@ class DayPlanViewModel @Inject constructor(
     fun decline(intakeId: Uuid) {
         if (intakeId in answering.value) return
         answering.value = answering.value + intakeId
-        viewModelScope.launch {
+        act(failures) {
             try {
                 told(declining.decline(intakeId, clock.instant()))
             } finally {
@@ -210,7 +218,7 @@ class DayPlanViewModel @Inject constructor(
 
     private fun reading(daysAhead: Int): StateFlow<Reading?> = readings.getOrPut(daysAhead) {
         combine(today.observe(), planning.observe(daysAhead)) { day, plan -> Reading(plan, day.zone) }
-            .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), null)
+            .stateInScreen(viewModelScope, reading, null)
     }
 
     /** План дня и зона, в которой его читают: вместе, потому что порознь они врозь и устаревают. */

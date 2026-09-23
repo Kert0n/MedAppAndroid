@@ -1,5 +1,8 @@
 package com.kert0n.medapp.presentation.settings
 
+import com.kert0n.medapp.presentation.act
+import com.kert0n.medapp.presentation.ScreenFailures
+import com.kert0n.medapp.presentation.ScreenReading
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.kert0n.medapp.feature.settings.AppSettings
@@ -24,15 +27,19 @@ import kotlinx.coroutines.launch
 @HiltViewModel
 class SettingsViewModel @Inject constructor(
     private val store: SettingsStore,
-    private val changing: SettingsChanging
+    private val changing: SettingsChanging,
+    private val failures: ScreenFailures = ScreenFailures()
 ) : ViewModel() {
+
+    /** Что экран читает из базы; не прочиталось — говорит об этом и предлагает повторить. */
+    val reading = ScreenReading()
 
     private val _state = MutableStateFlow<SettingsUiState>(SettingsUiState.Loading)
 
     val state: StateFlow<SettingsUiState> = _state.asStateFlow()
 
     init {
-        viewModelScope.launch {
+        reading.load(viewModelScope) {
             _state.value = SettingsUiState.Editing(store.observe().first().toFormPresentationDTO())
         }
     }
@@ -58,7 +65,9 @@ class SettingsViewModel @Inject constructor(
             is ParsedInput.Parsed -> {
                 val saving = editing.copy(error = null, isSaving = true)
                 _state.value = saving
-                viewModelScope.launch { write(saving, parsed.value) }
+                act(failures, undo = { (_state.value as? SettingsUiState.Editing)?.let { _state.value = it.copy(isSaving = false) } }) {
+                    write(saving, parsed.value)
+                }
             }
         }
     }

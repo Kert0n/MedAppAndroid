@@ -1,5 +1,9 @@
 package com.kert0n.medapp.presentation.course
 
+import com.kert0n.medapp.presentation.act
+import com.kert0n.medapp.presentation.ScreenFailures
+import com.kert0n.medapp.presentation.stateInScreen
+import com.kert0n.medapp.presentation.ScreenReading
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.kert0n.medapp.domain.course.CourseDraftProjection
@@ -52,8 +56,12 @@ class CourseFormViewModel @AssistedInject constructor(
     private val vocabulary: VocabularyStorageRepository,
     private val today: Today,
     private val clock: Clock,
-    @Assisted private val courseId: Uuid?
+    @Assisted private val courseId: Uuid?,
+    private val failures: ScreenFailures = ScreenFailures()
 ) : ViewModel() {
+
+    /** Что экран читает из базы; не прочиталось — говорит об этом и предлагает повторить. */
+    val reading = ScreenReading()
 
     @AssistedFactory
     interface Factory {
@@ -86,7 +94,7 @@ class CourseFormViewModel @AssistedInject constructor(
                 forms = forms.map { it.toPresentationDTO() }
             ).dated()
         } else state
-    }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), editing.value.let { if (it is CourseFormUiState.Editing) it.dated() else it })
+    }.stateInScreen(viewModelScope, reading, editing.value.let { if (it is CourseFormUiState.Editing) it.dated() else it })
 
     /**
      * Сегодня в зоне расписания — там же, где его считает домен (`CourseSchedule.startsBefore`):
@@ -95,8 +103,8 @@ class CourseFormViewModel @AssistedInject constructor(
     private fun CourseFormUiState.Editing.dated() = copy(today = clock.instant().atZone(form.zone).toLocalDate())
 
     init {
-        if (courseId != null) viewModelScope.launch { open(courseId) }
-        viewModelScope.launch { courses.observeDrafts().collect { drafts -> rebase(drafts) } }
+        if (courseId != null) reading.load(viewModelScope) { open(courseId) }
+        reading.listen(viewModelScope, courses.observeDrafts()) { drafts -> rebase(drafts) }
     }
 
     /**
@@ -129,7 +137,7 @@ class CourseFormViewModel @AssistedInject constructor(
         if (current.isBusy || current.isSaved) return
         val saving = current.copy(error = null, isSaving = true)
         editing.value = saving
-        viewModelScope.launch {
+        act(failures, undo = { (editing.value as? CourseFormUiState.Editing)?.let { editing.value = it.copy(isSaving = false) } }) {
             when (val parsed = current.form.parsed(vocabulary.snapshot())) {
                 is ParsedInput.Rejected -> editing.value = saving.copy(isSaving = false, error = parsed.error)
                 is ParsedInput.Parsed -> write(saving, parsed.value)
@@ -153,11 +161,11 @@ class CourseFormViewModel @AssistedInject constructor(
         current.plan?.let { editing.value = current.copy(sourcesOf = it.id); return }
         val saving = current.copy(error = null, isSaving = true)
         editing.value = saving
-        viewModelScope.launch {
+        act(failures, undo = { (editing.value as? CourseFormUiState.Editing)?.let { editing.value = it.copy(isSaving = false) } }) {
             when (val parsed = current.form.parsed(vocabulary.snapshot())) {
                 is ParsedInput.Rejected -> editing.value = saving.copy(isSaving = false, error = parsed.error)
                 is ParsedInput.Parsed -> {
-                    val written = written(saving, parsed.value) ?: return@launch
+                    val written = written(saving, parsed.value) ?: return@act
                     editing.value = saving.copy(
                         // С этой минуты редактор правит записанное: второй раз заводить его
                         // нельзя. Открытый из списка черновик остаётся собой — уходит он молча.
@@ -225,7 +233,7 @@ class CourseFormViewModel @AssistedInject constructor(
         // Номер берётся у записанного: у нового черновика ключа маршрута нет, а запись уже есть.
         val id = current.stored?.id ?: courseId ?: return
         editing.value = current.copy(asksToDiscard = false, asksToLeave = false, isDiscarding = true)
-        viewModelScope.launch {
+        act(failures, undo = { (editing.value as? CourseFormUiState.Editing)?.let { editing.value = it.copy(isDiscarding = false) } }) {
             // Удалять нечего — черновика уже нет: итог для человека тот же, экран уходит.
             drafting.discard(id)
             editing.value =
@@ -343,11 +351,11 @@ class CourseFormViewModel @AssistedInject constructor(
         if (current.isBusy || current.isSaved || current.startedId != null) return
         val starting = current.copy(error = null, isStarting = true)
         editing.value = starting
-        viewModelScope.launch {
+        act(failures, undo = { (editing.value as? CourseFormUiState.Editing)?.let { editing.value = it.copy(isStarting = false) } }) {
             when (val parsed = current.form.parsed(vocabulary.snapshot())) {
                 is ParsedInput.Rejected -> editing.value = starting.copy(isStarting = false, error = parsed.error)
                 is ParsedInput.Parsed -> {
-                    val written = written(starting, parsed.value) ?: return@launch
+                    val written = written(starting, parsed.value) ?: return@act
                     editing.value = starting.copy(stored = written).began(activation.activate(written.id, written.revision))
                 }
             }

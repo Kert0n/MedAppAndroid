@@ -1,5 +1,7 @@
 package com.kert0n.medapp.presentation.intake
 
+import com.kert0n.medapp.presentation.stateInScreen
+import com.kert0n.medapp.presentation.ScreenReading
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.kert0n.medapp.domain.intake.IntakeProjection
@@ -39,6 +41,9 @@ class IntakeHistoryViewModel @AssistedInject constructor(
     @Assisted("courseId") private val courseId: Uuid?,
     @Assisted("packageId") private val packageId: Uuid?
 ) : ViewModel() {
+
+    /** Что экран читает из базы; не прочиталось — говорит об этом и предлагает повторить. */
+    val reading = ScreenReading()
 
     @AssistedFactory
     interface Factory {
@@ -84,7 +89,7 @@ class IntakeHistoryViewModel @AssistedInject constructor(
             // Сверху — последнее: человек открывает историю, чтобы узнать, что было недавно.
             rows = intakes.sortedByDescending { it.happenedAt }.map { it.row(titles, day.zone) }
         )
-    }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), IntakeHistoryUiState(isLoading = true))
+    }.stateInScreen(viewModelScope, reading, IntakeHistoryUiState(isLoading = true))
 
     /** Когда это было: у состоявшегося — момент приёма, у неотвеченного — его место в расписании. */
     private val IntakeProjection.happenedAt: Instant

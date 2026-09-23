@@ -1,5 +1,8 @@
 package com.kert0n.medapp.presentation.medkit
 
+import com.kert0n.medapp.presentation.act
+import com.kert0n.medapp.presentation.ScreenFailures
+import com.kert0n.medapp.presentation.ScreenReading
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.kert0n.medapp.feature.medkits.MedKitKeeping
@@ -29,8 +32,12 @@ class MedKitFormViewModel @AssistedInject constructor(
     private val keeping: MedKitKeeping,
     private val medKits: MedKitStorageRepository,
     private val today: Today,
-    @Assisted private val medKitId: Uuid?
+    @Assisted private val medKitId: Uuid?,
+    private val failures: ScreenFailures = ScreenFailures()
 ) : ViewModel() {
+
+    /** Что экран читает из базы; не прочиталось — говорит об этом и предлагает повторить. */
+    val reading = ScreenReading()
 
     @AssistedFactory
     interface Factory {
@@ -44,7 +51,7 @@ class MedKitFormViewModel @AssistedInject constructor(
     val state: StateFlow<MedKitFormUiState> = _state.asStateFlow()
 
     init {
-        if (medKitId != null) viewModelScope.launch { open(medKitId) }
+        if (medKitId != null) reading.load(viewModelScope) { open(medKitId) }
     }
 
     fun edit(form: MedKitFormPresentationDTO) {
@@ -67,7 +74,9 @@ class MedKitFormViewModel @AssistedInject constructor(
             is ParsedInput.Parsed -> {
                 val saving = editing.copy(error = null, isSaving = true)
                 _state.value = saving
-                viewModelScope.launch { write(saving, parsed.value) }
+                act(failures, undo = { (_state.value as? MedKitFormUiState.Editing)?.let { _state.value = it.copy(isSaving = false) } }) {
+                    write(saving, parsed.value)
+                }
             }
         }
     }

@@ -5,7 +5,8 @@ import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
-import kotlinx.coroutines.launch
+import kotlinx.coroutines.flow.emitAll
+import kotlinx.coroutines.flow.flow
 
 /**
  * Что экран прочитал из базы после перечитывания у сервера (PLAN E4). Случая два, потому что
@@ -29,13 +30,11 @@ sealed interface Fresh<out T> {
  * именно на нём.
  *
  * Читает, пока жива область: у экрана это его `viewModelScope`, и дверь зовётся один раз на
- * экземпляр — поворот экрана её не повторяет.
+ * экземпляр — поворот экрана её не повторяет. Не прочиталось — говорит [reading], и его повтор
+ * зовёт дверь и чтение заново.
  */
-fun <T> CoroutineScope.readAfter(freshen: suspend () -> Unit, observe: () -> Flow<T>): StateFlow<Fresh<T>> {
-    val reading = MutableStateFlow<Fresh<T>>(Fresh.Waiting)
-    launch {
-        freshen()
-        observe().collect { reading.value = Fresh.Read(it) }
-    }
-    return reading.asStateFlow()
+fun <T> CoroutineScope.readAfter(reading: ScreenReading, freshen: suspend () -> Unit, observe: () -> Flow<T>): StateFlow<Fresh<T>> {
+    val read = MutableStateFlow<Fresh<T>>(Fresh.Waiting)
+    reading.listen(this, flow { freshen(); emitAll(observe()) }) { read.value = Fresh.Read(it) }
+    return read.asStateFlow()
 }
