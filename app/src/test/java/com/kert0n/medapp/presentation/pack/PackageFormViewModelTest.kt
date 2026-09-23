@@ -26,13 +26,18 @@ import com.kert0n.medapp.fixture.tablets
 import com.kert0n.medapp.fixture.watching
 import com.kert0n.medapp.presentation.value.toPresentationDTO
 import com.kert0n.medapp.queue.QueueService
+import com.kert0n.medapp.storage.pack.PackageStorageRepository
 import com.kert0n.medapp.storage.value.VocabularyStorageRepository
+import com.kert0n.medapp.domain.pack.Package
+import com.kert0n.medapp.network.pack.PackageSyncState
 import java.time.Clock
 import java.time.Instant
 import java.time.ZoneId
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertTrue
 import org.junit.Rule
 import org.junit.Test
+import kotlin.time.Duration.Companion.seconds
 
 /**
  * Заведение и правка упаковки (PLAN H3 №7, №8): что записывается и что человек видит в ответ.
@@ -55,7 +60,8 @@ class PackageFormViewModelTest {
 
     private fun viewModel(
         opened: PackageFormViewModel.Opened = PackageFormViewModel.Opened(medKitId = HOME_KIT),
-        vocabulary: VocabularyStorageRepository = FakeVocabulary()
+        vocabulary: VocabularyStorageRepository = FakeVocabulary(),
+        packages: PackageStorageRepository = this.packages
     ) = PackageFormViewModel(
         adding = PackageAdding(packages, medKits, queue, DirectTransactions, clock),
         describing = PackageDescribing(packages, FakeFollowing(), queue, DirectTransactions, clock),
@@ -157,5 +163,40 @@ class PackageFormViewModelTest {
 
         assertEquals(1, vocabulary.door.waiting)
         assertEquals(1, packages.packages.size)
+    }
+
+    /**
+     * Запись, которая не удалась по причине вне приложения, — полный диск, испорченная база, —
+     * не закрывает приложение и не оставляет форму вечно «сохраняющейся»: введённое остаётся на
+     * месте, и нажать «Сохранить» можно снова (ТЗ 4.3).
+     *
+     * Красная проверка: сбой сценария улетает из `viewModelScope` необработанным — на телефоне
+     * это падение процесса, а форма так и остаётся в `isSaving`.
+     */
+    @Test
+    fun aWriteThatFailsLeavesTheFormToTryAgain() {
+        val failing = object : PackageStorageRepository by packages {
+            override suspend fun add(pkg: Package, sync: PackageSyncState) =
+                throw IllegalStateException("database or disk is full")
+        }
+        val escaped = mutableListOf<Throwable>()
+        val before = Thread.getDefaultUncaughtExceptionHandler()
+        Thread.setDefaultUncaughtExceptionHandler { _, e -> escaped += e }
+        val state = try {
+            val model = viewModel(packages = failing)
+            watching(model.state) { state ->
+                val ready = state.awaiting { it.units.isNotEmpty() }
+                model.edit(filled(ready))
+                model.save()
+                state.awaiting(timeout = 2.seconds) { !it.isSaving }
+            }
+        } finally {
+            Thread.setDefaultUncaughtExceptionHandler(before)
+        }
+
+        assertTrue("сбой улетел мимо экрана: $escaped", escaped.isEmpty())
+        assertEquals(null, state.saved)
+        assertEquals("Нурофен", state.form.name)
+        assertTrue(packages.packages.isEmpty())
     }
 }
