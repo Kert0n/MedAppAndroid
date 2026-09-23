@@ -45,6 +45,7 @@ import com.kert0n.medapp.R
 import com.kert0n.medapp.ui.DAY
 import com.kert0n.medapp.domain.course.CourseRecord
 import com.kert0n.medapp.domain.course.CourseRejected
+import com.kert0n.medapp.domain.course.Prescription
 import com.kert0n.medapp.presentation.course.CourseFormError
 import com.kert0n.medapp.presentation.course.CourseFormPresentationDTO
 import com.kert0n.medapp.presentation.course.CourseFormUiState
@@ -352,22 +353,30 @@ private fun CourseFormError.message(): String = when (this) {
     is CourseFormError.PackageUnusable ->
         name?.let { stringResource(R.string.course_source_unusable_named, it) }
             ?: stringResource(R.string.course_source_unusable)
-    is CourseFormError.Rejected -> stringResource(reason.text)
+    is CourseFormError.Rejected -> reason.words()
     CourseFormError.Finished -> stringResource(R.string.course_finished)
     CourseFormError.Stale -> stringResource(R.string.course_stale)
 }
 
-/** Отказ сценария — словами по месту: чего не хватает, чтобы начать, или что нельзя под пачками. */
-internal val CourseRejected.Reason.text: Int
-    get() = when (this) {
-        CourseRejected.Reason.SCHEDULE_MISSING -> R.string.course_rejected_schedule_missing
-        CourseRejected.Reason.DOSE_MISSING -> R.string.course_rejected_dose_missing
-        CourseRejected.Reason.FORM_MISSING -> R.string.course_rejected_form_missing
-        CourseRejected.Reason.TOTAL_DOSES_MISSING -> R.string.course_rejected_total_doses_missing
-        CourseRejected.Reason.UNIT_MISMATCH -> R.string.course_rejected_unit_mismatch
-        CourseRejected.Reason.FORM_MISMATCH -> R.string.course_rejected_form_mismatch
-        CourseRejected.Reason.SCHEDULE_IN_PAST -> R.string.course_rejected_schedule_in_past
-        CourseRejected.Reason.FORM_UNKNOWN -> R.string.course_form_unknown
-        CourseRejected.Reason.ALREADY_ATTACHED -> R.string.course_rejected_already_attached
-        CourseRejected.Reason.PACKAGE_UNUSABLE -> R.string.course_rejected_package_unusable
-    }
+/**
+ * Отказ сценария — словами по месту: чего не хватает, чтобы начать, или что нельзя под пачками.
+ * Потолок числа доз называется числом из `Prescription`, а не повторяет его в строке.
+ */
+@Composable
+internal fun CourseRejected.Reason.words(): String = when (this) {
+    CourseRejected.Reason.SCHEDULE_MISSING -> stringResource(R.string.course_rejected_schedule_missing)
+    CourseRejected.Reason.DOSE_MISSING -> stringResource(R.string.course_rejected_dose_missing)
+    CourseRejected.Reason.FORM_MISSING -> stringResource(R.string.course_rejected_form_missing)
+    CourseRejected.Reason.TOTAL_DOSES_MISSING -> stringResource(R.string.course_rejected_total_doses_missing)
+    CourseRejected.Reason.TOTAL_DOSES_TOO_MANY -> pluralStringResource(
+        R.plurals.course_rejected_total_doses_too_many,
+        Prescription.MAX_TOTAL_DOSES,
+        Prescription.MAX_TOTAL_DOSES
+    )
+    CourseRejected.Reason.UNIT_MISMATCH -> stringResource(R.string.course_rejected_unit_mismatch)
+    CourseRejected.Reason.FORM_MISMATCH -> stringResource(R.string.course_rejected_form_mismatch)
+    CourseRejected.Reason.SCHEDULE_IN_PAST -> stringResource(R.string.course_rejected_schedule_in_past)
+    CourseRejected.Reason.FORM_UNKNOWN -> stringResource(R.string.course_form_unknown)
+    CourseRejected.Reason.ALREADY_ATTACHED -> stringResource(R.string.course_rejected_already_attached)
+    CourseRejected.Reason.PACKAGE_UNUSABLE -> stringResource(R.string.course_rejected_package_unusable)
+}

@@ -95,9 +95,52 @@ class CourseTest {
         val formed = course().setForm(TABLET_FORM, at = LATER).getOrThrow()
         assertEquals(TABLET_FORM, formed.form)
         assertEquals(Revision(1), formed.revision)
-        val counted = formed.setTotalDoses(10.doses, at = LATER)
+        val counted = formed.setTotalDoses(10.doses, at = LATER).getOrThrow()
         assertEquals(10.doses, counted.totalDoses)
         assertEquals(Revision(2), counted.revision)
+    }
+
+    /**
+     * Сколько доз назначают, ограничивает назначение, и спрашивает его и черновик, и начало, и
+     * идущее лечение: сверх меры — отказ с причиной, а не исключение и не молча записанное число.
+     * Черновик, записанный до правила, начатым не становится.
+     */
+    @Test
+    fun noMoreDosesThanAPrescriptionAllowsAnywhere() {
+        val limit = Prescription.MAX_TOTAL_DOSES
+        val formed = course().setForm(TABLET_FORM, at = LATER).getOrThrow()
+        assertEquals(limit.doses, formed.setTotalDoses(limit.doses, at = LATER).getOrThrow().totalDoses)
+        assertEquals(
+            CourseRejected.Reason.TOTAL_DOSES_TOO_MANY,
+            (formed.setTotalDoses((limit + 1).doses, at = LATER).exceptionOrNull() as CourseRejected).reason
+        )
+
+        val storedBeforeTheRule = course(dose = dose("1"), form = TABLET_FORM, schedule = schedule(), totalDoses = limit + 1)
+        assertEquals(
+            CourseRejected.Reason.TOTAL_DOSES_TOO_MANY,
+            (storedBeforeTheRule.activate(LATER).exceptionOrNull() as CourseRejected).reason
+        )
+
+        val running = activeCourse()
+        assertEquals(
+            CourseRejected.Reason.TOTAL_DOSES_TOO_MANY,
+            (running.setTotalDoses((limit + 1).doses, LATER).exceptionOrNull() as CourseRejected).reason
+        )
+    }
+
+    /**
+     * Курс, записанный до правила о потолке, читается: предел — правило **действия** (назначить,
+     * начать, изменить), а не того, что уже лежит в базе. Лечение на 15 000 доз законно жило и
+     * считалось, и чтение его не должно падать.
+     *
+     * Красная проверка (разбор #66): предел стоял `require` в конструкторе `Prescription`, и чтение
+     * такого курса из хранения бросало на каждом экране и в каждой сверке.
+     */
+    @Test
+    fun aCourseRecordedBeforeTheLimitIsStillRead() {
+        val recorded = activeCourse(totalDoses = Prescription.MAX_TOTAL_DOSES + 5_000)
+
+        assertEquals((Prescription.MAX_TOTAL_DOSES + 5_000).doses, recorded.remainingDoses(CourseProgress.none))
     }
 
     @Test

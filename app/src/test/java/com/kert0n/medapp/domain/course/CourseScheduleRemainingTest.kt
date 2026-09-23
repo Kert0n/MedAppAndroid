@@ -2,7 +2,11 @@ package com.kert0n.medapp.domain.course
 
 import com.kert0n.medapp.domain.value.doses
 import com.kert0n.medapp.fixture.BERLIN
+import com.kert0n.medapp.fixture.EARLIER
+import com.kert0n.medapp.fixture.TABLET_FORM
 import com.kert0n.medapp.fixture.activeCourse
+import com.kert0n.medapp.fixture.course
+import com.kert0n.medapp.fixture.dose
 import com.kert0n.medapp.fixture.progress
 import com.kert0n.medapp.fixture.schedule
 import java.time.DayOfWeek
@@ -32,6 +36,23 @@ class CourseScheduleRemainingTest {
         val year = activeCourse(schedule = fourTimesADay, totalDoses = 365 * 4)
         assertEquals((365 * 4).doses, year.remainingDoses(CourseProgress.none))
         assertEquals(start.plusDays(364), year.expectedEnd(CourseProgress.none)?.localDate)
+    }
+
+    /**
+     * Черновик с числом доз сверх всякой меры лечением не становится: начало отказывает причиной, а
+     * не строит курс, чей расчёт остатка разложил бы поштучно миллиарды пунктов. Обеспечение
+     * считается на каждое изменение базы, и такой курс ронял бы приложение при каждом запуске.
+     *
+     * Красная проверка: черновик на `Int.MAX_VALUE` доз начинался, а `remainingOccurrences`
+     * выделял список на всё число и падал `OutOfMemoryError`.
+     */
+    @Test
+    fun anAbsurdNumberOfDosesNeverBecomesATreatment() {
+        val draft = course(dose = dose("1"), form = TABLET_FORM, schedule = fourTimesADay, totalDoses = Int.MAX_VALUE)
+
+        val refused = draft.activate(EARLIER).exceptionOrNull()
+
+        assertEquals(CourseRejected.Reason.TOTAL_DOSES_TOO_MANY, (refused as CourseRejected).reason)
     }
 
     @Test
