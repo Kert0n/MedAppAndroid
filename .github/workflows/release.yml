@@ -97,13 +97,19 @@ jobs:
             echo "Релиз $tag уже заведён — повтор прогона его не трогает."
             exit 0
           fi
+          # Заметки — что изменилось с прошлого релиза: PR, слитые с него, разложенные по разделам
+          # (.github/release.yml). Прошлый релиз называется явно, до заведения нового: иначе GitHub
+          # выбирает его сам, и после пропущенной публикации заметки молча захватили бы не тот ряд.
+          previous=$(gh release list --limit 1 --exclude-drafts --exclude-pre-releases --json tagName --jq '.[0].tagName // empty')
           # Релиз заводится вместе со своим вложением одной командой: не вышло — нет ни релиза, ни
           # полупустого тега, а прежние релизы стоят нетронутыми.
           gh release create "$tag" "$file" \
             --target "$(git rev-parse HEAD)" \
             --title "MedApp $version" \
             --latest \
-            --notes "Сборка main: $(git log -1 --pretty='%s') ($(git rev-parse --short HEAD))."
+            --notes "Сборка main: $(git log -1 --pretty='%s') ($(git rev-parse --short HEAD))." \
+            --generate-notes \
+            ${previous:+--notes-start-tag "$previous"}
 
       - name: Ключ подписи не остаётся
         if: always()
