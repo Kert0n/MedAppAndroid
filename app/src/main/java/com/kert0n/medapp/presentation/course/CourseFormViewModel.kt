@@ -20,6 +20,7 @@ import dagger.assisted.Assisted
 import dagger.assisted.AssistedFactory
 import dagger.assisted.AssistedInject
 import dagger.hilt.android.lifecycle.HiltViewModel
+import java.time.Clock
 import java.time.LocalDate
 import kotlin.uuid.Uuid
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -50,6 +51,7 @@ class CourseFormViewModel @AssistedInject constructor(
     private val courses: CourseStorageRepository,
     private val vocabulary: VocabularyStorageRepository,
     private val today: Today,
+    private val clock: Clock,
     @Assisted private val courseId: Uuid?
 ) : ViewModel() {
 
@@ -71,8 +73,9 @@ class CourseFormViewModel @AssistedInject constructor(
         editing,
         vocabulary.observeUnits(),
         vocabulary.observeForms(),
+        // День — только повод пересчитать границу: считается она в зоне расписания, а не телефона.
         today.observe()
-    ) { state, units, forms, day ->
+    ) { state, units, forms, _ ->
         if (state is CourseFormUiState.Editing) {
             val known = units.map { it.toPresentationDTO() }
             // Единицу подсказывает форма выпуска — и при выборе формы, и здесь: у записанного
@@ -80,11 +83,16 @@ class CourseFormViewModel @AssistedInject constructor(
             state.copy(
                 form = state.form.suggestingUnit(known),
                 units = known,
-                forms = forms.map { it.toPresentationDTO() },
-                today = day.date
-            )
+                forms = forms.map { it.toPresentationDTO() }
+            ).dated()
         } else state
-    }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), editing.value)
+    }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), editing.value.let { if (it is CourseFormUiState.Editing) it.dated() else it })
+
+    /**
+     * Сегодня в зоне расписания — там же, где его считает домен (`CourseSchedule.startsBefore`):
+     * у записанного курса зона своя, и граница по телефону расходилась бы с отказом около полуночи.
+     */
+    private fun CourseFormUiState.Editing.dated() = copy(today = clock.instant().atZone(form.zone).toLocalDate())
 
     init {
         if (courseId != null) viewModelScope.launch { open(courseId) }
@@ -408,8 +416,9 @@ sealed interface CourseFormUiState {
         val units: List<UnitPresentationDTO> = emptyList(),
         val forms: List<FormPresentationDTO> = emptyList(),
         /**
-         * Сегодня: раньше него лечение не начинают. Отказывает домен, а календарь прошедших дней
-         * не предлагает, чтобы человек не выбирал дату, которую отвергнут.
+         * Сегодня в зоне расписания: раньше него лечение не начинают. Отказывает домен, а календарь
+         * прошедших дней не предлагает, чтобы человек не выбирал дату, которую отвергнут. Состояние
+         * правки без него не выходит из модели.
          */
         val today: LocalDate? = null,
         /** Когда ожидается последний приём по тому, что набрано; нечего считать — `null`. */

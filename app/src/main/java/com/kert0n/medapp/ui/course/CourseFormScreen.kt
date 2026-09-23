@@ -14,7 +14,6 @@ import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.AssistChip
 import androidx.compose.material3.Button
-import androidx.compose.material3.DatePickerDefaults
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FilledTonalButton
 import androidx.compose.material3.FilterChip
@@ -59,6 +58,7 @@ import com.kert0n.medapp.ui.LoadingState
 import com.kert0n.medapp.ui.PickerField
 import com.kert0n.medapp.ui.QuantityField
 import com.kert0n.medapp.ui.text
+import java.time.LocalDate
 import java.time.DayOfWeek
 import java.time.LocalTime
 
@@ -237,7 +237,8 @@ private fun Fields(
             value = form.start,
             onPick = { onEdit(form.copy(start = it)) },
             isError = field == CourseFormError.Field.START,
-            selectable = state.today?.let(::daysFrom) ?: DatePickerDefaults.AllDates
+            // Дня модель не отдаёт только по ошибке — и тогда не предлагается ничего, а не всё.
+            selectable = daysFrom(state.today ?: LocalDate.MAX)
         )
         Text(stringResource(R.string.course_days), style = MaterialTheme.typography.labelLarge)
         FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {

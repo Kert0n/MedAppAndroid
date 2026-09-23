@@ -83,6 +83,7 @@ class CourseFormLeavingTest {
         courses = database.courseRepository(),
         vocabulary = FakeVocabulary(),
         today = Today(Clock.fixed(scenarios.now, scenarios.zone), QuietClock),
+        clock = Clock.fixed(scenarios.now, scenarios.zone),
         courseId = courseId
     ).also { opened += it }
 
