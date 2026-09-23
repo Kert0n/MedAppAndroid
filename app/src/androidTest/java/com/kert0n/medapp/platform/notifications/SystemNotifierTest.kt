@@ -59,7 +59,7 @@ class SystemNotifierTest {
     fun setUp() = runTest {
         database = inMemoryDatabase()
         database.packageRepository().add(pack(quantity = tablets("20"), expiresOn = expiry))
-        notifier = SystemNotifier(context, database.intakeRepository(), database.courseRepository(), database.packageRepository(), NotificationChannels(context, FakeAppLanguages()), FakeAppLanguages(), java.time.Clock.systemDefaultZone())
+        notifier = SystemNotifier(context, database.intakeRepository(), database.courseRepository(), database.packageRepository(), NotificationChannels(context, FakeAppLanguages()), FakeAppLanguages(), java.time.Clock.fixed(planned.dueAt, java.time.ZoneOffset.UTC))
         NotificationChannels(context, FakeAppLanguages()).ensure()
         manager.cancelAll()
     }
