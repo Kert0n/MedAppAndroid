@@ -162,7 +162,11 @@ class QueueWorkerTest {
         /** Ответ записан — а применение бросает: так ведёт себя сломанная транзакция закрытия. */
         var settleFails = false
 
+        /** Запись ответа бросает: база полна или отказала — сервер при этом уже применил запрос. */
+        var answeredFails = false
+
         override suspend fun answered(id: Uuid, answer: RawResponse, at: Instant) {
+            if (answeredFails) throw IllegalStateException("запись ответа сорвалась")
             val operation = operations.getValue(id)
             operations[id] = operation.with(status = SyncOperationStatus.ANSWERED, answer = answer)
         }
@@ -695,6 +699,42 @@ class QueueWorkerTest {
         worker(raced, again).drain()
 
         assertEquals(Delivery.Stale(resolved(snapshot)), raced.settled.first().second)
+    }
+
+    /**
+     * Пересчёт 20 → 17 уехал, сервер его применил, а **записать ответ** не вышло — диск полон. Исход
+     * запроса для нас теперь неизвестен ровно так же, как после смерти процесса посреди отправки:
+     * повтор получает 412, у сервера уже 17 — и это применение, а не повод положить разницу второй
+     * раз.
+     *
+     * Красная проверка: сбой прохода возвращал операцию в ожидание без факта «исход неизвестен», и
+     * 412 переподготавливал разницу поверх неё самой: 20 → 17 → 14.
+     */
+    @Test
+    fun aFailureAfterSendingKeepsTheOutcomeUnknown() = runTest {
+        val recount = PackageSyncCommand.CorrectStock(PACK, seen = tablets("20"), actual = tablets("17"))
+        val before = medAppJson.decodeFromString(
+            PackageSnapshotNetworkDTO.serializer(),
+            snapshotJson.replace("17.000000", "20.000000").replace("\"version\":4", "\"version\":3")
+        )
+        val storage = Storage(listOf(operation(recount)))
+        var sends = 0
+        val server = transport(fresh = before) {
+            sends++
+            if (sends == 1) ApiResult.Success(RawResponse(200, snapshotJson)) else ApiResult.Failure(ApiFailure.PreconditionFailed)
+        }
+        server.snapshotAnswer = ApiResult.Success(snapshot) // у сервера 17: пересчёт лёг
+
+        storage.answeredFails = true
+        worker(storage, server).drain()
+        storage.answeredFails = false
+        val later = now.plusSeconds(3600)
+        worker(storage, server, clock = Clock.fixed(later, ZoneOffset.UTC)).drain()
+
+        assertEquals(2, server.sent.size)
+        assertEquals(server.sent[0], server.sent[1])
+        val laid = resolved(snapshot).let { PackageSnapshot(it.pack, it.sync.copy(syncedAt = later)) }
+        assertEquals(Delivery.Applied(PackageState.Present(laid)), storage.settled.last().second)
     }
 
     @Test
