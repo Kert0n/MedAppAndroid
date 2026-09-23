@@ -112,21 +112,34 @@ class PackageQueryDaoTest {
     }
 
     /**
-     * Человек ищет название, как его помнит: «мед» и «мёд» для него одно слово, а «5%» — текст с
-     * упаковки, а не шаблон. Поиск находит то, что человек имел в виду, а не всё подряд.
+     * «5%» — текст с упаковки, а не шаблон: поиск находит то, что человек набрал, а не всё подряд.
+     * Знак экранирования тоже текст — иначе он съел бы следующий за ним символ.
      *
      * Красная проверка: текст шёл в `LIKE` как есть — `%` и `_` работали шаблонами, и «5%» находил
-     * всё, где есть пятёрка; «ё» и «е» сравнивались как разные буквы.
+     * всё, где есть пятёрка.
      */
     @Test
-    fun searchTakesTheTypedTextLiterallyAndYoIsYe() = runTest {
-        packages.save(pack(id = id(11), name = "Мёд с лимоном", quantity = tablets("10")))
+    fun searchTakesTheTypedTextLiterally() = runTest {
         packages.save(pack(id = id(12), name = "Раствор 5%", quantity = tablets("10")))
         packages.save(pack(id = id(13), name = "Магний 50 мг", quantity = tablets("10")))
-        packages.save(pack(id = id(14), name = "Ёжик-витамин", quantity = tablets("10")))
+        packages.save(pack(id = id(15), name = "Капли 1\\2", quantity = tablets("10")))
 
         assertEquals(listOf("Раствор 5%"), names(PackageQuery(text = "5%")))
         assertEquals(emptyList<String>(), names(PackageQuery(text = "_агний")))
+        assertEquals(listOf("Капли 1\\2"), names(PackageQuery(text = "1\\")))
+        assertEquals(emptyList<String>(), names(PackageQuery(text = "\\%")))
+    }
+
+    /**
+     * «Мед» и «мёд» для человека одно слово.
+     *
+     * Красная проверка: «ё» и «е» сравнивались как разные буквы.
+     */
+    @Test
+    fun searchTakesYoForYe() = runTest {
+        packages.save(pack(id = id(11), name = "Мёд с лимоном", quantity = tablets("10")))
+        packages.save(pack(id = id(14), name = "Ёжик-витамин", quantity = tablets("10")))
+
         assertEquals(listOf("Мёд с лимоном"), names(PackageQuery(text = "мед")))
         assertEquals(listOf("Мёд с лимоном"), names(PackageQuery(text = "Мёд")))
         assertEquals(listOf("Ёжик-витамин"), names(PackageQuery(text = "ежик")))
