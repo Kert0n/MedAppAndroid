@@ -30,8 +30,8 @@ import com.kert0n.medapp.queue.medkit.MedKitSyncCommand
 import com.kert0n.medapp.queue.pack.PackageSyncCommand
 import com.kert0n.medapp.storage.database.MedAppDatabase
 import com.kert0n.medapp.storage.medkit.toStorageEntity
-import com.kert0n.medapp.storage.server.SyncOperationStorageEntity
-import com.kert0n.medapp.storage.server.toStorageEntity
+import com.kert0n.medapp.storage.operation.SyncOperationStorageEntity
+import com.kert0n.medapp.storage.operation.toStorageEntity
 import com.kert0n.medapp.ui.theme.MedAppTheme
 import dagger.hilt.android.testing.HiltAndroidRule
 import dagger.hilt.android.testing.HiltAndroidTest

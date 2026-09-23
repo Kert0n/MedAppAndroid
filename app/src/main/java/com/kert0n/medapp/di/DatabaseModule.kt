@@ -10,7 +10,7 @@ import com.kert0n.medapp.storage.intake.IntakeDao
 import com.kert0n.medapp.storage.medkit.MedKitDao
 import com.kert0n.medapp.storage.pack.PackageDao
 import com.kert0n.medapp.storage.notification.ReminderDao
-import com.kert0n.medapp.storage.server.SyncOperationDao
+import com.kert0n.medapp.storage.operation.SyncOperationDao
 import com.kert0n.medapp.storage.template.PackageTemplateDao
 import com.kert0n.medapp.storage.value.VocabularyDao
 import dagger.Module

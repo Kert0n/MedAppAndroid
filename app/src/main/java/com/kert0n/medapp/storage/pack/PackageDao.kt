@@ -22,9 +22,9 @@ import com.kert0n.medapp.queue.pack.PackageSyncCommand
 import com.kert0n.medapp.storage.course.CourseDao
 import com.kert0n.medapp.storage.database.chunkedForQuery
 import com.kert0n.medapp.storage.intake.IntakeDao
-import com.kert0n.medapp.storage.server.NamedThing
-import com.kert0n.medapp.storage.server.SyncOperationDao
-import com.kert0n.medapp.storage.server.SyncOperationStorageRow
+import com.kert0n.medapp.storage.operation.NamedThing
+import com.kert0n.medapp.storage.operation.SyncOperationDao
+import com.kert0n.medapp.storage.operation.SyncOperationStorageRow
 import java.time.Instant
 import java.time.LocalDate
 import kotlin.uuid.Uuid

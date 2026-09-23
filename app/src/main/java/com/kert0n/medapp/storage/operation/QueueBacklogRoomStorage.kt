@@ -1,4 +1,4 @@
-package com.kert0n.medapp.storage.server
+package com.kert0n.medapp.storage.operation
 
 import com.kert0n.medapp.queue.QueueBacklog
 import java.time.Instant

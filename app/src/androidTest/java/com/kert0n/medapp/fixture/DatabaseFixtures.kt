@@ -85,7 +85,7 @@ fun MedAppDatabase.medKitRepository() = com.kert0n.medapp.storage.medkit.MedKitR
     this, medKits(), packages(), courses(), syncOperations(), queueStorage(), vocabulary(), javax.inject.Provider { courseFollowing() }
 )
 
-fun MedAppDatabase.queueRepository() = com.kert0n.medapp.storage.server.SyncOperationRoomRepository(
+fun MedAppDatabase.queueRepository() = com.kert0n.medapp.storage.operation.SyncOperationRoomRepository(
     this, syncOperations(), vocabulary()
 )
 
@@ -98,13 +98,13 @@ fun MedAppDatabase.reportRepository() = com.kert0n.medapp.storage.report.ReportR
 fun MedAppDatabase.transactions() = com.kert0n.medapp.storage.database.RoomTransactions(this)
 
 /** Порт очереди для работника — транзакции взятия и применения исхода. */
-fun MedAppDatabase.queueStorage() = com.kert0n.medapp.storage.server.QueueRoomStorage(
+fun MedAppDatabase.queueStorage() = com.kert0n.medapp.storage.operation.QueueRoomStorage(
     this, syncOperations(), packages(), intakes(), medKits(), courses(), vocabulary(),
     javax.inject.Provider { courseFollowing() }
 )
 
 /** Порт полного снимка — укладка целиком одной транзакцией; полка с сервера зовётся как в ресурсах. */
-fun MedAppDatabase.snapshotStorage() = com.kert0n.medapp.storage.server.SnapshotRoomStorage(
+fun MedAppDatabase.snapshotStorage() = com.kert0n.medapp.storage.snapshot.SnapshotRoomStorage(
     this, medKits(), packages(), courses(), intakes(), vocabulary(), syncOperations(),
     arrivedName = "Общая аптечка",
     following = javax.inject.Provider { courseFollowing() }

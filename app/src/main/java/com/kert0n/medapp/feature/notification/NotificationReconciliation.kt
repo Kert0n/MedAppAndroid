@@ -13,7 +13,7 @@ import com.kert0n.medapp.storage.intake.IntakeStorageRepository
 import com.kert0n.medapp.storage.pack.PackageQuery
 import com.kert0n.medapp.storage.notification.ReminderStorageRepository
 import com.kert0n.medapp.storage.pack.PackageStorageRepository
-import com.kert0n.medapp.storage.server.SyncOperationStorageRepository
+import com.kert0n.medapp.storage.operation.SyncOperationStorageRepository
 import com.kert0n.medapp.queue.Transactions
 import java.time.LocalDate
 import java.time.ZoneId

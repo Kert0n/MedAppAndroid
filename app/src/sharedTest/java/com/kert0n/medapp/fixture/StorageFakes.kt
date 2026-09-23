@@ -50,8 +50,8 @@ import com.kert0n.medapp.storage.pack.PackageAdjustment
 import com.kert0n.medapp.storage.pack.PackageQuery
 import com.kert0n.medapp.storage.pack.PackageStorageRepository
 import com.kert0n.medapp.storage.pack.SnapshotApplied
-import com.kert0n.medapp.storage.server.OutstandingOperation
-import com.kert0n.medapp.storage.server.SyncOperationStorageRepository
+import com.kert0n.medapp.storage.operation.OutstandingOperation
+import com.kert0n.medapp.storage.operation.SyncOperationStorageRepository
 import com.kert0n.medapp.storage.value.VocabularyStorageRepository
 import java.time.Instant
 import java.time.LocalDate

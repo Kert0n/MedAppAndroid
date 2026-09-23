@@ -14,7 +14,7 @@ import com.kert0n.medapp.feature.time.Today
 import com.kert0n.medapp.storage.course.CourseStorageRepository
 import com.kert0n.medapp.storage.medkit.MedKitStorageRepository
 import com.kert0n.medapp.storage.pack.PackageStorageRepository
-import com.kert0n.medapp.storage.server.SyncOperationStorageRepository
+import com.kert0n.medapp.storage.operation.SyncOperationStorageRepository
 import dagger.assisted.Assisted
 import dagger.assisted.AssistedFactory
 import dagger.assisted.AssistedInject

@@ -32,7 +32,7 @@ import com.kert0n.medapp.storage.course.toSourceStorageEntities
 import com.kert0n.medapp.storage.course.toStorageEntity as toCourseStorageEntity
 import com.kert0n.medapp.storage.database.MedAppDatabase
 import com.kert0n.medapp.storage.medkit.toStorageEntity as toMedKitStorageEntity
-import com.kert0n.medapp.storage.server.SyncOperationRoomRepository
+import com.kert0n.medapp.storage.operation.SyncOperationRoomRepository
 import java.math.BigDecimal
 import java.time.Instant
 import java.time.LocalDate

@@ -31,7 +31,7 @@ class ClaimOwnershipTest {
     private val mayCommand: Set<String> = setOf(
         "queue/pack/PackageSyncCommand.kt",
         "queue/pack/ClaimChanges.kt",
-        "storage/server/SyncCommandStorageConverter.kt",
+        "storage/operation/SyncCommandStorageConverter.kt",
         "feature/intake/IntakeConfirmation.kt",
         "feature/packages/PackageRelocation.kt"
     )

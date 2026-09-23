@@ -1,4 +1,4 @@
-package com.kert0n.medapp.storage.server
+package com.kert0n.medapp.storage.snapshot
 
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import com.kert0n.medapp.domain.medkit.MedKit

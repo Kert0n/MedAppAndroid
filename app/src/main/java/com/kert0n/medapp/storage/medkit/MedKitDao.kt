@@ -10,7 +10,7 @@ import com.kert0n.medapp.domain.value.Vocabulary
 import com.kert0n.medapp.storage.course.CourseDao
 import com.kert0n.medapp.storage.pack.PackageDao
 import com.kert0n.medapp.storage.pack.end
-import com.kert0n.medapp.storage.server.NamedThing
+import com.kert0n.medapp.storage.operation.NamedThing
 import java.time.Instant
 import java.time.LocalDate
 import kotlin.uuid.Uuid

@@ -1,4 +1,4 @@
-package com.kert0n.medapp.storage.server
+package com.kert0n.medapp.storage.operation
 
 import java.time.Instant
 import kotlin.uuid.Uuid

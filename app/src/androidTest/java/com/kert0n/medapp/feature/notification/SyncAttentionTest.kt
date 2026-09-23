@@ -23,8 +23,8 @@ import com.kert0n.medapp.queue.StoredSyncOperation
 import com.kert0n.medapp.queue.SyncOperationStatus
 import com.kert0n.medapp.queue.pack.PackageSyncCommand
 import com.kert0n.medapp.storage.database.MedAppDatabase
-import com.kert0n.medapp.storage.server.SyncOperationStorageEntity
-import com.kert0n.medapp.storage.server.toStorageEntity
+import com.kert0n.medapp.storage.operation.SyncOperationStorageEntity
+import com.kert0n.medapp.storage.operation.toStorageEntity
 import java.math.BigDecimal
 import java.time.Instant
 import java.time.ZoneOffset

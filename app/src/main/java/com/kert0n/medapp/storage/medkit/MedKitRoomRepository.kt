@@ -17,7 +17,7 @@ import com.kert0n.medapp.storage.database.MedAppDatabase
 import com.kert0n.medapp.storage.database.observing
 import com.kert0n.medapp.storage.pack.PackageDao
 import com.kert0n.medapp.storage.pack.toStorageEntity
-import com.kert0n.medapp.storage.server.SyncOperationDao
+import com.kert0n.medapp.storage.operation.SyncOperationDao
 import com.kert0n.medapp.storage.value.VocabularyDao
 import java.time.Instant
 import java.time.LocalDate

@@ -33,7 +33,7 @@ import com.kert0n.medapp.queue.SyncOperationStatus
 import com.kert0n.medapp.queue.Synchronization
 import com.kert0n.medapp.queue.pack.PackageSyncCommand
 import com.kert0n.medapp.storage.database.MedAppDatabase
-import com.kert0n.medapp.storage.server.QueueBacklogRoomStorage
+import com.kert0n.medapp.storage.operation.QueueBacklogRoomStorage
 import com.kert0n.medapp.storage.value.VocabularyRoomRepository
 import io.ktor.client.engine.mock.MockEngine
 import io.ktor.client.engine.mock.respond

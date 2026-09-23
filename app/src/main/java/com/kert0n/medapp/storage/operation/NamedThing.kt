@@ -1,4 +1,4 @@
-package com.kert0n.medapp.storage.server
+package com.kert0n.medapp.storage.operation
 
 import androidx.room.ColumnInfo
 import kotlin.uuid.Uuid

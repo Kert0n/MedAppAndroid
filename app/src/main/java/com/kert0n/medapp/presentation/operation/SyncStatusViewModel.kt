@@ -8,7 +8,7 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.kert0n.medapp.feature.operation.OperationDismissing
 import com.kert0n.medapp.feature.operation.Refreshing
-import com.kert0n.medapp.storage.server.SyncOperationStorageRepository
+import com.kert0n.medapp.storage.operation.SyncOperationStorageRepository
 import dagger.hilt.android.lifecycle.HiltViewModel
 import java.time.Instant
 import javax.inject.Inject

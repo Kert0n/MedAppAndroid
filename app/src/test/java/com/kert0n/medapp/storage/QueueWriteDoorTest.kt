@@ -32,8 +32,8 @@ class QueueWriteDoorTest {
         assertEquals(
             "строку очереди меняют мимо переходов состояния",
             listOf(
-                "storage/server/SyncOperationDao.kt: SET dismissed_at…",
-                "storage/server/SyncOperationDao.kt: SET status…"
+                "storage/operation/SyncOperationDao.kt: SET dismissed_at…",
+                "storage/operation/SyncOperationDao.kt: SET status…"
             ),
             doors
         )
@@ -54,7 +54,7 @@ class QueueWriteDoorTest {
             "queue/Settlement.kt",
             // Граница, где колонки становятся состоянием: она не решает переход, а отбрасывает
             // то, что статусу противоречит, — иначе порченая строка не читалась бы вовсе.
-            "storage/server/SyncOperationStorageEntity.kt"
+            "storage/operation/SyncOperationStorageEntity.kt"
         )
         val offenders = kotlin()
             .map { it.relativeTo(sources).invariantSeparatorsPath to it.readText() }
@@ -75,7 +75,7 @@ class QueueWriteDoorTest {
      */
     @Test
     fun theRowReaderIsTolerantWhileTheOperationIsStrict() {
-        val reader = File(sources, "storage/server/SyncOperationStorageEntity.kt").readText()
+        val reader = File(sources, "storage/operation/SyncOperationStorageEntity.kt").readText()
         val body = reader.substringAfter("fun SyncOperationStorageEntity.toState()").substringBefore("\n\n")
         for (guard in listOf("status == SyncOperationStatus.ANSWERED", "status == SyncOperationStatus.REFUSED", "prepared != null")) {
             assertTrue("чтение строки не отбрасывает противоречащее статусу: $guard", body.contains(guard))
@@ -87,7 +87,7 @@ class QueueWriteDoorTest {
     /** Каждая запись хранилища очереди — чтение, переход и запись одной транзакцией (F5). */
     @Test
     fun everyQueueWriteReadsAndWritesInOneTransaction() {
-        val text = File(sources, "storage/server/QueueRoomStorage.kt").readText()
+        val text = File(sources, "storage/operation/QueueRoomStorage.kt").readText()
         val bodies = Regex("""override suspend fun (take|answered|defer|settle)\(.*?\n(.*?)\n    (?=override|private|/\*\*|companion)""", RegexOption.DOT_MATCHES_ALL)
             .findAll(text).associate { it.groupValues[1] to it.groupValues[2] }
         assertEquals(setOf("take", "answered", "defer", "settle"), bodies.keys)
