@@ -262,6 +262,37 @@ class ContractProbe {
         assertNull(success(owner.packageSnapshot(packageId)).claims.mine)
     }
 
+    /**
+     * Бронь — заявка, а не замок: сервер принимает бронь больше свободного и даже больше самого
+     * остатка, и расход из чужой брони тоже. Отказывает он только расходу больше остатка. Не
+     * планировать чужое и спрашивать перед приёмом из занятого — правило клиента
+     * (`NeighboursClaimsTest`, история «Одна коробка на два лечения»). Начни сервер отказывать
+     * бронью — очередь увидит новый отказ, которого клиент не читает, и проба скажет об этом первой.
+     */
+    @Test
+    fun claimsAreRequestsAndOnlyTheStockBoundsConsumption() = runBlocking {
+        val kit = newKit()
+        val pack = newPackage(kit, amount = "10").pack
+        success(guest.joinMedKit(MembershipPostNetworkDTO(success(owner.createInvitation(kit)).key)))
+
+        // Гость заявил восемь из десяти: владельцу свободно два.
+        success(guest.createClaim(ClaimPostNetworkDTO(pack.id, "8", success(guest.packageSnapshot(pack.id)).claims.version)))
+        // Пять — больше свободного: принято.
+        success(owner.createClaim(ClaimPostNetworkDTO(pack.id, "5", success(owner.packageSnapshot(pack.id)).claims.version)))
+        // Двадцать — больше самого остатка: тоже принято, сумма броней обгоняет коробку.
+        success(owner.patchClaim(pack.id, ClaimPatchNetworkDTO("20", success(owner.packageSnapshot(pack.id)).claims.version)))
+        val claimed = success(owner.packageSnapshot(pack.id))
+        assertEquals(0, BigDecimal("28").compareTo(BigDecimal(claimed.claims.total)))
+
+        // Шесть из десяти, хотя восемь заявил гость: расход из чужой брони принят.
+        val left = requireNotNull(
+            success(owner.synchronise(pack.id, Uuid.random(), PackageSyncNetworkDTO("6", claimed.pack.version)))
+        ) { "после частичного расхода пачка остаётся" }.pack
+        assertEquals("4.000000", left.amount)
+        // Больше остатка — единственный отказ: пятью таблетками из четырёх не распорядишься.
+        assertTrue(failure(owner.synchronise(pack.id, Uuid.random(), PackageSyncNetworkDTO("5", left.version))) is ApiFailure.Invalid)
+    }
+
     @Test
     fun consumptionAnswersWithTheSnapshotUntilThePackageIsGone() = runBlocking {
         val pack = newPackage(newKit(), amount = "10").pack
