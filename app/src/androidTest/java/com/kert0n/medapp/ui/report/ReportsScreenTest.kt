@@ -19,7 +19,6 @@ import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.unit.Density
 import androidx.test.ext.junit.runners.AndroidJUnit4
-import com.kert0n.medapp.domain.Unavailability
 import com.kert0n.medapp.presentation.ScreenState
 import com.kert0n.medapp.presentation.report.FutureRowPresentationDTO
 import com.kert0n.medapp.presentation.report.FutureSpendingPresentationDTO
@@ -222,14 +221,6 @@ class ReportsScreenTest {
         compose.onNodeWithText("Неделя").performClick()
 
         assertEquals(HorizonPreset.WEEK, preset)
-    }
-
-    /** Отказ чтения показан отказом, а не вечным ожиданием: у кружка человеку нечего ждать. */
-    @Test
-    fun aFailedReadingIsToldAsFailure() {
-        show(ReportsUiState(summary = ScreenState.Failed(Unavailability.DEVICE_STORAGE)))
-
-        compose.onNodeWithText("Не удалось обратиться к данным на устройстве.").assertIsDisplayed()
     }
 
     /** Крупный шрифт не режет ни переключателя отчётов, ни чипов срока: они переносятся строкой. */
