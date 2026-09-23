@@ -16,6 +16,8 @@ on:
 
 permissions:
   contents: write
+  # Метка `release: skip` читается с PR, который принёс коммит.
+  pull-requests: read
 
 # Группа очереди — по коммиту, а не одна на всё. Общая группа держала бы публикации в очередь
 # друг за другом, а **ждущий** прогон GitHub отменяет, когда приходит следующий: слейся два
@@ -41,19 +43,59 @@ jobs:
         with:
           # Коммит тот же, что проверяла «Проверка», а не голова main: между ними мог лечь ещё один.
           ref: ${{ github.event.workflow_run.head_sha || github.sha }}
+          # История целиком: сравнивать приходится с коммитом прошлого релиза.
+          fetch-depth: 0
+
+      # Релиз — новая сборка приложения, а не новый коммит. PR, который тронул только проверки,
+      # документы или CI, APK не меняет, и выпускать то же самое под новым номером незачем: такие
+      # PR войдут в заметки следующего настоящего релиза. Пропустить релиз можно и руками — меткой
+      # `release: skip` на PR. Ручной запуск (workflow_dispatch) публикует всегда: это и есть решение
+      # человека.
+      - name: Нужен ли релиз
+        id: need
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          EVENT: ${{ github.event_name }}
+        run: |
+          publish=true
+          reason="ручной запуск"
+          if [ "$EVENT" != "workflow_dispatch" ]; then
+            sha=$(git rev-parse HEAD)
+            labels=$(gh api "repos/$GITHUB_REPOSITORY/commits/$sha/pulls" --jq '[.[].labels[].name] | join(",")')
+            previous=$(gh release list --limit 1 --exclude-drafts --exclude-pre-releases --json tagName --jq '.[0].tagName // empty')
+            # Из чего собирается APK. Проверки (test, androidTest, sharedTest), схемы Room, документы,
+            # скрипты и CI в него не попадают.
+            built="app/src/main app/build.gradle.kts app/proguard-rules.pro build.gradle.kts settings.gradle.kts gradle.properties gradle"
+            if [[ ",$labels," == *",release: skip,"* ]]; then
+              publish=false
+              reason="метка «release: skip» на PR"
+            elif [ -z "$previous" ]; then
+              reason="прежних релизов нет"
+            elif git diff --quiet "$previous" "$sha" -- $built; then
+              publish=false
+              reason="с $previous не изменилось ничего, из чего собирается приложение"
+            else
+              reason="с $previous изменилось: $(git diff --name-only "$previous" "$sha" -- $built | head -5 | paste -sd ',' -)"
+            fi
+          fi
+          echo "publish=$publish" >> "$GITHUB_OUTPUT"
+          echo "Релиз: $publish — $reason" | tee -a "$GITHUB_STEP_SUMMARY"
 
       - name: JDK
+        if: steps.need.outputs.publish == 'true'
         uses: actions/setup-java@v5
         with:
           distribution: temurin
           java-version: '25'
 
       - name: Gradle
+        if: steps.need.outputs.publish == 'true'
         uses: gradle/actions/setup-gradle@v5
 
       # Ключ подписи в репозитории не лежит (G1): он приходит секретом и живёт только в этом
       # прогоне. Без него сборка не подписывается, и вложению неоткуда взяться.
       - name: Ключ подписи
+        if: steps.need.outputs.publish == 'true'
         env:
           KEYSTORE: ${{ secrets.MEDAPP_KEYSTORE_BASE64 }}
         run: |
@@ -65,6 +107,7 @@ jobs:
           printf '%s' "$KEYSTORE" | base64 -d > keystore/medapp-release.jks
 
       - name: Сборка
+        if: steps.need.outputs.publish == 'true'
         env:
           MEDAPP_KEYSTORE_FILE: keystore/medapp-release.jks
           MEDAPP_KEYSTORE_PASSWORD: ${{ secrets.MEDAPP_KEYSTORE_PASSWORD }}
@@ -81,6 +124,7 @@ jobs:
       # Неподписанная сборка называется иначе (`app-release-unsigned.apk`), поэтому имя файла здесь
       # и есть проверка подписи: подменить его нечем.
       - name: Релиз
+        if: steps.need.outputs.publish == 'true'
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
