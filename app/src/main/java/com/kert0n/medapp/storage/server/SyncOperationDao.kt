@@ -202,6 +202,13 @@ interface SyncOperationDao {
     )
     suspend fun earliestDueOfUnclosed(): Instant?
 
+    /** То же, кроме названных строк: их заход пропустил, и приходить за ними незачем. */
+    @Query(
+        "SELECT MIN(COALESCE(not_before, 0)) FROM sync_operations WHERE status IN ('PENDING', 'SENDING', 'ANSWERED') " +
+            "AND id NOT IN (:except)"
+    )
+    suspend fun earliestDueOfUnclosedExcept(except: List<Uuid>): Instant?
+
     /**
      * Одна дверь для состояния отправки (PLAN C1 «Переходы операции — у типа»): что писать, решил
      * переход [SyncOperationState], а здесь пишется только строка, которую прочитали той же
