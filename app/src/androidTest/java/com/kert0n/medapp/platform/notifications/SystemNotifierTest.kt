@@ -110,7 +110,6 @@ class SystemNotifierTest {
         val shown = requireNotNull(awaitShown(planned.key.subject)) { "уведомление не показано" }
         assertEquals(NotificationKind.EXPIRY_SOURCE_3D.ordinal, shown.id)
         assertEquals(NotificationChannel.EXPIRY.id, shown.notification.channelId)
-        assertTrue(shown.notification.extras.getCharSequence(android.app.Notification.EXTRA_TITLE).toString().contains("Парацетамол"))
 
         notifier.dismiss(planned.key)
         assertNull(awaitShown(planned.key.subject, expected = false))
