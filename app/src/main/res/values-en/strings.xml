@@ -305,7 +305,7 @@
     <string name="sync_reason_invalid">The server did not accept the data</string>
     <string name="sync_reason_not_enough">The server has less left than you took</string>
     <string name="sync_reason_unit_changed">The medicine\'s unit of measure has changed</string>
-    <string name="sync_reason_stale">The medicine was changed before you</string>
+    <string name="sync_reason_stale">The first-aid kit was changed or removed before you</string>
     <string name="sync_reason_conflict">The medicine was changed before you</string>
     <string name="sync_reason_superseded">Cancelled together with what it depended on</string>
 
