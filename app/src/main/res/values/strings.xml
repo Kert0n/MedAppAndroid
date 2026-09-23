@@ -312,7 +312,7 @@
     <string name="sync_reason_invalid">Сервер не принял данные</string>
     <string name="sync_reason_not_enough">На сервере осталось меньше, чем вы списали</string>
     <string name="sync_reason_unit_changed">У лекарства сменилась единица измерения</string>
-    <string name="sync_reason_stale">Лекарство изменили раньше вас</string>
+    <string name="sync_reason_stale">Аптечку изменили или убрали раньше вас</string>
     <string name="sync_reason_conflict">Лекарство изменили раньше вас</string>
     <string name="sync_reason_superseded">Отменено вместе с тем, от чего зависело</string>
 

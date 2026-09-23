@@ -100,6 +100,24 @@ class SyncStatusScreenTest {
         compose.onNodeWithText("Эту строку нечем прочитать").assertIsDisplayed()
     }
 
+    /**
+     * `STALE` — это про **аптечку**: полки, куда клали новое лекарство, не стало, или решение об
+     * аптечке опоздало за чужим. Скажи строка «лекарство изменили раньше вас» — человек пойдёт
+     * искать, кто правил лекарство, а правили или убрали полку.
+     */
+    @Test
+    fun aStaleRefusalTalksAboutTheKitNotTheMedicine() {
+        val stale = refused().copy(
+            about = OutstandingOperationPresentationDTO.About.PACKAGE_CREATED,
+            reason = OutstandingOperationPresentationDTO.Reason.STALE,
+            recountable = null
+        )
+        show(SyncStatusUiState(rows = listOf(stale), isLoaded = true))
+
+        compose.onNodeWithText("Аптечку изменили или убрали раньше вас").assertIsDisplayed()
+        compose.onNodeWithText("Лекарство изменили раньше вас").assertDoesNotExist()
+    }
+
     /** Расхождение по числу ведёт на пересчёт — той же коробки, о которой спор (REQ-045). */
     @Test
     fun aQuantityConflictLeadsToRecounting() {
