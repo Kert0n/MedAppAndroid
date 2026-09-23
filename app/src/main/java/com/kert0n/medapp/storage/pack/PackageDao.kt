@@ -191,7 +191,7 @@ interface PackageDao {
         JOIN package_details d ON d.package_id = p.id
         LEFT JOIN active_package_assignments a ON a.package_id = p.id
         WHERE (:medKitId IS NULL OR p.med_kit_id = :medKitId)
-          AND (:text = '' OR p.name_search LIKE '%' || :text || '%')
+          AND (:text = '' OR replace(p.name_search, 'ё', 'е') LIKE '%' || :text || '%' ESCAPE '\')
           AND (
             :filter = 'NONE'
             OR (:filter = 'EXPIRED' AND d.expires_on IS NOT NULL AND d.expires_on < :today)
