@@ -107,3 +107,6 @@
 - name: "status: blocked"
   color: "b60205"
   description: "Работа зависит от внешнего решения или изменения"
+- name: "release: skip"
+  color: "ededed"
+  description: "Слияние этого PR не заводит релиз, даже если приложение изменилось"
