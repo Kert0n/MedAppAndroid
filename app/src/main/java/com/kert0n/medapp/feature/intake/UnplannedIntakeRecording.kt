@@ -59,6 +59,7 @@ class UnplannedIntakeRecording @Inject constructor(
         val free = seen.freeForAnyone
         // Вопросы — после отказов и до записи, все разом: человек отвечает один раз (PLAN D6).
         val warnings = listOfNotNull(
+            pkg.expiredOn(at.atZone(clock.zone).toLocalDate())?.let { IntakeWarning.Expired(pkg.facts.name, it) },
             IntakeWarning.TouchesReserved(free).takeIf { !free.covers(amount) }
         )
         if (warnings.isNotEmpty() && !acknowledged) return@run Outcome.Warned(warnings)

@@ -48,6 +48,8 @@ fun PlanScreen(
     onConfirmIntake: (Uuid) -> Unit,
     onDeclineIntake: (Uuid) -> Unit,
     onDismissDayMessage: () -> Unit,
+    onAcknowledgeDayQuestion: () -> Unit,
+    onDismissDayQuestion: () -> Unit,
     onFixNotifications: () -> Unit,
     onFixAlarms: () -> Unit,
     onOpenCourse: (CoursePresentationDTO) -> Unit,
@@ -86,6 +88,8 @@ fun PlanScreen(
                     onConfirm = onConfirmIntake,
                     onDecline = onDeclineIntake,
                     onDismissMessage = onDismissDayMessage,
+                    onAcknowledge = onAcknowledgeDayQuestion,
+                    onDismissQuestion = onDismissDayQuestion,
                     onFixNotifications = onFixNotifications,
                     onFixAlarms = onFixAlarms,
                     modifier = Modifier.fillMaxSize()

@@ -1,5 +1,6 @@
 package com.kert0n.medapp.presentation.plan
 
+import com.kert0n.medapp.presentation.intake.toPresentationDTO
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.kert0n.medapp.domain.intake.IntakeProjection
@@ -63,6 +64,9 @@ class MissedIntakesViewModel @Inject constructor(
 
     private val message = MutableStateFlow<DayMessage?>(null)
 
+    /** Вопрос до записи — вместе с тем плановым, по которому отвечает «всё равно принял». */
+    private val question = MutableStateFlow<Asked?>(null)
+
     private val notices = combine(reminders.observeAwaiting(NoticeDelivery.IN_APP_BANNER), dismissed) { all, closed ->
         all.filter { it.key.kind == NotificationKind.INTAKE_MISSED && it.key !in closed }
     }
@@ -107,10 +111,11 @@ class MissedIntakesViewModel @Inject constructor(
                 }
         }
 
-    val state: StateFlow<MissedIntakesUiState> = combine(lines, answering, message) { lines, answering, message ->
+    val state: StateFlow<MissedIntakesUiState> = combine(lines, answering, message, question) { lines, answering, message, question ->
         MissedIntakesUiState(
             rows = lines.map { it.row.copy(isAnswering = it.row.intakeId in answering) },
             message = message,
+            question = question?.question,
             told = lines.mapTo(HashSet()) { it.key },
             planned = lines.mapNotNull { line -> line.answer?.let { answer -> line.row.intakeId?.let { it to answer } } }.toMap()
         )
@@ -125,15 +130,31 @@ class MissedIntakesViewModel @Inject constructor(
      * между взглядом и нажатием, а пропавшая строка съела бы ответ молча (C1 «Действие — по
      * показанному», CodeRabbit 4030390711).
      */
-    fun confirm(intakeId: Uuid, planned: MissedIntakesUiState.Planned) {
+    fun confirm(intakeId: Uuid, planned: MissedIntakesUiState.Planned) = answer(intakeId, planned, acknowledged = false)
+
+    /** «Всё равно принял»: то же плановое, что было нажато, — с подтверждением. */
+    fun acknowledge() {
+        val asked = question.value ?: return
+        question.value = null
+        answer(asked.question.intakeId, asked.planned, acknowledged = true)
+    }
+
+    /** Вопрос закрыт без ответа — не записано ничего (PLAN D6). */
+    fun dismissQuestion() {
+        question.value = null
+    }
+
+    private fun answer(intakeId: Uuid, planned: MissedIntakesUiState.Planned, acknowledged: Boolean) {
         if (intakeId in answering.value) return
         answering.update { it + intakeId }
         viewModelScope.launch {
             try {
-                when (val outcome = confirmation.confirm(intakeId, planned.packageId, planned.amount, planned.at)) {
+                when (val outcome = confirmation.confirm(intakeId, planned.packageId, planned.amount, planned.at, acknowledged)) {
                     is IntakeConfirmation.Outcome.Confirmed -> Unit
                     is IntakeConfirmation.Outcome.Rejected -> message.value = DayMessage.Refused(outcome.reason)
                     IntakeConfirmation.Outcome.Gone -> message.value = DayMessage.Gone
+                    is IntakeConfirmation.Outcome.Warned ->
+                        question.value = Asked(DayQuestion(intakeId, outcome.warnings.map { it.toPresentationDTO() }), planned)
                 }
             } finally {
                 answering.update { it - intakeId }
@@ -156,6 +177,8 @@ class MissedIntakesViewModel @Inject constructor(
 
     private data class Line(val key: NotificationKey, val row: DayItemPresentationDTO, val answer: MissedIntakesUiState.Planned?)
 
+    private data class Asked(val question: DayQuestion, val planned: MissedIntakesUiState.Planned)
+
     fun dismissMessage() {
         message.value = null
     }
@@ -168,6 +191,7 @@ class MissedIntakesViewModel @Inject constructor(
 data class MissedIntakesUiState(
     val rows: List<DayItemPresentationDTO> = emptyList(),
     val message: DayMessage? = null,
+    val question: DayQuestion? = null,
     /** Обязательства показанных строк: их и только их крестик отмечает сказанными. */
     val told: Set<NotificationKey> = emptySet(),
     /** Плановое строк, у которых есть быстрый ответ, — по номеру пункта. */

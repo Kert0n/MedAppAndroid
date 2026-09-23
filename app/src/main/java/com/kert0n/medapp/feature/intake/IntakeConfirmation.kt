@@ -38,9 +38,9 @@ import kotlin.uuid.Uuid
  * сети оно не зависит (PLAN E4). Домен считает от факта — подтверждённого остатка и чужих
  * броней; незакрытые команды очереди — доставка, и о ней он не думает (PLAN D4).
  *
- * Вопросов у планового приёма нет: принять из просроченной коробки — дело человека, срок ему
- * показан (PLAN C1 «Просроченная пачка», поправка владельца 2026-09-16, расходится с ТЗ 4.1.1.5.5).
- * Поэтому исходов три — записано, отказ, пункта нет, — и «Принял» из шторки пишет без экрана.
+ * Коробка, просроченная к дню приёма, — вопрос, а не отказ (ТЗ 4.1.1.5.5, решение владельца
+ * 2026-09-23): не записано ничего, пока человек не подтвердит тем же вызовом ([acknowledged]).
+ * «Принял» из шторки подтверждает заранее — руки заняты, а срок человеку сказан уведомлением.
  */
 class IntakeConfirmation @Inject constructor(
     private val intakes: IntakeStorageRepository,
@@ -57,17 +57,18 @@ class IntakeConfirmation @Inject constructor(
     /**
      * Принято [amount] из пачки [packageId] в момент [at], который называет человек: сейчас или
      * вчера — проверка одна и та же. Отказ — [Outcome.Rejected], и тогда не записано ничего; пункта
-     * уже нет — [Outcome.Gone]. Повтор по уже принятому пункту ничего не меняет и отвечает тем,
-     * что записано.
+     * уже нет — [Outcome.Gone]; вопрос — [Outcome.Warned], и записано будет тем же вызовом с
+     * [acknowledged]. Повтор по уже принятому пункту ничего не меняет и отвечает тем, что записано.
      */
     suspend fun confirm(
         intakeId: Uuid,
         packageId: Uuid,
         amount: Dose,
-        at: Instant
-    ): Outcome = transactions.run { write(intakeId, packageId, amount, at) }
+        at: Instant,
+        acknowledged: Boolean = false
+    ): Outcome = transactions.run { write(intakeId, packageId, amount, at, acknowledged) }
 
-    private suspend fun write(intakeId: Uuid, packageId: Uuid, amount: Dose, at: Instant): Outcome {
+    private suspend fun write(intakeId: Uuid, packageId: Uuid, amount: Dose, at: Instant, acknowledged: Boolean): Outcome {
         val now = clock.instant()
         // Идентификатор пришёл снаружи — с экрана или из шторки: пропавший пункт — исход, не падение.
         val intake = intakes.find(intakeId) as? CourseIntake ?: return Outcome.Gone
@@ -94,6 +95,12 @@ class IntakeConfirmation @Inject constructor(
         // Пункт курса принимают из пачки курса; из любой другой это внеплановый факт, и пункт им
         // не закрывается (PLAN D5).
         if (!course.isSource(pkg.ref)) return rejected(IntakeRejected.Reason.PACKAGE_NOT_A_SOURCE)
+        // Вопрос — после отказов и до всякой записи, в том числе отметки пропусков: не записано
+        // ничего, пока человек не ответит. Просрочена ли — на день приёма, а не на сегодня.
+        val warnings = listOfNotNull(
+            pkg.expiredOn(at.atZone(clock.zone).toLocalDate())?.let { IntakeWarning.Expired(pkg.facts.name, it) }
+        )
+        if (warnings.isNotEmpty() && !acknowledged) return Outcome.Warned(warnings)
         // Прошлое до ответа, но после всех отказов — отказ не пишет ничего: неответ, чей день
         // кончился, — пропуск. Иначе конец лечения этим приёмом отменил бы такие пункты, а
         // отменённый пропуском уже не станет (PLAN D6).
@@ -163,10 +170,11 @@ class IntakeConfirmation @Inject constructor(
     private fun rejected(reason: IntakeRejected.Reason): Outcome = Outcome.Rejected(reason)
 
     /**
-     * Чем кончилось — три исхода, которые экран делает по-разному (PLAN D6). Записано — принятый
+     * Чем кончилось — четыре исхода, которые экран делает по-разному (PLAN D6). Записано — принятый
      * пункт **проекцией** (сущность действительна лишь в транзакции, которая её прочитала, и
      * наружу не уходит — PLAN H1), где его расход, в локальном остатке или в очереди, и
-     * закончилось ли им лечение. Отказ — причина по месту.
+     * закончилось ли им лечение. Отказ — причина по месту. Вопрос — экран спрашивает и отвечает тем
+     * же вызовом с подтверждением.
      */
     sealed interface Outcome {
         data class Confirmed(
@@ -176,6 +184,8 @@ class IntakeConfirmation @Inject constructor(
         ) : Outcome
 
         data class Rejected(val reason: IntakeRejected.Reason) : Outcome
+
+        data class Warned(val warnings: List<IntakeWarning>) : Outcome
 
         /**
          * Пункта, названного снаружи, уже нет: расписание перестроили, пока экран или шторка его

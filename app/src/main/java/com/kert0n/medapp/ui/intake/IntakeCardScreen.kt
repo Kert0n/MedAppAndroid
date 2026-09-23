@@ -55,9 +55,16 @@ fun IntakeCardScreen(
     onEdit: (IntakeCardPresentationDTO) -> Unit,
     onConfirm: () -> Unit,
     onDecline: () -> Unit,
+    onAcknowledge: () -> Unit,
+    onDismissQuestions: () -> Unit,
     onBack: () -> Unit,
     modifier: Modifier = Modifier
 ) {
+    // Вопрос до записи: коробка просрочена к дню приёма. Решает человек, и не записано ничего,
+    // пока он не ответит (ТЗ 4.1.1.5.5).
+    if (state.questions.isNotEmpty()) {
+        IntakeQuestionsDialog(state.questions, onAcknowledge = onAcknowledge, onDismiss = onDismissQuestions)
+    }
     Scaffold(
         modifier = modifier.fillMaxSize(),
         topBar = {

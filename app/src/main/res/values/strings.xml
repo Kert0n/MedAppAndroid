@@ -477,6 +477,7 @@
     <string name="intake_confirm">Принял</string>
     <string name="intake_questions_title">Прежде чем записать</string>
     <string name="intake_confirm_anyway">Всё равно принял</string>
+    <string name="intake_question_expired">«%1$s» просрочен: годен до %2$s</string>
     <string name="intake_question_touches_reserved">Приём заденет занятое: свободно %1$s</string>
     <string name="intake_decline">Пропустил</string>
     <string name="courses_empty">Лечений пока нет.</string>

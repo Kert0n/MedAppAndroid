@@ -39,7 +39,8 @@ class ReminderAnswering @Inject constructor(
      * «Принял» из шторки — **без экрана** (PLAN C1, поправка владельца 2026-09-16): принято то, что
      * записано в пункте, — плановая пачка и доза, — в момент нажатия, тем же сценарием, что быстрый
      * ответ на «Дне». Открыть приложение, ответить за человека и закрыть его выглядело как «ничего
-     * не произошло».
+     * не произошло». Вопросов шторка не задаёт — подтверждает заранее: о просрочке человеку сказано
+     * уведомлением, а спрашивают экраны приёма (решение владельца 2026-09-23).
      *
      * Не вышло — не пишется ничего, и молча это не проходит: заводится обязательство «нужно ваше
      * решение», нажатие на него ведёт на карточку пункта. Курс закрыт или пункта нет — решать нечего.
@@ -51,7 +52,7 @@ class ReminderAnswering @Inject constructor(
     suspend fun take(intakeId: Uuid): Response = transactions.run {
         val intake = intakes.find(intakeId) as? CourseIntake ?: return@run Response.Done
         val planned = intake.plannedPackage
-        val outcome = planned?.let { confirmation.confirm(intakeId, it.id, intake.plannedAmount, clock.instant()) }
+        val outcome = planned?.let { confirmation.confirm(intakeId, it.id, intake.plannedAmount, clock.instant(), acknowledged = true) }
         when {
             outcome is IntakeConfirmation.Outcome.Confirmed || outcome == IntakeConfirmation.Outcome.Gone -> Response.Done
             outcome is IntakeConfirmation.Outcome.Rejected && outcome.reason == IntakeRejected.Reason.EPISODE_CLOSED -> {

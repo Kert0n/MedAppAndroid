@@ -462,6 +462,7 @@
     <string name="intake_confirm">Taken</string>
     <string name="intake_questions_title">Before recording</string>
     <string name="intake_confirm_anyway">Taken anyway</string>
+    <string name="intake_question_expired">“%1$s” has expired: good until %2$s</string>
     <string name="intake_question_touches_reserved">The intake will touch what is held: %1$s free</string>
     <string name="intake_decline">Skipped</string>
     <string name="courses_empty">No treatments yet.</string>

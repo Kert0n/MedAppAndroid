@@ -188,7 +188,9 @@ fun MedAppShell(
                     onOpen = { row -> row.intakeId?.let { stacks.go(Screen.IntakeCard(it)) } },
                     onConfirm = missed::confirm,
                     onDismiss = missed::dismiss,
-                    onDismissMessage = missed::dismissMessage
+                    onDismissMessage = missed::dismissMessage,
+                    onAcknowledge = missed::acknowledge,
+                    onDismissQuestion = missed::dismissQuestion
                 )
             } else {
                 ExpiringTodayPopup(
@@ -455,6 +457,8 @@ private fun screens(
             onConfirmIntake = days::confirm,
             onDeclineIntake = days::decline,
             onDismissDayMessage = days::dismissMessage,
+            onAcknowledgeDayQuestion = days::acknowledge,
+            onDismissDayQuestion = days::dismissQuestion,
             onFixNotifications = context::openNotificationSettings,
             onFixAlarms = context::openExactAlarmSettings,
             dayPermissions = days.permissions.collectAsStateWithLifecycle().value,
@@ -481,6 +485,8 @@ private fun screens(
             onEdit = model::edit,
             onConfirm = { model.confirm() },
             onDecline = model::decline,
+            onAcknowledge = { model.confirm(acknowledged = true) },
+            onDismissQuestions = model::dismissQuestions,
             onBack = stacks::back
         )
     }

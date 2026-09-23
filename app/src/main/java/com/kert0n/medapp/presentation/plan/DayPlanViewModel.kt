@@ -1,5 +1,6 @@
 package com.kert0n.medapp.presentation.plan
 
+import com.kert0n.medapp.presentation.intake.toPresentationDTO
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.kert0n.medapp.domain.report.DayPlan
@@ -63,6 +64,9 @@ class DayPlanViewModel @Inject constructor(
     /** Чем кончился ответ, если по самой странице этого не видно. */
     private val message = MutableStateFlow<DayMessage?>(null)
 
+    /** Вопрос до записи быстрого ответа: ответ на него — тот же вызов с подтверждением. */
+    private val question = MutableStateFlow<DayQuestion?>(null)
+
     /**
      * Что мешает напомнить вовремя. Состояние спрашивается у системы, а меняет его человек в её
      * настройках — поэтому перечитывается при каждом возвращении на экран ([refreshPermissions]),
@@ -100,9 +104,9 @@ class DayPlanViewModel @Inject constructor(
      * а «на этот день ничего не назначено» — это пришедшая пустая страница, а не ожидание.
      */
     fun page(daysAhead: Int): StateFlow<ScreenState<DayPagePresentationDTO>> = pages.getOrPut(daysAhead) {
-        combine(reading(daysAhead), answering, message) { reading, answering, message ->
+        combine(reading(daysAhead), answering, message, question) { reading, answering, message, question ->
             if (reading == null) ScreenState.Loading
-            else ScreenState.Ready(reading.plan.toPresentationDTO(daysAhead, reading.zone, answering, message))
+            else ScreenState.Ready(reading.plan.toPresentationDTO(daysAhead, reading.zone, answering, message).copy(question = question))
         }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), ScreenState.Loading)
     }
 
@@ -111,7 +115,7 @@ class DayPlanViewModel @Inject constructor(
      * в момент «сейчас». Человек нажал одну кнопку и ничего не называл, поэтому и берётся
      * назначенное, а не собранное экраном (H3 №12).
      */
-    fun confirm(intakeId: Uuid) {
+    fun confirm(intakeId: Uuid, acknowledged: Boolean = false) {
         if (intakeId in answering.value) return
         // Пункт без плановой пачки быстрым путём не отвечают: брать неоткуда, и человек выбирает
         // коробку на карточке. Кнопки у такой строки нет вовсе — нажимать нечего.
@@ -119,7 +123,7 @@ class DayPlanViewModel @Inject constructor(
         answering.value = answering.value + intakeId
         viewModelScope.launch {
             try {
-                told(planned, confirmation.confirm(intakeId, planned.packageId, planned.amount, clock.instant()))
+                told(planned, confirmation.confirm(intakeId, planned.packageId, planned.amount, clock.instant(), acknowledged))
             } finally {
                 // Сорвался сценарий или нет, строка должна снова принимать нажатие: иначе она
                 // останется погашенной до конца жизни экрана.
@@ -157,7 +161,21 @@ class DayPlanViewModel @Inject constructor(
             is IntakeConfirmation.Outcome.Confirmed -> Unit
             is IntakeConfirmation.Outcome.Rejected -> message.value = DayMessage.Refused(outcome.reason)
             IntakeConfirmation.Outcome.Gone -> message.value = DayMessage.Gone
+            is IntakeConfirmation.Outcome.Warned ->
+                question.value = DayQuestion(planned.intakeId, outcome.warnings.map { it.toPresentationDTO() })
         }
+    }
+
+    /** «Всё равно принял»: тот же быстрый ответ, но с подтверждением — и вопрос закрыт. */
+    fun acknowledge() {
+        val asked = question.value ?: return
+        question.value = null
+        confirm(asked.intakeId, acknowledged = true)
+    }
+
+    /** Вопрос закрыт без ответа — не записано ничего: отмена и есть отказ записывать (PLAN D6). */
+    fun dismissQuestion() {
+        question.value = null
     }
 
     /** Чем кончился отказ. Записанный отказ приходит чтением; остальное — словами. */

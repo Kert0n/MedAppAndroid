@@ -92,6 +92,8 @@ class PlanScreenTest {
                     onConfirmIntake = {},
                     onDeclineIntake = {},
                     onDismissDayMessage = {},
+                    onAcknowledgeDayQuestion = {},
+                    onDismissDayQuestion = {},
                     onOpenCourse = { opened = it },
                     onAddCourse = { added++ }
                 )
