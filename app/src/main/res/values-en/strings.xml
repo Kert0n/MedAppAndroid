@@ -538,7 +538,7 @@
     <string name="course_rejected_total_doses_missing">To start, say how many intakes in total.</string>
     <string name="course_rejected_unit_mismatch">The attached drugs use a different unit — detach them first.</string>
     <string name="course_rejected_form_mismatch">The attached drugs have a different form — detach them first.</string>
-    <string name="course_rejected_schedule_in_past">A new schedule can\'t start before today.</string>
+    <string name="course_rejected_schedule_in_past">Treatment can\'t start before today — pick the date again.</string>
     <string name="course_rejected_already_attached">This drug is already attached.</string>
     <string name="course_rejected_package_unusable">This drug is being thrown away or its shelf is gone — it can\'t be a source.</string>
     <string name="course_missing">This treatment no longer exists.</string>
