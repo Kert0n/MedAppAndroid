@@ -1,21 +1,21 @@
 package com.kert0n.medapp.fixture
 
+import com.kert0n.medapp.domain.intake.CourseIntake
 import com.kert0n.medapp.domain.intake.Intake
 import com.kert0n.medapp.domain.medkit.MedKitRef
 import com.kert0n.medapp.domain.pack.Package
 import com.kert0n.medapp.domain.pack.PackageRef
-import com.kert0n.medapp.storage.medkit.MedKitStorageEntity
-import com.kert0n.medapp.storage.pack.PackageRefStorageRow
 import com.kert0n.medapp.queue.intake.IntakeSyncState
-import com.kert0n.medapp.network.pack.PackageSyncState
+import com.kert0n.medapp.queue.pack.PackageSyncState
 import com.kert0n.medapp.storage.intake.IntakeStorageRow
 import com.kert0n.medapp.storage.intake.toStorageEntity
+import com.kert0n.medapp.storage.medkit.MedKitStorageEntity
 import com.kert0n.medapp.storage.medkit.toStorageEntity as toMedKitStorageEntity
+import com.kert0n.medapp.storage.pack.PackageRefStorageRow
 import com.kert0n.medapp.storage.pack.PackageStorageRow
 import com.kert0n.medapp.storage.pack.toDetailsStorageEntity
 import com.kert0n.medapp.storage.pack.toStorageEntity
 import com.kert0n.medapp.storage.pack.toStorageEntity as toClaimsStorageEntity
-import com.kert0n.medapp.domain.intake.CourseIntake
 
 /**
  * Строки хранения, собранные из доменных объектов так, как их собрала бы база: связи заполнены

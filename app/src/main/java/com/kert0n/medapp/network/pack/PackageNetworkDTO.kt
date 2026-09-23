@@ -1,6 +1,6 @@
 package com.kert0n.medapp.network.pack
 
-import com.kert0n.medapp.network.server.ResourceVersion
+import com.kert0n.medapp.network.server.ResourceVersionNetworkDTO
 import kotlin.uuid.Uuid
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
@@ -22,7 +22,7 @@ data class PackageNetworkDTO(
     val country: String? = null,
     val description: String? = null,
     val medKitId: Uuid,
-    val version: ResourceVersion
+    val version: ResourceVersionNetworkDTO
 ) {
     init {
         requireNetworkAmount(amount, "PackageNetworkDTO.amount")

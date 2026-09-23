@@ -2,10 +2,11 @@ package com.kert0n.medapp.feature.packages
 
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import com.kert0n.medapp.domain.course.CourseDraft
-import com.kert0n.medapp.domain.value.Doses
 import com.kert0n.medapp.domain.course.Revision
 import com.kert0n.medapp.domain.medkit.MedKit
+import com.kert0n.medapp.domain.pack.Claims
 import com.kert0n.medapp.domain.pack.PackageStatus
+import com.kert0n.medapp.domain.value.Doses
 import com.kert0n.medapp.fixture.COURSE
 import com.kert0n.medapp.fixture.LATER
 import com.kert0n.medapp.fixture.PACK
@@ -13,8 +14,6 @@ import com.kert0n.medapp.fixture.SHARED_KIT
 import com.kert0n.medapp.fixture.Scenarios
 import com.kert0n.medapp.fixture.TABLET_FORM
 import com.kert0n.medapp.fixture.VOCABULARY
-import com.kert0n.medapp.domain.pack.Claims
-import java.math.BigDecimal
 import com.kert0n.medapp.fixture.activeCourse
 import com.kert0n.medapp.fixture.courseRecord
 import com.kert0n.medapp.fixture.courseRepository
@@ -24,13 +23,14 @@ import com.kert0n.medapp.fixture.pack
 import com.kert0n.medapp.fixture.packageRepository
 import com.kert0n.medapp.fixture.source
 import com.kert0n.medapp.fixture.tablets
-import com.kert0n.medapp.network.pack.PackageSyncState
-import com.kert0n.medapp.network.server.ResourceVersion
+import com.kert0n.medapp.queue.ResourceVersion
 import com.kert0n.medapp.queue.StoredSyncOperation
 import com.kert0n.medapp.queue.SyncCommand
 import com.kert0n.medapp.queue.pack.PackageSyncCommand
+import com.kert0n.medapp.queue.pack.PackageSyncState
 import com.kert0n.medapp.storage.database.MedAppDatabase
 import com.kert0n.medapp.storage.medkit.toStorageEntity as toMedKitStorageEntity
+import java.math.BigDecimal
 import kotlin.uuid.Uuid
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.test.runTest

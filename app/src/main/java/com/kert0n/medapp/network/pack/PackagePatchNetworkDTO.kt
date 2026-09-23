@@ -1,7 +1,7 @@
 package com.kert0n.medapp.network.pack
 
 import com.kert0n.medapp.domain.pack.PackageSharedFacts
-import com.kert0n.medapp.network.server.ResourceVersion
+import com.kert0n.medapp.network.server.ResourceVersionNetworkDTO
 import kotlin.uuid.Uuid
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
@@ -29,7 +29,7 @@ data class PackagePatchNetworkDTO(
     val manufacturer: String? = null,
     val country: String? = null,
     val description: String? = null,
-    val version: ResourceVersion? = null
+    val version: ResourceVersionNetworkDTO? = null
 ) {
     init {
         require(name == null || name.isNotBlank()) { "название нельзя очистить" }

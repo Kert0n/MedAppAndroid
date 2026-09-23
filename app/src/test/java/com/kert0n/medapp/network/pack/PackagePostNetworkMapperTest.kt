@@ -1,18 +1,16 @@
 package com.kert0n.medapp.network.pack
 
-import com.kert0n.medapp.network.server.ResourceVersion
 import com.kert0n.medapp.domain.pack.PackageSharedFacts
-
-
 import com.kert0n.medapp.fixture.PACK
+import com.kert0n.medapp.fixture.TABLETS_ID
 import com.kert0n.medapp.fixture.TABLET_FORM
+import com.kert0n.medapp.fixture.TABLET_FORM_ID
 import com.kert0n.medapp.fixture.pack
-
+import com.kert0n.medapp.queue.ResourceVersion
+import com.kert0n.medapp.queue.pack.PackageSyncState
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertThrows
 import org.junit.Test
-import com.kert0n.medapp.fixture.TABLETS_ID
-import com.kert0n.medapp.fixture.TABLET_FORM_ID
 
 /**
  * Домен → тело создания пачки. Здесь и заканчивается граница данных: всё, чего нет в

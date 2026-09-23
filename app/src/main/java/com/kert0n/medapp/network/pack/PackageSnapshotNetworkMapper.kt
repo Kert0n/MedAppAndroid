@@ -9,15 +9,10 @@ import com.kert0n.medapp.domain.value.Quantity
 import com.kert0n.medapp.domain.value.Vocabulary
 import com.kert0n.medapp.network.value.formOrMiss
 import com.kert0n.medapp.network.value.unitOrMiss
+import com.kert0n.medapp.queue.pack.PackageSnapshot
+import com.kert0n.medapp.queue.pack.PackageSyncState
 import java.math.BigDecimal
 import java.time.Instant
-
-/**
- * Снимок пачки с сервера, собранный в домен: подтверждённое состояние и его обвязка вместе,
- * потому что порознь с провода они не приходят (PLAN E4). Равенство — по обвязке и тождеству
- * пачки: два снимка одной пачки различаются версиями, а не полями.
- */
-data class PackageSnapshot(val pack: Package, val sync: PackageSyncState)
 
 /**
  * Провод → домен. Единица и форма приходят идентификаторами и разрешаются по снимку словаря;
@@ -51,8 +46,8 @@ fun PackageSnapshotNetworkDTO.toDomain(
     ),
     sync = PackageSyncState(
         packageId = pack.id,
-        version = pack.version,
-        claimsVersion = claims.version,
+        version = pack.version.toVersion(),
+        claimsVersion = claims.version.toVersion(),
         syncedAt = observedAt
     )
 )

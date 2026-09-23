@@ -1,5 +1,9 @@
 package com.kert0n.medapp.network.server
 
+import com.kert0n.medapp.domain.value.Dose
+import com.kert0n.medapp.domain.value.Quantity
+import com.kert0n.medapp.domain.value.QuantityUnit
+import com.kert0n.medapp.fixture.ProbeAccounts
 import com.kert0n.medapp.network.account.AccountCredentials
 import com.kert0n.medapp.network.medkit.MedKitPostNetworkDTO
 import com.kert0n.medapp.network.medkit.MembershipPostNetworkDTO
@@ -9,6 +13,13 @@ import com.kert0n.medapp.network.pack.PackagePatchNetworkDTO
 import com.kert0n.medapp.network.pack.PackagePostNetworkDTO
 import com.kert0n.medapp.network.pack.PackageSnapshotNetworkDTO
 import com.kert0n.medapp.network.pack.PackageSyncNetworkDTO
+import com.kert0n.medapp.queue.PreparedRequest
+import com.kert0n.medapp.queue.ResourceVersion
+import com.kert0n.medapp.queue.pack.PackageSyncCommand
+import com.kert0n.medapp.queue.pack.PackageSyncState
+import com.kert0n.medapp.queue.pack.toPreparedRequest
+import java.math.BigDecimal
+import java.time.Instant
 import kotlin.uuid.Uuid
 import kotlinx.coroutines.runBlocking
 import org.junit.After
@@ -19,16 +30,6 @@ import org.junit.Assume.assumeTrue
 import org.junit.Before
 import org.junit.BeforeClass
 import org.junit.Test
-import com.kert0n.medapp.domain.value.Dose
-import com.kert0n.medapp.domain.value.Quantity
-import com.kert0n.medapp.domain.value.QuantityUnit
-import com.kert0n.medapp.queue.PreparedRequest
-import com.kert0n.medapp.queue.pack.PackageSyncCommand
-import com.kert0n.medapp.network.pack.PackageSyncState
-import com.kert0n.medapp.queue.pack.toPreparedRequest
-import com.kert0n.medapp.fixture.ProbeAccounts
-import java.math.BigDecimal
-import java.time.Instant
 
 /**
  * Проба контракта против боевого сервера (PLAN PR 5, AGENTS «Связь с сервером»): тот же клиент,
@@ -212,12 +213,12 @@ class ContractProbe {
         val edit = PackagePatchNetworkDTO(description = "правка пробы")
 
         assertEquals(ApiFailure.PreconditionRequired, failure(owner.patchPackage(pack.id, edit)))
-        val stale = edit.copy(version = ResourceVersion(pack.version.number + 1))
+        val stale = edit.copy(version = ResourceVersionNetworkDTO(pack.version.number + 1))
         assertEquals(ApiFailure.PreconditionFailed, failure(owner.patchPackage(pack.id, stale)))
 
         val patched = success(owner.patchPackage(pack.id, edit.copy(version = pack.version))).pack
         assertEquals("правка пробы", patched.description)
-        assertTrue(patched.version > pack.version)
+        assertTrue(patched.version.number > pack.version.number)
     }
 
     @Test
@@ -258,7 +259,7 @@ class ContractProbe {
         success(owner.patchClaim(packageId, ClaimPatchNetworkDTO("2", declared.version)))
         val changed = success(owner.packageSnapshot(packageId)).claims
         assertEquals("2.000000", changed.mine)
-        assertEquals(Unit, success(owner.deleteClaim(packageId, changed.version)))
+        assertEquals(Unit, success(owner.deleteClaim(packageId, changed.version.toVersion())))
         assertNull(success(owner.packageSnapshot(packageId)).claims.mine)
     }
 
@@ -347,14 +348,14 @@ class ContractProbe {
         val target = newKit()
         val pack = newPackage(newKit()).pack
 
-        assertEquals(target, success(owner.movePackage(pack.id, target, pack.version)).pack.medKitId)
+        assertEquals(target, success(owner.movePackage(pack.id, target, pack.version.toVersion())).pack.medKitId)
     }
 
     @Test
     fun removalAnswersWithNoContent() = runBlocking {
         val pack = newPackage(newKit()).pack
 
-        assertEquals(Unit, success(owner.deletePackage(pack.id, pack.version)))
+        assertEquals(Unit, success(owner.deletePackage(pack.id, pack.version.toVersion())))
         assertEquals(ApiFailure.NotFound, failure(owner.packageSnapshot(pack.id)))
     }
 
@@ -366,7 +367,7 @@ class ContractProbe {
     fun preparedRequestOfTheQueueIsAcceptedAsIs() = runBlocking {
         val pack = newPackage(newKit(), amount = "10").pack
         val unitObject = QuantityUnit(unit, "проба")
-        val sync = PackageSyncState(pack.id, version = pack.version)
+        val sync = PackageSyncState(pack.id, version = pack.version.toVersion())
         val operationId = Uuid.random()
         val consume = PackageSyncCommand.Consume(
             pack.id, Dose(Quantity(BigDecimal("2"), unitObject)), operationId,
@@ -386,7 +387,7 @@ class ContractProbe {
         assertEquals("8.000000", repeated.pack.amount)
         // Снятие брони и удаление — без тела.
         assertEquals("", success(owner.send(PackageSyncCommand.ReleaseClaim(pack.id).toPreparedRequest(
-            Uuid.random(), PackageSyncState(pack.id, snapshot.pack.version, snapshot.claims.version), null, null, Instant.EPOCH
+            Uuid.random(), PackageSyncState(pack.id, snapshot.pack.version.toVersion(), snapshot.claims.version.toVersion()), null, null, Instant.EPOCH
         ))).body)
     }
 
@@ -412,7 +413,7 @@ class ContractProbe {
         assertEquals("10.000000", untouched.pack.amount)
         assertEquals(pack.version, untouched.pack.version)
 
-        val fresh = consume.toPreparedRequest(operationId, PackageSyncState(pack.id, version = untouched.pack.version), null, null, Instant.EPOCH)
+        val fresh = consume.toPreparedRequest(operationId, PackageSyncState(pack.id, version = untouched.pack.version.toVersion()), null, null, Instant.EPOCH)
         val applied = medAppJson.decodeFromString(PackageSnapshotNetworkDTO.serializer(), success(owner.send(fresh)).body)
         assertEquals("8.000000", applied.pack.amount)
         assertNull(applied.claims.mine)

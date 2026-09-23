@@ -2,12 +2,13 @@ package com.kert0n.medapp.storage.pack
 
 import com.kert0n.medapp.domain.pack.Claims
 import com.kert0n.medapp.fixture.PACK
+import com.kert0n.medapp.fixture.VOCABULARY
 import com.kert0n.medapp.fixture.inMemoryDatabase
-import com.kert0n.medapp.fixture.save
 import com.kert0n.medapp.fixture.pack
+import com.kert0n.medapp.fixture.save
 import com.kert0n.medapp.fixture.tablets
-import com.kert0n.medapp.network.pack.PackageSyncState
-import com.kert0n.medapp.network.server.ResourceVersion
+import com.kert0n.medapp.queue.ResourceVersion
+import com.kert0n.medapp.queue.pack.PackageSyncState
 import com.kert0n.medapp.storage.database.MedAppDatabase
 import java.math.BigDecimal
 import java.time.Instant
@@ -17,7 +18,6 @@ import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNull
 import org.junit.Before
 import org.junit.Test
-import com.kert0n.medapp.fixture.VOCABULARY
 
 /**
  * Брони хранятся своей строкой и со своей версией: картину двигают чужие действия, а версия —

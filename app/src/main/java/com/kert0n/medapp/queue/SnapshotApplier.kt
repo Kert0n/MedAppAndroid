@@ -5,11 +5,11 @@ import com.kert0n.medapp.domain.medkit.InvitationKey
 import com.kert0n.medapp.network.account.asUnavailability
 import com.kert0n.medapp.network.medkit.MedKitNetworkDTO
 import com.kert0n.medapp.network.medkit.MembershipPostNetworkDTO
-import com.kert0n.medapp.network.pack.PackageSnapshot
 import com.kert0n.medapp.network.server.ApiFailure
 import com.kert0n.medapp.network.server.ApiResult
 import com.kert0n.medapp.network.server.MedAppApi
 import com.kert0n.medapp.network.value.VocabularyResolver
+import com.kert0n.medapp.queue.pack.PackageSnapshot
 import java.time.Clock
 import java.time.Instant
 import javax.inject.Inject

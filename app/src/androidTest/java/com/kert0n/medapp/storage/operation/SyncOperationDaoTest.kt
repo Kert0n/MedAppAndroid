@@ -1,27 +1,28 @@
 package com.kert0n.medapp.storage.operation
 
-import com.kert0n.medapp.domain.value.Attempts
 import android.database.sqlite.SQLiteConstraintException
+import com.kert0n.medapp.domain.value.Attempts
 import com.kert0n.medapp.fixture.HOME_KIT
-import com.kert0n.medapp.fixture.settle
 import com.kert0n.medapp.fixture.INTAKE
 import com.kert0n.medapp.fixture.OTHER_PACK
 import com.kert0n.medapp.fixture.PACK
 import com.kert0n.medapp.fixture.SHARED_KIT
 import com.kert0n.medapp.fixture.TABLETS
+import com.kert0n.medapp.fixture.VOCABULARY
 import com.kert0n.medapp.fixture.dose
 import com.kert0n.medapp.fixture.inMemoryDatabase
 import com.kert0n.medapp.fixture.pack
 import com.kert0n.medapp.fixture.rejectedByDatabase
+import com.kert0n.medapp.fixture.settle
 import com.kert0n.medapp.fixture.tablets
+import com.kert0n.medapp.queue.PreparedRequest
+import com.kert0n.medapp.queue.ResourceVersion
+import com.kert0n.medapp.queue.Settlement
+import com.kert0n.medapp.queue.StoredSyncOperation
+import com.kert0n.medapp.queue.SyncOperation
+import com.kert0n.medapp.queue.SyncOperationStatus
 import com.kert0n.medapp.queue.medkit.MedKitSyncCommand
 import com.kert0n.medapp.queue.pack.PackageSyncCommand
-import com.kert0n.medapp.queue.PreparedRequest
-import com.kert0n.medapp.queue.Settlement
-import com.kert0n.medapp.network.server.ResourceVersion
-import com.kert0n.medapp.queue.SyncOperation
-import com.kert0n.medapp.queue.StoredSyncOperation
-import com.kert0n.medapp.queue.SyncOperationStatus
 import com.kert0n.medapp.storage.database.MedAppDatabase
 import java.time.Instant
 import kotlin.uuid.Uuid
@@ -38,7 +39,6 @@ import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Before
 import org.junit.Test
-import com.kert0n.medapp.fixture.VOCABULARY
 
 /**
  * Очередь и её зависимости лежат в базе: номер выдаёт она, порядок по одной пачке строится

@@ -1,6 +1,6 @@
 package com.kert0n.medapp.network.pack
 
-import com.kert0n.medapp.network.server.ResourceVersion
+import com.kert0n.medapp.network.server.ResourceVersionNetworkDTO
 import kotlin.uuid.Uuid
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
@@ -13,7 +13,7 @@ import kotlinx.serialization.Serializable
 data class ClaimPostNetworkDTO(
     @SerialName("drugId") val packageId: Uuid,
     val amount: String,
-    val version: ResourceVersion? = null
+    val version: ResourceVersionNetworkDTO? = null
 ) {
     init {
         requirePositiveNetworkAmount(amount, "ClaimPostNetworkDTO.amount")

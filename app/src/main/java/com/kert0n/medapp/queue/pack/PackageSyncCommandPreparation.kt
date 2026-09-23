@@ -8,15 +8,15 @@ import com.kert0n.medapp.network.pack.ClaimPostNetworkDTO
 import com.kert0n.medapp.network.pack.PackagePatchNetworkDTO
 import com.kert0n.medapp.network.pack.PackagePostNetworkDTO
 import com.kert0n.medapp.network.pack.PackageSyncNetworkDTO
-import com.kert0n.medapp.network.pack.PackageSyncState
 import com.kert0n.medapp.network.pack.toPatchNetworkDTO
 import com.kert0n.medapp.network.server.MedAppRoutes
-import com.kert0n.medapp.network.server.ResourceVersion
 import com.kert0n.medapp.network.server.medAppJson
+import com.kert0n.medapp.network.server.toNetworkDTO
 import com.kert0n.medapp.network.value.toNetworkAmount
 import com.kert0n.medapp.queue.Preparation
 import com.kert0n.medapp.queue.PreparedRequest
 import com.kert0n.medapp.queue.RefusalReason
+import com.kert0n.medapp.queue.ResourceVersion
 import java.time.Instant
 import kotlin.uuid.Uuid
 
@@ -128,7 +128,7 @@ fun PackageSyncCommand.toPreparedRequest(
                 path = MedAppRoutes.pack(packageId),
                 body = medAppJson.encodeToString(
                     PackagePatchNetworkDTO.serializer(),
-                    PackagePatchNetworkDTO(amount = target.toNetworkAmount(), version = version)
+                    PackagePatchNetworkDTO(amount = target.toNetworkAmount(), version = version?.toNetworkDTO())
                 ),
                 sync = sync, confirmed = confirmed, mine = mine, at = at
             )
@@ -153,11 +153,11 @@ fun PackageSyncCommand.toPreparedRequest(
                 PackageSyncNetworkDTO.serializer(),
                 PackageSyncNetworkDTO(
                     consumed = amount.quantity.toNetworkAmount(),
-                    packageVersion = version,
+                    packageVersion = version?.toNetworkDTO(),
                     // Внеплановый расход и нулевая бронь — без блока брони: первому бронь не
                     // нужна, у второго снятие уезжает зависимым `ReleaseClaim` (PLAN E2).
                     claim = claimAfter?.takeUnless { it.isZero }?.let {
-                        PackageSyncNetworkDTO.Claim(it.toNetworkAmount(), claimsVersion)
+                        PackageSyncNetworkDTO.Claim(it.toNetworkAmount(), claimsVersion?.toNetworkDTO())
                     }
                 )
             ),
@@ -170,7 +170,7 @@ fun PackageSyncCommand.toPreparedRequest(
                 path = MedAppRoutes.CLAIMS,
                 body = medAppJson.encodeToString(
                     ClaimPostNetworkDTO.serializer(),
-                    ClaimPostNetworkDTO(packageId, amount.toNetworkAmount(), claimsVersion)
+                    ClaimPostNetworkDTO(packageId, amount.toNetworkAmount(), claimsVersion?.toNetworkDTO())
                 ),
                 sync = sync, confirmed = confirmed, mine = mine, at = at
             ) else prepared(
@@ -178,7 +178,7 @@ fun PackageSyncCommand.toPreparedRequest(
                 path = MedAppRoutes.claim(packageId),
                 body = medAppJson.encodeToString(
                     ClaimPatchNetworkDTO.serializer(),
-                    ClaimPatchNetworkDTO(amount.toNetworkAmount(), claimsVersion)
+                    ClaimPatchNetworkDTO(amount.toNetworkAmount(), claimsVersion?.toNetworkDTO())
                 ),
                 sync = sync, confirmed = confirmed, mine = mine, at = at
             )

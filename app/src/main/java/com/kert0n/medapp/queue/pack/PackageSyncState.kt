@@ -1,11 +1,11 @@
-package com.kert0n.medapp.network.pack
+package com.kert0n.medapp.queue.pack
 
-import com.kert0n.medapp.network.server.ResourceVersion
+import com.kert0n.medapp.queue.ResourceVersion
 import java.time.Instant
 import kotlin.uuid.Uuid
 
 /**
- * Обвязка синхронизации упаковки: то, что нужно хранению и сети, и не нужно правилам.
+ * Что очередь знает о пачке на сервере: то, что нужно поручениям, и не нужно правилам вещи.
  *
  * Версия — токен предусловия, который клиент **не толкует**, а возвращает серверу вместе с
  * командой (PLAN B3). О значении, которое запрещено толковать, нельзя сформулировать

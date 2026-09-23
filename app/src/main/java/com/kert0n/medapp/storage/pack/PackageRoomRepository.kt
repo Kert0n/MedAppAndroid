@@ -1,22 +1,21 @@
 package com.kert0n.medapp.storage.pack
 
 import androidx.room.withTransaction
-import com.kert0n.medapp.domain.pack.Claims
 import com.kert0n.medapp.domain.course.Course
+import com.kert0n.medapp.domain.course.PackageFollowing
 import com.kert0n.medapp.domain.pack.Availability
-import com.kert0n.medapp.storage.course.availabilityOf
+import com.kert0n.medapp.domain.pack.Claims
 import com.kert0n.medapp.domain.pack.Package
 import com.kert0n.medapp.domain.pack.PackageAfter
 import com.kert0n.medapp.domain.pack.PackageEnding
 import com.kert0n.medapp.domain.pack.PackageFacts
 import com.kert0n.medapp.domain.pack.PackageProjection
 import com.kert0n.medapp.domain.pack.PackageStatus
-import com.kert0n.medapp.network.pack.PackageSnapshot
-import com.kert0n.medapp.network.pack.PackageSyncState
+import com.kert0n.medapp.queue.pack.PackageSnapshot
+import com.kert0n.medapp.queue.pack.PackageSyncState
 import com.kert0n.medapp.storage.course.CourseDao
-import com.kert0n.medapp.domain.course.PackageFollowing
-import javax.inject.Provider
 import com.kert0n.medapp.storage.course.CourseReallocation
+import com.kert0n.medapp.storage.course.availabilityOf
 import com.kert0n.medapp.storage.course.toSourceStorageEntities
 import com.kert0n.medapp.storage.course.toStorageEntity as toCourseStorageEntity
 import com.kert0n.medapp.storage.database.MedAppDatabase
@@ -27,6 +26,7 @@ import com.kert0n.medapp.storage.value.VocabularyDao
 import java.time.Instant
 import java.time.LocalDate
 import javax.inject.Inject
+import javax.inject.Provider
 import kotlin.uuid.Uuid
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.map

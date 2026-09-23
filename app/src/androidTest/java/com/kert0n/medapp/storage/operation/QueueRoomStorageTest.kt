@@ -1,58 +1,60 @@
 package com.kert0n.medapp.storage.operation
 
-import com.kert0n.medapp.domain.value.Attempts
+import com.kert0n.medapp.domain.course.Revision
 import com.kert0n.medapp.domain.intake.IntakeStatus
-import com.kert0n.medapp.domain.pack.PackageStatus
-import com.kert0n.medapp.fixture.medKitRepository
-import com.kert0n.medapp.queue.medkit.MedKitSyncCommand
+import com.kert0n.medapp.domain.medkit.MedKit
 import com.kert0n.medapp.domain.medkit.MedKitStatus
+import com.kert0n.medapp.domain.pack.PackageStatus
+import com.kert0n.medapp.domain.value.Attempts
+import com.kert0n.medapp.fixture.COURSE
 import com.kert0n.medapp.fixture.HOME_KIT
 import com.kert0n.medapp.fixture.INTAKE
 import com.kert0n.medapp.fixture.PACK
 import com.kert0n.medapp.fixture.TABLETS
 import com.kert0n.medapp.fixture.TABLET_FORM
+import com.kert0n.medapp.fixture.VOCABULARY
+import com.kert0n.medapp.fixture.activeCourse
+import com.kert0n.medapp.fixture.courseRecord
 import com.kert0n.medapp.fixture.dose
 import com.kert0n.medapp.fixture.inMemoryDatabase
 import com.kert0n.medapp.fixture.medKit
+import com.kert0n.medapp.fixture.medKitRepository
 import com.kert0n.medapp.fixture.pack
-import com.kert0n.medapp.fixture.unplannedIntake
 import com.kert0n.medapp.fixture.packageRepository
 import com.kert0n.medapp.fixture.queueRepository
 import com.kert0n.medapp.fixture.queueStorage
-import com.kert0n.medapp.fixture.transactions
+import com.kert0n.medapp.fixture.save
+import com.kert0n.medapp.fixture.source
 import com.kert0n.medapp.fixture.tablets
-import com.kert0n.medapp.queue.intake.IntakeAccounting
-import com.kert0n.medapp.queue.intake.IntakeSyncState
-import com.kert0n.medapp.network.pack.PackageSnapshot
-import com.kert0n.medapp.network.pack.toDomain
-import com.kert0n.medapp.domain.medkit.MedKit
+import com.kert0n.medapp.fixture.transactions
+import com.kert0n.medapp.fixture.unplannedIntake
 import com.kert0n.medapp.network.pack.PackageSnapshotNetworkDTO
-import com.kert0n.medapp.queue.pack.PackageSyncCommand
-import com.kert0n.medapp.network.pack.PackageSyncState
+import com.kert0n.medapp.network.pack.toDomain
 import com.kert0n.medapp.network.server.RawResponse
-import com.kert0n.medapp.network.server.ResourceVersion
 import com.kert0n.medapp.network.server.medAppJson
 import com.kert0n.medapp.queue.Delivery
-import com.kert0n.medapp.queue.settlement
 import com.kert0n.medapp.queue.PackageState
+import com.kert0n.medapp.queue.QueuedCommand
 import com.kert0n.medapp.queue.RefusalReason
+import com.kert0n.medapp.queue.ResourceVersion
 import com.kert0n.medapp.queue.StoredSyncOperation
 import com.kert0n.medapp.queue.SyncOperationStatus
 import com.kert0n.medapp.queue.Take
-import com.kert0n.medapp.storage.database.MedAppDatabase
-import com.kert0n.medapp.storage.intake.toStorageEntity as toIntakeStorageEntity
-import com.kert0n.medapp.storage.medkit.toStorageEntity as toMedKitStorageEntity
-import com.kert0n.medapp.storage.pack.toStorageEntity
-import com.kert0n.medapp.fixture.COURSE
-import com.kert0n.medapp.fixture.activeCourse
-import com.kert0n.medapp.fixture.courseRecord
-import com.kert0n.medapp.fixture.save
-import com.kert0n.medapp.fixture.source
-import com.kert0n.medapp.domain.course.Revision
+import com.kert0n.medapp.queue.intake.IntakeAccounting
+import com.kert0n.medapp.queue.intake.IntakeSyncState
+import com.kert0n.medapp.queue.medkit.MedKitSyncCommand
+import com.kert0n.medapp.queue.pack.PackageSnapshot
+import com.kert0n.medapp.queue.pack.PackageSyncCommand
+import com.kert0n.medapp.queue.pack.PackageSyncState
+import com.kert0n.medapp.queue.settlement
 import com.kert0n.medapp.storage.course.ActivePackageAssignmentStorageEntity
 import com.kert0n.medapp.storage.course.toSourceStorageEntities
 import com.kert0n.medapp.storage.course.toStorageEntity as toCourseStorageEntity
 import com.kert0n.medapp.storage.course.toTimeStorageEntities
+import com.kert0n.medapp.storage.database.MedAppDatabase
+import com.kert0n.medapp.storage.intake.toStorageEntity as toIntakeStorageEntity
+import com.kert0n.medapp.storage.medkit.toStorageEntity as toMedKitStorageEntity
+import com.kert0n.medapp.storage.pack.toStorageEntity
 import java.math.BigDecimal
 import java.time.Instant
 import kotlin.uuid.Uuid
@@ -63,18 +65,16 @@ import kotlinx.coroutines.flow.collectIndexed
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.runBlocking
-import kotlinx.coroutines.withTimeout
-import com.kert0n.medapp.queue.QueuedCommand
 import kotlinx.coroutines.test.runTest
+import kotlinx.coroutines.withTimeout
 import org.junit.After
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNotNull
 import org.junit.Assert.assertNull
-import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Before
 import org.junit.Test
-import com.kert0n.medapp.fixture.VOCABULARY
 
 /**
  * Порт очереди в Room: заморозка запроса с предусловиями пачки, применение исхода со всеми его

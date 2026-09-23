@@ -130,7 +130,7 @@ fun MedAppDatabase.courseFollowing(): com.kert0n.medapp.feature.course.CourseFol
  */
 suspend fun com.kert0n.medapp.storage.pack.PackageDao.save(
     pkg: com.kert0n.medapp.domain.pack.Package,
-    sync: com.kert0n.medapp.network.pack.PackageSyncState = com.kert0n.medapp.network.pack.PackageSyncState(pkg.id)
+    sync: com.kert0n.medapp.queue.pack.PackageSyncState = com.kert0n.medapp.queue.pack.PackageSyncState(pkg.id)
 ) = save(
     pkg.record.toRecordStorageEntity(),
     pkg.toPackageStorageEntity(sync),

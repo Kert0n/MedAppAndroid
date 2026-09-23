@@ -60,7 +60,7 @@ class MedAppApiFailureTest {
         """
 
         val failure = failureOf(
-            api(HttpStatusCode.BadRequest, body).synchronise(pack, sync, PackageSyncNetworkDTO("2", ResourceVersion(3)))
+            api(HttpStatusCode.BadRequest, body).synchronise(pack, sync, PackageSyncNetworkDTO("2", ResourceVersionNetworkDTO(3)))
         )
 
         assertEquals(
@@ -73,7 +73,7 @@ class MedAppApiFailureTest {
     @Test
     fun badRequestWithUnreadableProblemIsStillInvalid() = runTest {
         val failure = failureOf(
-            api(HttpStatusCode.BadRequest, "<html>").synchronise(pack, sync, PackageSyncNetworkDTO("2", ResourceVersion(3)))
+            api(HttpStatusCode.BadRequest, "<html>").synchronise(pack, sync, PackageSyncNetworkDTO("2", ResourceVersionNetworkDTO(3)))
         )
 
         assertEquals(ApiFailure.Invalid(emptyList()), failure)
@@ -114,7 +114,7 @@ class MedAppApiFailureTest {
     @Test
     fun staleVersionIsAFailedPrecondition() = runTest {
         val result = api(HttpStatusCode.PreconditionFailed)
-            .patchPackage(pack, PackagePatchNetworkDTO(name = "Аспирин C", version = ResourceVersion(2)))
+            .patchPackage(pack, PackagePatchNetworkDTO(name = "Аспирин C", version = ResourceVersionNetworkDTO(2)))
 
         assertEquals(ApiFailure.PreconditionFailed, failureOf(result))
     }

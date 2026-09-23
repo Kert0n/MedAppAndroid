@@ -157,7 +157,7 @@ class FresheningProbe {
     @Test
     fun aBoxThrownAwayByTheNeighbourIsGoneWhenOpened(): Unit = runBlocking {
         val shared = sharedWithBoris()
-        success(boris.deletePackage(shared.box, success(boris.packageSnapshot(shared.box)).pack.version))
+        success(boris.deletePackage(shared.box, success(boris.packageSnapshot(shared.box)).pack.version.toVersion()))
 
         anna.freshening.pack(shared.box)
 

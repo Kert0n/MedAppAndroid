@@ -1,5 +1,6 @@
 package com.kert0n.medapp.presentation.pack
 
+import com.kert0n.medapp.domain.pack.Package
 import com.kert0n.medapp.feature.packages.PackageAdding
 import com.kert0n.medapp.feature.packages.PackageDescribing
 import com.kert0n.medapp.feature.scan.PackageScanning
@@ -26,18 +27,17 @@ import com.kert0n.medapp.fixture.tablets
 import com.kert0n.medapp.fixture.watching
 import com.kert0n.medapp.presentation.value.toPresentationDTO
 import com.kert0n.medapp.queue.QueueService
+import com.kert0n.medapp.queue.pack.PackageSyncState
 import com.kert0n.medapp.storage.pack.PackageStorageRepository
 import com.kert0n.medapp.storage.value.VocabularyStorageRepository
-import com.kert0n.medapp.domain.pack.Package
-import com.kert0n.medapp.network.pack.PackageSyncState
 import java.time.Clock
 import java.time.Instant
 import java.time.ZoneId
+import kotlin.time.Duration.Companion.seconds
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
 import org.junit.Rule
 import org.junit.Test
-import kotlin.time.Duration.Companion.seconds
 
 /**
  * Заведение и правка упаковки (PLAN H3 №7, №8): что записывается и что человек видит в ответ.

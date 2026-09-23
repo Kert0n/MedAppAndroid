@@ -3,10 +3,10 @@ package com.kert0n.medapp.queue
 import com.kert0n.medapp.domain.medkit.MedKit
 import com.kert0n.medapp.domain.medkit.MedKitRef
 import com.kert0n.medapp.domain.medkit.MedKitStatus
-import com.kert0n.medapp.network.pack.PackageSnapshot
 import com.kert0n.medapp.network.pack.PackageSnapshotNetworkDTO
 import com.kert0n.medapp.network.pack.toDomain
 import com.kert0n.medapp.network.value.VocabularyResolver
+import com.kert0n.medapp.queue.pack.PackageSnapshot
 import java.time.Instant
 import javax.inject.Inject
 import kotlin.uuid.Uuid
