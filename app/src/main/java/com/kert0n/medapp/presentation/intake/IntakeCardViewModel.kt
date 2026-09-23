@@ -4,6 +4,7 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.kert0n.medapp.domain.course.CourseSource
 import com.kert0n.medapp.domain.intake.IntakeProjection
+import com.kert0n.medapp.domain.pack.ExpiryDate
 import com.kert0n.medapp.domain.intake.IntakeRejected
 import com.kert0n.medapp.domain.intake.IntakeStatus
 import com.kert0n.medapp.domain.value.Dose
@@ -18,6 +19,7 @@ import com.kert0n.medapp.presentation.value.toDomain
 import com.kert0n.medapp.presentation.value.toPresentationDTO
 import com.kert0n.medapp.storage.course.CourseStorageRepository
 import com.kert0n.medapp.storage.intake.IntakeStorageRepository
+import com.kert0n.medapp.storage.pack.PackageStorageRepository
 import com.kert0n.medapp.storage.value.VocabularyStorageRepository
 import dagger.assisted.Assisted
 import dagger.assisted.AssistedFactory
@@ -31,6 +33,7 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.flatMapLatest
 import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.flow.map
@@ -64,6 +67,7 @@ class IntakeCardViewModel @AssistedInject constructor(
     private val clock: Clock,
     courses: CourseStorageRepository,
     intakes: IntakeStorageRepository,
+    packages: PackageStorageRepository,
     @Assisted private val intakeId: Uuid
 ) : ViewModel() {
 
@@ -108,17 +112,32 @@ class IntakeCardViewModel @AssistedInject constructor(
         }
     }
 
+    /**
+     * Сроки коробок-источников: срок человек видит у выбранной коробки до нажатия, а не только в
+     * вопросе после него (ТЗ 4.1.1.5.5).
+     */
+    private val expiries = episode
+        .map { (_, episode) -> episode?.second.orEmpty().map { it.pkg.id }.toSet() }
+        .distinctUntilChanged()
+        .flatMapLatest { ids ->
+            if (ids.isEmpty()) flowOf(emptyMap())
+            else combine(ids.map { packages.observe(it) }) { boxes ->
+                boxes.filterNotNull().mapNotNull { box -> box.facts.expiresOn?.let { box.id to it } }.toMap()
+            }
+        }
+
     val state: StateFlow<IntakeCardUiState> = combine(
         shown,
         today.observe(),
         typed,
-        writing
-    ) { (read, freshened), day, typed, writing ->
+        writing,
+        expiries
+    ) { (read, freshened), day, typed, writing, expiries ->
         val (intake, episode) = read
         val title = episode?.first
         // Пункта нет — расписание перестроили, пока карточку держали открытой: показывать нечего.
         if (intake == null || title == null) IntakeCardUiState(isGone = true)
-        else intake.card(title, episode.second.orEmpty(), day.zone, typed, writing).copy(isLoading = !freshened)
+        else intake.card(title, episode.second.orEmpty(), day.zone, typed, writing, expiries).copy(isLoading = !freshened)
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), IntakeCardUiState(isLoading = true))
 
     fun edit(form: IntakeCardPresentationDTO) {
@@ -227,7 +246,8 @@ class IntakeCardViewModel @AssistedInject constructor(
         sources: List<CourseSource>,
         zone: ZoneId,
         typed: IntakeCardPresentationDTO?,
-        writing: Writing
+        writing: Writing,
+        expiries: Map<Uuid, ExpiryDate>
     ): IntakeCardUiState {
         // «Сейчас» — по часам приложения, а не по системным: иначе проверка живёт в одном времени,
         // а карточка в другом, и записанный момент разойдётся с тем, что считает сценарий.
@@ -239,6 +259,12 @@ class IntakeCardViewModel @AssistedInject constructor(
         // коробка: подменённое молча списало бы не оттуда, откуда он брал.
         val picked = typed?.packageId?.takeIf { it != plannedPackage?.id }
         val chosen = if (picked != null) picked.takeIf { id -> usable.any { it.id == id } } else plannedPackage?.id
+        val form = typed ?: IntakeCardPresentationDTO(
+            amount = plannedAmount.quantity.toPresentationDTO().amount,
+            on = nowHere.toLocalDate(),
+            at = nowHere.toLocalTime().withSecond(0).withNano(0),
+            packageId = plannedPackage?.id
+        )
         return IntakeCardUiState(
             title = title,
             plannedOn = slot.localDate,
@@ -248,12 +274,11 @@ class IntakeCardViewModel @AssistedInject constructor(
             sources = usable,
             plannedAmount = plannedAmount.quantity.toPresentationDTO(),
             unit = plannedAmount.unit.toPresentationDTO(),
-            form = typed ?: IntakeCardPresentationDTO(
-                amount = plannedAmount.quantity.toPresentationDTO().amount,
-                on = nowHere.toLocalDate(),
-                at = nowHere.toLocalTime().withSecond(0).withNano(0),
-                packageId = plannedPackage?.id
-            ),
+            // Просрочена ли — к дню, которым человек пишет приём, как судит и сценарий.
+            expired = chosen?.let { expiries[it] }
+                ?.takeIf { it.isExpiredOn(form.on ?: nowHere.toLocalDate()) }
+                ?.toPresentationDTO(),
+            form = form,
             answer = when (status) {
                 IntakeStatus.PLANNED -> null
                 IntakeStatus.MISSED -> IntakeCardUiState.Answer.MISSED
