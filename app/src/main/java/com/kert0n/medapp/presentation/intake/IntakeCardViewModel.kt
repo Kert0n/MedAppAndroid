@@ -8,6 +8,7 @@ import com.kert0n.medapp.domain.intake.IntakeRejected
 import com.kert0n.medapp.domain.intake.IntakeStatus
 import com.kert0n.medapp.domain.value.Dose
 import com.kert0n.medapp.feature.intake.IntakeConfirmation
+import com.kert0n.medapp.feature.intake.IntakeWarning
 import com.kert0n.medapp.feature.intake.IntakeDeclining
 import com.kert0n.medapp.feature.operation.Freshening
 import com.kert0n.medapp.feature.time.Today
@@ -128,7 +129,7 @@ class IntakeCardViewModel @AssistedInject constructor(
      * Записать приём. Второе нажатие, пока идёт первое, ничего не начинает: сторожем служит само
      * состояние, а не расторопность пальца.
      */
-    fun confirm() {
+    fun confirm(acknowledged: Boolean = false) {
         // Сторож — у самой записи, а не у её отражения: состояние собрано `stateIn` и отстаёт от
         // записи на оборот, и второе нажатие успевало бы начать второй приём.
         if (writing.value.busy) return
@@ -148,7 +149,7 @@ class IntakeCardViewModel @AssistedInject constructor(
                 is ParsedInput.Rejected -> writing.value = Writing(error = IntakeCardError.Amount(parsed.error))
                 is ParsedInput.Parsed -> {
                     val at = moment(form, today.observe().first().zone)
-                    writing.value = told(confirmation.confirm(intakeId, pkg, Dose(parsed.value), at))
+                    writing.value = told(confirmation.confirm(intakeId, pkg, Dose(parsed.value), at, acknowledged))
                 }
             }
         }
@@ -199,12 +200,20 @@ class IntakeCardViewModel @AssistedInject constructor(
         // Пункта больше нет: показывать нечего, и чтение скажет то же самое.
         IntakeConfirmation.Outcome.Gone -> Writing(done = true)
         is IntakeConfirmation.Outcome.Rejected -> Writing(error = IntakeCardError.Rejected(outcome.reason))
+        // Вопрос — не записано ничего; ответ человека — тот же вызов с подтверждением.
+        is IntakeConfirmation.Outcome.Warned -> Writing(questions = outcome.warnings)
     }
 
-    /** Что идёт прямо сейчас: запись или отказ, который человек ещё не прочёл. */
+    /** Вопрос закрыт без ответа — не записано ничего: отмена и есть отказ записывать (PLAN D6). */
+    fun dismissQuestions() {
+        writing.value = writing.value.copy(questions = emptyList())
+    }
+
+    /** Что идёт прямо сейчас: запись, отказ, который человек ещё не прочёл, или вопрос до записи. */
     private data class Writing(
         val busy: Boolean = false,
         val error: IntakeCardError? = null,
+        val questions: List<IntakeWarning> = emptyList(),
         val done: Boolean = false
     )
 
@@ -253,6 +262,7 @@ class IntakeCardViewModel @AssistedInject constructor(
             },
             answeredAt = answer?.at?.atZone(zone)?.toLocalTime(),
             error = writing.error,
+            questions = writing.questions.map { it.toPresentationDTO() },
             isWriting = writing.busy,
             isDone = writing.done
         )

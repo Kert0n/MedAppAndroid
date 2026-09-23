@@ -1,5 +1,6 @@
 package com.kert0n.medapp.presentation.plan
 
+import com.kert0n.medapp.presentation.intake.IntakeQuestionPresentationDTO
 import com.kert0n.medapp.domain.intake.IntakeRejected
 import com.kert0n.medapp.presentation.value.QuantityPresentationDTO
 import java.time.LocalDate
@@ -24,7 +25,9 @@ data class DayPagePresentationDTO(
     val items: List<DayItemPresentationDTO>,
     val alsoOnThisDay: List<DayItemPresentationDTO>,
     /** Чем кончился ответ, если по самой странице этого не видно (PLAN U1). */
-    val message: DayMessage? = null
+    val message: DayMessage? = null,
+    /** Что спросить, прежде чем записать быстрый ответ: ничего не записано, пока человек не ответит. */
+    val question: DayQuestion? = null
 ) {
     val isEmpty: Boolean get() = items.isEmpty() && alsoOnThisDay.isEmpty()
 }
@@ -49,6 +52,13 @@ data class DayPermissionsPresentationDTO(
  * Что страница отвечает на ответ, когда записать его не вышло. Записанное своего случая здесь не
  * имеет: о нём говорит сама строка, а молчание после «принял» человек и так читает как успех.
  */
+/**
+ * Вопрос до записи ответа на пункт [intakeId] (PLAN D6). От беды он отличается делом: беду
+ * прочитывают и закрывают, а на вопрос отвечают — «всё равно принял» пишет тем же вызовом с
+ * подтверждением, отмена не пишет ничего.
+ */
+data class DayQuestion(val intakeId: Uuid, val questions: List<IntakeQuestionPresentationDTO>)
+
 sealed interface DayMessage {
 
     /** Домен отверг приём: причина по месту — в коробке не набралось, единица не та, эпизод закрыт. */

@@ -115,6 +115,25 @@ class ExpiryNoticeTest {
         assertEquals(emptyMap<Uuid, Any>(), kindsOf(planning.expiryDue(today.minusDays(2), now)).filterKeys { it == PACK }.filterValues { it.first != NotificationKind.EXPIRY_SOURCE_3D })
     }
 
+    /**
+     * Нина лечится из коробки, которой осталось **два** дня: в день «за три» телефон был выключен —
+     * или коробку подключили только сегодня. Предупреждение заранее нужно, чтобы успеть купить, и
+     * опоздание на день не повод промолчать до последнего.
+     *
+     * Красная проверка: этап считался только в точный день «−3», и пропущенный день оставлял
+     * источник без предупреждения заранее вовсе.
+     */
+    @Test
+    fun aSourceMissedOnItsThirdDayIsStillWarnedAhead() = runTest {
+        box(PACK, "Источник", today.plusDays(2))
+        treatedFrom(PACK)
+
+        assertEquals(
+            mapOf(PACK to (NotificationKind.EXPIRY_SOURCE_3D to NoticeDelivery.SYSTEM)),
+            kindsOf(planning.expiryDue(today, now))
+        )
+    }
+
     /** Выключенные напоминания источникам молчат, а баннер последнего дня остаётся. */
     @Test
     fun disabledSourceRemindersKeepTheBanner() = runTest {

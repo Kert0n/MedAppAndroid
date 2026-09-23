@@ -122,13 +122,13 @@ class CourseMedicineTest {
     fun activationRequiresScheduleDoseFormTotalAndSource() {
         val bare = course()
         assertEquals(CourseRejected.Reason.SCHEDULE_MISSING, bare.activate(LATER).rejection())
-        val scheduled = bare.setSchedule(schedule(), LATER)
+        val scheduled = bare.setSchedule(schedule(), LATER).getOrThrow()
         assertEquals(CourseRejected.Reason.DOSE_MISSING, scheduled.activate(LATER).rejection())
         val dosed = scheduled.setDose(dose("2"), LATER).getOrThrow()
         assertEquals(CourseRejected.Reason.FORM_MISSING, dosed.activate(LATER).rejection())
         val formed = dosed.setForm(TABLET_FORM, LATER).getOrThrow()
         assertEquals(CourseRejected.Reason.TOTAL_DOSES_MISSING, formed.activate(LATER).rejection())
-        val counted = formed.setTotalDoses(7.doses, LATER)
+        val counted = formed.setTotalDoses(7.doses, LATER).getOrThrow()
         // Пачки не нужно: лечение начинается и без лекарства на руках. Активация удалась — и
         // повторить её нечем: у плана этого перехода нет.
         assertTrue(counted.activate(LATER).isSuccess)
@@ -145,7 +145,7 @@ class CourseMedicineTest {
         )
         assertEquals(7.doses, coverage.requiredDoses)
         assertEquals(0.doses, coverage.coveredDoses)
-        assertEquals(schedule().next(schedule().beginning, 1).single().at, coverage.firstUncoveredAt)
+        assertEquals(schedule().next(schedule().beginning, 1).toList().single().at, coverage.firstUncoveredAt)
     }
 
     @Test

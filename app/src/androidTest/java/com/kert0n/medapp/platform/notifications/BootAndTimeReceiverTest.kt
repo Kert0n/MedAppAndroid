@@ -2,7 +2,11 @@ package com.kert0n.medapp.platform.notifications
 
 import android.content.Intent
 import androidx.test.ext.junit.runners.AndroidJUnit4
+import com.kert0n.medapp.domain.notification.NotificationKey
+import com.kert0n.medapp.domain.notification.NotificationTarget
+import com.kert0n.medapp.domain.notification.Reminder
 import com.kert0n.medapp.feature.notification.ReminderOutbox
+import com.kert0n.medapp.storage.notification.ReminderStorageRepository
 import com.kert0n.medapp.fixture.await
 import com.kert0n.medapp.platform.time.TimeShifts
 import kotlinx.coroutines.CoroutineStart
@@ -13,6 +17,7 @@ import kotlinx.coroutines.withTimeoutOrNull
 import dagger.hilt.android.testing.HiltAndroidRule
 import dagger.hilt.android.testing.HiltAndroidTest
 import javax.inject.Inject
+import org.junit.After
 import org.junit.Before
 import org.junit.Rule
 import androidx.test.platform.app.InstrumentationRegistry
@@ -64,6 +69,43 @@ class BootAndTimeReceiverTest {
         BootAndTimeReceiver().onReceive(context, Intent(android.app.AlarmManager.ACTION_SCHEDULE_EXACT_ALARM_PERMISSION_STATE_CHANGED))
 
         runBlocking { await("владелец постановок разбужен") { outbox.state.value.passes > before } }
+    }
+
+    @Inject
+    lateinit var promises: ReminderStorageRepository
+
+    @Inject
+    lateinit var alarms: AlarmManagerReminders
+
+    @After
+    fun tearDown() = runBlocking {
+        alarms.stopWaking(exact = true)
+        alarms.stopWaking(exact = false)
+    }
+
+    /**
+     * После загрузки будильников в системе нет, а в процессе, который она подняла ради этого сигнала,
+     * кроме приёмника никого нет: цикла владельца доставки может не быть вовсе, и умереть процесс
+     * вправе сразу, как приёмник вернётся. Поэтому приёмник ставит будильник сам — каждый повод
+     * перестроить день, — а не будит цикл, которого может не оказаться.
+     *
+     * Красная проверка: приёмник только звал `runNow()` цикла; без запущенного цикла проход не
+     * случался, и будильник к обещанному после загрузки не вставал.
+     */
+    @Test
+    fun theReceiverArmsTheAlarmItselfWithoutTheLoop() = runBlocking {
+        val context = InstrumentationRegistry.getInstrumentation().targetContext
+        val later = java.time.Instant.now().plusSeconds(3_600)
+        val day = later.atZone(java.time.ZoneId.systemDefault()).toLocalDate()
+        promises.saveAll(listOf(Reminder(NotificationKey.digest(day), NotificationTarget.DayPlan(day), later)))
+
+        for (action in BootAndTimeReceiver.TRIGGERS) {
+            alarms.stopWaking(exact = false)
+
+            BootAndTimeReceiver().onReceive(context, Intent(action))
+
+            await("будильник после «$action» не встал", timeoutMillis = 5_000) { alarms.isScheduled(exact = false) }
+        }
     }
 
     /**

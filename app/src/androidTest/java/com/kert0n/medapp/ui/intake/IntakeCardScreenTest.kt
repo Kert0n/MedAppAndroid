@@ -46,6 +46,8 @@ class IntakeCardScreenTest {
                     onEdit = {},
                     onConfirm = { confirmed++ },
                     onDecline = { declined++ },
+                    onAcknowledge = {},
+                    onDismissQuestions = {},
                     onBack = {}
                 )
             }

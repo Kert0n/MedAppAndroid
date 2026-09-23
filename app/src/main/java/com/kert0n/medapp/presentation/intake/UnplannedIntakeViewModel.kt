@@ -1,5 +1,6 @@
 package com.kert0n.medapp.presentation.intake
 
+import com.kert0n.medapp.presentation.value.ExpiryDatePresentationDTO
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.kert0n.medapp.feature.intake.IntakeWarning
@@ -75,6 +76,10 @@ class UnplannedIntakeViewModel @AssistedInject constructor(
                 // занятое, и спрашивает он по «свободно любому» (PLAN D4).
                 free = pack.availability.freeForAnyone.toPresentationDTO(),
                 inTheBox = pack.availability.effective.toPresentationDTO(),
+                // Срок человек видит до нажатия, а не только в вопросе после него.
+                expired = pack.facts.expiresOn
+                    ?.takeIf { it.isExpiredOn(clock.instant().atZone(clock.zone).toLocalDate()) }
+                    ?.toPresentationDTO(),
                 // До первой правки в поле стоит подсказка коробки: человеку чаще всего её и нужно
                 // подтвердить, а не набирать то же самое руками.
                 form = typed ?: UnplannedIntakePresentationDTO(hint?.amount.orEmpty()),
@@ -159,6 +164,8 @@ data class UnplannedIntakeUiState(
      */
     val free: QuantityPresentationDTO? = null,
     val inTheBox: QuantityPresentationDTO? = null,
+    /** Коробка просрочена к сегодняшнему дню — годна была до этого срока; иначе `null`. */
+    val expired: ExpiryDatePresentationDTO? = null,
     val form: UnplannedIntakePresentationDTO = UnplannedIntakePresentationDTO(),
     val error: UnplannedIntakeError? = null,
     /** О чём сценарий спросил до записи: пока на это не ответили, не записано ничего (PLAN D6). */

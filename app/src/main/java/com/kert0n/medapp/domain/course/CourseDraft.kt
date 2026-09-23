@@ -102,10 +102,13 @@ class CourseDraft(
 
     /**
      * Расписание черновика; у начатого лечения его меняет `Course.changeSchedule`. Редакция растёт,
-     * потому что меняется состав будущих пунктов.
+     * потому что меняется состав будущих пунктов. С прошедшего дня лечение не начинают
+     * ([CourseSchedule.startsBefore]) — ни сейчас, ни при запуске, когда дата уже могла пройти.
      */
-    fun setSchedule(schedule: CourseSchedule, at: Instant): CourseDraft =
-        changed(schedule = schedule, revision = revision.next(), updatedAt = at)
+    fun setSchedule(schedule: CourseSchedule, at: Instant): Result<CourseDraft> {
+        if (schedule.startsBefore(at)) return rejected(CourseRejected.Reason.SCHEDULE_IN_PAST)
+        return Result.success(changed(schedule = schedule, revision = revision.next(), updatedAt = at))
+    }
 
     /**
      * Сколько всего приёмов. Число правится и после начала — но уже у курса. Ноль здесь не
@@ -117,14 +120,21 @@ class CourseDraft(
      * только она может ответить, не разошлись ли они. У идущего лечения то же делает
      * `Course.clamped` после каждого изменения входов; у черновика это был единственный вход,
      * где правило не звали, — и человек видел «выделено 20» у лечения, которому нужно 10.
+     *
+     * Больше [Prescription.MAX_TOTAL_DOSES] — отказ: такой черновик не начался бы, и держать его
+     * значило бы обещать то, чего не будет.
      */
-    fun setTotalDoses(totalDoses: Doses, at: Instant): CourseDraft =
-        changed(
-            totalDoses = totalDoses,
-            medicine = medicine.withinNeed(totalDoses),
-            revision = revision.next(),
-            updatedAt = at
+    fun setTotalDoses(totalDoses: Doses, at: Instant): Result<CourseDraft> {
+        if (!Prescription.allows(totalDoses)) return rejected(CourseRejected.Reason.TOTAL_DOSES_TOO_MANY)
+        return Result.success(
+            changed(
+                totalDoses = totalDoses,
+                medicine = medicine.withinNeed(totalDoses),
+                revision = revision.next(),
+                updatedAt = at
+            )
         )
+    }
 
     /**
      * Подключает пачку к препарату последней в очереди расходования. Сверяет её назначение, а не
@@ -201,10 +211,14 @@ class CourseDraft(
      */
     fun activate(at: Instant): Result<Activation> {
         val schedule = schedule ?: return rejected(CourseRejected.Reason.SCHEDULE_MISSING)
+        // Черновик, заполненный в понедельник датой «сегодня», в среду с понедельника не начинают.
+        if (schedule.startsBefore(at)) return rejected(CourseRejected.Reason.SCHEDULE_IN_PAST)
         val dose = dose ?: return rejected(CourseRejected.Reason.DOSE_MISSING)
         val form = form ?: return rejected(CourseRejected.Reason.FORM_MISSING)
         val totalDoses = totalDoses?.takeUnless { it.isNone }
             ?: return rejected(CourseRejected.Reason.TOTAL_DOSES_MISSING)
+        // Черновик, записанный до правила, мог назначить больше: начатым такое лечение не бывает.
+        if (!Prescription.allows(totalDoses)) return rejected(CourseRejected.Reason.TOTAL_DOSES_TOO_MANY)
         // С отключённым источником лечение не начинается: человек его убирает или чинит (PLAN D5).
         medicine.firstFault?.let { return rejected(it.rejection) }
         val prescription = Prescription(

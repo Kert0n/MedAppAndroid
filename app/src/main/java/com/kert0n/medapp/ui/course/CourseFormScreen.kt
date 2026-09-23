@@ -45,18 +45,21 @@ import com.kert0n.medapp.R
 import com.kert0n.medapp.ui.DAY
 import com.kert0n.medapp.domain.course.CourseRecord
 import com.kert0n.medapp.domain.course.CourseRejected
+import com.kert0n.medapp.domain.course.Prescription
 import com.kert0n.medapp.presentation.course.CourseFormError
 import com.kert0n.medapp.presentation.course.CourseFormPresentationDTO
 import com.kert0n.medapp.presentation.course.CourseFormUiState
 import com.kert0n.medapp.presentation.course.suggestingUnit
 import com.kert0n.medapp.presentation.course.withForm
 import com.kert0n.medapp.ui.DateField
+import com.kert0n.medapp.ui.daysFrom
 import com.kert0n.medapp.ui.Form
 import com.kert0n.medapp.ui.ErrorMessage
 import com.kert0n.medapp.ui.LoadingState
 import com.kert0n.medapp.ui.PickerField
 import com.kert0n.medapp.ui.QuantityField
 import com.kert0n.medapp.ui.text
+import java.time.LocalDate
 import java.time.DayOfWeek
 import java.time.LocalTime
 
@@ -136,7 +139,7 @@ fun CourseFormScreen(
     BackHandler(enabled = editing?.mode == CourseFormUiState.Mode.UNASKED_DRAFT, onBack = onBack)
 }
 
-@OptIn(ExperimentalLayoutApi::class)
+@OptIn(ExperimentalMaterial3Api::class, ExperimentalLayoutApi::class)
 @Composable
 private fun Fields(
     state: CourseFormUiState.Editing,
@@ -233,7 +236,10 @@ private fun Fields(
         DateField(
             label = stringResource(R.string.course_start),
             value = form.start,
-            onPick = { onEdit(form.copy(start = it)) }
+            onPick = { onEdit(form.copy(start = it)) },
+            isError = field == CourseFormError.Field.START,
+            // Дня модель не отдаёт только по ошибке — и тогда не предлагается ничего, а не всё.
+            selectable = daysFrom(state.today ?: LocalDate.MAX)
         )
         Text(stringResource(R.string.course_days), style = MaterialTheme.typography.labelLarge)
         FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
@@ -352,22 +358,30 @@ private fun CourseFormError.message(): String = when (this) {
     is CourseFormError.PackageUnusable ->
         name?.let { stringResource(R.string.course_source_unusable_named, it) }
             ?: stringResource(R.string.course_source_unusable)
-    is CourseFormError.Rejected -> stringResource(reason.text)
+    is CourseFormError.Rejected -> reason.words()
     CourseFormError.Finished -> stringResource(R.string.course_finished)
     CourseFormError.Stale -> stringResource(R.string.course_stale)
 }
 
-/** Отказ сценария — словами по месту: чего не хватает, чтобы начать, или что нельзя под пачками. */
-internal val CourseRejected.Reason.text: Int
-    get() = when (this) {
-        CourseRejected.Reason.SCHEDULE_MISSING -> R.string.course_rejected_schedule_missing
-        CourseRejected.Reason.DOSE_MISSING -> R.string.course_rejected_dose_missing
-        CourseRejected.Reason.FORM_MISSING -> R.string.course_rejected_form_missing
-        CourseRejected.Reason.TOTAL_DOSES_MISSING -> R.string.course_rejected_total_doses_missing
-        CourseRejected.Reason.UNIT_MISMATCH -> R.string.course_rejected_unit_mismatch
-        CourseRejected.Reason.FORM_MISMATCH -> R.string.course_rejected_form_mismatch
-        CourseRejected.Reason.SCHEDULE_IN_PAST -> R.string.course_rejected_schedule_in_past
-        CourseRejected.Reason.FORM_UNKNOWN -> R.string.course_form_unknown
-        CourseRejected.Reason.ALREADY_ATTACHED -> R.string.course_rejected_already_attached
-        CourseRejected.Reason.PACKAGE_UNUSABLE -> R.string.course_rejected_package_unusable
-    }
+/**
+ * Отказ сценария — словами по месту: чего не хватает, чтобы начать, или что нельзя под пачками.
+ * Потолок числа доз называется числом из `Prescription`, а не повторяет его в строке.
+ */
+@Composable
+internal fun CourseRejected.Reason.words(): String = when (this) {
+    CourseRejected.Reason.SCHEDULE_MISSING -> stringResource(R.string.course_rejected_schedule_missing)
+    CourseRejected.Reason.DOSE_MISSING -> stringResource(R.string.course_rejected_dose_missing)
+    CourseRejected.Reason.FORM_MISSING -> stringResource(R.string.course_rejected_form_missing)
+    CourseRejected.Reason.TOTAL_DOSES_MISSING -> stringResource(R.string.course_rejected_total_doses_missing)
+    CourseRejected.Reason.TOTAL_DOSES_TOO_MANY -> pluralStringResource(
+        R.plurals.course_rejected_total_doses_too_many,
+        Prescription.MAX_TOTAL_DOSES,
+        Prescription.MAX_TOTAL_DOSES
+    )
+    CourseRejected.Reason.UNIT_MISMATCH -> stringResource(R.string.course_rejected_unit_mismatch)
+    CourseRejected.Reason.FORM_MISMATCH -> stringResource(R.string.course_rejected_form_mismatch)
+    CourseRejected.Reason.SCHEDULE_IN_PAST -> stringResource(R.string.course_rejected_schedule_in_past)
+    CourseRejected.Reason.FORM_UNKNOWN -> stringResource(R.string.course_form_unknown)
+    CourseRejected.Reason.ALREADY_ATTACHED -> stringResource(R.string.course_rejected_already_attached)
+    CourseRejected.Reason.PACKAGE_UNUSABLE -> stringResource(R.string.course_rejected_package_unusable)
+}

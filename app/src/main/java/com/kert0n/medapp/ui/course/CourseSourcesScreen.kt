@@ -593,7 +593,7 @@ internal fun CourseSourcesMessage.words(): String = when (this) {
     is CourseSourcesMessage.Unusable ->
         name?.let { stringResource(R.string.course_source_unusable_named, it) }
             ?: stringResource(R.string.course_source_unusable)
-    is CourseSourcesMessage.Refused -> stringResource(reason.text)
+    is CourseSourcesMessage.Refused -> reason.words()
     is CourseSourcesMessage.BeyondLimit ->
         pluralStringResource(R.plurals.course_source_beyond_limit, limit, limit)
     CourseSourcesMessage.Finished -> stringResource(R.string.course_finished)

@@ -46,7 +46,10 @@ class CourseRejected(val reason: Reason) : IllegalStateException(reason.name) {
         /** Активировать нельзя: не названо, сколько всего доз, — или названо ноль. */
         TOTAL_DOSES_MISSING,
 
-        /** Новое расписание начинается раньше сегодняшнего дня: пункты в прошлом не заводят. */
+        /** Доз больше, чем лечение может назначить ([Prescription.MAX_TOTAL_DOSES]). */
+        TOTAL_DOSES_TOO_MANY,
+
+        /** Расписание начинается раньше сегодняшнего дня: пункты в прошлом не заводят. */
         SCHEDULE_IN_PAST
     }
 }

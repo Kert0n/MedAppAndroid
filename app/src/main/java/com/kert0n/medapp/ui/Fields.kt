@@ -231,7 +231,9 @@ fun DateField(
     label: String,
     value: LocalDate?,
     onPick: (LocalDate?) -> Unit,
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier,
+    isError: Boolean = false,
+    selectable: SelectableDates = DatePickerDefaults.AllDates
 ) {
     var open by remember { mutableStateOf(false) }
     val presses = remember { MutableInteractionSource() }
@@ -262,11 +264,12 @@ fun DateField(
                 }
             }
         },
+        isError = isError,
         interactionSource = presses,
         modifier = modifier.fillMaxWidth().defaultMinSize(minHeight = 48.dp)
     )
     if (!open) return
-    DayPicker(selected = value, onPick = { onPick(it) }, onDismiss = { open = false })
+    DayPicker(selected = value, onPick = { onPick(it) }, onDismiss = { open = false }, selectable = selectable)
 }
 
 /**
@@ -307,6 +310,16 @@ fun DayPicker(
             TextButton(onClick = onDismiss) { Text(stringResource(R.string.action_cancel)) }
         }
     ) { DatePicker(picker) }
+}
+
+/** Дни с [from] и дальше: прошедшие не нажимаются. */
+@OptIn(ExperimentalMaterial3Api::class)
+fun daysFrom(from: LocalDate): SelectableDates = object : SelectableDates {
+
+    override fun isSelectableDate(utcTimeMillis: Long): Boolean =
+        !Instant.ofEpochMilli(utcTimeMillis).atZone(ZoneOffset.UTC).toLocalDate().isBefore(from)
+
+    override fun isSelectableYear(year: Int): Boolean = year >= from.year
 }
 
 /**

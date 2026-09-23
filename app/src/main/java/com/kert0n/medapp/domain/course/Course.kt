@@ -96,7 +96,7 @@ class Course(
      * минует по [progress]. Отсюда и конец лечения: пропуск сдвигает его вперёд, поздний ответ по
      * пропущенному — назад, и лишний материализованный пункт тогда убирает сценарий.
      */
-    fun remainingOccurrences(progress: CourseProgress): List<ScheduledOccurrence> =
+    fun remainingOccurrences(progress: CourseProgress): Sequence<ScheduledOccurrence> =
         schedule.next(schedule.beginning, remainingDoses(progress).count, progress.answered)
 
     /**
@@ -106,7 +106,7 @@ class Course(
      * вперёд, как уезжает у неответа (PLAN D6).
      */
     fun dosesDue(progress: CourseProgress, from: Instant, until: Instant): Doses =
-        Doses(schedule.next(from, remainingDoses(progress).count, progress.answered).count { it.at.isBefore(until) })
+        Doses(schedule.next(from, remainingDoses(progress).count, progress.answered).takeWhile { it.at.isBefore(until) }.count())
 
     /** Ожидаемый конец — последняя из оставшихся доз; `null` — принято всё. */
     fun expectedEnd(progress: CourseProgress): ScheduledOccurrence? =
@@ -115,10 +115,12 @@ class Course(
     /**
      * Число доз правится и после начала: пропуски растянули лечение, или врач сократил его.
      * Редакция растёт — меняется состав будущих пунктов; снимок назначения в записи эпизода
-     * переписывает та же транзакция (PLAN F5). Ноль доз — не лечение: отказ, а не исключение.
+     * переписывает та же транзакция (PLAN F5). Ноль доз — не лечение, сверх [Prescription.MAX_TOTAL_DOSES]
+     * — не назначают: отказ, а не исключение.
      */
     fun setTotalDoses(totalDoses: Doses, at: Instant): Result<Course> {
         if (totalDoses.isNone) return rejected(CourseRejected.Reason.TOTAL_DOSES_MISSING)
+        if (!Prescription.allows(totalDoses)) return rejected(CourseRejected.Reason.TOTAL_DOSES_TOO_MANY)
         if (totalDoses == this.totalDoses) return Result.success(this)
         return Result.success(
             changed(prescription = prescription.withTotalDoses(totalDoses), revision = revision.next(), updatedAt = at)
@@ -145,14 +147,11 @@ class Course(
 
     /**
      * Другое расписание — в том числе другая зона — то же лечение, и будущие пункты перестраиваются
-     * по нему. Прошлое уже случилось: новое расписание не начинается раньше сегодняшнего дня своей
-     * зоны, иначе в нём завелись бы пункты, на которые отвечать поздно (PLAN D5).
+     * по нему — но не с прошедшего дня ([CourseSchedule.startsBefore]).
      */
     fun changeSchedule(schedule: CourseSchedule, at: Instant): Result<Course> {
         if (schedule == this.schedule) return Result.success(this)
-        if (schedule.start.isBefore(at.atZone(schedule.zone).toLocalDate())) {
-            return rejected(CourseRejected.Reason.SCHEDULE_IN_PAST)
-        }
+        if (schedule.startsBefore(at)) return rejected(CourseRejected.Reason.SCHEDULE_IN_PAST)
         return Result.success(changed(prescription = prescription.copy(schedule = schedule), revision = revision.next(), updatedAt = at))
     }
 
@@ -227,7 +226,7 @@ class Course(
      * хватает (PLAN D5). Потребность — от назначенного числа доз, а не от окна календаря.
      */
     fun coverage(progress: CourseProgress, availability: Availability): CourseCoverage =
-        medicine.coverage(dose, remainingOccurrences(progress), availability, schedule.zone)
+        medicine.coverage(dose, remainingDoses(progress), remainingOccurrences(progress), availability, schedule.zone)
 
     /**
      * Верхняя граница ползунка пачки в целых дозах: меньшее из того, что пачка даёт, и того, что

@@ -1,5 +1,6 @@
 package com.kert0n.medapp.feature.intake
 
+import com.kert0n.medapp.domain.pack.ExpiryDate
 import com.kert0n.medapp.domain.value.Quantity
 
 /**
@@ -9,9 +10,11 @@ import com.kert0n.medapp.domain.value.Quantity
  */
 sealed interface IntakeWarning {
 
-    // Просрочки здесь нет намеренно: принимать из просроченной коробки — дело человека, срок ему
-    // показан на коробке и сказан уведомлением (PLAN C1 «Просроченная пачка», поправка 2026-09-16).
-
+    /**
+     * Коробка [name] просрочена к дню приёма: годна была до [expiry]. Приложение не запрещает —
+     * решает человек, — но и молча не пишет (ТЗ 4.1.1.5.5, решение владельца 2026-09-23).
+     */
+    data class Expired(val name: String, val expiry: ExpiryDate) : IntakeWarning
 
     /** Приём больше свободного любому — заденет моё выделение или чужие брони (PLAN D4). */
     data class TouchesReserved(val free: Quantity) : IntakeWarning

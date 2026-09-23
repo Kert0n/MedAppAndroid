@@ -401,7 +401,12 @@
     <string name="notice_intake_decision_body">«Принял» не смог записать приём — откройте, чтобы решить, откуда взять дозу</string>
     <string name="notice_intake_missed_title">Пропущен приём: %1$s</string>
     <string name="notice_intake_missed_body">Вчерашний приём (%1$s) остался без ответа</string>
-    <string name="notice_expiry_3d_title">Через три дня истекает срок: %1$s</string>
+    <plurals name="notice_expiry_ahead_title">
+        <item quantity="one">Через %1$d день истекает срок: %2$s</item>
+        <item quantity="few">Через %1$d дня истекает срок: %2$s</item>
+        <item quantity="many">Через %1$d дней истекает срок: %2$s</item>
+        <item quantity="other">Через %1$d дня истекает срок: %2$s</item>
+    </plurals>
     <string name="notice_expiry_1d_title">Завтра истекает срок: %1$s</string>
     <string name="notice_expiry_today_title">Сегодня истекает срок: %1$s</string>
     <string name="notice_expiry_body">Годен до %1$s</string>
@@ -477,6 +482,7 @@
     <string name="intake_confirm">Принял</string>
     <string name="intake_questions_title">Прежде чем записать</string>
     <string name="intake_confirm_anyway">Всё равно принял</string>
+    <string name="intake_question_expired">«%1$s» просрочен: годен до %2$s</string>
     <string name="intake_question_touches_reserved">Приём заденет занятое: свободно %1$s</string>
     <string name="intake_decline">Пропустил</string>
     <string name="courses_empty">Лечений пока нет.</string>
@@ -559,9 +565,15 @@
     <string name="course_rejected_dose_missing">Чтобы начать, укажите дозу.</string>
     <string name="course_rejected_form_missing">Чтобы начать, укажите форму выпуска.</string>
     <string name="course_rejected_total_doses_missing">Чтобы начать, укажите, сколько всего приёмов.</string>
+    <plurals name="course_rejected_total_doses_too_many">
+        <item quantity="one">Приёмов не больше %1$d.</item>
+        <item quantity="few">Приёмов не больше %1$d.</item>
+        <item quantity="many">Приёмов не больше %1$d.</item>
+        <item quantity="other">Приёмов не больше %1$d.</item>
+    </plurals>
     <string name="course_rejected_unit_mismatch">У подключённых препаратов другая единица — сначала отвяжите их.</string>
     <string name="course_rejected_form_mismatch">У подключённых препаратов другая форма — сначала отвяжите их.</string>
-    <string name="course_rejected_schedule_in_past">Новое расписание не может начинаться раньше сегодняшнего дня.</string>
+    <string name="course_rejected_schedule_in_past">Лечение не начинается раньше сегодняшнего дня — выберите дату заново.</string>
     <string name="course_rejected_already_attached">Этот препарат уже подключён.</string>
     <string name="course_rejected_package_unusable">Этот препарат выбрасывают или его полки больше нет — источником ему не быть.</string>
     <string name="course_missing">Этого лечения больше нет.</string>

@@ -24,6 +24,8 @@ import com.kert0n.medapp.storage.intake.IntakeStorageRepository
 import com.kert0n.medapp.storage.pack.PackageStorageRepository
 import com.kert0n.medapp.platform.settings.AppLanguages
 import dagger.hilt.android.qualifiers.ApplicationContext
+import java.time.Clock
+import java.time.LocalDate
 import java.time.format.DateTimeFormatter
 import java.time.format.FormatStyle
 import javax.inject.Inject
@@ -50,7 +52,8 @@ class SystemNotifier @Inject constructor(
     private val courses: CourseStorageRepository,
     private val packages: PackageStorageRepository,
     private val readiness: NotificationReadiness,
-    private val languages: AppLanguages
+    private val languages: AppLanguages,
+    private val clock: Clock
 ) : Notifier {
 
     /** Слова шторки — на языке приложения: до Android 13 контекст процесса сам его не знает. */
@@ -113,16 +116,17 @@ class SystemNotifier @Inject constructor(
         }
         is NotificationTarget.PackageCard -> {
             val pkg = packages.observe(target.packageId).first() ?: return null
-            val until = pkg.facts.expiresOn?.lastDay?.format(DATE.withLocale(words.resources.configuration.locales[0])) ?: return null
+            val expiresOn = pkg.facts.expiresOn ?: return null
+            val until = expiresOn.lastDay.format(DATE.withLocale(words.resources.configuration.locales[0]))
             Text(
-                words.getString(
-                    when (notification.kind) {
-                        NotificationKind.EXPIRY_SOURCE_3D -> R.string.notice_expiry_3d_title
-                        NotificationKind.EXPIRY_SOURCE_1D -> R.string.notice_expiry_1d_title
-                        else -> R.string.notice_expiry_today_title
-                    },
-                    pkg.name
-                ),
+                when (notification.kind) {
+                    // Заранее — окно, и сколько дней осталось, говорит срок на день показа.
+                    NotificationKind.EXPIRY_SOURCE_3D -> expiresOn.daysLeftOn(LocalDate.now(clock)).toInt().let { days ->
+                        words.resources.getQuantityString(R.plurals.notice_expiry_ahead_title, days, days, pkg.name)
+                    }
+                    NotificationKind.EXPIRY_SOURCE_1D -> words.getString(R.string.notice_expiry_1d_title, pkg.name)
+                    else -> words.getString(R.string.notice_expiry_today_title, pkg.name)
+                },
                 words.getString(R.string.notice_expiry_body, until)
             )
         }

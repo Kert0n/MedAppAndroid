@@ -23,6 +23,7 @@ import com.kert0n.medapp.fixture.MILLILITRES
 import java.math.BigDecimal
 import java.time.Instant
 import java.time.LocalDate
+import com.kert0n.medapp.fixture.MOSCOW
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNull
@@ -95,16 +96,59 @@ class CourseTest {
         val formed = course().setForm(TABLET_FORM, at = LATER).getOrThrow()
         assertEquals(TABLET_FORM, formed.form)
         assertEquals(Revision(1), formed.revision)
-        val counted = formed.setTotalDoses(10.doses, at = LATER)
+        val counted = formed.setTotalDoses(10.doses, at = LATER).getOrThrow()
         assertEquals(10.doses, counted.totalDoses)
         assertEquals(Revision(2), counted.revision)
+    }
+
+    /**
+     * Сколько доз назначают, ограничивает назначение, и спрашивает его и черновик, и начало, и
+     * идущее лечение: сверх меры — отказ с причиной, а не исключение и не молча записанное число.
+     * Черновик, записанный до правила, начатым не становится.
+     */
+    @Test
+    fun noMoreDosesThanAPrescriptionAllowsAnywhere() {
+        val limit = Prescription.MAX_TOTAL_DOSES
+        val formed = course().setForm(TABLET_FORM, at = LATER).getOrThrow()
+        assertEquals(limit.doses, formed.setTotalDoses(limit.doses, at = LATER).getOrThrow().totalDoses)
+        assertEquals(
+            CourseRejected.Reason.TOTAL_DOSES_TOO_MANY,
+            (formed.setTotalDoses((limit + 1).doses, at = LATER).exceptionOrNull() as CourseRejected).reason
+        )
+
+        val storedBeforeTheRule = course(dose = dose("1"), form = TABLET_FORM, schedule = schedule(), totalDoses = limit + 1)
+        assertEquals(
+            CourseRejected.Reason.TOTAL_DOSES_TOO_MANY,
+            (storedBeforeTheRule.activate(LATER).exceptionOrNull() as CourseRejected).reason
+        )
+
+        val running = activeCourse()
+        assertEquals(
+            CourseRejected.Reason.TOTAL_DOSES_TOO_MANY,
+            (running.setTotalDoses((limit + 1).doses, LATER).exceptionOrNull() as CourseRejected).reason
+        )
+    }
+
+    /**
+     * Курс, записанный до правила о потолке, читается: предел — правило **действия** (назначить,
+     * начать, изменить), а не того, что уже лежит в базе. Лечение на 15 000 доз законно жило и
+     * считалось, и чтение его не должно падать.
+     *
+     * Красная проверка (разбор #66): предел стоял `require` в конструкторе `Prescription`, и чтение
+     * такого курса из хранения бросало на каждом экране и в каждой сверке.
+     */
+    @Test
+    fun aCourseRecordedBeforeTheLimitIsStillRead() {
+        val recorded = activeCourse(totalDoses = Prescription.MAX_TOTAL_DOSES + 5_000)
+
+        assertEquals((Prescription.MAX_TOTAL_DOSES + 5_000).doses, recorded.remainingDoses(CourseProgress.none))
     }
 
     @Test
     fun settingTheDraftScheduleRaisesTheRevision() {
         // Расписание меняет состав будущих пунктов, поэтому редакция растёт — в отличие от
         // переименования.
-        val planned = course().setSchedule(schedule(), at = LATER)
+        val planned = course().setSchedule(schedule(), at = LATER).getOrThrow()
         assertEquals(schedule(), planned.schedule)
         assertEquals(Revision(1), planned.revision)
     }
@@ -222,5 +266,43 @@ class CourseTest {
 
         assertEquals(LocalDate.of(2027, 3, 11), tomorrow.schedule.start)
         assertEquals(CourseRejected.Reason.SCHEDULE_IN_PAST, (yesterday.exceptionOrNull() as CourseRejected).reason)
+    }
+
+    /** Черновик тоже не начинают с прошедшего дня: правило одно и у лечения, и у его заготовки. */
+    @Test
+    fun aDraftScheduleDoesNotStartInThePastEither() {
+        val at = Instant.parse("2027-03-10T12:00:00Z")
+
+        val today = course().setSchedule(schedule(start = LocalDate.of(2027, 3, 10)), at).getOrThrow()
+        val yesterday = course().setSchedule(schedule(start = LocalDate.of(2027, 3, 9)), at)
+
+        assertEquals(LocalDate.of(2027, 3, 10), today.schedule?.start)
+        assertEquals(CourseRejected.Reason.SCHEDULE_IN_PAST, (yesterday.exceptionOrNull() as CourseRejected).reason)
+    }
+
+    /**
+     * Черновик, заполненный в понедельник датой «сегодня», в среду с понедельника не начинают: дата
+     * была верна, когда её ставили, и прошла, пока черновик лежал. Иначе два дня стали бы
+     * пропусками, которых не было.
+     */
+    @Test
+    fun aDraftWhoseStartHasPassedIsNotStarted() {
+        val monday = LocalDate.of(2027, 3, 8)
+        val draft = prescribedDraft(schedule = schedule(start = monday), totalDoses = 7)
+
+        val onMonday = draft.activate(Instant.parse("2027-03-08T12:00:00Z"))
+        val onWednesday = draft.activate(Instant.parse("2027-03-10T12:00:00Z"))
+
+        assertEquals(monday, onMonday.getOrThrow().course.schedule.start)
+        assertEquals(CourseRejected.Reason.SCHEDULE_IN_PAST, (onWednesday.exceptionOrNull() as CourseRejected).reason)
+    }
+
+    /** «Сегодня» — в зоне расписания: в Москве уже вторник, хотя по Гринвичу ещё понедельник. */
+    @Test
+    fun todayIsTheScheduleZonesToday() {
+        val moscowTuesday = Instant.parse("2027-03-08T22:30:00Z")
+
+        assertTrue(schedule(start = LocalDate.of(2027, 3, 8), zone = MOSCOW).startsBefore(moscowTuesday))
+        assertFalse(schedule(start = LocalDate.of(2027, 3, 9), zone = MOSCOW).startsBefore(moscowTuesday))
     }
 }

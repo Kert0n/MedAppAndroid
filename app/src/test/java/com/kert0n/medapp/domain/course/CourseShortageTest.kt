@@ -53,7 +53,7 @@ class CourseShortageTest {
     fun shortageShowsUpAsCoverageAndNamesTheFirstGap() {
         // Человеку — «нужно 7, обеспечено 2, не хватает с третьего приёма», а не сдвинутые даты.
         val week = schedule()
-        val plan = week.next(week.beginning, 7)
+        val plan = week.next(week.beginning, 7).toList()
         val shrunk = availability(PACK to tablets("4"), OTHER_PACK to tablets("0"))
         val found = twoPacks.clamped(plan.size.doses, shrunk, LATER)
             .coverage(CourseProgress.none, shrunk)

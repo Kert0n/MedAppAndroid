@@ -15,6 +15,8 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.cancel
+import kotlinx.coroutines.job
+import kotlinx.coroutines.cancelAndJoin
 import kotlinx.coroutines.test.runTest
 import org.junit.After
 import org.junit.Assert.assertArrayEquals
@@ -73,7 +75,9 @@ class DataStoreSettingsTest {
     @Test
     fun savedSettingsSurviveRecreation() = runTest {
         assertEquals(SettingsSaved.SAVED, settings.save(chosen))
-        scope.cancel()
+        // Прежнее хранилище отпускает файл, когда его область **кончилась**, а не когда её отменили:
+        // открыть новое раньше — «несколько DataStore на один файл».
+        scope.coroutineContext.job.cancelAndJoin()
         scope = CoroutineScope(Dispatchers.IO + SupervisorJob())
 
         val reopened = DataStoreSettings(store(), file, Dispatchers.IO)
@@ -91,7 +95,9 @@ class DataStoreSettingsTest {
         settings.save(chosen)
         val garbage = byteArrayOf(0x4D, 0x65, 0x64, 0x41, 0x70, 0x70, 0x21, 0x00, 0x7F)
         file.writeBytes(garbage)
-        scope.cancel()
+        // Прежнее хранилище отпускает файл, когда его область **кончилась**, а не когда её отменили:
+        // открыть новое раньше — «несколько DataStore на один файл».
+        scope.coroutineContext.job.cancelAndJoin()
         scope = CoroutineScope(Dispatchers.IO + SupervisorJob())
         val damaged = DataStoreSettings(store(), file, Dispatchers.IO)
 

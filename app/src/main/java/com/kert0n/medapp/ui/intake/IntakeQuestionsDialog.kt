@@ -40,6 +40,7 @@ fun IntakeQuestionsDialog(
 
 @Composable
 private fun IntakeQuestionPresentationDTO.words(): String = when (this) {
+    is IntakeQuestionPresentationDTO.Expired -> stringResource(R.string.intake_question_expired, name, expiry.text)
     is IntakeQuestionPresentationDTO.TouchesReserved ->
         stringResource(R.string.intake_question_touches_reserved, free.words())
 }

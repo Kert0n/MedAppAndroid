@@ -3,6 +3,8 @@ package com.kert0n.medapp.di
 import android.util.Log
 import com.kert0n.medapp.BuildConfig
 import com.kert0n.medapp.network.account.AccessTokens
+import com.kert0n.medapp.network.account.AccountReclaim
+import com.kert0n.medapp.network.account.AccountRegistration
 import io.ktor.client.plugins.logging.Logger
 import com.kert0n.medapp.domain.account.DeviceAccount
 import com.kert0n.medapp.domain.medkit.MedKitInvitations
@@ -62,6 +64,10 @@ object NetworkModule {
         logger = if (BuildConfig.DEBUG) LogcatLogger else null,
         tokens = tokens
     )
+
+    /** Забытую сервером учётку возвращает регистрация — тем же путём, что недописанную. */
+    @Provides
+    fun accountReclaim(registration: AccountRegistration): AccountReclaim = registration
 
     /** Лог HTTP в debug; секреты из него вычищает клиент, а не этот адаптер. */
     private object LogcatLogger : Logger {

@@ -57,9 +57,11 @@ class CourseCancellationTest {
 
     /** Лечение с 8 марта: к 10-му два дня пропущены, дальше пункты ждут. */
     private suspend fun started(): Uuid {
+        // Лечение с прошедшего дня не начинают: его начали в первый день, а время прошло потом.
+        val beginning = Scenarios(database, Instant.parse("2027-03-08T05:00:00Z"))
         val scenarios = Scenarios(database, now)
-        val created = scenarios.courseDrafting.create("Ибупрофен")
-        val draft = (scenarios.courseDrafting.edit(
+        val created = beginning.courseDrafting.create("Ибупрофен")
+        val draft = (beginning.courseDrafting.edit(
             created.id, created.revision,
             listOf(
                 CourseDrafting.Edit.SetDose(dose("2")),
@@ -69,7 +71,7 @@ class CourseCancellationTest {
                 CourseDrafting.Edit.Attach(PACK, Doses(5))
             )
         ) as CourseDrafting.Outcome.Saved).draft
-        scenarios.courseActivation.activate(draft.id, draft.revision)
+        beginning.courseActivation.activate(draft.id, draft.revision)
         scenarios.courseUpkeep.keepUp()
         return draft.id
     }

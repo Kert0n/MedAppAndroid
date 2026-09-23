@@ -2,7 +2,11 @@ package com.kert0n.medapp.domain.course
 
 import com.kert0n.medapp.domain.value.doses
 import com.kert0n.medapp.fixture.BERLIN
+import com.kert0n.medapp.fixture.EARLIER
+import com.kert0n.medapp.fixture.TABLET_FORM
 import com.kert0n.medapp.fixture.activeCourse
+import com.kert0n.medapp.fixture.course
+import com.kert0n.medapp.fixture.dose
 import com.kert0n.medapp.fixture.progress
 import com.kert0n.medapp.fixture.schedule
 import java.time.DayOfWeek
@@ -32,6 +36,23 @@ class CourseScheduleRemainingTest {
         val year = activeCourse(schedule = fourTimesADay, totalDoses = 365 * 4)
         assertEquals((365 * 4).doses, year.remainingDoses(CourseProgress.none))
         assertEquals(start.plusDays(364), year.expectedEnd(CourseProgress.none)?.localDate)
+    }
+
+    /**
+     * Черновик с числом доз сверх всякой меры лечением не становится: начало отказывает причиной, а
+     * не строит курс, чей расчёт остатка разложил бы поштучно миллиарды пунктов. Обеспечение
+     * считается на каждое изменение базы, и такой курс ронял бы приложение при каждом запуске.
+     *
+     * Красная проверка: черновик на `Int.MAX_VALUE` доз начинался, а `remainingOccurrences`
+     * выделял список на всё число и падал `OutOfMemoryError`.
+     */
+    @Test
+    fun anAbsurdNumberOfDosesNeverBecomesATreatment() {
+        val draft = course(dose = dose("1"), form = TABLET_FORM, schedule = fourTimesADay, totalDoses = Int.MAX_VALUE)
+
+        val refused = draft.activate(EARLIER).exceptionOrNull()
+
+        assertEquals(CourseRejected.Reason.TOTAL_DOSES_TOO_MANY, (refused as CourseRejected).reason)
     }
 
     @Test
@@ -79,7 +100,7 @@ class CourseScheduleRemainingTest {
             times = listOf(LocalTime.of(2, 15), LocalTime.of(2, 45)),
             zone = BERLIN
         )
-        val found = day.next(day.beginning, 2)
+        val found = day.next(day.beginning, 2).toList()
         assertEquals(listOf(LocalTime.of(2, 15), LocalTime.of(2, 45)), found.map { it.localTime })
         assertEquals(found[0].at, found[1].at)
     }
@@ -87,7 +108,7 @@ class CourseScheduleRemainingTest {
     @Test
     fun remainingOccurrencesSkipTheAnsweredOnes() {
         val week = activeCourse()
-        val ahead = week.remainingOccurrences(week.progress(taken = 3))
+        val ahead = week.remainingOccurrences(week.progress(taken = 3)).toList()
         assertEquals(4, ahead.size)
         assertEquals(week.schedule.start.plusDays(3), ahead.first().localDate)
         assertEquals(week.schedule.start.plusDays(6), ahead.last().localDate)
@@ -101,24 +122,24 @@ class CourseScheduleRemainingTest {
             schedule = schedule(start = start, times = listOf(LocalTime.of(9, 0), LocalTime.of(13, 0), LocalTime.of(18, 0))),
             totalDoses = 3
         )
-        val slots = day.schedule.next(day.schedule.beginning, 3)
+        val slots = day.schedule.next(day.schedule.beginning, 3).toList()
         val noonTaken = CourseProgress(taken = setOf(slots[1]))
 
         assertEquals(2.doses, day.remainingDoses(noonTaken))
-        assertEquals(listOf(LocalTime.of(9, 0), LocalTime.of(18, 0)), day.remainingOccurrences(noonTaken).map { it.localTime })
+        assertEquals(listOf(LocalTime.of(9, 0), LocalTime.of(18, 0)), day.remainingOccurrences(noonTaken).toList().map { it.localTime })
         assertEquals(slots[2], day.expectedEnd(noonTaken))
     }
 
     /** Пункт — это дата и время: тот же пункт с другим моментом дважды не принимается. */
     @Test(expected = IllegalArgumentException::class)
     fun oneSlotIsNotTakenTwiceUnderDifferentMoments() {
-        val slot = schedule().next(schedule().beginning, 1).single()
+        val slot = schedule().next(schedule().beginning, 1).toList().single()
         CourseProgress(taken = setOf(slot, slot.copy(at = slot.at.plusSeconds(3600))))
     }
 
     @Test(expected = IllegalArgumentException::class)
     fun oneSlotIsNotBothTakenAndMissedUnderDifferentMoments() {
-        val slot = schedule().next(schedule().beginning, 1).single()
+        val slot = schedule().next(schedule().beginning, 1).toList().single()
         CourseProgress(taken = setOf(slot), missed = setOf(slot.copy(at = slot.at.plusSeconds(3600))))
     }
 
@@ -127,12 +148,12 @@ class CourseScheduleRemainingTest {
         // Пропустили первый день — конец уехал на восьмой; ответили по нему позже — вернулся на
         // седьмой, и восьмой пункт стал лишним.
         val week = activeCourse()
-        val slots = week.schedule.next(week.schedule.beginning, 8)
+        val slots = week.schedule.next(week.schedule.beginning, 8).toList()
         val missed = CourseProgress(missed = setOf(slots[0]))
         val answeredLate = CourseProgress(taken = setOf(slots[0]))
 
         assertEquals(slots[7], week.expectedEnd(missed))
         assertEquals(slots[6], week.expectedEnd(answeredLate))
-        assertEquals(false, slots[7] in week.remainingOccurrences(answeredLate))
+        assertEquals(false, slots[7] in week.remainingOccurrences(answeredLate).toList())
     }
 }

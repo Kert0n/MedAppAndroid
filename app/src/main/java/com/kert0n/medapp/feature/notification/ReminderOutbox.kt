@@ -20,6 +20,8 @@ import javax.inject.Inject
 import javax.inject.Singleton
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.currentCoroutineContext
+import kotlinx.coroutines.ensureActive
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -102,7 +104,7 @@ class ReminderOutbox @Inject constructor(
         // Ожидание свежести — окно до двух секунд, и прочитанное до него устаревает: человек
         // успевает отложить, лечение — отмениться, а срок — наступить. Показывается то, что
         // наступило **после** него, и «сейчас» берётся после него же.
-        if (due(clock.instant()).any { it.kind == NotificationKind.INTAKE_DUE }) freshness.refreshBriefly(REFRESH_WAIT)
+        if (due(clock.instant()).any { it.kind == NotificationKind.INTAKE_DUE }) freshenBriefly()
         val now = clock.instant()
         val due = due(now)
 
@@ -142,6 +144,19 @@ class ReminderOutbox @Inject constructor(
         val report = Report(shown = shown, dismissed = dismissed, blocked = blocked, nextAt = next)
         _state.update { it.copy(passes = it.passes + 1, lastReport = report, lastFailure = null, pushBlocked = blocked > 0) }
         return report
+    }
+
+    /**
+     * Свежесть перед напоминанием — насколько успели. Заход, которого ждали, могли отменить: его
+     * позвал первым экран, и человек с него ушёл. Для прохода это то же «не успели», и напоминание
+     * говорится с тем, что есть. Своя отмена летит дальше: `ensureActive` бросает её.
+     */
+    private suspend fun freshenBriefly() {
+        try {
+            freshness.refreshBriefly(REFRESH_WAIT)
+        } catch (cancelled: CancellationException) {
+            currentCoroutineContext().ensureActive()
+        }
     }
 
     /**

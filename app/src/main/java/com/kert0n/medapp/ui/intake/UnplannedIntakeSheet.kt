@@ -1,5 +1,6 @@
 package com.kert0n.medapp.ui.intake
 
+import com.kert0n.medapp.ui.pack.Marker
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.defaultMinSize
@@ -64,6 +65,13 @@ fun UnplannedIntakeSheet(
                     stringResource(R.string.intake_free_of_total, it.amount, state.inTheBox?.words().orEmpty()),
                     style = MaterialTheme.typography.bodyMedium,
                     color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            }
+            state.expired?.let {
+                Marker(
+                    icon = R.drawable.ic_expired,
+                    text = stringResource(R.string.pack_expired_on, it.text),
+                    color = MaterialTheme.colorScheme.error
                 )
             }
             OutlinedTextField(

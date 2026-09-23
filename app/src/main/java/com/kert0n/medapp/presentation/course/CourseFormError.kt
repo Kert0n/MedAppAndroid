@@ -41,7 +41,7 @@ sealed interface CourseFormError {
                 CourseRejected.Reason.DOSE_MISSING, CourseRejected.Reason.UNIT_MISMATCH -> Field.DOSE
                 CourseRejected.Reason.FORM_MISSING, CourseRejected.Reason.FORM_UNKNOWN,
                 CourseRejected.Reason.FORM_MISMATCH -> Field.FORM
-                CourseRejected.Reason.TOTAL_DOSES_MISSING -> Field.TOTAL_DOSES
+                CourseRejected.Reason.TOTAL_DOSES_MISSING, CourseRejected.Reason.TOTAL_DOSES_TOO_MANY -> Field.TOTAL_DOSES
                 CourseRejected.Reason.ALREADY_ATTACHED, CourseRejected.Reason.PACKAGE_UNUSABLE -> Field.NONE
             }
     }

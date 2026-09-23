@@ -1,6 +1,7 @@
 package com.kert0n.medapp.queue
 
 import java.time.Instant
+import kotlin.uuid.Uuid
 
 /**
  * Что осталось в очереди после захода и когда за ним приходить. Нужно тому, кто планирует заход
@@ -11,6 +12,10 @@ import java.time.Instant
  */
 interface QueueBacklog {
 
-    /** `null` — незакрытых операций нет. Иначе — ближайший срок; прошедший значит «как будет связь». */
-    suspend fun dueAt(now: Instant): Instant?
+    /**
+     * `null` — незакрытых операций нет. Иначе — ближайший срок; прошедший значит «как будет связь».
+     * [except] — строки, которые заход пропустил: нечитаемую ожиданием не доставить, и приходить за
+     * ней планировщику незачем — её разбирает человек.
+     */
+    suspend fun dueAt(now: Instant, except: Set<Uuid> = emptySet()): Instant?
 }

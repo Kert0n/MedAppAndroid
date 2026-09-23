@@ -67,8 +67,10 @@ class CourseOffPlanCountingTest {
         }
         val shelf = if (shared) medKit(id = SHARED_KIT, publication = MedKit.Publication.PUBLISHED).ref else medKit().ref
         database.packageRepository().add(pack(id = PACK, medKit = shelf, quantity = tablets("20"), form = TABLET_FORM))
-        val created = scenarios.courseDrafting.create("Ибупрофен")
-        val draft = (scenarios.courseDrafting.edit(
+        // Лечение с прошедшего дня не начинают: его начали в первый день, а время прошло потом.
+        val beginning = Scenarios(database, Instant.parse("2027-03-08T05:00:00Z"))
+        val created = beginning.courseDrafting.create("Ибупрофен")
+        val draft = (beginning.courseDrafting.edit(
             created.id, created.revision,
             listOf(
                 CourseDrafting.Edit.SetDose(dose("2")),
@@ -78,7 +80,7 @@ class CourseOffPlanCountingTest {
                 CourseDrafting.Edit.Attach(PACK, Doses(6))
             )
         ) as CourseDrafting.Outcome.Saved).draft
-        scenarios.courseActivation.activate(draft.id, draft.revision)
+        beginning.courseActivation.activate(draft.id, draft.revision)
         scenarios.courseUpkeep.keepUp()
         return draft.id
     }

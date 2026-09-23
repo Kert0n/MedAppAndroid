@@ -1,5 +1,6 @@
 package com.kert0n.medapp.ui.intake
 
+import com.kert0n.medapp.presentation.value.ExpiryDatePresentationDTO
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.junit4.v2.createComposeRule
 import androidx.compose.ui.test.onNodeWithText
@@ -53,7 +54,8 @@ class UnplannedIntakeSheetTest {
     private fun taking(
         amount: String = "2",
         error: UnplannedIntakeError? = null,
-        questions: List<IntakeQuestionPresentationDTO> = emptyList()
+        questions: List<IntakeQuestionPresentationDTO> = emptyList(),
+        expired: ExpiryDatePresentationDTO? = null
     ) = UnplannedIntakeUiState(
         packageName = "Нурофен",
         unit = TABLETS.toPresentationDTO(),
@@ -61,7 +63,8 @@ class UnplannedIntakeSheetTest {
         inTheBox = QuantityPresentationDTO("15", TABLETS.toPresentationDTO()),
         form = UnplannedIntakePresentationDTO(amount),
         error = error,
-        questions = questions
+        questions = questions,
+        expired = expired
     )
 
     /**
@@ -75,6 +78,23 @@ class UnplannedIntakeSheetTest {
         compose.onNodeWithText("Прежде чем записать").assertIsDisplayed()
         compose.onNodeWithText("• Приём заденет занятое: свободно 1 таблетка").assertIsDisplayed()
         compose.onNodeWithText("Всё равно принял").performClick()
+
+        assertEquals(1, acknowledged)
+    }
+
+    /**
+     * Просроченную коробку видно **до** нажатия — срок стоит на листе значком и словами, — а вопрос
+     * после нажатия называет и коробку, и срок, и «всё равно принял» уходит тем же подтверждением
+     * (ТЗ 4.1.1.5.5). Узкий экран и крупный шрифт не прячут ни то, ни другое.
+     */
+    @Test
+    fun anExpiredBoxShowsItsTermAndTheQuestionNamesIt() {
+        val term = ExpiryDatePresentationDTO("14.08.2026")
+        show(taking(expired = term, questions = listOf(IntakeQuestionPresentationDTO.Expired("Нурофен", term))))
+
+        compose.onNodeWithText("Просрочен 14.08.2026").assertIsDisplayed()
+        compose.onNodeWithText("• «Нурофен» просрочен: годен до 14.08.2026").assertIsDisplayed()
+        compose.onNodeWithText("Всё равно принял").assertIsDisplayed().performClick()
 
         assertEquals(1, acknowledged)
     }
