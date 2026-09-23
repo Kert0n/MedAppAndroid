@@ -5,6 +5,7 @@ import android.content.BroadcastReceiver
 import android.content.Context
 import android.util.Log
 import androidx.test.runner.AndroidJUnitRunner
+import com.kert0n.medapp.fixture.freshTestWorkManager
 import dagger.hilt.android.testing.HiltTestApplication
 
 /**
@@ -15,10 +16,20 @@ import dagger.hilt.android.testing.HiltTestApplication
  * будит `BootAndTimeReceiver`, когда графа ещё нет (`HiltAndroidRule` не отработал). В приложении
  * граф есть с `MedApp.onCreate`, и будить есть кого; в процессе проверок будить некого — сигнал
  * не роняет прогон (иначе он кончался нулём тестов), а называется в журнале.
+ *
+ * Задание планировщика приходит так же, но принимает его сам WorkManager, и ему нужна настройка:
+ * на устройстве стоит настоящая установка, её ежечасный заход лежит в расписании системы и по
+ * сроку отдаётся процессу пакета — идёт ли там прогон, система не спрашивает. Поэтому WorkManager
+ * настраивается процессу здесь, до любого компонента.
  */
 class HiltTestRunner : AndroidJUnitRunner() {
     override fun newApplication(cl: ClassLoader?, name: String?, context: Context?): Application =
         super.newApplication(cl, HiltTestApplication::class.java.name, context)
+
+    override fun callApplicationOnCreate(app: Application) {
+        super.callApplicationOnCreate(app)
+        freshTestWorkManager(app)
+    }
 
     override fun onException(obj: Any?, e: Throwable): Boolean {
         if (obj is BroadcastReceiver && e.isMissingTestComponent()) {
