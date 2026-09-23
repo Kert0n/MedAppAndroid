@@ -16,6 +16,8 @@ import androidx.compose.ui.test.performScrollTo
 import androidx.compose.ui.test.performTextReplacement
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import androidx.test.platform.app.InstrumentationRegistry
+import com.kert0n.medapp.fixture.medKitRepository
+import com.kert0n.medapp.domain.medkit.MedKit
 import com.kert0n.medapp.HiltTestActivity
 import com.kert0n.medapp.domain.course.CourseSchedule
 import com.kert0n.medapp.domain.intake.IntakeProjection
@@ -25,6 +27,7 @@ import com.kert0n.medapp.domain.value.Quantity
 import com.kert0n.medapp.domain.value.QuantityUnit
 import com.kert0n.medapp.feature.course.CourseDrafting
 import com.kert0n.medapp.fixture.ProbeAccounts
+import com.kert0n.medapp.fixture.removeFromProd
 import com.kert0n.medapp.fixture.Scenarios
 import com.kert0n.medapp.fixture.allowNotifications
 import com.kert0n.medapp.fixture.dose
@@ -155,9 +158,7 @@ class NeighboursClaimsStoryTest {
     @After
     fun tearDown() = runBlocking {
         if (ProbeAccounts.skipReason != null) return@runBlocking
-        ProbeAccounts.anna?.deleteMedKit(shelf.id)
-        ProbeAccounts.boris?.deleteMedKit(shelf.id)
-        Unit
+        removeFromProd(shelf.id, listOfNotNull(ProbeAccounts.anna, ProbeAccounts.boris))
     }
 
     /**
@@ -186,6 +187,8 @@ class NeighboursClaimsStoryTest {
             shown("Решение об аптечке уже едет серверу. Пригласить можно будет, когда оно доедет.")
         }
         refreshFromOptions()
+        // «Последний обмен в» мог остаться от прошлого обмена: верят не надписи, а тому, что легло.
+        compose.waitUntil(WAIT) { runBlocking { database.medKitRepository().find(shelf.id)?.publication == MedKit.Publication.PUBLISHED } }
     }
 
     /**
@@ -202,6 +205,10 @@ class NeighboursClaimsStoryTest {
             check(claimed is ApiResult.Success) { "Сергей не смог заявить на коробку: $claimed" }
         }
         refreshFromOptions()
+        // Лечение начнётся по картине броней, лежащей в базе: ждут, пока в ней появится бронь Сергея.
+        compose.waitUntil(WAIT) {
+            runBlocking { database.packageRepository().find(box)?.claims?.total?.compareTo(BigDecimal("50")) == 0 }
+        }
     }
 
     /**

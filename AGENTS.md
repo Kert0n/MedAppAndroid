@@ -703,8 +703,9 @@ exit $rc
 сервер (`Reservation`, «ограничения сверху нет»). Поэтому чужую бронь стережёт клиент: план берёт
 только доступное мне (`CourseMedicine.maxDoses`; правка состава отвечает `BeyondLimit`, старт
 лечения зажимает черновик), а приём сверх свободного спрашивает (`TouchesReserved`). Поведение
-сервера утверждает `ContractProbe.claimsAreRequestsAndOnlyTheStockBoundsConsumption`, правило
-клиента — `NeighboursClaimsTest` и история «Одна коробка на два лечения».
+сервера утверждают `ContractProbe.aClaimMayExceedWhatIsFreeAndEvenTheStock` и
+`consumptionIsBoundedByTheStockNotByOthersClaims`, правило клиента — `NeighboursClaimsTest` и
+история «Одна коробка на два лечения».
 
 **Отказ зарабатывается там, где он настоящий, а показывается там, где он местный.** Отказ сервера
 **зарабатывает** второй человек: он допивает упаковку, а первый берёт из неё то, чего уже нет, — и
