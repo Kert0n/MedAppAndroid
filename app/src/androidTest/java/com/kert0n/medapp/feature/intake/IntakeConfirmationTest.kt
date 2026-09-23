@@ -246,7 +246,7 @@ class IntakeConfirmationTest {
      */
     @Test
     fun aLateAnswerRemovesTheSurplusPlannedOccurrence() = runTest {
-        val slots = schedule().next(schedule().beginning, 3)
+        val slots = schedule().next(schedule().beginning, 3).toList()
         val first = planned(INTAKE, slots[0])
         activate(totalDoses = 2, planned = listOf(first, planned(OTHER_INTAKE, slots[1]), planned(third, slots[2])))
         miss(first)

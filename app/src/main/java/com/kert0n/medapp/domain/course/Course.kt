@@ -96,7 +96,7 @@ class Course(
      * минует по [progress]. Отсюда и конец лечения: пропуск сдвигает его вперёд, поздний ответ по
      * пропущенному — назад, и лишний материализованный пункт тогда убирает сценарий.
      */
-    fun remainingOccurrences(progress: CourseProgress): List<ScheduledOccurrence> =
+    fun remainingOccurrences(progress: CourseProgress): Sequence<ScheduledOccurrence> =
         schedule.next(schedule.beginning, remainingDoses(progress).count, progress.answered)
 
     /**
@@ -106,7 +106,7 @@ class Course(
      * вперёд, как уезжает у неответа (PLAN D6).
      */
     fun dosesDue(progress: CourseProgress, from: Instant, until: Instant): Doses =
-        Doses(schedule.next(from, remainingDoses(progress).count, progress.answered).count { it.at.isBefore(until) })
+        Doses(schedule.next(from, remainingDoses(progress).count, progress.answered).takeWhile { it.at.isBefore(until) }.count())
 
     /** Ожидаемый конец — последняя из оставшихся доз; `null` — принято всё. */
     fun expectedEnd(progress: CourseProgress): ScheduledOccurrence? =
@@ -226,7 +226,7 @@ class Course(
      * хватает (PLAN D5). Потребность — от назначенного числа доз, а не от окна календаря.
      */
     fun coverage(progress: CourseProgress, availability: Availability): CourseCoverage =
-        medicine.coverage(dose, remainingOccurrences(progress), availability, schedule.zone)
+        medicine.coverage(dose, remainingDoses(progress), remainingOccurrences(progress), availability, schedule.zone)
 
     /**
      * Верхняя граница ползунка пачки в целых дозах: меньшее из того, что пачка даёт, и того, что

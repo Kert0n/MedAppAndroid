@@ -145,7 +145,7 @@ class CourseMedicineTest {
         )
         assertEquals(7.doses, coverage.requiredDoses)
         assertEquals(0.doses, coverage.coveredDoses)
-        assertEquals(schedule().next(schedule().beginning, 1).single().at, coverage.firstUncoveredAt)
+        assertEquals(schedule().next(schedule().beginning, 1).toList().single().at, coverage.firstUncoveredAt)
     }
 
     @Test

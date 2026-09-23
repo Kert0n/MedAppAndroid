@@ -162,7 +162,7 @@ class IntakeConfirmation @Inject constructor(
             // Снятие брони с этой пачки уже уехало зависимым от расхода — второй раз не ставится.
             closing.close(course, completion.close(record, intakes.ofCourse(course.id).filterIsInstance<CourseIntake>(), now), now, except = pkg.ref)
         } else {
-            calendar.prune(course, course.remainingOccurrences(progress).toSet(), now)
+            calendar.prune(course, course.remainingOccurrences(progress), now)
         }
         return Outcome.Confirmed(confirmed.projection(), sync.accounting, episodeClosed = finished)
     }

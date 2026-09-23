@@ -49,8 +49,8 @@ class CourseCalendar @Inject constructor(
     suspend fun extend(course: Course, now: Instant): Int {
         val existing = intakes.ofCourse(course.id).filterIsInstance<CourseIntake>()
         val remaining = course.remainingOccurrences(CourseProgress.of(existing))
-        prune(course, remaining.toSet(), now)
-        val window = remaining.filter { it.at.isBefore(now.plus(WINDOW)) }
+        prune(course, remaining, now)
+        val window = remaining.takeWhile { it.at.isBefore(now.plus(WINDOW)) }.toList()
         if (window.isEmpty()) return 0
         val order = course.spendOrder(Doses(window.size), packages.availabilityFor(course))
         val materialised = window.mapIndexed { index, slot ->
@@ -75,13 +75,15 @@ class CourseCalendar @Inject constructor(
      * Лишние плановые пункты убраны: остаются [remaining] и **начавшиеся** — чей момент уже прошёл,
      * а день ещё нет. Такой пункт ещё ждёт ответа — «в девять утра принял по прежней дозе, отвечаю
      * в полдень», — и назначен он прежним планом: его дозу и пачку правка плана не переписывает
-     * (PLAN D5). Пропуском он станет по концу своего дня.
+     * (PLAN D5). Пропуском он станет по концу своего дня. Из [remaining] читается только то, что
+     * не позже последнего записанного планового: дальше сверять не с чем.
      */
-    suspend fun prune(course: Course, remaining: Set<ScheduledOccurrence>, now: Instant): Int {
-        val started = intakes.ofCourse(course.id).filterIsInstance<CourseIntake>()
-            .filter { it.status == IntakeStatus.PLANNED && it.plannedAt.isBefore(now) }
-            .map { it.slot }
-        val gone = intakes.prunePlanned(course.id, remaining + started)
+    suspend fun prune(course: Course, remaining: Sequence<ScheduledOccurrence>, now: Instant): Int {
+        val planned = intakes.ofCourse(course.id).filterIsInstance<CourseIntake>().filter { it.status == IntakeStatus.PLANNED }
+        val started = planned.filter { it.plannedAt.isBefore(now) }.map { it.slot }
+        val last = planned.maxOfOrNull { it.plannedAt }
+        val kept = if (last == null) emptySet() else remaining.takeWhile { !it.at.isAfter(last) }.toSet()
+        val gone = intakes.prunePlanned(course.id, kept + started)
         // Пункта больше нет — и напоминать о нём нечего: перестройка расписания уносит обещание
         // вместе с пунктом, а не оставляет будильник на удалённом (PLAN D8).
         withdrawal.withdrawAll(gone)
@@ -134,7 +136,7 @@ class CourseCalendar @Inject constructor(
      * начавшиеся остаются как были (PLAN D5).
      */
     suspend fun replan(course: Course, now: Instant): Int {
-        prune(course, remaining = emptySet(), now = now)
+        prune(course, remaining = emptySequence(), now = now)
         return extend(course, now)
     }
 

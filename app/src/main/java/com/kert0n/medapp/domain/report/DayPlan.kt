@@ -60,7 +60,10 @@ data class DayPlan(val date: LocalDate, val items: List<Item>) {
             val expected = inProgress.flatMap { plan ->
                 val course = plan.course
                 val known = written[course.id].orEmpty().toSet()
+                // Пункт дня встаёт не позже начала послезавтра: перевод часов сдвигает на часы.
+                val after = date.plusDays(2).atStartOfDay(course.schedule.zone).toInstant()
                 course.remainingOccurrences(plan.progress)
+                    .takeWhile { it.at.isBefore(after) }
                     .filter { it.localDate == date && it.slot !in known }
                     .map { Item.Expected(course.id, title(course.id), it, course.dose) }
             }

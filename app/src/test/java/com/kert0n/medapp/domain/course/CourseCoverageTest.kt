@@ -38,7 +38,7 @@ class CourseCoverageTest {
     )
 
     /** Назначены те самые 28 доз, и с начала календаря они ложатся на неделю. */
-    private val remaining: List<ScheduledOccurrence> = fourTimesADay.next(fourTimesADay.beginning, 28)
+    private val remaining: List<ScheduledOccurrence> = fourTimesADay.next(fourTimesADay.beginning, 28).toList()
 
     private val availability = availability(PACK to tablets("20"), OTHER_PACK to tablets("12"))
 
@@ -66,7 +66,7 @@ class CourseCoverageTest {
     @Test
     fun fullyCoveredCourseNamesNoGap() {
         val week = schedule()
-        val plan = week.next(week.beginning, 7)
+        val plan = week.next(week.beginning, 7).toList()
         val found = activeCourse(sources = listOf(source(PACK, 7))).coverage()
         assertTrue(found.isFullyCovered)
         assertEquals(plan.last().at, found.coveredUntil)
@@ -173,7 +173,7 @@ class CourseCoverageTest {
         val week = schedule()
         val course = activeCourse(sources = listOf(source(PACK, 7)))
         val firstMissed = course.progress(missed = 1)
-        val ahead = course.remainingOccurrences(firstMissed)
+        val ahead = course.remainingOccurrences(firstMissed).toList()
         assertEquals(7, ahead.size)
         assertEquals(week.start.plusDays(1), ahead.first().localDate)
         assertEquals(week.start.plusDays(7), course.expectedEnd(firstMissed)?.localDate)
