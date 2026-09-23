@@ -115,6 +115,7 @@ class ChangingTreatmentStoryTest {
         heStartsTheTreatment()
         heSpendsTheOpenedBoxFirst()
         theDoctorRaisesTheDose()
+        theDoctorSaysToKeepTakingIt()
         heGivesTheOtherBoxAway()
         andInTheEndTheTreatmentIsCancelled()
     }
@@ -199,6 +200,38 @@ class ChangingTreatmentStoryTest {
         compose.waitUntil(WAIT) {
             compose.onAllNodesWithText("3 таблетка", substring = true).fetchSemanticsNodes().isNotEmpty()
         }
+    }
+
+    /**
+     * Врач велит пить не переставая. Пётр набирает сто тысяч приёмов — столько не назначают, и
+     * форма говорит предел, а не падает и не записывает. Он ставит предел, и десять тысяч
+     * приёмов не тяжелее десяти: форма называет последний приём, карточка — сколько нужно, «День»
+     * открывается сразу. Расписание читается окном, а не всеми пунктами лечения.
+     */
+    private fun theDoctorSaysToKeepTakingIt() {
+        compose.onNodeWithContentDescription("Ещё").performClick()
+        compose.onNodeWithText("Изменить").performClick()
+        compose.waitUntil(WAIT) { compose.onAllNodesWithText("Всего приёмов").fetchSemanticsNodes().isNotEmpty() }
+
+        compose.onNodeWithText("Всего приёмов").performScrollTo().performTextReplacement("100000")
+        // Подвал уходит на время ввода: человек убирает клавиатуру, чтобы нажать.
+        closeSoftKeyboard()
+        compose.onNodeWithText("Сохранить").performClick()
+        compose.waitUntil(WAIT) { compose.onAllNodesWithText("Приёмов не больше 10000.").fetchSemanticsNodes().isNotEmpty() }
+
+        compose.onNodeWithText("Всего приёмов").performScrollTo().performTextReplacement("10000")
+        compose.waitUntil(WAIT) { compose.onAllNodesWithText("Последний приём —", substring = true).fetchSemanticsNodes().isNotEmpty() }
+        closeSoftKeyboard()
+        compose.onNodeWithText("Сохранить").performClick()
+        compose.waitUntil(WAIT) { compose.onAllNodesWithText("нужно 10000 приёмов", substring = true).fetchSemanticsNodes().isNotEmpty() }
+
+        // «День» не раскладывает все десять тысяч, чтобы найти сегодняшний приём.
+        back()
+        compose.onNodeWithText("День").performClick()
+        compose.waitUntil(WAIT) { compose.onAllNodesWithText("Ибупрофен").fetchSemanticsNodes().isNotEmpty() }
+        compose.onNodeWithText("Курсы").performClick()
+        compose.waitUntil(WAIT) { compose.onAllNodesWithText("Ибупрофен").fetchSemanticsNodes().isNotEmpty() }
+        compose.onNodeWithText("Ибупрофен").performClick()
     }
 
     /** Дачную пачку он отдал соседу — отвязка идущего лечения спрашивает, прежде чем снять бронь. */
