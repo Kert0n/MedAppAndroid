@@ -42,6 +42,10 @@ class LayerBoundariesTest {
         "storage" to setOf("domain", "feature"),
         // Журнал поручений: раскладывает типы очереди по колонкам и собирает обратно, но не толкует.
         "storage/operation" to setOf("domain", "queue", "feature"),
+        // Уходит в PR B вместе с портами пачки и приёма (решение владельца 2026-09-24): знание о
+        // сервере в строках пачки и приёма и свёртка поручений в проекции для экрана.
+        "storage/pack" to setOf("domain", "feature", "queue"),
+        "storage/intake" to setOf("domain", "feature", "queue"),
         // Сценарий стоит над логиками, но в сеть не ходит: сетевое действие называет домен портом.
         "feature" to setOf("domain", "queue", "storage"),
         // Android-службы без экранов: фон, ключи, уведомления — и порты, которые они исполняют.
