@@ -31,6 +31,7 @@ import com.kert0n.medapp.network.medkit.MembershipPostNetworkDTO
 import com.kert0n.medapp.network.medkit.ServerMedKitInvitations
 import com.kert0n.medapp.network.pack.PackageSnapshotResolver
 import com.kert0n.medapp.network.pack.PackageSyncNetworkDTO
+import com.kert0n.medapp.network.register.MedAppRegister
 import com.kert0n.medapp.network.server.ApiFailure
 import com.kert0n.medapp.network.server.ApiResult
 import com.kert0n.medapp.network.server.MedAppApi
@@ -247,7 +248,7 @@ class FresheningProbe {
         private val transactions = database.transactions()
         val vocabulary = VocabularyResolver(VocabularyRoomRepository(database.vocabulary()), api)
         private val snapshots = PackageSnapshotResolver(vocabulary, database.queueStorage())
-        private val reading = SnapshotApplier(api, database.snapshotStorage(), vocabulary, snapshots, clock)
+        private val reading = SnapshotApplier(MedAppRegister(api, snapshots, clock), database.snapshotStorage(), clock)
         private val worker = QueueWorker(database.queueStorage(), MedAppCourier(MedAppDoor(api), vocabulary, snapshots, clock), MedAppPacking(), RoomTransactions(database), clock)
         val packages = database.packageRepository()
         private val medKits = database.medKitRepository()
@@ -256,7 +257,7 @@ class FresheningProbe {
         private val relocation = PackageRelocation(packages, medKits, database.courseRepository(), queue, transactions, clock)
         private val publishing = MedKitPublishing(medKits, packages, relocation, queue, transactions, clock)
         val freshening = Freshening(
-            Rereading(api, database.snapshotStorage(), snapshots, clock),
+            Rereading(MedAppRegister(api, snapshots, clock), database.snapshotStorage(), clock),
             FakeConnection(online = true),
             packages,
             transactions,

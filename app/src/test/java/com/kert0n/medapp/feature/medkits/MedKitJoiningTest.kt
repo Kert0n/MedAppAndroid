@@ -14,6 +14,7 @@ import com.kert0n.medapp.fixture.TABLETS
 import com.kert0n.medapp.fixture.TABLET_FORM
 import com.kert0n.medapp.fixture.medKit
 import com.kert0n.medapp.network.pack.PackageSnapshotResolver
+import com.kert0n.medapp.network.register.MedAppRegister
 import com.kert0n.medapp.network.server.MedAppApi
 import com.kert0n.medapp.network.server.RawResponse
 import com.kert0n.medapp.network.server.medAppHttpClient
@@ -107,7 +108,7 @@ class MedKitJoiningTest {
             )
         )
         val vocabulary = VocabularyResolver(Store(), api)
-        val applier = SnapshotApplier(api, storage, vocabulary, PackageSnapshotResolver(vocabulary, Shelves()), Clock.fixed(now, ZoneOffset.UTC))
+        val applier = SnapshotApplier(MedAppRegister(api, PackageSnapshotResolver(vocabulary, Shelves()), Clock.fixed(now, ZoneOffset.UTC)), storage, Clock.fixed(now, ZoneOffset.UTC))
         return MedKitJoining(applier)
     }
 

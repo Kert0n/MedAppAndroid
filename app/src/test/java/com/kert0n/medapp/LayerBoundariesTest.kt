@@ -46,6 +46,10 @@ class LayerBoundariesTest {
         // сервере в строках пачки и приёма и свёртка поручений в проекции для экрана.
         "storage/pack" to setOf("domain", "feature", "queue"),
         "storage/intake" to setOf("domain", "feature", "queue"),
+        // Исполнители портов очереди, которые переедут к сценарию вместе с транзакцией и укладкой
+        // снимка в PR B: `RoomTransactions` (Transactions) и `SnapshotRoomStorage` (SnapshotStorage).
+        "storage/database" to setOf("domain", "feature", "queue"),
+        "storage/snapshot" to setOf("domain", "feature", "queue"),
         // Сценарий стоит над логиками, но в сеть не ходит: сетевое действие называет домен портом.
         "feature" to setOf("domain", "queue", "storage"),
         // Android-службы без экранов: фон, ключи, уведомления — и порты, которые они исполняют.

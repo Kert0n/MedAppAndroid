@@ -1,11 +1,6 @@
 package com.kert0n.medapp.queue
 
 import com.kert0n.medapp.domain.Unavailability
-import com.kert0n.medapp.network.account.asUnavailability
-import com.kert0n.medapp.network.pack.PackageSnapshotResolver
-import com.kert0n.medapp.network.server.ApiFailure
-import com.kert0n.medapp.network.server.ApiResult
-import com.kert0n.medapp.network.server.MedAppApi
 import java.time.Clock
 import javax.inject.Inject
 import javax.inject.Singleton
@@ -21,16 +16,15 @@ import kotlin.uuid.Uuid
  * **сам список** (`GET /v1/med-kits`): в каких полках мы ещё есть и сколько в них людей, — чтобы
  * человек не решал ничего о полке, из которой его вывели.
  *
- * Ложится ответ тем же путём, что снимок: разбор `PackageSnapshotResolver`, укладка
+ * Ложится ответ тем же путём, что снимок: сборка в домен у реестра ([Register]), укладка
  * `SnapshotStorage.lay` — по версиям, не трогая коробку с запросом в полёте и не возвращая
  * убранное (E1, C0). Очередь не трогается: неотправленное уезжает своим порядком и ложится поверх
  * прочитанного.
  */
 @Singleton
 class Rereading @Inject constructor(
-    private val api: MedAppApi,
+    private val register: Register,
     private val storage: SnapshotStorage,
-    private val snapshots: PackageSnapshotResolver,
     private val clock: Clock
 ) {
 
@@ -43,16 +37,15 @@ class Rereading @Inject constructor(
         val at = clock.instant()
         // Спрашивается до сети, как и у снимка: что человек сделает, пока ответ летит, ответ не знает.
         val knew = storage.serverKnows()
-        val read = when (val answer = api.medKits()) {
-            is ApiResult.Success -> answer.value
-            is ApiResult.Failure -> return Outcome.Refused(answer.failure.asUnavailability())
+        val participants = when (val answer = register.shelves()) {
+            is Register.Shelves.Answered -> answer.participants
+            is Register.Shelves.Refused -> return Outcome.Refused(answer.reason)
         }
-        val named = read.mapTo(HashSet()) { it.id }
         storage.lay(
             ServerSnapshot(
-                participants = read.filter { it.id in knew.heldMedKits }.associate { it.id to it.participantCount },
+                participants = participants.filterKeys { it in knew.heldMedKits },
                 packages = emptyList(),
-                goneMedKits = knew.medKits - named,
+                goneMedKits = knew.medKits - participants.keys,
                 gonePackages = emptySet(),
                 arrivedMedKits = emptySet(),
                 heldPackages = knew.heldPackages
@@ -62,40 +55,34 @@ class Rereading @Inject constructor(
         return Outcome.Read
     }
 
-    /** Одна коробка. 404 — её больше нет: выбросили, кончилась или унесли туда, где нас нет. */
+    /** Одна коробка. Её больше нет — выбросили, кончилась или унесли туда, где нас нет. */
     suspend fun pack(packageId: Uuid): Outcome {
         val at = clock.instant()
         val knew = storage.serverKnows()
-        val read = when (val answer = api.packageSnapshot(packageId)) {
-            is ApiResult.Success -> answer.value
-            is ApiResult.Failure -> return when (answer.failure) {
-                ApiFailure.NotFound -> {
-                    storage.lay(
-                        ServerSnapshot(
-                            participants = emptyMap(),
-                            packages = emptyList(),
-                            goneMedKits = emptySet(),
-                            gonePackages = setOf(packageId),
-                            arrivedMedKits = emptySet(),
-                            heldPackages = knew.heldPackages
-                        ),
-                        at
-                    )
-                    Outcome.Gone
-                }
-                else -> Outcome.Refused(answer.failure.asUnavailability())
+        val snapshot = when (val answer = register.pack(packageId)) {
+            is Register.Pack.Answered -> answer.snapshot
+            Register.Pack.Gone -> {
+                storage.lay(
+                    ServerSnapshot(
+                        participants = emptyMap(),
+                        packages = emptyList(),
+                        goneMedKits = emptySet(),
+                        gonePackages = setOf(packageId),
+                        arrivedMedKits = emptySet(),
+                        heldPackages = knew.heldPackages
+                    ),
+                    at
+                )
+                return Outcome.Gone
             }
-        }
-        val snapshot = when (val resolution = snapshots.resolve(read, at)) {
-            is PackageSnapshotResolver.Resolution.Resolved -> resolution.snapshot
             // Коробка на полке, которой у нас нет, — это не «пропала»: её переставили туда, где нас
             // нет, и отвечает за это полный снимок со своим утверждением о целом (E6).
-            is PackageSnapshotResolver.Resolution.Elsewhere -> return Outcome.Read
+            Register.Pack.Elsewhere -> return Outcome.Read
             // Ничего не легло: словарь не дочитался или ответ вне контракта. Прочитанным это не
             // считается — иначе коробка сошла бы за свежую, а человек видел бы старое число.
-            is PackageSnapshotResolver.Resolution.Unresolved -> return Outcome.Refused(
-                if (resolution.stop) Unavailability.NO_CONNECTION else Unavailability.SERVER_SILENT
-            )
+            is Register.Pack.Unresolved ->
+                return Outcome.Refused(if (answer.stop) Unavailability.NO_CONNECTION else Unavailability.SERVER_SILENT)
+            is Register.Pack.Refused -> return Outcome.Refused(answer.reason)
         }
         storage.lay(
             ServerSnapshot(

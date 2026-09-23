@@ -12,6 +12,7 @@ import com.kert0n.medapp.fixture.SHARED_KIT
 import com.kert0n.medapp.fixture.awaiting
 import com.kert0n.medapp.fixture.watching
 import com.kert0n.medapp.network.pack.PackageSnapshotResolver
+import com.kert0n.medapp.network.register.MedAppRegister
 import com.kert0n.medapp.network.server.MedAppApi
 import com.kert0n.medapp.network.server.medAppHttpClient
 import com.kert0n.medapp.network.value.VocabularyResolver
@@ -74,7 +75,7 @@ class MedKitJoiningViewModelTest {
             )
             val vocabulary = VocabularyResolver(FakeVocabulary(), api)
             MedKitJoining(
-                SnapshotApplier(api, Laid(), vocabulary, PackageSnapshotResolver(vocabulary, FakeQueue()), clock)
+                SnapshotApplier(MedAppRegister(api, PackageSnapshotResolver(vocabulary, FakeQueue()), clock), Laid(), clock)
             )
         }
     }

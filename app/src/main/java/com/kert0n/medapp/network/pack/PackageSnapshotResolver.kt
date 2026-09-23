@@ -57,6 +57,9 @@ class PackageSnapshotResolver @Inject constructor(
         }
     }
 
+    /** Заход разбора многих снимков одного ответа: словарь в нём дочитывается не больше раза. */
+    fun session(): VocabularyResolver.Session = vocabulary.session()
+
     /** Чем кончилось: снимок в домене — или что именно неизвестно и надо ли останавливать проход. */
     sealed interface Resolution {
 

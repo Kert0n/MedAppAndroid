@@ -7,6 +7,7 @@ import com.kert0n.medapp.domain.value.QuantityUnit
 import com.kert0n.medapp.domain.value.Vocabulary
 import com.kert0n.medapp.domain.value.VocabularyStore
 import com.kert0n.medapp.network.pack.PackageSnapshotResolver
+import com.kert0n.medapp.network.register.MedAppRegister
 import com.kert0n.medapp.network.server.MedAppApi
 import com.kert0n.medapp.network.server.RawResponse
 import com.kert0n.medapp.network.server.medAppHttpClient
@@ -128,5 +129,5 @@ class RereadingServer(clock: Clock) {
 
     private val vocabulary = VocabularyResolver(Words, api)
 
-    val rereading = Rereading(api, storage, PackageSnapshotResolver(vocabulary, Shelves), clock)
+    val rereading = Rereading(MedAppRegister(api, PackageSnapshotResolver(vocabulary, Shelves), clock), storage, clock)
 }

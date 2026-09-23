@@ -25,6 +25,7 @@ import com.kert0n.medapp.fixture.medKit
 import com.kert0n.medapp.fixture.pack
 import com.kert0n.medapp.fixture.watching
 import com.kert0n.medapp.network.pack.PackageSnapshotResolver
+import com.kert0n.medapp.network.register.MedAppRegister
 import com.kert0n.medapp.network.server.MedAppApi
 import com.kert0n.medapp.network.server.medAppHttpClient
 import com.kert0n.medapp.network.value.VocabularyResolver
@@ -106,7 +107,7 @@ class MedKitSharingViewModelTest {
     private fun snapshots(): SnapshotApplier {
         val api = MedAppApi(medAppHttpClient(MockEngine { error("снимок этой проверке не нужен") }, "https://medapp.test"))
         val vocabulary = VocabularyResolver(FakeVocabulary(), api)
-        return SnapshotApplier(api, Untouched, vocabulary, PackageSnapshotResolver(vocabulary, FakeQueue()), clock)
+        return SnapshotApplier(MedAppRegister(api, PackageSnapshotResolver(vocabulary, FakeQueue()), clock), Untouched, clock)
     }
 
     private object Untouched : SnapshotStorage {

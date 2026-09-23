@@ -2,17 +2,7 @@ package com.kert0n.medapp.queue
 
 import com.kert0n.medapp.domain.Unavailability
 import com.kert0n.medapp.domain.medkit.InvitationKey
-import com.kert0n.medapp.network.account.asUnavailability
-import com.kert0n.medapp.network.medkit.MedKitNetworkDTO
-import com.kert0n.medapp.network.medkit.MembershipPostNetworkDTO
-import com.kert0n.medapp.network.pack.PackageSnapshotResolver
-import com.kert0n.medapp.network.server.ApiFailure
-import com.kert0n.medapp.network.server.ApiResult
-import com.kert0n.medapp.network.server.MedAppApi
-import com.kert0n.medapp.network.value.VocabularyResolver
-import com.kert0n.medapp.queue.pack.PackageSnapshot
 import java.time.Clock
-import java.time.Instant
 import javax.inject.Inject
 import javax.inject.Singleton
 import kotlin.uuid.Uuid
@@ -28,21 +18,16 @@ import kotlin.uuid.Uuid
  * разрешается и ложится она тем же путём ([join]). Утверждения о целом в нём нет, и пропажи оно не
  * объявляет.
  *
- * Сеть между транзакциями, а не внутри (F5): сначала читается ответ, потом он разрешается в домен,
- * и только разрешённое ложится одной записью. Промах словаря дочитывается один раз за чтение —
- * единица или форма, появившаяся на сервере, это обычное дело, а не ошибка; строка, которой не
- * помог и свежий словарь, пропускается с названной причиной, а не роняет всё чтение.
- *
- * **Живёт в очереди, а не в сети.** Разрешить снимок нельзя, не спросив, что за полку он называет,
- * а это вопрос к хранилищу: `PackageSnapshotResolver` потому и лежит здесь. Сеть про очередь не
- * знает (H1), так что место у чтения снимка — рядом с остальной доставкой, а не в `network/`.
+ * Сеть между транзакциями, а не внутри (F5): сначала реестр читается и собирается в домен
+ * ([Register]), и только собранное ложится одной записью. Промах словаря дочитывается один раз за
+ * чтение; строка, которой не помог и свежий словарь, пропускается с названной причиной, а не
+ * роняет всё чтение. Какие полки ответ заводит и что пропало, решается здесь — по тому, что было
+ * у нас до чтения.
  */
 @Singleton
 class SnapshotApplier @Inject constructor(
-    private val api: MedAppApi,
+    private val register: Register,
     private val storage: SnapshotStorage,
-    private val vocabulary: VocabularyResolver,
-    private val snapshots: PackageSnapshotResolver,
     private val clock: Clock
 ) {
 
@@ -50,28 +35,24 @@ class SnapshotApplier @Inject constructor(
         val at = clock.instant()
         // Спрашивается до сети: что человек заведёт или уберёт, пока снимок летит, ответ не знает.
         val knew = storage.serverKnows()
-        val read = when (val answer = api.snapshot()) {
-            is ApiResult.Success -> answer.value
-            is ApiResult.Failure -> return Outcome.Refused(answer.failure.asUnavailability())
-        }
-        val participants = read.medKits.associate { it.id to it.participantCount }
         // Полку, которой у нас не было, снимок заводит: сервер назвал её нашей — вступили, а ответ
         // на вступление потерялся. Была и пропала, пока снимок летел, — её убрали, не заводим.
-        val arriving = participants.keys - knew.heldMedKits
-        val resolution = resolve(read.medKits, arriving, at)
+        val read = when (val answer = register.whole { named -> named - knew.heldMedKits }) {
+            is Register.Whole.Answered -> answer.read
+            is Register.Whole.Refused -> return Outcome.Refused(answer.reason)
+        }
         // Чего в снимке нет, к тому доступа больше нет. Считается это по названным номерам, а не
-        // по разрешённым: коробка, которую не удалось разрешить, названа сервером и не пропала.
-        val named = read.medKits.flatMapTo(HashSet()) { medKit -> medKit.packages.map { it.pack.id } }
+        // по собранным: коробка, которую не удалось собрать, названа сервером и не пропала.
         val snapshot = ServerSnapshot(
-            participants = participants,
-            packages = resolution.packages,
-            goneMedKits = knew.medKits - participants.keys,
-            gonePackages = knew.packages - named,
-            arrivedMedKits = arriving,
+            participants = read.participants,
+            packages = read.packages,
+            goneMedKits = knew.medKits - read.participants.keys,
+            gonePackages = knew.packages - read.namedPackages,
+            arrivedMedKits = read.arrived,
             heldPackages = knew.heldPackages
         )
         storage.lay(snapshot, at)
-        return Outcome.Applied(medKits = participants.size, packages = resolution.packages.size, skipped = resolution.skipped)
+        return Outcome.Applied(medKits = read.participants.size, packages = read.packages.size, skipped = read.skipped)
     }
 
     /**
@@ -83,53 +64,24 @@ class SnapshotApplier @Inject constructor(
     suspend fun join(key: InvitationKey): Joining {
         val at = clock.instant()
         val knew = storage.serverKnows()
-        val joined = when (val answer = api.joinMedKit(MembershipPostNetworkDTO(key.value))) {
-            is ApiResult.Success -> answer.value
-            is ApiResult.Failure -> return when (val failure = answer.failure) {
-                // Неизвестный, истёкший ключ и вышедший пригласивший неразличимы (B6).
-                ApiFailure.NotFound -> Joining.InvitationInvalid
-                ApiFailure.Conflict -> Joining.AlreadyMember
-                ApiFailure.OutcomeUnknown -> Joining.OutcomeUnknown
-                else -> Joining.Refused(failure.asUnavailability())
-            }
+        val (medKitId, read) = when (val answer = register.join(key) { joined -> setOf(joined) - knew.heldMedKits }) {
+            is Register.Joined.Answered -> answer.medKitId to answer.read
+            Register.Joined.AlreadyMember -> return Joining.AlreadyMember
+            Register.Joined.InvitationInvalid -> return Joining.InvitationInvalid
+            Register.Joined.OutcomeUnknown -> return Joining.OutcomeUnknown
+            is Register.Joined.Refused -> return Joining.Refused(answer.reason)
         }
-        val arriving = setOf(joined.id) - knew.heldMedKits
-        val resolution = resolve(listOf(joined), arriving, at)
         val snapshot = ServerSnapshot(
-            participants = mapOf(joined.id to joined.participantCount),
-            packages = resolution.packages,
+            participants = read.participants,
+            packages = read.packages,
             goneMedKits = emptySet(),
             gonePackages = emptySet(),
-            arrivedMedKits = arriving,
+            arrivedMedKits = read.arrived,
             heldPackages = knew.heldPackages
         )
         storage.lay(snapshot, at)
-        return Joining.Joined(joined.id)
+        return Joining.Joined(medKitId)
     }
-
-    /** Коробки названных полок — в домен; [arriving] — полки, которые этот же ответ и заводит. */
-    private suspend fun resolve(medKits: List<MedKitNetworkDTO>, arriving: Set<Uuid>, at: Instant): Resolution {
-        val resolved = ArrayList<PackageSnapshot>()
-        val skipped = ArrayList<String>()
-        // Один заход разбора на весь ответ: сколько бы коробок ни назвали незнакомую единицу,
-        // словарь дочитывается один раз.
-        val words = vocabulary.session()
-        for (medKit in medKits) {
-            for (dto in medKit.packages) {
-                when (val resolution = snapshots.resolve(dto, at, arriving, words)) {
-                    is PackageSnapshotResolver.Resolution.Resolved -> resolved += resolution.snapshot
-                    // Полки уже нет: её убрали у нас, пока снимок летел, и класть коробку некуда.
-                    is PackageSnapshotResolver.Resolution.Elsewhere ->
-                        skipped += "коробка ${dto.pack.id} на убранной полке ${resolution.medKitId}"
-                    is PackageSnapshotResolver.Resolution.Unresolved ->
-                        skipped += "коробка ${dto.pack.id}: ${resolution.reason}"
-                }
-            }
-        }
-        return Resolution(resolved, skipped)
-    }
-
-    private class Resolution(val packages: List<PackageSnapshot>, val skipped: List<String>)
 
     /**
      * Чем кончилось чтение. Различает поведение экрана состояния синхронизации: прочитали — видно

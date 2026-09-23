@@ -25,6 +25,7 @@ import com.kert0n.medapp.network.delivery.MedAppCourier
 import com.kert0n.medapp.network.delivery.MedAppDoor
 import com.kert0n.medapp.network.delivery.MedAppPacking
 import com.kert0n.medapp.network.pack.PackageSnapshotResolver
+import com.kert0n.medapp.network.register.MedAppRegister
 import com.kert0n.medapp.network.server.MedAppApi
 import com.kert0n.medapp.network.server.medAppHttpClient
 import com.kert0n.medapp.network.value.VocabularyResolver
@@ -112,7 +113,7 @@ class SyncBackgroundTest {
         val resolver = PackageSnapshotResolver(vocabulary, database.queueStorage())
         return Synchronization(
             QueueWorker(database.queueStorage(), MedAppCourier(MedAppDoor(api), vocabulary, resolver, clock), MedAppPacking(), RoomTransactions(database), clock),
-            SnapshotApplier(api, database.snapshotStorage(), vocabulary, resolver, clock),
+            SnapshotApplier(MedAppRegister(api, resolver, clock), database.snapshotStorage(), clock),
             QueueBacklogRoomStorage(database.syncOperations()),
             schedule,
             clock,

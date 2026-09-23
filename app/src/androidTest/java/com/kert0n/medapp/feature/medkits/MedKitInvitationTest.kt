@@ -15,6 +15,7 @@ import com.kert0n.medapp.fixture.medKitRepository
 import com.kert0n.medapp.fixture.queueStorage
 import com.kert0n.medapp.fixture.snapshotStorage
 import com.kert0n.medapp.network.pack.PackageSnapshotResolver
+import com.kert0n.medapp.network.register.MedAppRegister
 import com.kert0n.medapp.network.server.MedAppApi
 import com.kert0n.medapp.network.server.medAppHttpClient
 import com.kert0n.medapp.network.value.VocabularyResolver
@@ -80,7 +81,7 @@ class MedKitInvitationTest {
             )
         )
         val vocabulary = VocabularyResolver(VocabularyRoomRepository(database.vocabulary()), api)
-        val snapshots = SnapshotApplier(api, database.snapshotStorage(), vocabulary, PackageSnapshotResolver(vocabulary, database.queueStorage()), clock)
+        val snapshots = SnapshotApplier(MedAppRegister(api, PackageSnapshotResolver(vocabulary, database.queueStorage()), clock), database.snapshotStorage(), clock)
         return MedKitInvitation(database.medKitRepository(), server, snapshots, term, clock)
     }
 
