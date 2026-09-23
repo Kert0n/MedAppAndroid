@@ -100,6 +100,29 @@ class SyncStatusScreenTest {
         compose.onNodeWithText("Эту строку нечем прочитать").assertIsDisplayed()
     }
 
+    /**
+     * `STALE` — это про **аптечку**: полки, куда клали новое лекарство, не стало, или решение об
+     * аптечке опоздало за чужим. Скажи строка «лекарство изменили раньше вас» — человек пойдёт
+     * искать, кто правил лекарство, а правили или убрали полку.
+     */
+    @Test
+    fun aStaleRefusalTalksAboutTheKitNotTheMedicine() {
+        val stale = refused().copy(
+            about = OutstandingOperationPresentationDTO.About.PACKAGE_CREATED,
+            reason = OutstandingOperationPresentationDTO.Reason.STALE,
+            recountable = null
+        )
+        show(SyncStatusUiState(rows = listOf(stale), isLoaded = true))
+        val words = androidx.test.platform.app.InstrumentationRegistry.getInstrumentation().targetContext
+
+        compose.onNodeWithText(words.getString(com.kert0n.medapp.R.string.sync_reason_stale)).assertIsDisplayed()
+        assertEquals(
+            "отказ по аптечке говорит словами отказа по лекарству",
+            false,
+            words.getString(com.kert0n.medapp.R.string.sync_reason_stale) == words.getString(com.kert0n.medapp.R.string.sync_reason_conflict)
+        )
+    }
+
     /** Расхождение по числу ведёт на пересчёт — той же коробки, о которой спор (REQ-045). */
     @Test
     fun aQuantityConflictLeadsToRecounting() {
