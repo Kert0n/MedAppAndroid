@@ -4,8 +4,6 @@ import com.kert0n.medapp.domain.Unavailability
 import com.kert0n.medapp.domain.account.AccountReadiness
 import com.kert0n.medapp.domain.account.DeviceAccount
 import com.kert0n.medapp.feature.bootstrap.AppStart
-import com.kert0n.medapp.queue.Transactions
-import com.kert0n.medapp.storage.medkit.MedKitStorageRepository
 import java.time.Clock
 import javax.inject.Inject
 
@@ -23,15 +21,14 @@ import javax.inject.Inject
  */
 class AccountReplacement @Inject constructor(
     private val account: DeviceAccount,
-    private val medKits: MedKitStorageRepository,
-    private val transactions: Transactions,
+    private val abandonment: ServerAbandonment,
     private val appStart: AppStart,
     private val clock: Clock
 ) {
 
     suspend fun decide(): AppStart.Outcome {
         if (account.ensure() != AccountReadiness.KeyLost) return appStart.begin()
-        transactions.run { medKits.abandonServer(clock.instant()) }
+        abandonment.abandon(clock.instant())
         return when (val replaced = account.replaceUnreadable()) {
             AccountReadiness.Ready -> appStart.begin()
             // Нечитаемое после стирания — уже не про учётку, а про хранилище устройства.

@@ -42,6 +42,7 @@ import kotlinx.coroutines.sync.withLock
 class QueueWorker @Inject constructor(
     private val storage: QueueStorage,
     private val courier: Courier,
+    private val transactions: Transactions,
     private val clock: Clock
 ) {
 
@@ -50,6 +51,9 @@ class QueueWorker @Inject constructor(
      * первого, а не пропускается, — тот, кто позвал, хочет, чтобы очередь ушла.
      */
     private val single = Mutex()
+
+    /** Взятие в отправку — своей транзакцией, по свежему состоянию. */
+    private val taking = Taking(storage, transactions)
 
     /**
      * Поездка курьера текущего прохода: промах словаря дочитывается один раз на проход, а не на
@@ -117,7 +121,7 @@ class QueueWorker @Inject constructor(
         } else {
             null
         }
-        val taken = when (val take = storage.take(operation.id, fresh, clock.instant())) {
+        val taken = when (val take = taking.take(operation.id, fresh, clock.instant())) {
             null -> return Step.Skipped
             is Take.Closed -> {
                 packageId?.let(pass.freshPackages::add)

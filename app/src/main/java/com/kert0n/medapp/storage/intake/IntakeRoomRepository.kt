@@ -1,22 +1,21 @@
 package com.kert0n.medapp.storage.intake
 
+import androidx.room.withTransaction
+import com.kert0n.medapp.domain.course.PackageFollowing
 import com.kert0n.medapp.domain.course.ScheduledOccurrence
 import com.kert0n.medapp.domain.intake.CourseIntake
 import com.kert0n.medapp.domain.intake.Intake
 import com.kert0n.medapp.domain.intake.IntakeProjection
-import com.kert0n.medapp.queue.intake.IntakeSyncState
 import com.kert0n.medapp.domain.intake.UnplannedIntake
-import androidx.room.withTransaction
-import com.kert0n.medapp.queue.readThisTransaction
+import com.kert0n.medapp.domain.pack.PackageAfter
+import com.kert0n.medapp.feature.readThisTransaction
+import com.kert0n.medapp.queue.intake.IntakeSyncState
 import com.kert0n.medapp.storage.course.CourseDao
-import com.kert0n.medapp.domain.course.PackageFollowing
-import javax.inject.Provider
 import com.kert0n.medapp.storage.course.toSourceStorageEntities
 import com.kert0n.medapp.storage.course.toStorageEntity as toCourseStorageEntity
 import com.kert0n.medapp.storage.database.MedAppDatabase
 import com.kert0n.medapp.storage.database.chunkedForQuery
 import com.kert0n.medapp.storage.database.observing
-import com.kert0n.medapp.domain.pack.PackageAfter
 import com.kert0n.medapp.storage.pack.PackageDao
 import com.kert0n.medapp.storage.pack.end
 import com.kert0n.medapp.storage.pack.save
@@ -24,6 +23,7 @@ import com.kert0n.medapp.storage.value.VocabularyDao
 import com.kert0n.medapp.storage.value.toStorageAmount
 import java.time.Instant
 import javax.inject.Inject
+import javax.inject.Provider
 import kotlin.uuid.Uuid
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.flowOf

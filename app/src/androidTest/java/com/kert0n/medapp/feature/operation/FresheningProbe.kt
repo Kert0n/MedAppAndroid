@@ -22,6 +22,7 @@ import com.kert0n.medapp.fixture.packageRepository
 import com.kert0n.medapp.fixture.queueService
 import com.kert0n.medapp.fixture.queueStorage
 import com.kert0n.medapp.fixture.snapshotStorage
+import com.kert0n.medapp.fixture.taking
 import com.kert0n.medapp.fixture.transactions
 import com.kert0n.medapp.network.delivery.MedAppCourier
 import com.kert0n.medapp.network.delivery.MedAppDoor
@@ -39,6 +40,7 @@ import com.kert0n.medapp.queue.QueueWorker
 import com.kert0n.medapp.queue.Rereading
 import com.kert0n.medapp.queue.SnapshotApplier
 import com.kert0n.medapp.queue.SyncOperationStatus
+import com.kert0n.medapp.storage.database.RoomTransactions
 import com.kert0n.medapp.storage.medkit.toStorageEntity
 import com.kert0n.medapp.storage.value.VocabularyRoomRepository
 import java.math.BigDecimal
@@ -245,7 +247,7 @@ class FresheningProbe {
         val vocabulary = VocabularyResolver(VocabularyRoomRepository(database.vocabulary()), api)
         private val snapshots = PackageSnapshotResolver(vocabulary, database.queueStorage())
         private val reading = SnapshotApplier(api, database.snapshotStorage(), vocabulary, snapshots, clock)
-        private val worker = QueueWorker(database.queueStorage(), MedAppCourier(MedAppDoor(api), vocabulary, snapshots, clock), clock)
+        private val worker = QueueWorker(database.queueStorage(), MedAppCourier(MedAppDoor(api), vocabulary, snapshots, clock), RoomTransactions(database), clock)
         val packages = database.packageRepository()
         private val medKits = database.medKitRepository()
         private val queue = database.queueService()
@@ -305,7 +307,7 @@ class FresheningProbe {
             val operation = database.syncOperations().all()
                 .map { (it.toDomain(words) as com.kert0n.medapp.queue.StoredSyncOperation.Readable).operation }
                 .single { it.status == SyncOperationStatus.PENDING }.id
-            database.queueStorage().take(operation, null, clock.instant())
+            database.taking().take(operation, null, clock.instant())
         }
 
         suspend fun effective(box: Uuid): BigDecimal =

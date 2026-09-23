@@ -53,6 +53,7 @@ import com.kert0n.medapp.queue.StoredSyncOperation
 import com.kert0n.medapp.queue.SyncCommand
 import com.kert0n.medapp.queue.SyncOperationStatus
 import com.kert0n.medapp.queue.intake.IntakeAccounting
+import com.kert0n.medapp.storage.database.RoomTransactions
 import com.kert0n.medapp.storage.medkit.toStorageEntity as toMedKitStorageEntity
 import com.kert0n.medapp.storage.value.VocabularyRoomRepository
 import java.math.BigDecimal
@@ -606,7 +607,7 @@ class SharedMedKitProbe {
         private val snapshots = PackageSnapshotResolver(vocabulary, database.queueStorage())
         private val reading = SnapshotApplier(api, database.snapshotStorage(), vocabulary, snapshots, clock)
         private val joining = MedKitJoining(reading)
-        private val worker = QueueWorker(database.queueStorage(), MedAppCourier(MedAppDoor(api), vocabulary, snapshots, clock), clock)
+        private val worker = QueueWorker(database.queueStorage(), MedAppCourier(MedAppDoor(api), vocabulary, snapshots, clock), RoomTransactions(database), clock)
         val packages = database.packageRepository()
         private val courses = database.courseRepository()
         private val queue = database.queueService()

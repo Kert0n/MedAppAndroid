@@ -1,12 +1,11 @@
 package com.kert0n.medapp.feature.account
 
-import com.kert0n.medapp.network.account.AccessTokens
 import androidx.test.ext.junit.runners.AndroidJUnit4
+import com.kert0n.medapp.domain.Unavailability
 import com.kert0n.medapp.domain.course.CourseDraft
 import com.kert0n.medapp.domain.medkit.MedKit
 import com.kert0n.medapp.domain.value.Vocabulary
 import com.kert0n.medapp.domain.value.VocabularyLibrary
-import com.kert0n.medapp.domain.Unavailability
 import com.kert0n.medapp.feature.bootstrap.AppStart
 import com.kert0n.medapp.fixture.COURSE
 import com.kert0n.medapp.fixture.HOME_KIT
@@ -17,6 +16,7 @@ import com.kert0n.medapp.fixture.PACK
 import com.kert0n.medapp.fixture.SHARED_KIT
 import com.kert0n.medapp.fixture.TABLET_FORM
 import com.kert0n.medapp.fixture.VOCABULARY
+import com.kert0n.medapp.fixture.abandonment
 import com.kert0n.medapp.fixture.activeCourse
 import com.kert0n.medapp.fixture.courseRecord
 import com.kert0n.medapp.fixture.courseRepository
@@ -30,6 +30,7 @@ import com.kert0n.medapp.fixture.plannedIntake
 import com.kert0n.medapp.fixture.source
 import com.kert0n.medapp.fixture.tablets
 import com.kert0n.medapp.fixture.transactions
+import com.kert0n.medapp.network.account.AccessTokens
 import com.kert0n.medapp.network.account.AccountCredentials
 import com.kert0n.medapp.network.account.AccountRegistration
 import com.kert0n.medapp.network.account.CredentialSource
@@ -143,7 +144,7 @@ class AccountReplacementTest {
             )
         )
         val account = ServerDeviceAccount(AccountRegistration(api, stored, "build-token", AccessTokens(stored)))
-        return AccountReplacement(account, database.medKitRepository(), database.transactions(), AppStart(account, KnownWords()), Clock.fixed(LATER, ZoneOffset.UTC))
+        return AccountReplacement(account, database.abandonment(), AppStart(account, KnownWords()), Clock.fixed(LATER, ZoneOffset.UTC))
     }
 
     private fun HttpRequestData.bodyText(): String = (body as TextContent).text

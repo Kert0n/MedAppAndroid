@@ -6,9 +6,11 @@ import com.kert0n.medapp.domain.account.DeviceAccount
 import com.kert0n.medapp.domain.value.Vocabulary
 import com.kert0n.medapp.domain.value.VocabularyLibrary
 import com.kert0n.medapp.feature.account.AccountReplacement
+import com.kert0n.medapp.feature.account.ServerAbandonment
 import com.kert0n.medapp.feature.bootstrap.AppStart
 import com.kert0n.medapp.fixture.DirectTransactions
 import com.kert0n.medapp.fixture.FakeMedKits
+import com.kert0n.medapp.fixture.FakeQueue
 import com.kert0n.medapp.fixture.MainDispatcherRule
 import com.kert0n.medapp.fixture.TABLETS
 import com.kert0n.medapp.fixture.awaiting
@@ -52,7 +54,7 @@ class AppStartViewModelTest {
     private fun viewModel(account: Account): AppStartViewModel {
         val start = AppStart(account, KnownVocabulary)
         val replacement = AccountReplacement(
-            account, FakeMedKits(), DirectTransactions, start,
+            account, ServerAbandonment(FakeMedKits(), FakeQueue(), DirectTransactions), start,
             Clock.fixed(Instant.parse("2026-09-17T09:00:00Z"), ZoneOffset.UTC)
         )
         return AppStartViewModel(start, replacement)

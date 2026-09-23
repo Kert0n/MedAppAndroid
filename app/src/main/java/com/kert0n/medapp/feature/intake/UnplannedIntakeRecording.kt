@@ -5,13 +5,13 @@ import com.kert0n.medapp.domain.intake.IntakeRejected
 import com.kert0n.medapp.domain.intake.UnplannedIntake
 import com.kert0n.medapp.domain.value.Dose
 import com.kert0n.medapp.feature.course.CourseFollowing
+import com.kert0n.medapp.feature.readThisTransaction
 import com.kert0n.medapp.queue.QueueService
 import com.kert0n.medapp.queue.QueuedCommand
 import com.kert0n.medapp.queue.Transactions
 import com.kert0n.medapp.queue.intake.IntakeAccounting
 import com.kert0n.medapp.queue.intake.IntakeSyncState
 import com.kert0n.medapp.queue.pack.PackageSyncCommand
-import com.kert0n.medapp.queue.readThisTransaction
 import com.kert0n.medapp.storage.course.CourseStorageRepository
 import com.kert0n.medapp.storage.intake.IntakeOutcome
 import com.kert0n.medapp.storage.intake.IntakeStorageRepository

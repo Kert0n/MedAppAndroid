@@ -34,6 +34,7 @@ import com.kert0n.medapp.queue.SyncOperationStatus
 import com.kert0n.medapp.queue.Synchronization
 import com.kert0n.medapp.queue.pack.PackageSyncCommand
 import com.kert0n.medapp.storage.database.MedAppDatabase
+import com.kert0n.medapp.storage.database.RoomTransactions
 import com.kert0n.medapp.storage.operation.QueueBacklogRoomStorage
 import com.kert0n.medapp.storage.value.VocabularyRoomRepository
 import dagger.hilt.android.testing.HiltAndroidRule
@@ -109,7 +110,7 @@ class SyncBackgroundTest {
         val vocabulary = VocabularyResolver(VocabularyRoomRepository(database.vocabulary()), api)
         val resolver = PackageSnapshotResolver(vocabulary, database.queueStorage())
         return Synchronization(
-            QueueWorker(database.queueStorage(), MedAppCourier(MedAppDoor(api), vocabulary, resolver, clock), clock),
+            QueueWorker(database.queueStorage(), MedAppCourier(MedAppDoor(api), vocabulary, resolver, clock), RoomTransactions(database), clock),
             SnapshotApplier(api, database.snapshotStorage(), vocabulary, resolver, clock),
             QueueBacklogRoomStorage(database.syncOperations()),
             schedule,

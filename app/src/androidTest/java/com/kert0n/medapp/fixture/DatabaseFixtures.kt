@@ -82,8 +82,15 @@ fun MedAppDatabase.intakeRepository() = com.kert0n.medapp.storage.intake.IntakeR
 )
 
 fun MedAppDatabase.medKitRepository() = com.kert0n.medapp.storage.medkit.MedKitRoomRepository(
-    this, medKits(), packages(), courses(), syncOperations(), queueStorage(), vocabulary(), javax.inject.Provider { courseFollowing() }
+    this, medKits(), packages(), courses(), vocabulary(), javax.inject.Provider { courseFollowing() }
 )
+
+/** Взятие в отправку над настоящей базой — той же транзакцией Room, что у работника. */
+fun MedAppDatabase.taking() = com.kert0n.medapp.queue.Taking(queueStorage(), transactions())
+
+/** Уход с серверных полок, когда учётку заменили, — над настоящей базой. */
+fun MedAppDatabase.abandonment() =
+    com.kert0n.medapp.feature.account.ServerAbandonment(medKitRepository(), queueStorage(), transactions())
 
 fun MedAppDatabase.queueRepository() = com.kert0n.medapp.storage.operation.SyncOperationRoomRepository(
     this, syncOperations(), vocabulary()

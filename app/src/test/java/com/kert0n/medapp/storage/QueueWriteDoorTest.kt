@@ -84,13 +84,18 @@ class QueueWriteDoorTest {
         assertTrue("операция строит состояние не сама — строгости нет", operation.contains("val state: SyncOperationState = SyncOperationState("))
     }
 
-    /** Каждая запись хранилища очереди — чтение, переход и запись одной транзакцией (F5). */
+    /**
+     * Каждая запись хранилища очереди — одной транзакцией (F5): снимок, операция после решённого
+     * очередью перехода, квитанция, отсрочка, исход. Взятие в отправку целиком — транзакция
+     * работника ([com.kert0n.medapp.queue.Taking]); эти двери ложатся внутрь неё.
+     */
     @Test
     fun everyQueueWriteReadsAndWritesInOneTransaction() {
         val text = File(sources, "storage/operation/QueueRoomStorage.kt").readText()
-        val bodies = Regex("""override suspend fun (take|answered|defer|settle)\(.*?\n(.*?)\n    (?=override|private|/\*\*|companion)""", RegexOption.DOT_MATCHES_ALL)
-            .findAll(text).associate { it.groupValues[1] to it.groupValues[2] }
-        assertEquals(setOf("take", "answered", "defer", "settle"), bodies.keys)
+        val bodies = Regex("""override suspend fun (layDown|write|answered|defer|settle)\(.*?\n(.*?)\n    (?=override|private|/\*\*|companion)""", RegexOption.DOT_MATCHES_ALL)
+            // Объявление вместе с телом: обёртка транзакции стоит на строке объявления, а не в теле.
+            .findAll(text).associate { it.groupValues[1] to it.value }
+        assertEquals(setOf("layDown", "write", "answered", "defer", "settle"), bodies.keys)
         val outside = bodies.filterValues { !it.contains("withTransaction") && !it.contains("transaction {") }.keys
         assertEquals("запись хранилища очереди вне транзакции", emptySet<String>(), outside)
     }

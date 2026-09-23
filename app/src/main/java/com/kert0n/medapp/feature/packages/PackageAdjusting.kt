@@ -1,15 +1,15 @@
 package com.kert0n.medapp.feature.packages
 
+import com.kert0n.medapp.domain.course.PackageFollowing
 import com.kert0n.medapp.domain.pack.Package
 import com.kert0n.medapp.domain.pack.PackageAfter
 import com.kert0n.medapp.domain.pack.PackageStatus
 import com.kert0n.medapp.domain.value.Quantity
-import com.kert0n.medapp.domain.course.PackageFollowing
+import com.kert0n.medapp.feature.readThisTransaction
 import com.kert0n.medapp.queue.QueueService
 import com.kert0n.medapp.queue.QueuedCommand
 import com.kert0n.medapp.queue.Transactions
 import com.kert0n.medapp.queue.pack.PackageSyncCommand
-import com.kert0n.medapp.queue.readThisTransaction
 import com.kert0n.medapp.storage.pack.PackageAdjustment
 import com.kert0n.medapp.storage.pack.PackageStorageRepository
 import java.time.Clock

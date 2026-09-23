@@ -26,6 +26,9 @@ import com.kert0n.medapp.queue.ServerSnapshot
 import com.kert0n.medapp.queue.Settlement
 import com.kert0n.medapp.queue.SnapshotApplier
 import com.kert0n.medapp.queue.SnapshotStorage
+import com.kert0n.medapp.queue.StoredSyncOperation
+import com.kert0n.medapp.queue.SyncOperation
+import com.kert0n.medapp.queue.SyncOperationStatus
 import com.kert0n.medapp.queue.pack.PackageSnapshot
 import io.ktor.client.engine.mock.MockEngine
 import io.ktor.client.engine.mock.respond
@@ -67,7 +70,11 @@ class MedKitJoiningTest {
         override fun changes() = kotlinx.coroutines.flow.emptyFlow<Unit>()
         override suspend fun nextDueAt(now: Instant): Instant? = null
         override suspend fun ready(now: Instant) = error("не для этого теста")
-        override suspend fun take(id: Uuid, fresh: PackageSnapshot?, at: Instant) = error("не для этого теста")
+        override suspend fun operation(id: Uuid): SyncOperation? = error("не для этого теста")
+        override suspend fun knownPackage(id: Uuid): PackageSnapshot? = error("не для этого теста")
+        override suspend fun layDown(snapshot: PackageSnapshot, at: Instant) = error("не для этого теста")
+        override suspend fun write(operation: SyncOperation, was: SyncOperationStatus) = error("не для этого теста")
+        override suspend fun unclosedOfMedKit(medKitId: Uuid): List<StoredSyncOperation> = error("не для этого теста")
         override suspend fun answered(id: Uuid, answer: Receipt, at: Instant) = error("не для этого теста")
         override suspend fun defer(id: Uuid, reason: String, at: Instant, notBefore: Instant) = error("не для этого теста")
         override suspend fun settle(id: Uuid, settlement: Settlement, at: Instant) = error("не для этого теста")

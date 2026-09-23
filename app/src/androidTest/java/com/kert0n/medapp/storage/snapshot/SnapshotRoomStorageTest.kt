@@ -22,6 +22,7 @@ import com.kert0n.medapp.fixture.packageRepository
 import com.kert0n.medapp.fixture.queueStorage
 import com.kert0n.medapp.fixture.snapshotStorage
 import com.kert0n.medapp.fixture.tablets
+import com.kert0n.medapp.fixture.taking
 import com.kert0n.medapp.queue.ResourceVersion
 import com.kert0n.medapp.queue.ServerSnapshot
 import com.kert0n.medapp.queue.pack.PackageSnapshot
@@ -123,7 +124,7 @@ class SnapshotRoomStorageTest {
         storage.lay(serverSnapshot(mapOf(HOME_KIT to 2L), listOf(snapshot(PACK))), at)
         val operation = Uuid.random()
         database.syncOperations().enqueue(operation, PackageSyncCommand.Consume(PACK, dose("3"), INTAKE), at)
-        database.queueStorage().take(operation, null, at)
+        database.taking().take(operation, null, at)
 
         storage.lay(serverSnapshot(mapOf(HOME_KIT to 2L), listOf(snapshot(PACK, quantity = "14", version = 5))), at)
 

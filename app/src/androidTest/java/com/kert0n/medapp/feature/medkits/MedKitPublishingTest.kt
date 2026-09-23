@@ -5,6 +5,7 @@ import com.kert0n.medapp.domain.course.CourseDraft
 import com.kert0n.medapp.domain.medkit.MedKit
 import com.kert0n.medapp.domain.medkit.MedKitStatus
 import com.kert0n.medapp.domain.pack.PackageStatus
+import com.kert0n.medapp.feature.intake.UnplannedIntakeRecording
 import com.kert0n.medapp.fixture.HOME_KIT
 import com.kert0n.medapp.fixture.LATER
 import com.kert0n.medapp.fixture.OTHER_PACK
@@ -16,16 +17,15 @@ import com.kert0n.medapp.fixture.VOCABULARY
 import com.kert0n.medapp.fixture.activeCourse
 import com.kert0n.medapp.fixture.courseRecord
 import com.kert0n.medapp.fixture.courseRepository
+import com.kert0n.medapp.fixture.dose
 import com.kert0n.medapp.fixture.inMemoryDatabase
 import com.kert0n.medapp.fixture.medKit
-import com.kert0n.medapp.fixture.dose
-import com.kert0n.medapp.queue.intake.IntakeAccounting
-import com.kert0n.medapp.feature.intake.UnplannedIntakeRecording
 import com.kert0n.medapp.fixture.pack
 import com.kert0n.medapp.fixture.packageRepository
 import com.kert0n.medapp.fixture.queueStorage
 import com.kert0n.medapp.fixture.source
 import com.kert0n.medapp.fixture.tablets
+import com.kert0n.medapp.fixture.taking
 import com.kert0n.medapp.queue.Delivery
 import com.kert0n.medapp.queue.PackageState
 import com.kert0n.medapp.queue.RefusalReason
@@ -33,6 +33,7 @@ import com.kert0n.medapp.queue.StoredSyncOperation
 import com.kert0n.medapp.queue.SyncCommand
 import com.kert0n.medapp.queue.SyncOperation
 import com.kert0n.medapp.queue.SyncOperationStatus
+import com.kert0n.medapp.queue.intake.IntakeAccounting
 import com.kert0n.medapp.queue.medkit.MedKitSyncCommand
 import com.kert0n.medapp.queue.pack.PackageSyncCommand
 import com.kert0n.medapp.queue.settlement
@@ -227,7 +228,7 @@ class MedKitPublishingTest {
         theShelfIsCreated()
 
         val create = operations().first { (it.command as? PackageSyncCommand.Create)?.packageId == PACK }
-        val taken = database.queueStorage().take(create.id, null, LATER) as com.kert0n.medapp.queue.Take.Sending
+        val taken = database.taking().take(create.id, null, LATER) as com.kert0n.medapp.queue.Take.Sending
 
         val body = requireNotNull(taken.operation.prepared?.body)
         assertTrue(body.contains("\"quantity\":\"19\""))

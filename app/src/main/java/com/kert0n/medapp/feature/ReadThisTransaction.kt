@@ -1,4 +1,4 @@
-package com.kert0n.medapp.queue
+package com.kert0n.medapp.feature
 
 /**
  * Правило F5 одним местом: что прочитано этой же транзакцией, никуда не делось. Условная

@@ -5,12 +5,11 @@ import androidx.room.Insert
 import androidx.room.Query
 import androidx.room.Transaction
 import androidx.room.Update
+import com.kert0n.medapp.queue.RefusalReason
 import com.kert0n.medapp.queue.SyncCommand
 import com.kert0n.medapp.queue.SyncOperation
 import com.kert0n.medapp.queue.SyncOperationState
-import com.kert0n.medapp.queue.RefusalReason
 import com.kert0n.medapp.queue.SyncOperationStatus
-import com.kert0n.medapp.queue.pack.claimChangesSince
 import com.kert0n.medapp.storage.pack.PackageDao
 import java.time.Instant
 import kotlin.uuid.Uuid

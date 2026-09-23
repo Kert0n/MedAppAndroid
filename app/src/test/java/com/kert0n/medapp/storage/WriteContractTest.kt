@@ -131,7 +131,8 @@ class WriteContractTest {
         "MedKitStorageRepository.mark" to (Shape.NAMED_FIELDS by "(Uuid, MedKitStatus): Boolean"),
         "MedKitStorageRepository.applyServerParticipants" to (Shape.NAMED_FIELDS by "(Uuid, long, Instant): Unit"),
         // Все серверные полки — утратой доступа разом: решение о нечитаемой учётке (G2).
-        "MedKitStorageRepository.abandonServer" to (Shape.NAMED_FIELDS by "(Instant): Integer"),
+        "MedKitStorageRepository.published" to (Shape.READ by "(): List<Uuid>"),
+        "MedKitStorageRepository.loseAccess" to (Shape.NAMED_FIELDS by "(Uuid, Instant): Unit"),
         "MedKitStorageRepository.add" to (Shape.CREATION by "(MedKit): Unit"),
         "MedKitStorageRepository.describe" to (Shape.NAMED_FIELDS by "(Uuid, String, String): Boolean"),
         // Приём

@@ -6,6 +6,7 @@ import com.kert0n.medapp.domain.pack.Claims
 import com.kert0n.medapp.domain.pack.Package
 import com.kert0n.medapp.domain.value.Attempts
 import com.kert0n.medapp.domain.value.Vocabulary
+import com.kert0n.medapp.fixture.DirectTransactions
 import com.kert0n.medapp.fixture.EARLIER
 import com.kert0n.medapp.fixture.HOME_KIT
 import com.kert0n.medapp.fixture.INTAKE
@@ -96,7 +97,7 @@ class QueueWorkerTest {
         var frozen = 0
         var known = PackageSyncState(PACK, ResourceVersion(3))
         var knownPack: Package = pack(quantity = tablets("20"))
-        val takenWith = mutableListOf<PackageSnapshot?>()
+        val takenWith = mutableListOf<PackageSnapshot>()
 
         /** Аптечки, которые «есть в базе»: снимок, называющий другую, положить некуда. */
         val knownMedKits = mutableSetOf(HOME_KIT)
@@ -134,32 +135,25 @@ class QueueWorkerTest {
         /** Операции, на которых взятие бросает: база отказала, снимок не собрался — что угодно. */
         val takeFailsFor = mutableSetOf<Uuid>()
 
-        override suspend fun take(id: Uuid, fresh: PackageSnapshot?, at: Instant): Take? {
+        override suspend fun operation(id: Uuid): SyncOperation? {
             if (id in takeFailsFor) throw IllegalStateException("взятие $id сорвалось")
-            val operation = operations[id] ?: return null
-            if (operation.status.isClosed) return null
-            takenWith += fresh
-            fresh?.let(::learn)
-            val prepared = operation.prepared ?: run {
-                frozen++
-                when (val command = operation.command) {
-                    // У аптечки предусловий нет: замораживать нечего, кроме самого пути.
-                    is MedKitSyncCommand -> command.toPreparedRequest(at)
-                    is PackageSyncCommand -> when (val prepared = command.prepare(operation.id, knownPack, known, at)) {
-                        is Preparation.Request -> prepared.request
-                        is Preparation.Refuse -> return Take.Closed(Delivery.Refused(prepared.reason, PackageState.None)).also { settle(id, it.delivery.settlement(operation.command), at) }
-                        Preparation.AlreadyApplied -> return Take.Closed(Delivery.Applied(PackageState.None)).also { settle(id, it.delivery.settlement(operation.command), at) }
-                    }
-                    else -> command.unknownRoot()
-                }
-            }
-            // Операция, найденная в отправке, — прошлый полёт умер вместе с процессом: исход неизвестен.
-            val flightLost = operation.status == SyncOperationStatus.SENDING && operation.prepared != null
-            return Take.Sending(
-                operation.with(status = SyncOperationStatus.SENDING, prepared = prepared, outcomeUnknown = operation.outcomeUnknown || flightLost)
-                    .also { operations[id] = it }
-            )
+            return operations[id]
         }
+
+        override suspend fun knownPackage(id: Uuid): PackageSnapshot? = PackageSnapshot(knownPack, known)
+
+        override suspend fun layDown(snapshot: PackageSnapshot, at: Instant) {
+            takenWith += snapshot
+            learn(snapshot)
+        }
+
+        override suspend fun write(operation: SyncOperation, was: SyncOperationStatus) {
+            if (operations[operation.id]?.prepared == null && operation.prepared != null) frozen++
+            operations[operation.id] = operation
+        }
+
+        override suspend fun unclosedOfMedKit(medKitId: Uuid): List<StoredSyncOperation> =
+            operations.values.filter { !it.status.isClosed }.map { StoredSyncOperation.Readable(it) }
 
         /** Ответ записан — а применение бросает: так ведёт себя сломанная транзакция закрытия. */
         var settleFails = false
@@ -341,7 +335,7 @@ class QueueWorkerTest {
         Transport(answer).also { it.fresh = ApiResult.Success(fresh) }
 
     private fun worker(storage: Storage, transport: CourierDoor, online: Boolean = true, clock: Clock = this.clock) =
-        QueueWorker(storage, MedAppCourier(transport, resolver(online), PackageSnapshotResolver(resolver(online), storage), clock), clock)
+        QueueWorker(storage, MedAppCourier(transport, resolver(online), PackageSnapshotResolver(resolver(online), storage), clock), DirectTransactions, clock)
 
     /** Снимок, каким его положит хранение: разрешённый, с домашней аптечкой. */
     private fun resolved(dto: PackageSnapshotNetworkDTO): PackageSnapshot =
@@ -391,7 +385,8 @@ class QueueWorkerTest {
         assertEquals(2, report.settled)
         assertEquals(1, transport.snapshots)
         assertEquals(listOf(ResourceVersion(7), ResourceVersion(8)), transport.sent.map { it.drugVersion })
-        assertEquals(listOf(resolved(snapshotWithVersion(7)), null), storage.takenWith)
+        // Вторая готовится по ответу первой: свежего снимка ей не читали, в базу ничего не клали.
+        assertEquals(listOf(resolved(snapshotWithVersion(7))), storage.takenWith)
     }
 
     /** Отправка, пережившая смерть процесса: исход неизвестен, запрос уже заморожен — уходит как есть. */

@@ -5,13 +5,12 @@ import com.kert0n.medapp.domain.pack.PackageSharedFacts
 import com.kert0n.medapp.domain.value.Dose
 import com.kert0n.medapp.domain.value.Quantity
 import com.kert0n.medapp.domain.value.Vocabulary
-import com.kert0n.medapp.queue.medkit.MedKitSyncCommand
-import com.kert0n.medapp.queue.pack.PackageSyncCommand
-import com.kert0n.medapp.queue.SyncCommand
-import com.kert0n.medapp.queue.unknownRoot
 import com.kert0n.medapp.network.value.VocabularyMiss
 import com.kert0n.medapp.network.value.formOrMiss
 import com.kert0n.medapp.network.value.unitOrMiss
+import com.kert0n.medapp.queue.SyncCommand
+import com.kert0n.medapp.queue.medkit.MedKitSyncCommand
+import com.kert0n.medapp.queue.pack.PackageSyncCommand
 import com.kert0n.medapp.storage.value.storedQuantity
 import com.kert0n.medapp.storage.value.toStorageAmount
 import kotlin.uuid.Uuid
@@ -69,7 +68,7 @@ object SyncCommandStorageConverter {
             is MedKitSyncCommand.Delete -> MEDKIT_DELETE
             is MedKitSyncCommand.Leave -> MEDKIT_LEAVE
         }
-        else -> command.unknownRoot()
+        else -> foreignRoot(command)
     }
 
     /** Какой пачки касается команда; `null` у команд аптечки — порядок по пачке строит запрос. */
@@ -94,7 +93,7 @@ object SyncCommandStorageConverter {
         when (command) {
             is PackageSyncCommand -> packagePayload(command)
             is MedKitSyncCommand -> medKitPayload(command)
-            else -> command.unknownRoot()
+            else -> foreignRoot(command)
         }
     )
 
@@ -267,4 +266,11 @@ object SyncCommandStorageConverter {
         country = optionalText("country"),
         description = optionalText("description")
     )
+
+    /**
+     * Корней команд два, и хранение раскладывает оба. Третий значит, что маркер надели на новое
+     * понятие, а колонку для него не завели.
+     */
+    private fun foreignRoot(command: SyncCommand): Nothing =
+        error("хранение не знает корня команды ${command::class.simpleName}")
 }

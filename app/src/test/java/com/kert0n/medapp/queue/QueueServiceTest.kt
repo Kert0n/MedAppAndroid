@@ -6,6 +6,7 @@ import com.kert0n.medapp.fixture.INTAKE
 import com.kert0n.medapp.fixture.PACK
 import com.kert0n.medapp.fixture.dose
 import com.kert0n.medapp.fixture.medKit
+import com.kert0n.medapp.queue.pack.PackageSnapshot
 import com.kert0n.medapp.queue.pack.PackageSyncCommand
 import java.time.Instant
 import kotlin.uuid.Uuid
@@ -25,7 +26,11 @@ class QueueServiceTest {
         override suspend fun nextDueAt(now: Instant): Instant? = null
         override suspend fun ready(now: Instant): List<StoredSyncOperation> = emptyList()
         override suspend fun medKit(id: Uuid): com.kert0n.medapp.domain.medkit.MedKitRef? = null
-        override suspend fun take(id: Uuid, fresh: com.kert0n.medapp.queue.pack.PackageSnapshot?, at: Instant): Take? = null
+        override suspend fun operation(id: Uuid): SyncOperation? = null
+        override suspend fun knownPackage(id: Uuid): PackageSnapshot? = null
+        override suspend fun layDown(snapshot: PackageSnapshot, at: Instant) = Unit
+        override suspend fun write(operation: SyncOperation, was: SyncOperationStatus) = Unit
+        override suspend fun unclosedOfMedKit(medKitId: Uuid): List<StoredSyncOperation> = emptyList()
         override suspend fun answered(id: Uuid, answer: Receipt, at: Instant) = Unit
         override suspend fun defer(id: Uuid, reason: String, at: Instant, notBefore: Instant) = Unit
         override suspend fun settle(id: Uuid, settlement: Settlement, at: Instant) = Unit

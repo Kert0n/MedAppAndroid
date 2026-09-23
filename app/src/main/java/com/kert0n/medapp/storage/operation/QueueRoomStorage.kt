@@ -7,9 +7,7 @@ import com.kert0n.medapp.domain.medkit.MedKitStatus
 import com.kert0n.medapp.domain.pack.PackageAfter
 import com.kert0n.medapp.domain.value.Quantity
 import com.kert0n.medapp.domain.value.Vocabulary
-import com.kert0n.medapp.queue.Delivery
-import com.kert0n.medapp.queue.PackageState
-import com.kert0n.medapp.queue.Preparation
+import com.kert0n.medapp.feature.readThisTransaction
 import com.kert0n.medapp.queue.QueueStorage
 import com.kert0n.medapp.queue.QueuedCommand
 import com.kert0n.medapp.queue.Receipt
@@ -18,17 +16,9 @@ import com.kert0n.medapp.queue.StoredSyncOperation
 import com.kert0n.medapp.queue.SyncOperation
 import com.kert0n.medapp.queue.SyncOperationState
 import com.kert0n.medapp.queue.SyncOperationStatus
-import com.kert0n.medapp.queue.Take
-import com.kert0n.medapp.queue.medkit.MedKitSyncCommand
-import com.kert0n.medapp.queue.medkit.toPreparedRequest as toMedKitPreparedRequest
 import com.kert0n.medapp.queue.pack.PackageSnapshot
 import com.kert0n.medapp.queue.pack.PackageSyncCommand
 import com.kert0n.medapp.queue.pack.PackageSyncState
-import com.kert0n.medapp.queue.pack.prepare
-import com.kert0n.medapp.queue.pack.toPreparedRequest
-import com.kert0n.medapp.queue.readThisTransaction
-import com.kert0n.medapp.queue.settlement
-import com.kert0n.medapp.queue.unknownRoot
 import com.kert0n.medapp.storage.course.CourseDao
 import com.kert0n.medapp.storage.database.MedAppDatabase
 import com.kert0n.medapp.storage.intake.IntakeDao
@@ -85,52 +75,23 @@ class QueueRoomStorage @Inject constructor(
 
     override suspend fun medKit(id: Uuid): MedKitRef? = medKits.find(id)?.toRef()
 
-    /**
-     * Свежее состояние ложится в базу первым, предусловия берутся у пачки после этого — в той же
-     * транзакции: версии, подтверждённый остаток и своя бронь — то, что у сервера сейчас (PLAN
-     * E2, E3). Берётся только ожидающая или отправлявшаяся — это предусловие переходов
-     * [SyncOperation.taken] и [SyncOperation.resent]; второй раз запрос не собирается.
-     */
-    override suspend fun take(id: Uuid, fresh: PackageSnapshot?, at: Instant): Take? = database.withTransaction {
+    override suspend fun operation(id: Uuid): SyncOperation? = operationOf(id)
+
+    override suspend fun knownPackage(id: Uuid): PackageSnapshot? = database.withTransaction {
+        packages.find(id)?.let { row -> PackageSnapshot(row.toDomain(vocabulary.snapshot()), row.pack.syncState()) }
+    }
+
+    override suspend fun layDown(snapshot: PackageSnapshot, at: Instant) = database.withTransaction {
+        layDown(snapshot, at, carried = null)
+    }
+
+    override suspend fun write(operation: SyncOperation, was: SyncOperationStatus) = database.withTransaction {
+        save(operation, was)
+    }
+
+    override suspend fun unclosedOfMedKit(medKitId: Uuid): List<StoredSyncOperation> = database.withTransaction {
         val words = vocabulary.snapshot()
-        val stored = queue.find(id)?.toDomain(words) as? StoredSyncOperation.Readable
-            ?: return@withTransaction null
-        val operation = stored.operation
-        if (operation.status.isClosed || operation.awaitsApplication) return@withTransaction null
-        val command = operation.command
-        // Унесённую домой коробку человек мог уже выбросить у себя. Серверу она всё равно должна
-        // исчезнуть, а свежий снимок, положенный в базу, завёл бы её обратно: он даёт только версию.
-        val carriedAway = command is PackageSyncCommand.Withdraw && packages.find(command.packageId) == null
-        if (!carriedAway) fresh?.let { layDown(it, at) }
-        val sending = if (operation.prepared == null) {
-            val request = when (command) {
-                // Снимают по версии полки, а её подтверждённое число запоминается в запросе: из него
-                // и из сделанного дома сложится остаток, когда полка ответит (PLAN E6).
-                is PackageSyncCommand.Withdraw if fresh != null ->
-                    command.toPreparedRequest(operation.id, fresh.sync, confirmed = fresh.pack.quantity, mine = null, at = at)
-                is PackageSyncCommand -> {
-                    val row = packages.find(command.packageId)
-                        ?: return@withTransaction closedByPreparation(operation, Delivery.AccessLost, at)
-                    val pkg = row.toDomain(words)
-                    when (val prepared = command.prepare(operation.id, pkg, row.pack.syncState(), at)) {
-                        is Preparation.Request -> prepared.request
-                        is Preparation.Refuse -> return@withTransaction closedByPreparation(
-                            operation, Delivery.Refused(prepared.reason, PackageState.None), at
-                        )
-                        Preparation.AlreadyApplied -> return@withTransaction closedByPreparation(
-                            operation, Delivery.Applied(PackageState.None), at
-                        )
-                    }
-                }
-                is MedKitSyncCommand -> command.toMedKitPreparedRequest(at)
-                else -> command.unknownRoot()
-            }
-            operation.taken(request)
-        } else {
-            operation.resent()
-        } ?: return@withTransaction null
-        save(sending, was = operation.status)
-        Take.Sending(sending)
+        queue.unclosedRowsOfMedKit(medKitId).map { it.toDomain(words) }
     }
 
     override suspend fun answered(id: Uuid, answer: Receipt, at: Instant) = database.withTransaction {
@@ -148,12 +109,6 @@ class QueueRoomStorage @Inject constructor(
     /** Операция после перехода — в строку, которую прочитали этой же транзакцией (F5). */
     private suspend fun save(operation: SyncOperation, was: SyncOperationStatus) =
         (queue.save(operation.id, operation.state, operation.prepared?.toStorageColumns(), was) == 1).readThisTransaction("операция")
-
-    /** Подготовка закрыла операцию сама: истина по пачке уже в базе — она только что легла свежим снимком. */
-    private suspend fun closedByPreparation(operation: SyncOperation, delivery: Delivery, at: Instant): Take {
-        settle(operation.id, delivery.settlement(operation.command), at)
-        return Take.Closed(delivery)
-    }
 
     /**
      * Переход и его эффекты одной транзакцией. Что переход меняет и из какого статуса возможен,

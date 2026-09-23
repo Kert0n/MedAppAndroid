@@ -40,7 +40,6 @@ import com.kert0n.medapp.queue.StoredSyncOperation
 import com.kert0n.medapp.queue.SyncCommand
 import com.kert0n.medapp.queue.SyncOperation
 import com.kert0n.medapp.queue.SyncOperationStatus
-import com.kert0n.medapp.queue.Take
 import com.kert0n.medapp.queue.Transactions
 import com.kert0n.medapp.queue.pack.PackageSnapshot
 import com.kert0n.medapp.queue.pack.PackageSyncState
@@ -242,7 +241,8 @@ class FakeMedKits(vararg kits: MedKit) : MedKitStorageRepository {
 
     override suspend fun applyServerParticipants(id: Uuid, participantCount: Long, syncedAt: Instant) = Unit
 
-    override suspend fun abandonServer(at: Instant): Int = 0
+    override suspend fun published(): List<Uuid> = emptyList()
+    override suspend fun loseAccess(medKitId: Uuid, at: Instant) = Unit
 
     /** «Полку убрали, пока экран был открыт». */
     fun forget(id: Uuid): Boolean {
@@ -300,8 +300,11 @@ class FakeQueue : QueueStorage {
 
     override suspend fun nextDueAt(now: Instant): Instant? = null
 
-    override suspend fun take(id: Uuid, fresh: PackageSnapshot?, at: Instant): Take? =
-        error("путь доставки проверяется на очереди, а не на экране")
+    override suspend fun operation(id: Uuid): SyncOperation? = error("путь доставки проверяется на очереди, а не на экране")
+    override suspend fun knownPackage(id: Uuid): PackageSnapshot? = error("путь доставки проверяется на очереди, а не на экране")
+    override suspend fun layDown(snapshot: PackageSnapshot, at: Instant) = error("путь доставки проверяется на очереди, а не на экране")
+    override suspend fun write(operation: SyncOperation, was: SyncOperationStatus) = error("путь доставки проверяется на очереди, а не на экране")
+    override suspend fun unclosedOfMedKit(medKitId: Uuid): List<StoredSyncOperation> = error("путь доставки проверяется на очереди, а не на экране")
 
     override suspend fun answered(id: Uuid, answer: Receipt, at: Instant): Unit =
         error("путь доставки проверяется на очереди, а не на экране")

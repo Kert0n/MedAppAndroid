@@ -15,8 +15,8 @@ import kotlin.uuid.Uuid
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.emitAll
-import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.flow.flow
 
 /**
  * Работа, которую проверка держит на паузе.
@@ -119,7 +119,8 @@ class HeldMedKits(
     override suspend fun applyServerParticipants(id: Uuid, participantCount: Long, syncedAt: Instant) =
         notAsked("applyServerParticipants")
 
-    override suspend fun abandonServer(at: Instant): Int = notAsked("abandonServer")
+    override suspend fun published(): List<Uuid> = notAsked("published")
+    override suspend fun loseAccess(medKitId: Uuid, at: Instant) = notAsked("loseAccess")
 
     private fun notAsked(method: String): Nothing =
         error("карточка читает место одним чтением полки, а спросила «$method» — модель разъехалась с проверкой")

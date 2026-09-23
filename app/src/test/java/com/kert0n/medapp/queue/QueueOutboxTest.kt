@@ -4,6 +4,7 @@ import com.kert0n.medapp.domain.medkit.MedKitRef
 import com.kert0n.medapp.domain.value.DosageForm
 import com.kert0n.medapp.domain.value.QuantityUnit
 import com.kert0n.medapp.domain.value.Vocabulary
+import com.kert0n.medapp.fixture.DirectTransactions
 import com.kert0n.medapp.fixture.EARLIER
 import com.kert0n.medapp.fixture.INTAKE
 import com.kert0n.medapp.fixture.PACK
@@ -71,8 +72,11 @@ class QueueOutboxTest {
         override suspend fun nextDueAt(now: Instant): Instant? =
             operations.values.filter { !it.status.isClosed }.mapNotNull { it.notBefore }.filter { it.isAfter(now) }.minOrNull()
         override suspend fun medKit(id: Uuid): MedKitRef? = null
-        override suspend fun take(id: Uuid, fresh: PackageSnapshot?, at: Instant): Take? =
-            operations[id]?.let { Take.Sending(it) }
+        override suspend fun operation(id: Uuid): SyncOperation? = operations[id]
+        override suspend fun knownPackage(id: Uuid): PackageSnapshot? = null
+        override suspend fun layDown(snapshot: PackageSnapshot, at: Instant) = Unit
+        override suspend fun write(operation: SyncOperation, was: SyncOperationStatus) { operations[operation.id] = operation }
+        override suspend fun unclosedOfMedKit(medKitId: Uuid): List<StoredSyncOperation> = emptyList()
         override suspend fun answered(id: Uuid, answer: Receipt, at: Instant) = Unit
         override suspend fun defer(id: Uuid, reason: String, at: Instant, notBefore: Instant) = Unit
         override suspend fun settle(id: Uuid, settlement: Settlement, at: Instant) {
@@ -124,7 +128,7 @@ class QueueOutboxTest {
             Store(),
             MedAppApi(medAppHttpClient(MockEngine { throw java.io.IOException("связи нет") }, "https://medapp.test", retryDelay = { delayMillis(false) { 0L } }))
         )
-        return QueueWorker(storage, MedAppCourier(transport, vocabulary, PackageSnapshotResolver(vocabulary, storage), clock), clock)
+        return QueueWorker(storage, MedAppCourier(transport, vocabulary, PackageSnapshotResolver(vocabulary, storage), clock), DirectTransactions, clock)
     }
 
     /** Запрос, замороженный раньше: работник шлёт его как есть, чтения перед подготовкой нет. */
@@ -179,7 +183,7 @@ class QueueOutboxTest {
             }
         }
         val vocabulary = VocabularyResolver(Store(), MedAppApi(medAppHttpClient(MockEngine { throw java.io.IOException("связи нет") }, "https://medapp.test", retryDelay = { delayMillis(false) { 0L } })))
-        val worker = QueueWorker(storage, MedAppCourier(slow, vocabulary, PackageSnapshotResolver(vocabulary, storage), Clock.fixed(now, ZoneOffset.UTC)), Clock.fixed(now, ZoneOffset.UTC))
+        val worker = QueueWorker(storage, MedAppCourier(slow, vocabulary, PackageSnapshotResolver(vocabulary, storage), Clock.fixed(now, ZoneOffset.UTC)), DirectTransactions, Clock.fixed(now, ZoneOffset.UTC))
         val outbox = QueueOutbox(worker, storage, Clock.fixed(now, ZoneOffset.UTC), backgroundScope)
         outbox.start()
         runCurrent()

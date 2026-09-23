@@ -41,7 +41,7 @@ class LayerBoundariesTest {
         // Данные: как сохранить и отдать требуемое. Порты сценария исполняет, очередь не видит.
         "storage" to setOf("domain", "feature"),
         // Журнал поручений: раскладывает типы очереди по колонкам и собирает обратно, но не толкует.
-        "storage/operation" to setOf("domain", "queue"),
+        "storage/operation" to setOf("domain", "queue", "feature"),
         // Сценарий стоит над логиками, но в сеть не ходит: сетевое действие называет домен портом.
         "feature" to setOf("domain", "queue", "storage"),
         // Android-службы без экранов: фон, ключи, уведомления — и порты, которые они исполняют.
@@ -181,6 +181,8 @@ class LayerBoundariesTest {
         val invariant = Regex("этой же транзакцией|записан|^у .+ есть ")
         val offenders = sources.resolve("feature").walkTopDown()
             .filter { it.extension == "kt" }
+            // Само правило F5 держит свой `checkNotNull` — оно и есть «прочитано этой же транзакцией».
+            .filter { it.name != "ReadThisTransaction.kt" }
             .flatMap { file ->
                 file.readLines().withIndex()
                     .filter { (_, line) -> "requireNotNull(" in line || "checkNotNull(" in line }

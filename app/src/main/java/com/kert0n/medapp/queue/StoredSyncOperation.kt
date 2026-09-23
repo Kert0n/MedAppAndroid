@@ -49,3 +49,14 @@ sealed interface StoredSyncOperation {
      */
     data class Unreadable(override val id: Uuid, val reason: String, override val state: SyncOperationState) : StoredSyncOperation
 }
+
+/**
+ * Чем закрыть незакрытую операцию, когда полки у сервера для нас больше нет — учётку заменили
+ * (PLAN G2): «отправлять некуда», тем же переходом, что у 404. У собранной — со следствиями её
+ * команды: унесённая домой коробка остаётся у человека. У несобранной следствий нет — дочитывать
+ * словарь ради строки, которой некуда ехать, незачем.
+ */
+fun StoredSyncOperation.abandoned(): Settlement = when (this) {
+    is StoredSyncOperation.Readable -> Delivery.AccessLost.settlement(operation.command)
+    is StoredSyncOperation.Stale, is StoredSyncOperation.Unreadable -> Settlement(Settlement.Transition.Close.AccessLost)
+}

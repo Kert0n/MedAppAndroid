@@ -30,6 +30,7 @@ import com.kert0n.medapp.fixture.queueStorage
 import com.kert0n.medapp.fixture.schedule
 import com.kert0n.medapp.fixture.snapshotStorage
 import com.kert0n.medapp.fixture.tablets
+import com.kert0n.medapp.fixture.taking
 import com.kert0n.medapp.queue.Delivery
 import com.kert0n.medapp.queue.PackageState
 import com.kert0n.medapp.queue.ResourceVersion
@@ -153,7 +154,7 @@ class SnapshotClampingTest {
     fun anAnswerLaysTheSnapshotThroughTheSameDoorAndClamps() = runTest {
         val id = treated()
         val claim = (database.syncOperations().all().single().toDomain(VOCABULARY) as StoredSyncOperation.Readable).operation
-        database.queueStorage().take(claim.id, null, now)
+        database.taking().take(claim.id, null, now)
 
         database.queueStorage().settle(
             claim.id,

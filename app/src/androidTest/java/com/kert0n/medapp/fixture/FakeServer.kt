@@ -9,6 +9,7 @@ import com.kert0n.medapp.network.value.VocabularyResolver
 import com.kert0n.medapp.queue.SnapshotApplier
 import com.kert0n.medapp.queue.Synchronization
 import com.kert0n.medapp.storage.database.MedAppDatabase
+import com.kert0n.medapp.storage.database.RoomTransactions
 import com.kert0n.medapp.storage.operation.QueueBacklogRoomStorage
 import com.kert0n.medapp.storage.value.VocabularyRoomRepository
 import io.ktor.client.engine.mock.MockEngine
@@ -163,7 +164,7 @@ class FakeServer {
         val vocabulary = VocabularyResolver(VocabularyRoomRepository(database.vocabulary()), api)
         val resolver = PackageSnapshotResolver(vocabulary, database.queueStorage())
         return Synchronization(
-            com.kert0n.medapp.queue.QueueWorker(database.queueStorage(), MedAppCourier(MedAppDoor(api), vocabulary, resolver, clock), clock),
+            com.kert0n.medapp.queue.QueueWorker(database.queueStorage(), MedAppCourier(MedAppDoor(api), vocabulary, resolver, clock), RoomTransactions(database), clock),
             SnapshotApplier(api, database.snapshotStorage(), vocabulary, resolver, clock),
             QueueBacklogRoomStorage(database.syncOperations()),
             schedule,
