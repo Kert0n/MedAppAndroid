@@ -239,6 +239,8 @@ class MedKitsTour : ScreenTour() {
         tap("Принять")
         see("Сколько принял")
         snap("10-unplanned-intake/expired")
+        compose.onAllNodesWithText("Сколько принял").onFirst().performTextReplacement("1")
+        closeSoftKeyboard()
         tapLast("Принять")
         see("Прежде чем записать")
         snap("10-unplanned-intake/expired-question")
