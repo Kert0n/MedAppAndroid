@@ -82,6 +82,8 @@ class DayPageScreenTest {
                     onConfirm = { confirmed += it },
                     onDecline = { declined += it },
                     onDismissMessage = { dismissed++ },
+                    onAcknowledge = {},
+                    onDismissQuestion = {},
                     modifier = Modifier.fillMaxSize()
                 )
             }

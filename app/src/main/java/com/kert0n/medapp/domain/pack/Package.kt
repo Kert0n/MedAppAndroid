@@ -93,6 +93,9 @@ class Package(
 
     fun isExpiredOn(date: LocalDate): Boolean = facts.isExpiredOn(date)
 
+    /** Срок, если к дню [date] он уже истёк; годна или срок неизвестен — `null`. */
+    fun expiredOn(date: LocalDate): ExpiryDate? = facts.expiresOn?.takeIf { it.isExpiredOn(date) }
+
     fun expiresWithin(date: LocalDate, days: Long): Boolean = facts.expiresWithin(date, days)
 
     /**

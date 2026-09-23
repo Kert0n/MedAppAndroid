@@ -107,13 +107,14 @@ class SchoolMorningStoryTest {
     fun tearDown() = world.end()
 
     /**
-     * Утро: «Отложить», через четверть часа снова, промах в «Пропустил» и исправление на «Дне».
-     * Вечер: «Принял» у плиты пишет без приложения и без вопроса о просрочке. Наутро коробки нет, и
-     * «Принял» ничего не записывает, а приходит «нужно ваше решение», ведущее на карточку; возврат
-     * из недавних на неё не возвращает.
+     * Утро: «Отложить», через четверть часа снова, промах в «Пропустил» и исправление на «Дне», где
+     * «Принял» один раз спрашивает о просроченном железе. Вечер: «Принял» у плиты пишет без
+     * приложения и без вопроса. Наутро коробки нет, и «Принял» ничего не записывает, а приходит
+     * «нужно ваше решение», ведущее на карточку; возврат из недавних на неё не возвращает.
      *
      * Стережёт: все три кнопки шторки делают своё без экрана; ошибку видно и её можно исправить;
-     * просрочка не спрашивает; незаписанный приём не пропадает молча; открытие применяется один раз.
+     * о просрочке спрашивает экран, а шторка — нет; незаписанный приём не пропадает молча;
+     * открытие применяется один раз.
      */
     @Test
     fun olgaAnswersFromTheShadeWithWetHandsAndAtTheStove() {
@@ -140,7 +141,10 @@ class SchoolMorningStoryTest {
         compose.waitUntil(WAIT) { runBlocking { database.intakeOn(course, monday, 7, 30).status } == IntakeStatus.MISSED }
     }
 
-    /** На остановке: «пропущен» видно, и «Принял» рядом исправляет. */
+    /**
+     * На остановке: «пропущен» видно, и «Принял» рядом исправляет. На экране приложение спрашивает
+     * о просроченном железе — один раз, и «всё равно принял» пишет (решение владельца 2026-09-23).
+     */
     private fun sheFixesTheWrongButtonOnTheDay() {
         world.moveTo(moscow(monday, 8, 10))
         compose.onNodeWithText("План").performClick()
@@ -149,6 +153,10 @@ class SchoolMorningStoryTest {
         val row = hasClickAction() and hasText("07:30") and hasText("пропущен")
         compose.waitUntil(WAIT) { compose.onAllNodes(row).fetchSemanticsNodes().isNotEmpty() }
         compose.onNode(hasText("Принял") and hasAnyAncestor(row)).performClick()
+        compose.waitUntil(WAIT) { shown("Прежде чем записать") }
+        compose.onNodeWithText("«Железо» просрочен", substring = true).assertExists()
+        assertEquals(IntakeStatus.MISSED, runBlocking { database.intakeOn(course, monday, 7, 30).status })
+        compose.onNodeWithText("Всё равно принял").performClick()
         compose.waitUntil(WAIT) { runBlocking { database.intakeOn(course, monday, 7, 30).status } == IntakeStatus.TAKEN }
         compose.onNodeWithText("Аптечки").performClick()
     }
@@ -164,7 +172,7 @@ class SchoolMorningStoryTest {
         assertEquals(ReminderAnswering.Response.Done, taken)
         assertEquals(IntakeStatus.TAKEN, runBlocking { database.intakeOn(course, monday, 19, 30).status })
         compose.waitUntil(WAIT) { !world.cardUp(evening.id) }
-        // Приложение не открывалось и не спрашивало о просроченной коробке.
+        // Приложение не открывалось, и шторка о просроченной коробке не спрашивала.
         assertNull(world.opening.value)
         compose.onNodeWithText("Прежде чем записать").assertDoesNotExist()
     }

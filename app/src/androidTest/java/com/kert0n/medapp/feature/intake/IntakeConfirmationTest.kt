@@ -1,5 +1,6 @@
 package com.kert0n.medapp.feature.intake
 
+import com.kert0n.medapp.feature.intake.IntakeWarning
 import com.kert0n.medapp.domain.pack.ExpiryDate
 import com.kert0n.medapp.fixture.factsOf
 import com.kert0n.medapp.fixture.confirmed
@@ -387,20 +388,25 @@ class IntakeConfirmationTest {
     }
 
     /**
-     * **Просроченная коробка приём не переспрашивает** (C1 «Просроченная пачка», поправка владельца
-     * 2026-09-16). Ольга знает, что железо со вчера просрочено, и решила допить: приложение срок
-     * показало, а решать ей. Спроси сценарий «вы уверены?» — и «Принял» из шторки не смог бы
-     * записать приём без экрана, а человека учили бы жить.
+     * **Просроченная к дню приёма коробка спрашивает** (ТЗ 4.1.1.5.5, решение владельца 2026-09-23):
+     * не записано ничего — ни приёма, ни расхода, — пока человек не ответит, а «всё равно принял»
+     * пишет тем же вызовом. Решает человек; приложение лишь не даёт сделать это молча.
      */
     @Test
-    fun anExpiredBoxIsTakenWithoutAQuestion() = runTest {
+    fun anExpiredBoxAsksAndWritesNothingUntilAcknowledged() = runTest {
         val today = FIRST_PLANNED_AT.atZone(ZoneOffset.UTC).toLocalDate()
         assertTrue(packages.describe(PACK, factsOf(pack(quantity = tablets("20"))).copy(expiresOn = ExpiryDate(today.minusDays(1)))))
         activate()
+        val name = requireNotNull(packages.find(PACK)).facts.name
 
-        val outcome = confirmation.confirm(INTAKE, PACK, dose("2"), FIRST_PLANNED_AT)
+        val asked = confirmation.confirm(INTAKE, PACK, dose("2"), FIRST_PLANNED_AT)
 
-        assertTrue("просрочка спросила, а не записала: $outcome", outcome is IntakeConfirmation.Outcome.Confirmed)
+        assertEquals(IntakeConfirmation.Outcome.Warned(listOf(IntakeWarning.Expired(name, ExpiryDate(today.minusDays(1))))), asked)
+        assertEquals(IntakeStatus.PLANNED, requireNotNull(intakes.find(INTAKE)).status)
+        assertEquals(tablets("20"), requireNotNull(packages.find(PACK)).quantity)
+
+        confirmation.confirm(INTAKE, PACK, dose("2"), FIRST_PLANNED_AT, acknowledged = true).confirmed()
+
         assertEquals(IntakeStatus.TAKEN, requireNotNull(intakes.find(INTAKE)).status)
         assertEquals(tablets("18"), requireNotNull(packages.find(PACK)).quantity)
     }

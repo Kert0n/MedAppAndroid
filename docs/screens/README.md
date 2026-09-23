@@ -33,6 +33,7 @@
 | `08-package-edit` | `filled` | правка упаковки |
 | `09-recount` | `filled` | пересчёт |
 | `10-unplanned-intake` | `filled`, `questions` | разовый приём; вопрос «приём заденет занятое» |
+| `10-unplanned-intake` | `expired`, `expired-question` | из просроченной коробки: срок до нажатия; вопрос, прежде чем записать |
 | `11-transfer` | `filled` | перенос в другую аптечку |
 | `12-day` | `today`, `tomorrow` | план дня: принятый, запланированные, отменённый, разовый; завтра |
 | `12-day` | `notifications-off`, `dark` | напоминания не приходят; тёмная тема |

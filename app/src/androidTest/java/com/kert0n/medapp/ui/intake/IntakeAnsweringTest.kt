@@ -202,12 +202,12 @@ class IntakeAnsweringTest {
     }
 
     /**
-     * Быстрый ответ по просроченной коробке **пишет сразу**: вопроса нет, срок человеку показан
-     * (PLAN C1 «Просроченная пачка», поправка 2026-09-16). Отправляй его на карточку — и одним
-     * нажатием приём было бы не записать.
+     * Быстрый ответ по просроченной коробке **спрашивает** прямо на «Дне», а не отправляет на
+     * карточку (ТЗ 4.1.1.5.5, решение владельца 2026-09-23): вопрос — на странице, отмена не пишет
+     * ничего, «всё равно принял» пишет тем же быстрым ответом.
      */
     @Test
-    fun anExpiredBoxIsTakenFromTheDayAtOnce(): Unit = runBlocking {
+    fun anExpiredBoxAsksOnTheDayAndIsTakenOnceAcknowledged(): Unit = runBlocking {
         val courseId = started(expiresOn = LocalDate.of(2027, 3, 1))
         val intakeId = firstIntake(courseId).id
         val model = dayModel()
@@ -215,6 +215,16 @@ class IntakeAnsweringTest {
         watching(model.page(0)) { page ->
             page.awaiting(PATIENTLY) { it.ready()?.items?.isNotEmpty() == true }
             model.confirm(intakeId)
+            page.awaiting(PATIENTLY) { it.ready()?.question?.intakeId == intakeId }
+            model.dismissQuestion()
+            page.awaiting(PATIENTLY) { it.ready()?.question == null }
+        }
+        assertEquals(IntakeStatus.PLANNED, database.intakeRepository().find(intakeId)?.status)
+
+        watching(model.page(0)) { page ->
+            model.confirm(intakeId)
+            page.awaiting(PATIENTLY) { it.ready()?.question != null }
+            model.acknowledge()
             page.awaiting(PATIENTLY) { state -> state.ready()?.items.orEmpty().none { it.canConfirm } }
         }
 

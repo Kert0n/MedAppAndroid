@@ -1,5 +1,6 @@
 package com.kert0n.medapp.ui.plan
 
+import com.kert0n.medapp.ui.intake.IntakeQuestionsDialog
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -37,7 +38,9 @@ fun MissedIntakesPopup(
     onOpen: (DayItemPresentationDTO) -> Unit,
     onConfirm: (Uuid, MissedIntakesUiState.Planned) -> Unit,
     onDismiss: (Set<NotificationKey>) -> Unit,
-    onDismissMessage: () -> Unit
+    onDismissMessage: () -> Unit,
+    onAcknowledge: () -> Unit,
+    onDismissQuestion: () -> Unit
 ) {
     if (state.isEmpty) return
     // Строк нет, а ответ на последнюю не прочитан — окно уходит, а слова остаются.
@@ -76,5 +79,8 @@ fun MissedIntakesPopup(
             text = { Text(it.words()) },
             confirmButton = { TextButton(onClick = onDismissMessage) { Text(stringResource(R.string.action_got_it)) } }
         )
+    }
+    state.question?.let {
+        IntakeQuestionsDialog(it.questions, onAcknowledge = onAcknowledge, onDismiss = onDismissQuestion)
     }
 }

@@ -1,5 +1,6 @@
 package com.kert0n.medapp.app.navigation
 
+import com.kert0n.medapp.domain.pack.ExpiryDate
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.junit4.v2.createAndroidComposeRule
 import androidx.compose.ui.test.onAllNodesWithText
@@ -50,7 +51,9 @@ import org.junit.runner.RunWith
 /**
  * **История Анны** (PLAN U1 «история человека»). У неё идёт лечение, и весь её день — это ответы
  * на приёмы: утренний она подтверждает одним нажатием, вечерний пропускает, днём выпивает таблетку
- * просто так — а вечером хочет знать, что вообще было.
+ * просто так — а вечером хочет знать, что вообще было. Срок коробки кончился вчера, и Анна этого не
+ * заметила: приём спрашивает, прежде чем записать, — и на «Дне», и с карточки коробки (ТЗ 4.1.1.5.5,
+ * решение владельца 2026-09-23).
  *
  * Проверка идёт её путём целиком — от страницы дня до истории коробки, — потому что набор и есть
  * про **связь** этих мест: ответ в строке меняет число в коробке, а разовый приём и приём по плану
@@ -89,7 +92,12 @@ class DayOfIntakesStoryTest {
             )
             database.medKits().insertIfMissing(medKit(id = HOME_KIT).toMedKitStorageEntity())
             database.packageRepository()
-                .add(pack(id = PACK, name = "Цетрин", quantity = tablets("20"), form = TABLET_FORM))
+                .add(
+                    pack(
+                        id = PACK, name = "Цетрин", quantity = tablets("20"), form = TABLET_FORM,
+                        expiresOn = ExpiryDate(LocalDate.now(zone).minusDays(1))
+                    )
+                )
         }
         compose.setContent { MedAppTheme { MedAppShell() } }
     }
@@ -139,6 +147,8 @@ class DayOfIntakesStoryTest {
             compose.onAllNodesWithText("Принял").fetchSemanticsNodes().isNotEmpty()
         }
         compose.onAllNodesWithText("Принял").onFirst().performClick()
+        // Коробка со вчера просрочена: одно нажатие не пишет молча, а спрашивает — и называет её.
+        theExpiredBoxIsAskedAbout()
         // Записанное приходит чтением: строка называет время, в которое Анна ответила.
         compose.waitUntil(WAIT) {
             compose.onAllNodesWithText("принят в", substring = true).fetchSemanticsNodes().isNotEmpty()
@@ -157,6 +167,7 @@ class DayOfIntakesStoryTest {
         compose.onNodeWithText("Сколько принял").performTextReplacement("1")
         closeSoftKeyboard()
         compose.onNodeWithText("Принять").performClick()
+        theExpiredBoxIsAskedAbout()
         compose.waitUntil(WAIT) { compose.onAllNodesWithText("Сколько принял").fetchSemanticsNodes().isEmpty() }
         // В места приложения человек возвращается назад: на карточке коробки нижних мест нет.
         back()
@@ -194,6 +205,16 @@ class DayOfIntakesStoryTest {
         compose.onNodeWithText("План").performClick()
         compose.waitUntil(WAIT) { compose.onAllNodesWithText("День").fetchSemanticsNodes().isNotEmpty() }
         compose.onNodeWithText("День").performClick()
+    }
+
+    /**
+     * Вопрос о просрочке: пока Анна не ответит, не записано ничего; «всё равно принял» пишет. Не
+     * спроси приложение — она пила бы просроченное, так и не узнав об этом.
+     */
+    private fun theExpiredBoxIsAskedAbout() {
+        compose.waitUntil(WAIT) { compose.onAllNodesWithText("Прежде чем записать").fetchSemanticsNodes().isNotEmpty() }
+        compose.onNodeWithText("«Цетрин» просрочен", substring = true).assertExists()
+        compose.onNodeWithText("Всё равно принял").performClick()
     }
 
     /** Возврат кнопкой: у каждого экрана набора она в панели. */

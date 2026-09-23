@@ -1,5 +1,6 @@
 package com.kert0n.medapp.presentation.intake
 
+import com.kert0n.medapp.presentation.value.ExpiryDatePresentationDTO
 import com.kert0n.medapp.domain.intake.IntakeRejected
 import com.kert0n.medapp.presentation.value.QuantityPresentationDTO
 import com.kert0n.medapp.presentation.value.QuantityPresentationError
@@ -44,6 +45,8 @@ data class IntakeCardUiState(
     val answer: Answer? = null,
     val answeredAt: LocalTime? = null,
     val error: IntakeCardError? = null,
+    /** Что спросить до записи: ничего не записано, пока человек не ответит (PLAN D6). */
+    val questions: List<IntakeQuestionPresentationDTO> = emptyList(),
     val isWriting: Boolean = false,
     val isDone: Boolean = false
 ) {
@@ -77,6 +80,9 @@ data class IntakeSourcePresentationDTO(val id: Uuid, val name: String)
 
 /** Вопрос сценария словами экрана: ответ на него — тот же приём, подтверждённый человеком. */
 sealed interface IntakeQuestionPresentationDTO {
+
+    /** Коробка [name] просрочена к дню приёма: годна была до [expiry]. */
+    data class Expired(val name: String, val expiry: ExpiryDatePresentationDTO) : IntakeQuestionPresentationDTO
 
     /** Приём заденет выделенное лечению или занятое соседями (PLAN D4). */
     data class TouchesReserved(val free: QuantityPresentationDTO) : IntakeQuestionPresentationDTO

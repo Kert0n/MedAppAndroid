@@ -1,5 +1,6 @@
 package com.kert0n.medapp.ui.plan
 
+import com.kert0n.medapp.ui.intake.IntakeQuestionsDialog
 import androidx.annotation.DrawableRes
 import androidx.annotation.StringRes
 import androidx.compose.foundation.layout.Arrangement
@@ -70,6 +71,8 @@ fun DayPages(
     onConfirm: (Uuid) -> Unit,
     onDecline: (Uuid) -> Unit,
     onDismissMessage: () -> Unit,
+    onAcknowledge: () -> Unit,
+    onDismissQuestion: () -> Unit,
     onFixNotifications: () -> Unit,
     onFixAlarms: () -> Unit,
     modifier: Modifier = Modifier
@@ -87,6 +90,10 @@ fun DayPages(
                     TextButton(onClick = onDismissMessage) { Text(stringResource(R.string.action_got_it)) }
                 }
             )
+        }
+        // Быстрый ответ спрашивает, прежде чем записать: коробка просрочена к дню приёма.
+        (state as? ScreenState.Ready)?.value?.question?.let {
+            IntakeQuestionsDialog(it.questions, onAcknowledge = onAcknowledge, onDismiss = onDismissQuestion)
         }
     }
 }

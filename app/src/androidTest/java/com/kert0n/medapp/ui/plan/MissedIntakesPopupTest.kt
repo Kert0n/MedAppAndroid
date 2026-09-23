@@ -76,7 +76,9 @@ class MissedIntakesPopupTest {
                     onOpen = { opened += it },
                     onConfirm = { id, planned -> confirmed += id to planned },
                     onDismiss = { dismissed += it },
-                    onDismissMessage = {}
+                    onDismissMessage = {},
+                    onAcknowledge = {},
+                    onDismissQuestion = {}
                 )
             }
         }
