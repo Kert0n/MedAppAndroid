@@ -179,8 +179,7 @@ class ClaimsOnTransferStoryTest {
     fun tearDown() = runBlocking {
         if (ProbeAccounts.thirdSkipReason != null) return@runBlocking
         val everyone = listOfNotNull(ProbeAccounts.anna, ProbeAccounts.boris, ProbeAccounts.viktor)
-        removeFromProd(summer.id, everyone)
-        removeFromProd(city.id, everyone)
+        removeFromProd(listOf(summer.id, city.id), everyone)
     }
 
     /**

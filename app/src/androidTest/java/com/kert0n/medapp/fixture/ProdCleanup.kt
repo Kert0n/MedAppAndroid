@@ -6,15 +6,19 @@ import com.kert0n.medapp.network.server.MedAppApi
 import kotlin.uuid.Uuid
 
 /**
- * Синтетическая полка убрана с боевого сервера: её не видит **никто** из [participants]. Удаляют все —
- * вышедший удалить не может, — а верят не ответу на удаление, а отсутствию: `404` не говорит, нет
- * полки или нет доступа, и оставшаяся полка — мусор, который больше никто не найдёт.
+ * Синтетические полки убраны с боевого сервера: ни одну из [medKitIds] не видит **никто** из
+ * [participants]. Удаляют все — вышедший удалить не может, — а верят не ответу на удаление, а
+ * отсутствию: `404` не говорит, нет полки или нет доступа, и оставшаяся полка — мусор, который больше
+ * никто не найдёт. Сначала удаляются все полки, потом проверяются все: оставшаяся первая не мешает
+ * убрать вторую.
  */
-suspend fun removeFromProd(medKitId: Uuid, participants: List<MedAppApi>) {
-    participants.forEach { it.deleteMedKit(medKitId) }
-    val stillSeen = participants.count { api ->
-        val seen = api.medKit(medKitId)
-        !(seen is ApiResult.Failure && seen.failure == ApiFailure.NotFound)
+suspend fun removeFromProd(medKitIds: List<Uuid>, participants: List<MedAppApi>) {
+    medKitIds.forEach { id -> participants.forEach { it.deleteMedKit(id) } }
+    val left = medKitIds.filter { id ->
+        participants.any { api ->
+            val seen = api.medKit(id)
+            !(seen is ApiResult.Failure && seen.failure == ApiFailure.NotFound)
+        }
     }
-    if (stillSeen > 0) throw AssertionError("синтетическая полка $medKitId осталась на боевом сервере")
+    if (left.isNotEmpty()) throw AssertionError("синтетические полки остались на боевом сервере: $left")
 }

@@ -119,7 +119,7 @@ class SharedShelfStoryTest {
     @After
     fun tearDown() = runBlocking {
         if (ProbeAccounts.skipReason != null) return@runBlocking
-        removeFromProd(shelf.id, listOfNotNull(ProbeAccounts.anna, ProbeAccounts.boris))
+        removeFromProd(listOf(shelf.id), listOfNotNull(ProbeAccounts.anna, ProbeAccounts.boris))
     }
 
     /**
