@@ -113,14 +113,9 @@ class SyncStatusScreenTest {
             recountable = null
         )
         show(SyncStatusUiState(rows = listOf(stale), isLoaded = true))
-        val words = androidx.test.platform.app.InstrumentationRegistry.getInstrumentation().targetContext
 
-        compose.onNodeWithText(words.getString(com.kert0n.medapp.R.string.sync_reason_stale)).assertIsDisplayed()
-        assertEquals(
-            "отказ по аптечке говорит словами отказа по лекарству",
-            false,
-            words.getString(com.kert0n.medapp.R.string.sync_reason_stale) == words.getString(com.kert0n.medapp.R.string.sync_reason_conflict)
-        )
+        compose.onNodeWithText("Аптечку изменили или убрали раньше вас").assertIsDisplayed()
+        compose.onNodeWithText("Лекарство изменили раньше вас").assertDoesNotExist()
     }
 
     /** Расхождение по числу ведёт на пересчёт — той же коробки, о которой спор (REQ-045). */
