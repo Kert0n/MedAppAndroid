@@ -180,7 +180,7 @@ class MissedIntakesViewModel @Inject constructor(
      */
     fun dismiss(told: Set<NotificationKey>) {
         dismissed.update { it + told }
-        act(failures) { outbox.bannerShown(told) }
+        act(failures, undo = { dismissed.update { it - told } }) { outbox.bannerShown(told) }
     }
 
     private data class Line(val key: NotificationKey, val row: DayItemPresentationDTO, val answer: MissedIntakesUiState.Planned?)

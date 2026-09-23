@@ -155,11 +155,16 @@ class ScreenWorkTest {
     fun retryingWithoutAFailureDoesNothing() = runTest {
         val reading = ScreenReading()
         var opened = 0
-        val values = reading.guarded(flow { opened++; emit(opened) }).take(1).toList()
+        val values = mutableListOf<Int>()
+        // Слушатель жив, пока зовут повтор: иначе переоткрывать было бы некому, и проверка не могла бы покраснеть.
+        val listening = launch { reading.guarded(flow { opened++; emit(opened) }).collect { values += it } }
+        testScheduler.runCurrent()
 
         reading.retry()
+        testScheduler.runCurrent()
 
         assertEquals(listOf(1), values)
         assertEquals(1, opened)
+        listening.cancel()
     }
 }

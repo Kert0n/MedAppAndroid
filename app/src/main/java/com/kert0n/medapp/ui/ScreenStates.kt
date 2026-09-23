@@ -1,5 +1,6 @@
 package com.kert0n.medapp.ui
 
+import androidx.activity.compose.BackHandler
 import com.kert0n.medapp.presentation.ScreenReading
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.compose.material3.TopAppBar
@@ -189,6 +190,9 @@ fun Readable(
         content()
         return
     }
+    // Системный «назад» ведёт туда же, куда стрелка: у листа приёма это закрыть лист, а не уйти с
+    // карточки целиком.
+    if (onBack != null) BackHandler(onBack = onBack)
     Scaffold(
         topBar = {
             if (onBack != null) {

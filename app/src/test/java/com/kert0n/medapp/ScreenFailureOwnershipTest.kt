@@ -30,12 +30,12 @@ class ScreenFailureOwnershipTest {
 
     @Test
     fun noScreenWorkIsLaunchedWithoutAnOwnerOfItsFailure() {
-        assertEquals("сбой работы экрана улетает мимо него и роняет приложение", emptyList<String>(), offenders(Regex("\\blaunch\\s*\\{")))
+        assertEquals("сбой работы экрана улетает мимо него и роняет приложение", emptyList<String>(), offenders(Regex("\\blaunch\\s*[({]|\\.launchIn\\(")))
     }
 
     @Test
     fun noScreenReadingIsSharedWithoutAnOwnerOfItsFailure() {
-        assertEquals("сбой чтения экрана улетает мимо него и роняет приложение", emptyList<String>(), offenders(Regex("\\.stateIn\\(")))
+        assertEquals("сбой чтения экрана улетает мимо него и роняет приложение", emptyList<String>(), offenders(Regex("\\.(stateIn|shareIn)\\(")))
     }
 
     private companion object {
