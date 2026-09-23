@@ -255,31 +255,40 @@ class UnplannedIntakeRecordingTest {
     }
 
     /**
-     * Просрочка — не вопрос (C1 «Просроченная пачка», поправка владельца 2026-09-16): спрашивается
-     * только то, что заденет чужое, — занятое. Годен до вчера и заденет занятое — один вопрос о
-     * занятом; просрочку человек видит на коробке, а решает сам.
+     * Годен до вчера и заденет занятое — два вопроса **разом** (PLAN D6; ТЗ 4.1.1.5.5, решение
+     * владельца 2026-09-23): человек отвечает один раз, а не дважды подряд.
      */
     @Test
-    fun onlyTheReservedIsAskedAndExpiryIsNot() = runTest {
+    fun theExpiryAndTheReservedAreAskedAtOnce() = runTest {
         local()
         holdByACourse()
         val today = LATER.atZone(ZoneOffset.UTC).toLocalDate()
         assertTrue(database.packageRepository().describe(PACK, factsOf(pack(quantity = tablets("20"), form = TABLET_FORM)).copy(expiresOn = ExpiryDate(today.minusDays(1)))))
+        val name = requireNotNull(database.packageRepository().find(PACK)).facts.name
 
         val asked = recording.record(PACK, dose("12"), LATER)
 
-        assertEquals(UnplannedIntakeRecording.Outcome.Warned(listOf(IntakeWarning.TouchesReserved(tablets("10")))), asked)
+        assertEquals(
+            UnplannedIntakeRecording.Outcome.Warned(
+                listOf(IntakeWarning.Expired(name, ExpiryDate(today.minusDays(1))), IntakeWarning.TouchesReserved(tablets("10")))
+            ),
+            asked
+        )
         assertTrue(recording.record(PACK, dose("12"), LATER, acknowledged = true) is UnplannedIntakeRecording.Outcome.Recorded)
         assertEquals(tablets("8"), requireNotNull(database.packageRepository().find(PACK)).quantity)
     }
 
-    /** Разовый приём из просроченной коробки, не задевающий занятого, пишется сразу. */
+    /** Разовый приём из просроченной коробки спрашивает и тогда, когда занятого не задевает. */
     @Test
-    fun anExpiredBoxIsTakenOnceWithoutAQuestion() = runTest {
+    fun anExpiredBoxAsksEvenWhenNothingIsReserved() = runTest {
         local()
         val today = LATER.atZone(ZoneOffset.UTC).toLocalDate()
         assertTrue(database.packageRepository().describe(PACK, factsOf(pack(quantity = tablets("20"), form = TABLET_FORM)).copy(expiresOn = ExpiryDate(today.minusDays(1)))))
 
-        assertTrue(recording.record(PACK, dose("1"), LATER) is UnplannedIntakeRecording.Outcome.Recorded)
+        val asked = recording.record(PACK, dose("1"), LATER)
+
+        assertTrue("просрочка не спросила: $asked", asked is UnplannedIntakeRecording.Outcome.Warned)
+        assertEquals(tablets("20"), requireNotNull(database.packageRepository().find(PACK)).quantity)
+        assertTrue(recording.record(PACK, dose("1"), LATER, acknowledged = true) is UnplannedIntakeRecording.Outcome.Recorded)
     }
 }
