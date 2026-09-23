@@ -5,14 +5,15 @@ import com.kert0n.medapp.domain.medkit.MedKitRef
 import com.kert0n.medapp.domain.value.DosageForm
 import com.kert0n.medapp.domain.value.QuantityUnit
 import com.kert0n.medapp.domain.value.Vocabulary
+import com.kert0n.medapp.network.pack.PackageSnapshotResolver
 import com.kert0n.medapp.network.server.MedAppApi
 import com.kert0n.medapp.network.server.RawResponse
 import com.kert0n.medapp.network.server.medAppHttpClient
 import com.kert0n.medapp.network.value.VocabularyResolver
 import com.kert0n.medapp.network.value.VocabularyStore
-import com.kert0n.medapp.queue.PackageSnapshotResolver
 import com.kert0n.medapp.queue.QueueStorage
 import com.kert0n.medapp.queue.QueuedCommand
+import com.kert0n.medapp.queue.Receipt
 import com.kert0n.medapp.queue.Rereading
 import com.kert0n.medapp.queue.ServerKnowledge
 import com.kert0n.medapp.queue.ServerSnapshot
@@ -105,7 +106,7 @@ class RereadingServer(clock: Clock) {
         override suspend fun nextDueAt(now: Instant): Instant? = null
         override suspend fun ready(now: Instant) = error("не для перечитывания")
         override suspend fun take(id: Uuid, fresh: PackageSnapshot?, at: Instant) = error("не для перечитывания")
-        override suspend fun answered(id: Uuid, answer: RawResponse, at: Instant) = error("не для перечитывания")
+        override suspend fun answered(id: Uuid, answer: Receipt, at: Instant) = error("не для перечитывания")
         override suspend fun defer(id: Uuid, reason: String, at: Instant, notBefore: Instant) = error("не для перечитывания")
         override suspend fun settle(id: Uuid, settlement: Settlement, at: Instant) = error("не для перечитывания")
         override suspend fun enqueue(queued: QueuedCommand, shelf: Uuid, at: Instant) = error("не для перечитывания")

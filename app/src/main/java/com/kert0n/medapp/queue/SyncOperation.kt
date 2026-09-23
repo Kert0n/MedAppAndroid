@@ -1,7 +1,6 @@
 package com.kert0n.medapp.queue
 
 import com.kert0n.medapp.domain.value.Attempts
-import com.kert0n.medapp.network.server.RawResponse
 import java.time.Instant
 import java.util.Objects
 import kotlin.uuid.Uuid
@@ -43,7 +42,7 @@ class SyncOperation(
     val attempts: Attempts = Attempts.none,
     val lastError: String? = null,
     val lastTriedAt: Instant? = null,
-    val answer: RawResponse? = null,
+    val answer: Receipt? = null,
     val notBefore: Instant? = null,
     val outcomeUnknown: Boolean = false,
     val refusalReason: RefusalReason? = null
@@ -71,7 +70,7 @@ class SyncOperation(
     /** Замороженный запрос уходит снова; застали в отправке — исход прошлого полёта неизвестен. */
     fun resent(): SyncOperation? = state.resent()?.let { with(it, prepared) }
 
-    fun answered(answer: RawResponse, at: Instant): SyncOperation? = state.answered(answer, at)?.let { with(it, prepared) }
+    fun answered(answer: Receipt, at: Instant): SyncOperation? = state.answered(answer, at)?.let { with(it, prepared) }
 
     fun deferred(reason: String, at: Instant, notBefore: Instant): SyncOperation? =
         state.deferred(reason, at, notBefore)?.let { with(it, prepared) }

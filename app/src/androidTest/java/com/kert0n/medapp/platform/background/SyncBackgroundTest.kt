@@ -11,21 +11,22 @@ import androidx.work.WorkerFactory
 import androidx.work.WorkerParameters
 import androidx.work.testing.TestListenableWorkerBuilder
 import androidx.work.workDataOf
-import com.kert0n.medapp.fixture.INTAKE
-import com.kert0n.medapp.fixture.settle
-import com.kert0n.medapp.fixture.PACK
 import com.kert0n.medapp.feature.settings.AppSettings
 import com.kert0n.medapp.fixture.FakeSettingsStore
+import com.kert0n.medapp.fixture.INTAKE
+import com.kert0n.medapp.fixture.PACK
 import com.kert0n.medapp.fixture.Scenarios
 import com.kert0n.medapp.fixture.dose
 import com.kert0n.medapp.fixture.inMemoryDatabase
 import com.kert0n.medapp.fixture.queueStorage
+import com.kert0n.medapp.fixture.settle
 import com.kert0n.medapp.fixture.snapshotStorage
+import com.kert0n.medapp.network.delivery.MedAppCourier
+import com.kert0n.medapp.network.delivery.MedAppDoor
+import com.kert0n.medapp.network.pack.PackageSnapshotResolver
 import com.kert0n.medapp.network.server.MedAppApi
 import com.kert0n.medapp.network.server.medAppHttpClient
 import com.kert0n.medapp.network.value.VocabularyResolver
-import com.kert0n.medapp.queue.PackageSnapshotResolver
-import com.kert0n.medapp.queue.QueueHttpTransport
 import com.kert0n.medapp.queue.QueueWorker
 import com.kert0n.medapp.queue.SnapshotApplier
 import com.kert0n.medapp.queue.SyncInterval
@@ -35,6 +36,8 @@ import com.kert0n.medapp.queue.pack.PackageSyncCommand
 import com.kert0n.medapp.storage.database.MedAppDatabase
 import com.kert0n.medapp.storage.operation.QueueBacklogRoomStorage
 import com.kert0n.medapp.storage.value.VocabularyRoomRepository
+import dagger.hilt.android.testing.HiltAndroidRule
+import dagger.hilt.android.testing.HiltAndroidTest
 import io.ktor.client.engine.mock.MockEngine
 import io.ktor.client.engine.mock.respond
 import io.ktor.http.HttpHeaders
@@ -45,6 +48,7 @@ import java.time.Duration
 import java.time.Instant
 import java.time.ZoneOffset
 import java.util.concurrent.atomic.AtomicInteger
+import javax.inject.Inject
 import kotlin.uuid.Uuid
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -54,9 +58,6 @@ import org.junit.After
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
-import dagger.hilt.android.testing.HiltAndroidRule
-import dagger.hilt.android.testing.HiltAndroidTest
-import javax.inject.Inject
 import org.junit.Before
 import org.junit.Rule
 import org.junit.Test
@@ -108,7 +109,7 @@ class SyncBackgroundTest {
         val vocabulary = VocabularyResolver(VocabularyRoomRepository(database.vocabulary()), api)
         val resolver = PackageSnapshotResolver(vocabulary, database.queueStorage())
         return Synchronization(
-            QueueWorker(database.queueStorage(), QueueHttpTransport(api), vocabulary, resolver, clock),
+            QueueWorker(database.queueStorage(), MedAppCourier(MedAppDoor(api), vocabulary, resolver, clock), clock),
             SnapshotApplier(api, database.snapshotStorage(), vocabulary, resolver, clock),
             QueueBacklogRoomStorage(database.syncOperations()),
             schedule,

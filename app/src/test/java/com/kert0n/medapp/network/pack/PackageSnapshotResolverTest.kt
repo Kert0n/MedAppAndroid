@@ -1,4 +1,4 @@
-package com.kert0n.medapp.queue
+package com.kert0n.medapp.network.pack
 
 import com.kert0n.medapp.domain.medkit.MedKit
 import com.kert0n.medapp.domain.medkit.MedKitRef
@@ -14,12 +14,17 @@ import com.kert0n.medapp.fixture.TABLETS
 import com.kert0n.medapp.fixture.TABLET_FORM
 import com.kert0n.medapp.fixture.medKit
 import com.kert0n.medapp.network.pack.PackageSnapshotNetworkDTO
+import com.kert0n.medapp.network.pack.PackageSnapshotResolver
 import com.kert0n.medapp.network.server.MedAppApi
 import com.kert0n.medapp.network.server.RawResponse
 import com.kert0n.medapp.network.server.medAppHttpClient
 import com.kert0n.medapp.network.server.medAppJson
 import com.kert0n.medapp.network.value.VocabularyResolver
 import com.kert0n.medapp.network.value.VocabularyStore
+import com.kert0n.medapp.queue.QueueStorage
+import com.kert0n.medapp.queue.QueuedCommand
+import com.kert0n.medapp.queue.Receipt
+import com.kert0n.medapp.queue.Settlement
 import com.kert0n.medapp.queue.pack.PackageSnapshot
 import io.ktor.client.engine.mock.MockEngine
 import io.ktor.client.engine.mock.respond
@@ -65,7 +70,7 @@ class PackageSnapshotResolverTest {
         override suspend fun nextDueAt(now: Instant): Instant? = null
         override suspend fun ready(now: Instant) = error("не для этого теста")
         override suspend fun take(id: Uuid, fresh: PackageSnapshot?, at: Instant) = error("не для этого теста")
-        override suspend fun answered(id: Uuid, answer: RawResponse, at: Instant) = error("не для этого теста")
+        override suspend fun answered(id: Uuid, answer: Receipt, at: Instant) = error("не для этого теста")
         override suspend fun defer(id: Uuid, reason: String, at: Instant, notBefore: Instant) = error("не для этого теста")
         override suspend fun settle(id: Uuid, settlement: Settlement, at: Instant) = error("не для этого теста")
         override suspend fun enqueue(queued: QueuedCommand, shelf: kotlin.uuid.Uuid, at: Instant) = error("не для этого теста")

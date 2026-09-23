@@ -5,7 +5,10 @@ import com.kert0n.medapp.domain.medkit.MedKitRef
 import com.kert0n.medapp.domain.value.DosageForm
 import com.kert0n.medapp.domain.value.QuantityUnit
 import com.kert0n.medapp.domain.value.Vocabulary
+import com.kert0n.medapp.network.delivery.CourierDoor
+import com.kert0n.medapp.network.delivery.MedAppCourier
 import com.kert0n.medapp.network.pack.PackageSnapshotNetworkDTO
+import com.kert0n.medapp.network.pack.PackageSnapshotResolver
 import com.kert0n.medapp.network.server.ApiFailure
 import com.kert0n.medapp.network.server.ApiResult
 import com.kert0n.medapp.network.server.MedAppApi
@@ -51,13 +54,13 @@ class SynchronizationTest {
         override suspend fun nextDueAt(now: Instant): Instant? = null
         override suspend fun medKit(id: Uuid): MedKitRef? = null
         override suspend fun take(id: Uuid, fresh: PackageSnapshot?, at: Instant) = error("не для этого теста")
-        override suspend fun answered(id: Uuid, answer: RawResponse, at: Instant) = error("не для этого теста")
+        override suspend fun answered(id: Uuid, answer: Receipt, at: Instant) = error("не для этого теста")
         override suspend fun defer(id: Uuid, reason: String, at: Instant, notBefore: Instant) = error("не для этого теста")
         override suspend fun settle(id: Uuid, settlement: Settlement, at: Instant) = error("не для этого теста")
         override suspend fun enqueue(queued: QueuedCommand, shelf: Uuid, at: Instant) = error("не для этого теста")
     }
 
-    private object NoTransport : QueueTransport {
+    private object NoTransport : CourierDoor {
         override suspend fun send(request: PreparedRequest): ApiResult<RawResponse> = error("не для этого теста")
         override suspend fun packageSnapshot(packageId: Uuid): ApiResult<PackageSnapshotNetworkDTO> = error("не для этого теста")
         override suspend fun medKitIsOurs(medKitId: Uuid): ApiResult<Boolean> = ApiResult.Failure(ApiFailure.Unavailable)
@@ -112,7 +115,7 @@ class SynchronizationTest {
         val storage = EmptyQueue(calls)
         val vocabulary = VocabularyResolver(Store(), api)
         val resolver = PackageSnapshotResolver(vocabulary, storage)
-        val worker = QueueWorker(storage, NoTransport, vocabulary, resolver, clock)
+        val worker = QueueWorker(storage, MedAppCourier(NoTransport, vocabulary, resolver, clock), clock)
         val snapshots = SnapshotApplier(api, Nothing(), vocabulary, resolver, clock)
         return Synchronization(worker, snapshots, backlog, schedule, clock, scope)
     }
@@ -255,7 +258,7 @@ class SynchronizationTest {
         val vocabulary = VocabularyResolver(Store(), api)
         val resolver = PackageSnapshotResolver(vocabulary, storage)
         val failing = Synchronization(
-            QueueWorker(storage, NoTransport, vocabulary, resolver, clock),
+            QueueWorker(storage, MedAppCourier(NoTransport, vocabulary, resolver, clock), clock),
             SnapshotApplier(api, Nothing(), vocabulary, resolver, clock),
             Backlog(null), Schedule(), clock, scope
         )

@@ -1,7 +1,6 @@
 package com.kert0n.medapp.queue
 
 import com.kert0n.medapp.domain.value.Attempts
-import com.kert0n.medapp.network.server.RawResponse
 import com.kert0n.medapp.queue.Settlement.Transition.Close
 import java.time.Instant
 import org.junit.Assert.assertEquals
@@ -20,7 +19,7 @@ import org.junit.Test
 class SyncOperationStateTest {
 
     private val at: Instant = Instant.parse("2027-03-10T12:00:00Z")
-    private val answer = RawResponse(200, "{}")
+    private val answer = Receipt(200, "{}")
 
     /** Состояние в каждом статусе, соблюдающее инварианты; [withRequest] — запрос заморожен. */
     private fun state(status: SyncOperationStatus, withRequest: Boolean = status != SyncOperationStatus.PENDING) = SyncOperationState(

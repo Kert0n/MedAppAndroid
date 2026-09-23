@@ -6,7 +6,7 @@ import androidx.room.Entity
 import androidx.room.Index
 import androidx.room.PrimaryKey
 import com.kert0n.medapp.domain.value.Attempts
-import com.kert0n.medapp.network.server.RawResponse
+import com.kert0n.medapp.queue.Receipt
 import com.kert0n.medapp.queue.RefusalReason
 import com.kert0n.medapp.queue.SyncOperation
 import com.kert0n.medapp.queue.SyncOperationState
@@ -77,7 +77,7 @@ class SyncOperationStorageEntity(
  * сама и строго: противоречие делает её нечитаемой, а не чинит её.
  */
 fun SyncOperationStorageEntity.toState(): SyncOperationState {
-    val answer = answerStatus?.let { RawResponse(it, answerBody.orEmpty()) }
+    val answer = answerStatus?.let { Receipt(it, answerBody.orEmpty()) }
     val undisputed = when {
         // Ответа нет — значит, его и не получали: операция ждёт.
         status == SyncOperationStatus.ANSWERED && answer == null -> SyncOperationStatus.PENDING

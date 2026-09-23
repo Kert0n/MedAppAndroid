@@ -26,7 +26,7 @@ class QueueServiceTest {
         override suspend fun ready(now: Instant): List<StoredSyncOperation> = emptyList()
         override suspend fun medKit(id: Uuid): com.kert0n.medapp.domain.medkit.MedKitRef? = null
         override suspend fun take(id: Uuid, fresh: com.kert0n.medapp.queue.pack.PackageSnapshot?, at: Instant): Take? = null
-        override suspend fun answered(id: Uuid, answer: com.kert0n.medapp.network.server.RawResponse, at: Instant) = Unit
+        override suspend fun answered(id: Uuid, answer: Receipt, at: Instant) = Unit
         override suspend fun defer(id: Uuid, reason: String, at: Instant, notBefore: Instant) = Unit
         override suspend fun settle(id: Uuid, settlement: Settlement, at: Instant) = Unit
         override suspend fun enqueue(queued: QueuedCommand, shelf: kotlin.uuid.Uuid, at: Instant): SyncOperation {

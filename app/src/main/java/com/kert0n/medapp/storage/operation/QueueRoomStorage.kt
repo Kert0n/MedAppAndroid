@@ -7,12 +7,12 @@ import com.kert0n.medapp.domain.medkit.MedKitStatus
 import com.kert0n.medapp.domain.pack.PackageAfter
 import com.kert0n.medapp.domain.value.Quantity
 import com.kert0n.medapp.domain.value.Vocabulary
-import com.kert0n.medapp.network.server.RawResponse
 import com.kert0n.medapp.queue.Delivery
 import com.kert0n.medapp.queue.PackageState
 import com.kert0n.medapp.queue.Preparation
 import com.kert0n.medapp.queue.QueueStorage
 import com.kert0n.medapp.queue.QueuedCommand
+import com.kert0n.medapp.queue.Receipt
 import com.kert0n.medapp.queue.Settlement
 import com.kert0n.medapp.queue.StoredSyncOperation
 import com.kert0n.medapp.queue.SyncOperation
@@ -133,7 +133,7 @@ class QueueRoomStorage @Inject constructor(
         Take.Sending(sending)
     }
 
-    override suspend fun answered(id: Uuid, answer: RawResponse, at: Instant) = database.withTransaction {
+    override suspend fun answered(id: Uuid, answer: Receipt, at: Instant) = database.withTransaction {
         val operation = operationOf(id) ?: return@withTransaction
         val answered = operation.answered(answer, at) ?: return@withTransaction
         save(answered, was = operation.status)

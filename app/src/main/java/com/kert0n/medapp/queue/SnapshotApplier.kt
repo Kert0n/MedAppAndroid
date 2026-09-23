@@ -5,6 +5,7 @@ import com.kert0n.medapp.domain.medkit.InvitationKey
 import com.kert0n.medapp.network.account.asUnavailability
 import com.kert0n.medapp.network.medkit.MedKitNetworkDTO
 import com.kert0n.medapp.network.medkit.MembershipPostNetworkDTO
+import com.kert0n.medapp.network.pack.PackageSnapshotResolver
 import com.kert0n.medapp.network.server.ApiFailure
 import com.kert0n.medapp.network.server.ApiResult
 import com.kert0n.medapp.network.server.MedAppApi

@@ -1,7 +1,6 @@
 package com.kert0n.medapp.queue
 
 import com.kert0n.medapp.domain.medkit.MedKitRef
-import com.kert0n.medapp.network.server.RawResponse
 import com.kert0n.medapp.queue.pack.PackageSnapshot
 import java.time.Instant
 import kotlin.uuid.Uuid
@@ -56,7 +55,7 @@ interface QueueStorage {
      * Записывает ответ сервера до того, как он применён: полученное подтверждение не теряется,
      * даже если применить его сейчас нечем. Операция становится `ANSWERED`.
      */
-    suspend fun answered(id: Uuid, answer: RawResponse, at: Instant)
+    suspend fun answered(id: Uuid, answer: Receipt, at: Instant)
 
     /** Ответ есть, применить его пока нечем — операция остаётся `ANSWERED` до [notBefore], причина названа. */
     suspend fun defer(id: Uuid, reason: String, at: Instant, notBefore: Instant)

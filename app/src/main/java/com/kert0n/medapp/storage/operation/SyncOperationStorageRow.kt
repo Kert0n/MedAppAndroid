@@ -3,10 +3,10 @@ package com.kert0n.medapp.storage.operation
 import androidx.room.Embedded
 import androidx.room.Relation
 import com.kert0n.medapp.domain.value.Vocabulary
-import com.kert0n.medapp.network.server.RawResponse
-import com.kert0n.medapp.queue.SyncOperation
-import com.kert0n.medapp.queue.StoredSyncOperation
 import com.kert0n.medapp.network.value.VocabularyMiss
+import com.kert0n.medapp.queue.Receipt
+import com.kert0n.medapp.queue.StoredSyncOperation
+import com.kert0n.medapp.queue.SyncOperation
 
 /**
  * Операция очереди вместе со своими зависимостями.
@@ -47,7 +47,7 @@ class SyncOperationStorageRow(
                 attempts = com.kert0n.medapp.domain.value.Attempts(operation.attempts),
                 lastError = operation.lastError,
                 lastTriedAt = operation.lastTriedAt,
-                answer = operation.answerStatus?.let { RawResponse(it, operation.answerBody.orEmpty()) },
+                answer = operation.answerStatus?.let { Receipt(it, operation.answerBody.orEmpty()) },
                 notBefore = operation.notBefore,
                 outcomeUnknown = operation.outcomeUnknown,
                 refusalReason = operation.refusalReason

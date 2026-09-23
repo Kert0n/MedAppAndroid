@@ -14,10 +14,10 @@ import com.kert0n.medapp.fixture.medKit
 import com.kert0n.medapp.fixture.medKitRepository
 import com.kert0n.medapp.fixture.queueStorage
 import com.kert0n.medapp.fixture.snapshotStorage
+import com.kert0n.medapp.network.pack.PackageSnapshotResolver
 import com.kert0n.medapp.network.server.MedAppApi
 import com.kert0n.medapp.network.server.medAppHttpClient
 import com.kert0n.medapp.network.value.VocabularyResolver
-import com.kert0n.medapp.queue.PackageSnapshotResolver
 import com.kert0n.medapp.queue.SnapshotApplier
 import com.kert0n.medapp.storage.database.MedAppDatabase
 import com.kert0n.medapp.storage.medkit.toStorageEntity as toMedKitStorageEntity

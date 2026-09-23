@@ -19,7 +19,10 @@ import com.kert0n.medapp.fixture.dose
 import com.kert0n.medapp.fixture.medKit
 import com.kert0n.medapp.fixture.pack
 import com.kert0n.medapp.fixture.tablets
+import com.kert0n.medapp.network.delivery.CourierDoor
+import com.kert0n.medapp.network.delivery.MedAppCourier
 import com.kert0n.medapp.network.pack.PackageSnapshotNetworkDTO
+import com.kert0n.medapp.network.pack.PackageSnapshotResolver
 import com.kert0n.medapp.network.pack.toDomain
 import com.kert0n.medapp.network.server.ApiFailure
 import com.kert0n.medapp.network.server.ApiResult
@@ -164,7 +167,7 @@ class QueueWorkerTest {
         /** Запись ответа бросает: база полна или отказала — сервер при этом уже применил запрос. */
         var answeredFails = false
 
-        override suspend fun answered(id: Uuid, answer: RawResponse, at: Instant) {
+        override suspend fun answered(id: Uuid, answer: Receipt, at: Instant) {
             if (answeredFails) throw IllegalStateException("запись ответа сорвалась")
             val operation = operations.getValue(id)
             operations[id] = operation.with(status = SyncOperationStatus.ANSWERED, answer = answer)
@@ -235,7 +238,7 @@ class QueueWorkerTest {
             prepared: PreparedRequest? = this.prepared,
             attempts: Attempts = this.attempts,
             lastTriedAt: Instant? = this.lastTriedAt,
-            answer: RawResponse? = this.answer,
+            answer: Receipt? = this.answer,
             notBefore: Instant? = this.notBefore,
             dropPrepared: Boolean = false,
             dropAnswer: Boolean = false,
@@ -249,7 +252,7 @@ class QueueWorkerTest {
         )
     }
 
-    private class Transport(private val answer: (PreparedRequest) -> ApiResult<RawResponse>) : QueueTransport {
+    private class Transport(private val answer: (PreparedRequest) -> ApiResult<RawResponse>) : CourierDoor {
         val sent = mutableListOf<PreparedRequest>()
         var snapshots = 0
         var snapshotAnswer: ApiResult<PackageSnapshotNetworkDTO>? = null
@@ -337,8 +340,8 @@ class QueueWorkerTest {
     private fun transport(fresh: PackageSnapshotNetworkDTO = snapshot, answer: (PreparedRequest) -> ApiResult<RawResponse>) =
         Transport(answer).also { it.fresh = ApiResult.Success(fresh) }
 
-    private fun worker(storage: Storage, transport: QueueTransport, online: Boolean = true, clock: Clock = this.clock) =
-        QueueWorker(storage, transport, resolver(online), PackageSnapshotResolver(resolver(online), storage), clock)
+    private fun worker(storage: Storage, transport: CourierDoor, online: Boolean = true, clock: Clock = this.clock) =
+        QueueWorker(storage, MedAppCourier(transport, resolver(online), PackageSnapshotResolver(resolver(online), storage), clock), clock)
 
     /** Снимок, каким его положит хранение: разрешённый, с домашней аптечкой. */
     private fun resolved(dto: PackageSnapshotNetworkDTO): PackageSnapshot =
@@ -1044,7 +1047,7 @@ class QueueWorkerTest {
 
         assertEquals(0, first.settled)
         assertEquals(SyncOperationStatus.ANSWERED, storage.operations.getValue(INTAKE).status)
-        assertEquals(RawResponse(200, newUnit), storage.operations.getValue(INTAKE).answer)
+        assertEquals(Receipt(200, newUnit), storage.operations.getValue(INTAKE).answer)
         assertEquals(1, storage.deferred.size)
         assertTrue(storage.settled.isEmpty())
 
@@ -1124,7 +1127,7 @@ class QueueWorkerTest {
         val storage = Storage(listOf(
             SyncOperation(
                 id = INTAKE, command = consume, sequence = 0, createdAt = EARLIER, payloadVersion = 1, prepared = frozen,
-                status = SyncOperationStatus.ANSWERED, answer = RawResponse(200, snapshotJson)
+                status = SyncOperationStatus.ANSWERED, answer = Receipt(200, snapshotJson)
             )
         ))
         val transport = Transport { error("отправки быть не должно") }
@@ -1195,7 +1198,7 @@ class QueueWorkerTest {
     fun concurrentDrainsSendEachOperationOnce() = runTest {
         val storage = Storage(listOf(operation()))
         val gate = kotlinx.coroutines.CompletableDeferred<Unit>()
-        val transport = object : QueueTransport {
+        val transport = object : CourierDoor {
             val sent = java.util.concurrent.atomic.AtomicInteger()
             override suspend fun send(request: PreparedRequest): ApiResult<RawResponse> {
                 sent.incrementAndGet()

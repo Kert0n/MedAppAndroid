@@ -34,6 +34,7 @@ import com.kert0n.medapp.domain.value.Vocabulary
 import com.kert0n.medapp.network.server.RawResponse
 import com.kert0n.medapp.queue.QueueStorage
 import com.kert0n.medapp.queue.QueuedCommand
+import com.kert0n.medapp.queue.Receipt
 import com.kert0n.medapp.queue.Settlement
 import com.kert0n.medapp.queue.StoredSyncOperation
 import com.kert0n.medapp.queue.SyncCommand
@@ -302,7 +303,7 @@ class FakeQueue : QueueStorage {
     override suspend fun take(id: Uuid, fresh: PackageSnapshot?, at: Instant): Take? =
         error("путь доставки проверяется на очереди, а не на экране")
 
-    override suspend fun answered(id: Uuid, answer: RawResponse, at: Instant): Unit =
+    override suspend fun answered(id: Uuid, answer: Receipt, at: Instant): Unit =
         error("путь доставки проверяется на очереди, а не на экране")
 
     override suspend fun defer(id: Uuid, reason: String, at: Instant, notBefore: Instant): Unit =

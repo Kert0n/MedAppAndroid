@@ -30,11 +30,11 @@ import com.kert0n.medapp.fixture.transactions
 import com.kert0n.medapp.fixture.unplannedIntake
 import com.kert0n.medapp.network.pack.PackageSnapshotNetworkDTO
 import com.kert0n.medapp.network.pack.toDomain
-import com.kert0n.medapp.network.server.RawResponse
 import com.kert0n.medapp.network.server.medAppJson
 import com.kert0n.medapp.queue.Delivery
 import com.kert0n.medapp.queue.PackageState
 import com.kert0n.medapp.queue.QueuedCommand
+import com.kert0n.medapp.queue.Receipt
 import com.kert0n.medapp.queue.RefusalReason
 import com.kert0n.medapp.queue.ResourceVersion
 import com.kert0n.medapp.queue.StoredSyncOperation
@@ -479,12 +479,12 @@ class QueueRoomStorageTest {
         database.syncOperations().enqueue(operation, PackageSyncCommand.Consume(PACK, dose("3"), INTAKE), at)
         storage.take(operation, null, at)
 
-        storage.answered(operation, RawResponse(200, snapshotJson), at.plusSeconds(1))
+        storage.answered(operation, Receipt(200, snapshotJson), at.plusSeconds(1))
         storage.defer(operation, "словарь не знает единицу", at.plusSeconds(2), notBefore = at.plusSeconds(4))
 
         val stored = (requireNotNull(database.syncOperations().find(operation)).toDomain(VOCABULARY) as StoredSyncOperation.Readable).operation
         assertEquals(SyncOperationStatus.ANSWERED, stored.status)
-        assertEquals(RawResponse(200, snapshotJson), stored.answer)
+        assertEquals(Receipt(200, snapshotJson), stored.answer)
         assertEquals(Attempts(1), stored.attempts)
         assertEquals(listOf(operation), storage.ready(at.plusSeconds(600)).map { it.id })
         assertNull(storage.take(operation, null, at.plusSeconds(3)))

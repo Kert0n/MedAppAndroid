@@ -8,7 +8,10 @@ import com.kert0n.medapp.fixture.EARLIER
 import com.kert0n.medapp.fixture.INTAKE
 import com.kert0n.medapp.fixture.PACK
 import com.kert0n.medapp.fixture.dose
+import com.kert0n.medapp.network.delivery.CourierDoor
+import com.kert0n.medapp.network.delivery.MedAppCourier
 import com.kert0n.medapp.network.pack.PackageSnapshotNetworkDTO
+import com.kert0n.medapp.network.pack.PackageSnapshotResolver
 import com.kert0n.medapp.network.server.ApiFailure
 import com.kert0n.medapp.network.server.ApiResult
 import com.kert0n.medapp.network.server.MedAppApi
@@ -70,7 +73,7 @@ class QueueOutboxTest {
         override suspend fun medKit(id: Uuid): MedKitRef? = null
         override suspend fun take(id: Uuid, fresh: PackageSnapshot?, at: Instant): Take? =
             operations[id]?.let { Take.Sending(it) }
-        override suspend fun answered(id: Uuid, answer: RawResponse, at: Instant) = Unit
+        override suspend fun answered(id: Uuid, answer: Receipt, at: Instant) = Unit
         override suspend fun defer(id: Uuid, reason: String, at: Instant, notBefore: Instant) = Unit
         override suspend fun settle(id: Uuid, settlement: Settlement, at: Instant) {
             settled += settlement
@@ -91,7 +94,7 @@ class QueueOutboxTest {
         override suspend fun enqueue(queued: QueuedCommand, shelf: kotlin.uuid.Uuid, at: Instant): SyncOperation = error("не для этого теста")
     }
 
-    private class Transport(private val answer: () -> ApiResult<RawResponse>) : QueueTransport {
+    private class Transport(private val answer: () -> ApiResult<RawResponse>) : CourierDoor {
         var sent = 0
         override suspend fun send(request: PreparedRequest): ApiResult<RawResponse> {
             sent++
@@ -121,7 +124,7 @@ class QueueOutboxTest {
             Store(),
             MedAppApi(medAppHttpClient(MockEngine { throw java.io.IOException("связи нет") }, "https://medapp.test", retryDelay = { delayMillis(false) { 0L } }))
         )
-        return QueueWorker(storage, transport, vocabulary, PackageSnapshotResolver(vocabulary, storage), clock)
+        return QueueWorker(storage, MedAppCourier(transport, vocabulary, PackageSnapshotResolver(vocabulary, storage), clock), clock)
     }
 
     /** Запрос, замороженный раньше: работник шлёт его как есть, чтения перед подготовкой нет. */
@@ -169,14 +172,14 @@ class QueueOutboxTest {
         val gate = kotlinx.coroutines.CompletableDeferred<Unit>()
         storage.operations[INTAKE] = sendingOperation()
         val transport = Transport { ApiResult.Failure(ApiFailure.Unavailable) }
-        val slow = object : QueueTransport by transport {
+        val slow = object : CourierDoor by transport {
             override suspend fun send(request: PreparedRequest): ApiResult<RawResponse> {
                 gate.await()
                 return transport.send(request)
             }
         }
         val vocabulary = VocabularyResolver(Store(), MedAppApi(medAppHttpClient(MockEngine { throw java.io.IOException("связи нет") }, "https://medapp.test", retryDelay = { delayMillis(false) { 0L } })))
-        val worker = QueueWorker(storage, slow, vocabulary, PackageSnapshotResolver(vocabulary, storage), Clock.fixed(now, ZoneOffset.UTC))
+        val worker = QueueWorker(storage, MedAppCourier(slow, vocabulary, PackageSnapshotResolver(vocabulary, storage), Clock.fixed(now, ZoneOffset.UTC)), Clock.fixed(now, ZoneOffset.UTC))
         val outbox = QueueOutbox(worker, storage, Clock.fixed(now, ZoneOffset.UTC), backgroundScope)
         outbox.start()
         runCurrent()
