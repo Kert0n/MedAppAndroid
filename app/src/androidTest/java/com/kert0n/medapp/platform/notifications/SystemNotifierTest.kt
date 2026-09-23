@@ -110,14 +110,32 @@ class SystemNotifierTest {
         val shown = requireNotNull(awaitShown(planned.key.subject)) { "уведомление не показано" }
         assertEquals(NotificationKind.EXPIRY_SOURCE_3D.ordinal, shown.id)
         assertEquals(NotificationChannel.EXPIRY.id, shown.notification.channelId)
-        // Заранее говорится числом дней на день показа: срок 31-го, показ 28-го — три дня.
+        assertTrue(shown.notification.extras.getCharSequence(android.app.Notification.EXTRA_TITLE).toString().contains("Парацетамол"))
+
+        notifier.dismiss(planned.key)
+        assertNull(awaitShown(planned.key.subject, expected = false))
+    }
+
+    /**
+     * «Заранее» говорит, сколько дней осталось **на день показа**: срок 31-го, показ 28-го — три дня.
+     * Считай заголовок по другим часам — человек прочтёт «через 189 дней» о коробке, которая
+     * кончится послезавтра.
+     */
+    @Test
+    fun theNoticeAheadCountsTheDaysLeftOnTheDayItIsShown() = runTest {
+        if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.TIRAMISU) {
+            InstrumentationRegistry.getInstrumentation().uiAutomation
+                .grantRuntimePermission(context.packageName, Manifest.permission.POST_NOTIFICATIONS)
+        }
+
+        assertEquals(com.kert0n.medapp.domain.notification.Delivery.SHOWN, notifier.show(planned))
+
+        val shown = requireNotNull(awaitShown(planned.key.subject)) { "уведомление не показано" }
         assertEquals(
             context.resources.getQuantityString(com.kert0n.medapp.R.plurals.notice_expiry_ahead_title, 3, 3, "Парацетамол"),
             shown.notification.extras.getCharSequence(android.app.Notification.EXTRA_TITLE).toString()
         )
-
         notifier.dismiss(planned.key)
-        assertNull(awaitShown(planned.key.subject, expected = false))
     }
 
     /** Внимание к очереди — карточка на канале `sync`, без данных в цели: очередь одна (H3 №28). */
