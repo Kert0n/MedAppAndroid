@@ -4,6 +4,7 @@ import android.os.Build
 import androidx.room.withTransaction
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import com.kert0n.medapp.domain.course.CourseDraft
+import com.kert0n.medapp.domain.course.Prescription
 import com.kert0n.medapp.domain.intake.TakenDose
 import com.kert0n.medapp.domain.medkit.MedKit
 import com.kert0n.medapp.domain.pack.Claims
@@ -60,7 +61,8 @@ import org.junit.Test
 import org.junit.runner.RunWith
 
 /**
- * Сто полок, тысяча пачек, пятьдесят лечений и год приёмов (PLAN C1 «Число аптечек», REQ-055):
+ * Сто полок, тысяча пачек, пятьдесят лечений — сорок из них на пределе в 10 000 доз, — и год
+ * приёмов (PLAN C1 «Число аптечек», REQ-055):
  * «до ста» — не предел, а масштаб проверки. Чтения экранов, укладка снимка на сто полок, четыре
  * отчёта, сверка обещанного и проход доставки укладываются в эталон времени, записанный в PLAN J1
  * (замер на `BigLatest` 2026-09-14: полки 1 мс, все лекарства 46 мс, снимок 915 мс, отчёты 32–52 мс,
@@ -99,7 +101,11 @@ class HundredMedKitsTest {
 
     private class Seed(val shelves: List<Uuid>, val packages: List<Uuid>, val courses: List<Uuid>)
 
-    /** [shelves] общих полок по [perShelf] коробок, [courses] лечений из первых коробок, [yearsOfIntakes] лечений с годом ежедневных приёмов. */
+    /**
+     * [shelves] общих полок по [perShelf] коробок, [courses] лечений из первых коробок, [yearsOfIntakes]
+     * лечений с годом ежедневных приёмов. Остальные назначены на предел доз: «День», расход вперёд и
+     * сверка читают у лечения своё окно, а не все его пункты.
+     */
     private suspend fun seeded(shelves: Int = 100, perShelf: Int = 10, courses: Int = 50, yearsOfIntakes: Int = 10): Seed {
         val shelfIds = List(shelves) { Uuid.random() }
         val packageIds = mutableListOf<Uuid>()
@@ -127,7 +133,7 @@ class HundredMedKitsTest {
                 courseIds += id
                 val box = pack(id = packageIds[n], medKit = medKit(id = shelfIds[n / perShelf], publication = MedKit.Publication.PUBLISHED).ref, quantity = tablets("40"), form = TABLET_FORM)
                 val withHistory = n < yearsOfIntakes
-                val plan = activeCourse(id = id, schedule = schedule(start = if (withHistory) start else today), totalDoses = if (withHistory) 400 else 20, sources = listOf(source(box, 5)))
+                val plan = activeCourse(id = id, schedule = schedule(start = if (withHistory) start else today), totalDoses = if (withHistory) 400 else Prescription.MAX_TOTAL_DOSES, sources = listOf(source(box, 5)))
                 database.courseRepository().activate(CourseDraft.Activation(plan, courseRecord(id = id, prescription = plan.prescription)))
                 if (withHistory) {
                     for (day in 0 until 365) {
