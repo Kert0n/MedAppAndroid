@@ -282,6 +282,25 @@ class ReminderOutboxTest {
     }
 
     /**
+     * Заход, которого ждал проход перед напоминанием, отменили — первым его позвал экран, и
+     * человек с экрана ушёл. Проход этого не заметит: напоминание говорится с тем, что есть, как и
+     * при заходе, не успевшем за две секунды.
+     *
+     * Красная проверка: проход принимал чужую отмену за свою, бросал её и ничего не показывал; тем
+     * же путём останавливался цикл владельца доставки.
+     */
+    @Test
+    fun aCancelledRoundBeforeTheReminderStillLetsItBeSaid() = runTest {
+        val reminder = intake()
+        scenarios.reminderStore.saveAll(listOf(reminder))
+        scenarios.freshness.meanwhile = { throw kotlinx.coroutines.CancellationException("заход отменил позвавший первым") }
+
+        scenarios.reminderOutbox.pass()
+
+        assertEquals(listOf(reminder.key), scenarios.notifier.shown.map { it.key })
+    }
+
+    /**
      * **Гонка «показ против отмены».** Владелец доставки читает обязательства, идёт за свежестью —
      * это до двух секунд, — и только потом показывает. За это время лечение могли отменить: отмена
      * снимает обязательство своей транзакцией.

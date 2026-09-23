@@ -204,6 +204,101 @@ class SynchronizationTest {
         assertEquals(1, calls.count { it == "снимок" })
     }
 
+    /** Ждать условия по настоящим часам — не дольше пяти секунд: сломанный заход не вешает прогон. */
+    private suspend fun until(what: String, condition: () -> Boolean) {
+        kotlinx.coroutines.withTimeoutOrNull(5_000) { while (!condition()) kotlinx.coroutines.delay(10) }
+            ?: throw AssertionError("не дождались: $what")
+    }
+
+    /**
+     * Заход не принадлежит тому, кто позвал первым. Анна нажала «Обновить» и ушла с экрана — её
+     * ожидание кончилось, а напоминание, вставшее ждать того же захода, получает его итог.
+     *
+     * Красная проверка: первый позвавший вёл заход в своём контексте, его отмена завершала заход
+     * `CancellationException`, и присоединившийся получал её как свою — так останавливался цикл
+     * владельца доставки уведомлений.
+     */
+    @Test
+    fun aCancelledFirstCallerDoesNotCancelThoseWhoJoined() = kotlinx.coroutines.runBlocking {
+        val calls = java.util.Collections.synchronizedList(ArrayList<String>())
+        val gate = CompletableDeferred<Unit>()
+        val scope = kotlinx.coroutines.CoroutineScope(kotlinx.coroutines.SupervisorJob() + kotlinx.coroutines.Dispatchers.Default)
+        val synchronization = synchronization(calls, gate = gate, scope = scope)
+        val screen = kotlinx.coroutines.CoroutineScope(kotlinx.coroutines.Job() + kotlinx.coroutines.Dispatchers.Default)
+
+        try {
+            screen.async { synchronization.synchronize() }
+            until("заход дошёл до снимка") { "снимок" in calls }
+            val reminder = async(start = kotlinx.coroutines.CoroutineStart.UNDISPATCHED) { synchronization.synchronize() }
+            screen.cancel()
+            gate.complete(Unit)
+
+            assertEquals(now, reminder.await().finishedAt)
+        } finally {
+            screen.cancel()
+            scope.cancel()
+        }
+    }
+
+    /**
+     * Заход упал — ждущие получают **сбой**, а не отмену: сбой они умеют пережить, а отмена значила
+     * бы для них «остановили нас самих».
+     */
+    @Test
+    fun aFailedRoundIsAFailureForEveryoneWaiting() = kotlinx.coroutines.runBlocking {
+        val scope = kotlinx.coroutines.CoroutineScope(kotlinx.coroutines.SupervisorJob() + kotlinx.coroutines.Dispatchers.Default)
+        val gate = CompletableDeferred<Unit>()
+        val requests = java.util.concurrent.atomic.AtomicInteger()
+        val api = MedAppApi(medAppHttpClient(MockEngine { requests.incrementAndGet(); gate.await(); error("сервер ответил не по-человечески") }, "https://medapp.test"))
+        val rounds = java.util.Collections.synchronizedList(ArrayList<String>())
+        val storage = EmptyQueue(rounds)
+        val vocabulary = VocabularyResolver(Store(), api)
+        val resolver = PackageSnapshotResolver(vocabulary, storage)
+        val failing = Synchronization(
+            QueueWorker(storage, NoTransport, vocabulary, resolver, clock),
+            SnapshotApplier(api, Nothing(), vocabulary, resolver, clock),
+            Backlog(null), Schedule(), clock, scope
+        )
+
+        try {
+            // Второй присоединяется, пока заход держит ворота: сбой один, и получают его оба.
+            val first = async { kotlin.runCatching { failing.synchronize() }.exceptionOrNull() }
+            until("заход дошёл до сервера") { requests.get() >= 1 }
+            val second = async(start = kotlinx.coroutines.CoroutineStart.UNDISPATCHED) { kotlin.runCatching { failing.synchronize() }.exceptionOrNull() }
+            gate.complete(Unit)
+
+            for (outcome in listOf(first.await(), second.await())) {
+                assertEquals(false, outcome is kotlinx.coroutines.CancellationException)
+                assertEquals("сервер ответил не по-человечески", outcome?.message)
+            }
+            // Заход — один проход очереди; запросов у него больше: чтение клиент повторяет сам.
+            assertEquals("заход был один на обоих", 1, rounds.count { it == "очередь" })
+        } finally {
+            scope.cancel()
+        }
+    }
+
+    /**
+     * Кончилась область приложения — кончился и заход: это единственная отмена, которая его
+     * останавливает, и ждущие получают её как свою остановку.
+     */
+    @Test
+    fun theEndOfTheApplicationScopeStopsTheRound() = kotlinx.coroutines.runBlocking {
+        val calls = java.util.Collections.synchronizedList(ArrayList<String>())
+        val scope = kotlinx.coroutines.CoroutineScope(kotlinx.coroutines.SupervisorJob() + kotlinx.coroutines.Dispatchers.Default)
+        val synchronization = synchronization(calls, gate = CompletableDeferred(), scope = scope)
+
+        try {
+            val waiting = async { kotlin.runCatching { synchronization.synchronize() }.exceptionOrNull() }
+            until("заход дошёл до снимка") { "снимок" in calls }
+            scope.cancel()
+
+            assertEquals(true, waiting.await() is kotlinx.coroutines.CancellationException)
+        } finally {
+            scope.cancel()
+        }
+    }
+
     /** Не прочитали — кэш прежний, и время последнего успешного чтения не сдвигается (PLAN E4). */
     @Test
     fun aRoundThatCouldNotReadKeepsTheLastRefreshTime() = runTest {
