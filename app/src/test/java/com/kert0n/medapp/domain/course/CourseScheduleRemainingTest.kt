@@ -39,18 +39,20 @@ class CourseScheduleRemainingTest {
     }
 
     /**
-     * Черновик с числом доз сверх всякой меры либо не становится лечением, либо лечение по нему
-     * отвечает, сколько осталось, — но расчёт не падает: обеспечение считается на каждое
-     * изменение базы, и упавший расчёт ронял бы приложение при каждом запуске.
+     * Черновик с числом доз сверх всякой меры лечением не становится: начало отказывает причиной, а
+     * не строит курс, чей расчёт остатка разложил бы поштучно миллиарды пунктов. Обеспечение
+     * считается на каждое изменение базы, и такой курс ронял бы приложение при каждом запуске.
      *
      * Красная проверка: черновик на `Int.MAX_VALUE` доз начинался, а `remainingOccurrences`
      * выделял список на всё число и падал `OutOfMemoryError`.
      */
     @Test
-    fun anAbsurdNumberOfDosesDoesNotCrashWhatIsLeft() {
+    fun anAbsurdNumberOfDosesNeverBecomesATreatment() {
         val draft = course(dose = dose("1"), form = TABLET_FORM, schedule = fourTimesADay, totalDoses = Int.MAX_VALUE)
 
-        draft.activate(EARLIER).onSuccess { it.course.remainingOccurrences(CourseProgress.none) }
+        val refused = draft.activate(EARLIER).exceptionOrNull()
+
+        assertEquals(CourseRejected.Reason.TOTAL_DOSES_TOO_MANY, (refused as CourseRejected).reason)
     }
 
     @Test
