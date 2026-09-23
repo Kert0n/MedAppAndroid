@@ -83,7 +83,9 @@ class QueueWorker @Inject constructor(
                 // Словаря не хватило: дочитывается один раз за проход, и строка читается снова.
                 is StoredSyncOperation.Stale -> {
                     if (words.refreshOnce()) continue
-                    drain.skip(entry.id, entry.miss.message.orEmpty())
+                    // Сервер словаря не дал — строка ждёт следующего захода; дал, а её единицы в
+                    // нём нет — ждать нечего, и строка пропущена.
+                    if (words.refreshFailed) drain.hold(entry.id) else drain.skip(entry.id, entry.miss.message.orEmpty())
                     continue
                 }
                 is StoredSyncOperation.Unreadable -> {
@@ -364,6 +366,11 @@ class QueueWorker @Inject constructor(
 
         fun skip(id: Uuid, reason: String) {
             skipped += Report.Skipped(id, reason)
+            skippedIds += id
+        }
+
+        /** Строка ждёт следующего захода: в этом её больше не берут, но и пропущенной она не стала. */
+        fun hold(id: Uuid) {
             skippedIds += id
         }
 

@@ -202,10 +202,24 @@ interface SyncOperationDao {
     )
     suspend fun earliestDueOfUnclosed(): Instant?
 
-    /** То же, кроме названных строк: их заход пропустил, и приходить за ними незачем. */
+    /**
+     * То же, кроме названных строк и всех, что стоят за ними: их заход пропустил, а стоящих за
+     * ними — зависимых и следующих по коробке или полке, как в [ready], — не отправит ни один
+     * заход, пока пропущенную не разберёт человек. Приходить за ними незачем.
+     */
     @Query(
-        "SELECT MIN(COALESCE(not_before, 0)) FROM sync_operations WHERE status IN ('PENDING', 'SENDING', 'ANSWERED') " +
-            "AND id NOT IN (:except)"
+        "WITH RECURSIVE stuck(id, sequence, package_id, med_kit_id) AS (" +
+            "  SELECT id, sequence, package_id, med_kit_id FROM sync_operations WHERE id IN (:except) " +
+            "  UNION " +
+            "  SELECT o.id, o.sequence, o.package_id, o.med_kit_id FROM sync_operations o, stuck s " +
+            "  WHERE o.status IN ('PENDING', 'SENDING', 'ANSWERED') AND (" +
+            "    EXISTS (SELECT 1 FROM sync_operation_dependencies d WHERE d.operation_id = o.id AND d.depends_on_id = s.id) " +
+            "    OR (s.sequence < o.sequence AND (s.package_id = o.package_id " +
+            "      OR (s.med_kit_id = o.med_kit_id AND (o.package_id IS NULL OR s.package_id IS NULL))))" +
+            "  )" +
+            ") " +
+            "SELECT MIN(COALESCE(not_before, 0)) FROM sync_operations WHERE status IN ('PENDING', 'SENDING', 'ANSWERED') " +
+            "AND id NOT IN (SELECT id FROM stuck)"
     )
     suspend fun earliestDueOfUnclosedExcept(except: List<Uuid>): Instant?
 
