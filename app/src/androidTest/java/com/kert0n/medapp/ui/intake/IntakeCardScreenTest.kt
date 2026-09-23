@@ -11,6 +11,7 @@ import com.kert0n.medapp.fixture.TABLETS
 import com.kert0n.medapp.presentation.intake.IntakeCardPresentationDTO
 import com.kert0n.medapp.presentation.intake.IntakeCardUiState
 import com.kert0n.medapp.presentation.intake.IntakeSourcePresentationDTO
+import com.kert0n.medapp.presentation.value.ExpiryDatePresentationDTO
 import com.kert0n.medapp.presentation.value.QuantityPresentationDTO
 import com.kert0n.medapp.presentation.value.toPresentationDTO
 import com.kert0n.medapp.ui.theme.MedAppTheme
@@ -18,6 +19,8 @@ import java.time.LocalDate
 import java.time.LocalTime
 import kotlin.uuid.Uuid
 import org.junit.Assert.assertEquals
+import androidx.test.platform.app.InstrumentationRegistry
+import com.kert0n.medapp.R
 import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
@@ -85,6 +88,22 @@ class IntakeCardScreenTest {
         compose.onNodeWithText("Откуда принять").assertIsDisplayed()
         compose.onAllNodesWithText("Нурофен").assertCountEquals(2)
         compose.onNodeWithText("Принял").performClick()
+        assertEquals(1, confirmed)
+    }
+
+    /**
+     * Выбранная коробка просрочена к дню приёма — карточка говорит это под «Откуда принять»
+     * значком и словами **до** нажатия, а «Принял» остаётся на экране: спросит сценарий, а не
+     * запретит экран (ТЗ 4.1.1.5.5). Узкий экран и крупный шрифт отметку не прячут.
+     */
+    @Test
+    fun anExpiredSourceIsMarkedUnderTheChoiceBeforeThePress() {
+        show(waiting().copy(expired = ExpiryDatePresentationDTO("14.08.2026")))
+        // Слова — из ресурсов: отметку смотрят и на английском крупном экране, где её прятал бы шрифт.
+        val words = InstrumentationRegistry.getInstrumentation().targetContext
+
+        compose.onNodeWithText(words.getString(R.string.pack_expired_on, "14.08.2026")).assertIsDisplayed()
+        compose.onNodeWithText(words.getString(R.string.intake_confirm)).assertIsDisplayed().performClick()
         assertEquals(1, confirmed)
     }
 

@@ -83,16 +83,31 @@ class UnplannedIntakeSheetTest {
     }
 
     /**
-     * Просроченную коробку видно **до** нажатия — срок стоит на листе значком и словами, — а вопрос
-     * после нажатия называет и коробку, и срок, и «всё равно принял» уходит тем же подтверждением
-     * (ТЗ 4.1.1.5.5). Узкий экран и крупный шрифт не прячут ни то, ни другое.
+     * Просроченную коробку видно **до** нажатия: срок стоит на листе значком и словами, когда
+     * вопроса ещё нет, а «Принять» остаётся живым и зовёт сценарий — спросить о сроке его дело
+     * (ТЗ 4.1.1.5.5). Без этого человек узнаёт о просрочке, уже решив принять.
      */
     @Test
-    fun anExpiredBoxShowsItsTermAndTheQuestionNamesIt() {
+    fun anExpiredBoxShowsItsTermBeforeAnyQuestion() {
+        show(taking(expired = ExpiryDatePresentationDTO("14.08.2026")))
+
+        compose.onNodeWithText("Просрочен 14.08.2026").assertIsDisplayed()
+        compose.onNodeWithText("Прежде чем записать").assertDoesNotExist()
+        compose.onNodeWithText("Принять").performClick()
+
+        assertEquals(1, recorded)
+    }
+
+    /**
+     * Вопрос о сроке называет и коробку, и срок, и «всё равно принял» уходит тем же
+     * подтверждением. Узкий экран и крупный шрифт не прячут ни вопрос, ни кнопку. Без этого
+     * человек соглашается, не зная, о какой коробке его спросили.
+     */
+    @Test
+    fun theQuestionAboutAnExpiredBoxNamesTheBoxAndItsTerm() {
         val term = ExpiryDatePresentationDTO("14.08.2026")
         show(taking(expired = term, questions = listOf(IntakeQuestionPresentationDTO.Expired("Нурофен", term))))
 
-        compose.onNodeWithText("Просрочен 14.08.2026").assertIsDisplayed()
         compose.onNodeWithText("• «Нурофен» просрочен: годен до 14.08.2026").assertIsDisplayed()
         compose.onNodeWithText("Всё равно принял").assertIsDisplayed().performClick()
 
