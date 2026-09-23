@@ -2,6 +2,8 @@ package com.kert0n.medapp.app.navigation
 
 import com.kert0n.medapp.domain.pack.ExpiryDate
 import androidx.compose.ui.test.assertIsDisplayed
+import androidx.compose.ui.test.hasClickAction
+import androidx.compose.ui.test.hasText
 import androidx.compose.ui.test.junit4.v2.createAndroidComposeRule
 import androidx.compose.ui.test.onAllNodesWithText
 import androidx.compose.ui.test.onFirst
@@ -174,13 +176,20 @@ class DayOfIntakesStoryTest {
         back()
     }
 
-    /** Вечерний приём Анна пропускает: это решение, и лечение о нём знает. */
+    /**
+     * Вечерний приём Анна открывает карточкой — и срок коробки стоит под «Откуда принять» **до**
+     * того, как она что-то нажала (ТЗ 4.1.1.5.5). Приём она пропускает: это решение, и лечение о
+     * нём знает. Не назови карточка срок заранее — узнала бы о нём, только решив принять.
+     */
     private fun theEveningDoseSheSkips() {
         openTheDay()
-        compose.waitUntil(WAIT) {
-            compose.onAllNodesWithText("Пропустил").fetchSemanticsNodes().isNotEmpty()
-        }
-        compose.onAllNodesWithText("Пропустил").onFirst().performClick()
+        val evening = hasClickAction() and hasText("Цетрин") and hasText("21:00")
+        compose.waitUntil(WAIT) { compose.onAllNodes(evening).fetchSemanticsNodes().isNotEmpty() }
+        compose.onNode(evening).performClick()
+        compose.waitUntil(WAIT) { compose.onAllNodesWithText("Откуда принять").fetchSemanticsNodes().isNotEmpty() }
+        compose.waitUntil(WAIT) { compose.onAllNodesWithText("Просрочен", substring = true).fetchSemanticsNodes().isNotEmpty() }
+        compose.onNodeWithText("Просрочен", substring = true).assertIsDisplayed()
+        compose.onNodeWithText("Пропустил").performClick()
         compose.waitUntil(WAIT) {
             compose.onAllNodesWithText("пропущен").fetchSemanticsNodes().isNotEmpty()
         }

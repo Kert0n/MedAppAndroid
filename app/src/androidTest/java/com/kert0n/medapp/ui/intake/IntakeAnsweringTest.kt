@@ -105,6 +105,7 @@ class IntakeAnsweringTest {
         clock = clock,
         courses = database.courseRepository(),
         intakes = database.intakeRepository(),
+        packages = database.packageRepository(),
         intakeId = intakeId
     ).also { opened += it }
 
@@ -229,6 +230,35 @@ class IntakeAnsweringTest {
         }
 
         assertEquals(IntakeStatus.TAKEN, database.intakeRepository().find(intakeId)?.status)
+    }
+
+    /**
+     * Срок выбранной коробки карточка называет **до** «Принял», а не только вопросом после него
+     * (ТЗ 4.1.1.5.5, решение владельца 2026-09-23): просрочена она к дню, которым человек пишет
+     * приём, — назови он день до конца срока, отметки нет. У коробки в сроке отметки нет вовсе.
+     * Без этого человек узнаёт о просрочке, уже решив принять.
+     */
+    @Test
+    fun theCardNamesAnExpiredBoxBeforeThePressAndJudgesByTheTypedDay(): Unit = runBlocking {
+        val courseId = started(expiresOn = LocalDate.of(2027, 3, 5))
+        val model = cardModel(firstIntake(courseId).id)
+
+        watching(model.state) { state ->
+            val shown = state.awaiting(PATIENTLY) { it.unit != null && it.expired != null }
+            model.edit(shown.form.copy(on = LocalDate.of(2027, 3, 4)))
+            state.awaiting(PATIENTLY) { it.form.on == LocalDate.of(2027, 3, 4) && it.expired == null }
+        }
+    }
+
+    @Test
+    fun aBoxWithinItsTermCarriesNoMark(): Unit = runBlocking {
+        val courseId = started(expiresOn = LocalDate.of(2027, 6, 1))
+        val model = cardModel(firstIntake(courseId).id)
+
+        watching(model.state) { state ->
+            val shown = state.awaiting(PATIENTLY) { it.unit != null && !it.isLoading }
+            assertEquals(null, shown.expired)
+        }
     }
 
     /**
