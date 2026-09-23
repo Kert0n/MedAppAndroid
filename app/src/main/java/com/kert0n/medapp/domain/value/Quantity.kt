@@ -2,7 +2,10 @@ package com.kert0n.medapp.domain.value
 
 import java.math.BigDecimal
 
-/** Потолок числа доз: расписание такого размера отвергается задолго до этого (PLAN H1). */
+/**
+ * Потолок ответа [Quantity.dosesIn]: число доз — `Int`, а в огромной пачке целых доз бывает больше.
+ * Сколько доз назначают, ограничивает назначение (`Prescription.MAX_TOTAL_DOSES`), а не этот предел.
+ */
 private val MAX_DOSES = BigDecimal(Int.MAX_VALUE)
 
 /**

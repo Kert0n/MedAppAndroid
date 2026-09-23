@@ -19,9 +19,11 @@ data class PackageQuery(
     /**
      * Текст поиска в том виде, в каком его сравнивает база. Приведение к нижнему регистру
      * делает Kotlin: `lower()` и `COLLATE NOCASE` в SQLite знают только латиницу, и
-     * «парацетамол» не нашёл бы «Парацетамол».
+     * «парацетамол» не нашёл бы «Парацетамол». «Ё» сводится к «е» — названия пишут то так, то
+     * так, — а `\`, `%` и `_` экранируются: набранное ищется буквально, а не шаблоном `LIKE`.
      */
-    val searchText: String = text.trim().lowercase()
+    val searchText: String = text.trim().lowercase().replace('ё', 'е')
+        .replace("\\", "\\\\").replace("%", "\\%").replace("_", "\\_")
 
     sealed interface Filter {
         data object Expired : Filter

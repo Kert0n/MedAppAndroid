@@ -115,10 +115,12 @@ class Course(
     /**
      * Число доз правится и после начала: пропуски растянули лечение, или врач сократил его.
      * Редакция растёт — меняется состав будущих пунктов; снимок назначения в записи эпизода
-     * переписывает та же транзакция (PLAN F5). Ноль доз — не лечение: отказ, а не исключение.
+     * переписывает та же транзакция (PLAN F5). Ноль доз — не лечение, сверх [Prescription.MAX_TOTAL_DOSES]
+     * — не назначают: отказ, а не исключение.
      */
     fun setTotalDoses(totalDoses: Doses, at: Instant): Result<Course> {
         if (totalDoses.isNone) return rejected(CourseRejected.Reason.TOTAL_DOSES_MISSING)
+        if (!Prescription.allows(totalDoses)) return rejected(CourseRejected.Reason.TOTAL_DOSES_TOO_MANY)
         if (totalDoses == this.totalDoses) return Result.success(this)
         return Result.success(
             changed(prescription = prescription.withTotalDoses(totalDoses), revision = revision.next(), updatedAt = at)

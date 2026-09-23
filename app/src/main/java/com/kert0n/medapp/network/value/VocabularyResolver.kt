@@ -52,6 +52,9 @@ class VocabularyResolver @Inject constructor(
 
         private var refreshed: ApiResult<Vocabulary>? = null
 
+        /** Дочитать словарь в этом заходе не удалось: промах ждёт следующего захода, а не человека. */
+        val refreshFailed: Boolean get() = refreshed is ApiResult.Failure
+
         /** Дочитать словарь, если в этом заходе ещё не дочитывали; `true` — дочитан сейчас и успешно. */
         suspend fun refreshOnce(): Boolean {
             if (refreshed != null) return false

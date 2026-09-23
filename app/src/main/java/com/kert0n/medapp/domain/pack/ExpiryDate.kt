@@ -2,6 +2,7 @@ package com.kert0n.medapp.domain.pack
 
 import java.time.LocalDate
 import java.time.YearMonth
+import java.time.temporal.ChronoUnit
 
 /**
  * Срок годности — последний день, когда пачка ещё годна. `null` вместо него значит «срока не
@@ -23,16 +24,21 @@ value class ExpiryDate(val lastDay: LocalDate) {
         return !lastDay.isAfter(date.plusDays(days))
     }
 
+    /** Сколько календарных дней до последнего дня годности, считая от [date]; просроченной — меньше нуля. */
+    fun daysLeftOn(date: LocalDate): Long = ChronoUnit.DAYS.between(date, lastDay)
+
     /**
-     * Какой этап предупреждения о годности наступает в день [date] (PLAN D8): за три дня, за день,
-     * в последний день годности. По **календарным датам**, а не через `72h`: переход на летнее
-     * время день не сдвигает. Просроченной этапов нет — у неё статус, а не предупреждение; и
-     * поздно подключённая коробка получает только этап сегодняшнего дня, а не залп прошедших.
+     * Какой этап предупреждения о годности идёт в день [date] (PLAN D8): заранее — когда осталось
+     * три или два дня, за день, в последний день годности. Этап — **окно**, а не точный день:
+     * сверка могла опоздать (телефон выключен, задача сдвинута), коробку могли подключить позже, и
+     * предупреждение заранее не пропадает вместе с пропущенным днём. Этап при этом один — текущий:
+     * залпа прошедших нет. По **календарным датам**, а не через `72h`: переход на летнее время день не
+     * сдвигает. Просроченной этапов нет — у неё статус, а не предупреждение.
      */
-    fun stageOn(date: LocalDate): Stage? = when (date) {
-        lastDay.minusDays(3) -> Stage.SOURCE_3D
-        lastDay.minusDays(1) -> Stage.SOURCE_1D
-        lastDay -> Stage.TODAY
+    fun stageOn(date: LocalDate): Stage? = when (daysLeftOn(date)) {
+        0L -> Stage.TODAY
+        1L -> Stage.SOURCE_1D
+        2L, 3L -> Stage.SOURCE_3D
         else -> null
     }
 

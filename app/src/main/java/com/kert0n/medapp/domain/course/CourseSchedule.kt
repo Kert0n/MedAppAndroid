@@ -117,7 +117,9 @@ class CourseSchedule(
         require(count >= 0) { "число пунктов не бывает отрицательным: $count" }
         if (count == 0) return emptyList()
         val taken = except.mapTo(HashSet()) { it.slot }
-        val found = ArrayList<ScheduledOccurrence>(count)
+        // Без заранее выделенного места: сколько пунктов просят, решает вызывающий, и вперёд под
+        // это число память не занимается.
+        val found = ArrayList<ScheduledOccurrence>()
         // Сутки запаса назад: момент зависит от перехода часов, отбор идёт по моменту.
         var date = maxOf(start, from.atZone(zone).toLocalDate().minusDays(1))
         while (found.size < count) {

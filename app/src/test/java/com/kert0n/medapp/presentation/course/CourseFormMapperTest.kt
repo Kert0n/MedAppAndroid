@@ -1,6 +1,8 @@
 package com.kert0n.medapp.presentation.course
 
 import com.kert0n.medapp.domain.course.CourseRecord
+import com.kert0n.medapp.domain.course.CourseRejected
+import com.kert0n.medapp.domain.course.Prescription
 import com.kert0n.medapp.domain.course.CourseSchedule
 import com.kert0n.medapp.domain.value.Doses
 import com.kert0n.medapp.fixture.MILLILITRES
@@ -177,12 +179,39 @@ class CourseFormMapperTest {
         assertEquals(null, blank.value.totalDoses)
     }
 
+    /**
+     * Сверх того, что назначают, форма отвечает на наборе тем же отказом, каким ответил бы домен, —
+     * и конца для такого числа не показывает: лечения такого не будет.
+     */
+    @Test
+    fun moreDosesThanAPrescriptionAllowsIsTheDomainRefusalAlready() {
+        val over = (Prescription.MAX_TOTAL_DOSES + 1).toString()
+        assertEquals(
+            ParsedInput.Rejected(CourseFormError.Rejected(CourseRejected.Reason.TOTAL_DOSES_TOO_MANY)),
+            full().copy(totalDoses = over).parsed(VOCABULARY)
+        )
+        assertEquals(CourseFormError.Field.TOTAL_DOSES, CourseFormError.Rejected(CourseRejected.Reason.TOTAL_DOSES_TOO_MANY).field)
+        assertEquals(null, full().copy(totalDoses = over).expectedEnd())
+    }
+
     /** «Дата конца» читается, а не вводится: семь приёмов по два в день с понедельника кончаются в четверг. */
     @Test
     fun theExpectedEndIsReadFromTheScheduleAndTheCount() {
         assertEquals(LocalDate.of(2027, 3, 4), full().expectedEnd())
         assertEquals(null, full().copy(totalDoses = "").expectedEnd())
         assertEquals(null, full().copy(days = emptySet()).expectedEnd())
+    }
+
+    /**
+     * Ожидаемый конец считается на каждую набранную цифру — и на любое число, которое человек
+     * успел набрать или вставить: ответ или его отсутствие, но не падение приложения (ТЗ 4.3).
+     *
+     * Красная проверка: `CourseSchedule.next` заранее выделял список на всё число доз, и
+     * 2147483647 ронял форму `OutOfMemoryError` прямо при наборе.
+     */
+    @Test
+    fun anAbsurdNumberOfDosesDoesNotCrashTheExpectedEnd() {
+        full().copy(totalDoses = Int.MAX_VALUE.toString()).expectedEnd()
     }
 
     /**
