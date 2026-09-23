@@ -1,5 +1,6 @@
 package com.kert0n.medapp.ui.intake
 
+import com.kert0n.medapp.ui.pack.Marker
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.setValue
 import androidx.compose.foundation.layout.Column
@@ -132,6 +133,13 @@ private fun Card(
                 onPick = { onEdit(state.form.copy(packageId = it.id)) },
                 emptyText = stringResource(R.string.intake_no_sources)
             )
+            state.expired?.let {
+                Marker(
+                    icon = R.drawable.ic_expired,
+                    text = stringResource(R.string.pack_expired_on, it.text),
+                    color = MaterialTheme.colorScheme.error
+                )
+            }
         } else {
             state.packageName?.let { Text(stringResource(R.string.intake_from_package, it)) }
         }

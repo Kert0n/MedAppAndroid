@@ -39,6 +39,8 @@ data class IntakeCardUiState(
     val packageId: Uuid? = null,
     val packageName: String? = null,
     val sources: List<IntakeSourcePresentationDTO> = emptyList(),
+    /** Срок выбранной коробки, если к дню приёма она просрочена. */
+    val expired: ExpiryDatePresentationDTO? = null,
     val plannedAmount: QuantityPresentationDTO? = null,
     val unit: UnitPresentationDTO? = null,
     val form: IntakeCardPresentationDTO = IntakeCardPresentationDTO(),
