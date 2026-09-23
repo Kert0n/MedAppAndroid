@@ -122,7 +122,7 @@ class CourseMedicineTest {
     fun activationRequiresScheduleDoseFormTotalAndSource() {
         val bare = course()
         assertEquals(CourseRejected.Reason.SCHEDULE_MISSING, bare.activate(LATER).rejection())
-        val scheduled = bare.setSchedule(schedule(), LATER)
+        val scheduled = bare.setSchedule(schedule(), LATER).getOrThrow()
         assertEquals(CourseRejected.Reason.DOSE_MISSING, scheduled.activate(LATER).rejection())
         val dosed = scheduled.setDose(dose("2"), LATER).getOrThrow()
         assertEquals(CourseRejected.Reason.FORM_MISSING, dosed.activate(LATER).rejection())

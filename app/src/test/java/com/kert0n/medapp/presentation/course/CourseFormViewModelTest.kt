@@ -1,5 +1,7 @@
 package com.kert0n.medapp.presentation.course
 
+import com.kert0n.medapp.fixture.QuietClock
+import com.kert0n.medapp.feature.time.Today
 import com.kert0n.medapp.domain.course.Revision
 import com.kert0n.medapp.feature.course.CourseActivation
 import com.kert0n.medapp.feature.course.CourseAmendment
@@ -74,6 +76,7 @@ class CourseFormViewModelTest {
             renaming = CourseRenaming(courses, transactions),
             courses = courses,
             vocabulary = FakeVocabulary(),
+            today = Today(clock, QuietClock),
             courseId = courseId
         )
 

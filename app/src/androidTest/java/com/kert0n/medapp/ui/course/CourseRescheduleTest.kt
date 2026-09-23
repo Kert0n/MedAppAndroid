@@ -1,5 +1,8 @@
 package com.kert0n.medapp.ui.course
 
+import java.time.Clock
+import com.kert0n.medapp.fixture.QuietClock
+import com.kert0n.medapp.feature.time.Today
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import androidx.test.ext.junit.runners.AndroidJUnit4
@@ -90,6 +93,7 @@ class CourseRescheduleTest {
             renaming = scenarios.courseRenaming,
             courses = database.courseRepository(),
             vocabulary = FakeVocabulary(),
+            today = Today(Clock.fixed(scenarios.now, scenarios.zone), QuietClock),
             courseId = courseId
         ).also { opened += it }
     }

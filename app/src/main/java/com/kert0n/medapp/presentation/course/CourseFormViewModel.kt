@@ -9,6 +9,7 @@ import com.kert0n.medapp.feature.course.CourseActivation
 import com.kert0n.medapp.feature.course.CourseAmendment
 import com.kert0n.medapp.feature.course.CourseDrafting
 import com.kert0n.medapp.feature.course.CourseRenaming
+import com.kert0n.medapp.feature.time.Today
 import com.kert0n.medapp.presentation.ParsedInput
 import com.kert0n.medapp.presentation.value.FormPresentationDTO
 import com.kert0n.medapp.presentation.value.UnitPresentationDTO
@@ -48,6 +49,7 @@ class CourseFormViewModel @AssistedInject constructor(
     private val renaming: CourseRenaming,
     private val courses: CourseStorageRepository,
     private val vocabulary: VocabularyStorageRepository,
+    private val today: Today,
     @Assisted private val courseId: Uuid?
 ) : ViewModel() {
 
@@ -61,17 +63,26 @@ class CourseFormViewModel @AssistedInject constructor(
         else CourseFormUiState.Loading
     )
 
-    /** Из чего человек выбирает: словарь. Приходит к форме, а не в неё — редактор её не пишет. */
+    /**
+     * Из чего человек выбирает: словарь и дни, с которых можно начать. Приходит к форме, а не в
+     * неё — редактор её не пишет.
+     */
     val state: StateFlow<CourseFormUiState> = combine(
         editing,
         vocabulary.observeUnits(),
-        vocabulary.observeForms()
-    ) { state, units, forms ->
+        vocabulary.observeForms(),
+        today.observe()
+    ) { state, units, forms, day ->
         if (state is CourseFormUiState.Editing) {
             val known = units.map { it.toPresentationDTO() }
             // Единицу подсказывает форма выпуска — и при выборе формы, и здесь: у записанного
             // черновика её негде хранить, пока нет числа, а открывается он с готовой формой.
-            state.copy(form = state.form.suggestingUnit(known), units = known, forms = forms.map { it.toPresentationDTO() })
+            state.copy(
+                form = state.form.suggestingUnit(known),
+                units = known,
+                forms = forms.map { it.toPresentationDTO() },
+                today = day.date
+            )
         } else state
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), editing.value)
 
@@ -396,6 +407,11 @@ sealed interface CourseFormUiState {
         val record: CourseRecordProjection? = null,
         val units: List<UnitPresentationDTO> = emptyList(),
         val forms: List<FormPresentationDTO> = emptyList(),
+        /**
+         * Сегодня: раньше него лечение не начинают. Отказывает домен, а календарь прошедших дней
+         * не предлагает, чтобы человек не выбирал дату, которую отвергнут.
+         */
+        val today: LocalDate? = null,
         /** Когда ожидается последний приём по тому, что набрано; нечего считать — `null`. */
         val expectedEnd: LocalDate? = null,
         val error: CourseFormError? = null,

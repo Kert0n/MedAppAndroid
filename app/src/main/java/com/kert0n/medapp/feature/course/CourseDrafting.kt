@@ -56,7 +56,7 @@ class CourseDrafting @Inject constructor(
                 is Edit.Rename -> edited.rename(edit.title, edit.note, now)
                 is Edit.SetDose -> edited.setDose(edit.dose, now).getOrElse { return@run rejected(it) }
                 is Edit.SetForm -> edited.setForm(edit.form, now).getOrElse { return@run rejected(it) }
-                is Edit.SetSchedule -> edited.setSchedule(edit.schedule, now)
+                is Edit.SetSchedule -> edited.setSchedule(edit.schedule, now).getOrElse { return@run rejected(it) }
                 is Edit.SetTotalDoses -> edited.setTotalDoses(edit.totalDoses, now)
                 is Edit.Attach -> {
                     // Источник — только коробка, которая у человека есть и которой можно пользоваться.

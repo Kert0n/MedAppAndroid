@@ -14,6 +14,7 @@ import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.AssistChip
 import androidx.compose.material3.Button
+import androidx.compose.material3.DatePickerDefaults
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FilledTonalButton
 import androidx.compose.material3.FilterChip
@@ -51,6 +52,7 @@ import com.kert0n.medapp.presentation.course.CourseFormUiState
 import com.kert0n.medapp.presentation.course.suggestingUnit
 import com.kert0n.medapp.presentation.course.withForm
 import com.kert0n.medapp.ui.DateField
+import com.kert0n.medapp.ui.daysFrom
 import com.kert0n.medapp.ui.Form
 import com.kert0n.medapp.ui.ErrorMessage
 import com.kert0n.medapp.ui.LoadingState
@@ -136,7 +138,7 @@ fun CourseFormScreen(
     BackHandler(enabled = editing?.mode == CourseFormUiState.Mode.UNASKED_DRAFT, onBack = onBack)
 }
 
-@OptIn(ExperimentalLayoutApi::class)
+@OptIn(ExperimentalMaterial3Api::class, ExperimentalLayoutApi::class)
 @Composable
 private fun Fields(
     state: CourseFormUiState.Editing,
@@ -233,7 +235,9 @@ private fun Fields(
         DateField(
             label = stringResource(R.string.course_start),
             value = form.start,
-            onPick = { onEdit(form.copy(start = it)) }
+            onPick = { onEdit(form.copy(start = it)) },
+            isError = field == CourseFormError.Field.START,
+            selectable = state.today?.let(::daysFrom) ?: DatePickerDefaults.AllDates
         )
         Text(stringResource(R.string.course_days), style = MaterialTheme.typography.labelLarge)
         FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
