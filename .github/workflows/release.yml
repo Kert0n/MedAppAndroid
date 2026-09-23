@@ -63,19 +63,26 @@ jobs:
             sha=$(git rev-parse HEAD)
             labels=$(gh api "repos/$GITHUB_REPOSITORY/commits/$sha/pulls" --jq '[.[].labels[].name] | join(",")')
             previous=$(gh release list --limit 1 --exclude-drafts --exclude-pre-releases --json tagName --jq '.[0].tagName // empty')
-            # Из чего собирается APK. Проверки (test, androidTest, sharedTest), схемы Room, документы,
-            # скрипты и CI в него не попадают.
-            built="app/src/main app/build.gradle.kts app/proguard-rules.pro build.gradle.kts settings.gradle.kts gradle.properties gradle"
+            # Что заведомо не попадает в release-APK: проверки, debug-набор, схемы Room, документы,
+            # CI, скрипты и прочее окружение. Всё остальное считается приложением — и новый набор
+            # исходников (скажем, `app/src/release`) тоже, пока его не назовут здесь: ошибиться
+            # можно только лишним релизом, а не пропущенным.
+            outside=(
+              ':(exclude)app/src/test' ':(exclude)app/src/androidTest' ':(exclude)app/src/sharedTest'
+              ':(exclude)app/src/debug' ':(exclude)app/schemas'
+              ':(exclude)docs' ':(exclude).github' ':(exclude)scripts' ':(exclude)art' ':(exclude)releases'
+              ':(exclude)*.md' ':(exclude)package.json' ':(exclude)package-lock.json' ':(exclude).coderabbit.yaml' ':(exclude).gitignore'
+            )
             if [[ ",$labels," == *",release: skip,"* ]]; then
               publish=false
               reason="метка «release: skip» на PR"
             elif [ -z "$previous" ]; then
               reason="прежних релизов нет"
-            elif git diff --quiet "$previous" "$sha" -- $built; then
+            elif git diff --quiet "$previous" "$sha" -- . "${outside[@]}"; then
               publish=false
-              reason="с $previous не изменилось ничего, из чего собирается приложение"
+              reason="с $previous менялись только проверки, документы и окружение"
             else
-              reason="с $previous изменилось: $(git diff --name-only "$previous" "$sha" -- $built | head -5 | paste -sd ',' -)"
+              reason="с $previous изменилось: $(git diff --name-only "$previous" "$sha" -- . "${outside[@]}" | head -5 | paste -sd ',' -)"
             fi
           fi
           echo "publish=$publish" >> "$GITHUB_OUTPUT"
