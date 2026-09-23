@@ -93,7 +93,8 @@ class Synchronization @Inject constructor(
             val queue = worker.drain()
             val snapshot = snapshots.refresh()
             val now = clock.instant()
-            val left = backlog.dueAt(now)?.let { maxOf(it, now) }
+            // Пропущенные заходом строки — нечитаемые — ожиданием не доставить: за ними не приходят.
+            val left = backlog.dueAt(now, except = queue.skipped.mapTo(HashSet()) { it.id })?.let { maxOf(it, now) }
             left?.let(schedule::comeBackFor)
             val round = Round(queue, snapshot, backlogDueAt = left, finishedAt = now)
             _state.update {

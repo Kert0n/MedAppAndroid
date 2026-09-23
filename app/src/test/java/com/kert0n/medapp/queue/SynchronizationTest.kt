@@ -74,7 +74,7 @@ class SynchronizationTest {
     }
 
     private class Backlog(var due: Instant?) : QueueBacklog {
-        override suspend fun dueAt(now: Instant): Instant? = due
+        override suspend fun dueAt(now: Instant, except: Set<Uuid>): Instant? = due
     }
 
     private class Schedule : SyncSchedule {
