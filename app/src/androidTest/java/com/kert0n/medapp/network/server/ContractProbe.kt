@@ -262,6 +262,51 @@ class ContractProbe {
         assertNull(success(owner.packageSnapshot(packageId)).claims.mine)
     }
 
+    /**
+     * Бронь — заявка, а не замок: сервер принимает бронь больше свободного и даже больше самого
+     * остатка. Не планировать чужое — правило клиента (`NeighboursClaimsTest`). Начни сервер
+     * отказывать бронью — очередь получит отказ, которого клиент по брони не ждёт, и эта проба
+     * скажет об этом первой.
+     */
+    @Test
+    fun aClaimMayExceedWhatIsFreeAndEvenTheStock() = runBlocking {
+        val kit = newKit()
+        val pack = newPackage(kit, amount = "10").pack
+        success(guest.joinMedKit(MembershipPostNetworkDTO(success(owner.createInvitation(kit)).key)))
+
+        // Гость заявил восемь из десяти: владельцу свободно два.
+        success(guest.createClaim(ClaimPostNetworkDTO(pack.id, "8", success(guest.packageSnapshot(pack.id)).claims.version)))
+        // Пять — больше свободного: принято.
+        success(owner.createClaim(ClaimPostNetworkDTO(pack.id, "5", success(owner.packageSnapshot(pack.id)).claims.version)))
+        // Двадцать — больше самого остатка: тоже принято, сумма броней обгоняет коробку.
+        success(owner.patchClaim(pack.id, ClaimPatchNetworkDTO("20", success(owner.packageSnapshot(pack.id)).claims.version)))
+
+        assertEquals(0, BigDecimal("28").compareTo(BigDecimal(success(owner.packageSnapshot(pack.id)).claims.total)))
+    }
+
+    /**
+     * Расход ограничен только остатком: из чужой брони сервер списывает, а отказывает (`400` →
+     * `INSUFFICIENT`) лишь тогда, когда берут больше, чем лежит. Спрашивать перед приёмом из
+     * занятого — дело клиента (`UnplannedIntakeRecordingTest`). Начни сервер отказывать расходу из
+     * чужой брони — приём, который человек подтвердил, стал бы отказом, которого экран не объясняет.
+     */
+    @Test
+    fun consumptionIsBoundedByTheStockNotByOthersClaims() = runBlocking {
+        val kit = newKit()
+        val pack = newPackage(kit, amount = "10").pack
+        success(guest.joinMedKit(MembershipPostNetworkDTO(success(owner.createInvitation(kit)).key)))
+        success(guest.createClaim(ClaimPostNetworkDTO(pack.id, "8", success(guest.packageSnapshot(pack.id)).claims.version)))
+        val claimed = success(owner.packageSnapshot(pack.id))
+
+        // Шесть из десяти, хотя восемь заявил гость: расход из чужой брони принят.
+        val left = requireNotNull(
+            success(owner.synchronise(pack.id, Uuid.random(), PackageSyncNetworkDTO("6", claimed.pack.version)))
+        ) { "после частичного расхода пачка остаётся" }.pack
+        assertEquals("4.000000", left.amount)
+        // Больше остатка — единственный отказ: пятью таблетками из четырёх не распорядишься.
+        assertTrue(failure(owner.synchronise(pack.id, Uuid.random(), PackageSyncNetworkDTO("5", left.version))) is ApiFailure.Invalid)
+    }
+
     @Test
     fun consumptionAnswersWithTheSnapshotUntilThePackageIsGone() = runBlocking {
         val pack = newPackage(newKit(), amount = "10").pack

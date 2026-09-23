@@ -22,6 +22,7 @@ import com.kert0n.medapp.domain.value.DosageForm
 import com.kert0n.medapp.domain.value.Quantity
 import com.kert0n.medapp.domain.value.QuantityUnit
 import com.kert0n.medapp.fixture.ProbeAccounts
+import com.kert0n.medapp.fixture.removeFromProd
 import com.kert0n.medapp.fixture.TABLET_FORM
 import com.kert0n.medapp.fixture.medKit
 import com.kert0n.medapp.fixture.pack
@@ -118,9 +119,7 @@ class SharedShelfStoryTest {
     @After
     fun tearDown() = runBlocking {
         if (ProbeAccounts.skipReason != null) return@runBlocking
-        ProbeAccounts.anna?.deleteMedKit(shelf.id)
-        ProbeAccounts.boris?.deleteMedKit(shelf.id)
-        Unit
+        removeFromProd(listOf(shelf.id), listOfNotNull(ProbeAccounts.anna, ProbeAccounts.boris))
     }
 
     /**

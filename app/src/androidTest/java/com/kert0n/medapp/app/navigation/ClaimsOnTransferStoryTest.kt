@@ -24,6 +24,7 @@ import com.kert0n.medapp.domain.value.Quantity
 import com.kert0n.medapp.domain.value.QuantityUnit
 import com.kert0n.medapp.feature.course.CourseDrafting
 import com.kert0n.medapp.fixture.ProbeAccounts
+import com.kert0n.medapp.fixture.removeFromProd
 import com.kert0n.medapp.fixture.Scenarios
 import com.kert0n.medapp.fixture.courseRepository
 import com.kert0n.medapp.fixture.dose
@@ -177,11 +178,8 @@ class ClaimsOnTransferStoryTest {
     @After
     fun tearDown() = runBlocking {
         if (ProbeAccounts.thirdSkipReason != null) return@runBlocking
-        for (api in listOfNotNull(ProbeAccounts.anna, ProbeAccounts.boris, ProbeAccounts.viktor)) {
-            api.deleteMedKit(summer.id)
-            api.deleteMedKit(city.id)
-        }
-        Unit
+        val everyone = listOfNotNull(ProbeAccounts.anna, ProbeAccounts.boris, ProbeAccounts.viktor)
+        removeFromProd(listOf(summer.id, city.id), everyone)
     }
 
     /**
