@@ -1,5 +1,11 @@
 package com.kert0n.medapp.storage.server
 
+import org.junit.Assert.assertNotNull
+import java.math.BigDecimal
+import com.kert0n.medapp.domain.value.QuantityUnit
+import com.kert0n.medapp.domain.value.Quantity
+import com.kert0n.medapp.fixture.dose
+import com.kert0n.medapp.fixture.INTAKE
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import com.kert0n.medapp.domain.medkit.MedKit
 import com.kert0n.medapp.fixture.FakeServer
@@ -79,5 +85,61 @@ class UnreadableBacklogTest {
         assertEquals(listOf(row), round.queue.skipped.map { it.id })
         assertNull(round.backlogDueAt)
         assertEquals(emptyList<Instant>(), schedule.comeBacks)
+    }
+
+    /**
+     * Строки, стоящие **за** нечитаемой, — её зависимые и следующие команды той же коробки, — тоже
+     * ждут человека: пока он её не разберёт, их не отправит ни один заход. Приходить за ними
+     * планировщику незачем так же, как за ней самой.
+     *
+     * Красная проверка: из остатка вычиталась только сама пропущенная строка, а следующая по
+     * коробке оставалась «к сроку» — и заход за остатком ставился каждым заходом.
+     */
+    @Test
+    fun rowsWaitingBehindAnUnreadableOneAskTheSchedulerForNothing() = runBlocking {
+        unreadable()
+        val next = Uuid.random()
+        val dependent = Uuid.random()
+        database.syncOperations().enqueue(next, PackageSyncCommand.ReleaseClaim(PACK), at)
+        database.syncOperations().enqueue(dependent, PackageSyncCommand.ReleaseClaim(Uuid.random()), at, dependsOn = setOf(row))
+        val schedule = FakeSyncSchedule()
+
+        val round = FakeServer().synchronization(database, clock, schedule).synchronize()
+
+        assertEquals(listOf(row), round.queue.skipped.map { it.id })
+        assertNull(round.backlogDueAt)
+        assertEquals(emptyList<Instant>(), schedule.comeBacks)
+    }
+
+    /**
+     * Строке не хватило словаря, а дочитать его заход не смог — сервер не ответил. Это ожидание, а
+     * не решение человека: следующий заход дочитает словарь, и строка уйдёт. Приходить за ней
+     * планировщик должен.
+     *
+     * Красная проверка: такая строка попадала в пропущенные вместе с нечитаемыми, и заход за
+     * остатком для неё не ставился — до следующего входа в приложение.
+     */
+    @Test
+    fun aRowShortOfVocabularyWhenTheServerDidNotAnswerIsComeBackFor() = runBlocking {
+        val foreign = QuantityUnit(Uuid.random(), "чужая единица")
+        database.syncOperations().enqueue(row, PackageSyncCommand.Consume(PACK, dose(Quantity(BigDecimal.ONE, foreign)), INTAKE), at)
+        val schedule = FakeSyncSchedule()
+
+        val round = FakeServer().synchronization(database, clock, schedule).synchronize()
+
+        assertEquals(emptyList<Uuid>(), round.queue.skipped.map { it.id })
+        assertNotNull(round.backlogDueAt)
+    }
+
+    /** Строка чужой версии формата — такая, какой её оставляет обновление. */
+    private suspend fun unreadable() {
+        val stored = database.syncOperations().enqueue(row, PackageSyncCommand.Delete(PACK), at).toStorageEntity()
+        database.syncOperations().update(
+            SyncOperationStorageEntity(
+                id = stored.id, kind = stored.kind, payload = stored.payload, payloadVersion = 99,
+                sequence = stored.sequence, status = stored.status, attempts = stored.attempts,
+                createdAt = stored.createdAt, packageId = stored.packageId
+            )
+        )
     }
 }
