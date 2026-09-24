@@ -1,4 +1,4 @@
-package com.kert0n.medapp.storage.template
+package com.kert0n.medapp.feature.template
 
 import com.kert0n.medapp.domain.template.PackageTemplate
 import com.kert0n.medapp.domain.template.TemplateQuery
@@ -10,7 +10,7 @@ import java.time.Instant
  * **Заготовка**: сценарием не используется, запись и чтение без сети не подключены (issue на кэш
  * справочника).
  */
-interface PackageTemplateStorageRepository {
+interface TemplateRecords {
 
     suspend fun remember(templates: List<PackageTemplate>, at: Instant)
 

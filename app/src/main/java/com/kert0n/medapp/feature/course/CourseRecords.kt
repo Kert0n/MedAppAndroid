@@ -1,14 +1,10 @@
-package com.kert0n.medapp.storage.course
+package com.kert0n.medapp.feature.course
 
 import androidx.annotation.CheckResult
 import com.kert0n.medapp.domain.course.Course
 import com.kert0n.medapp.domain.course.CourseCompletion
-import com.kert0n.medapp.domain.course.CourseCoverage
 import com.kert0n.medapp.domain.course.CourseDraft
-import com.kert0n.medapp.domain.course.CourseDraftProjection
-import com.kert0n.medapp.domain.course.CourseProjection
 import com.kert0n.medapp.domain.course.CourseRecord
-import com.kert0n.medapp.domain.course.CourseRecordProjection
 import com.kert0n.medapp.domain.course.CoverageReduction
 import com.kert0n.medapp.domain.course.Revision
 import com.kert0n.medapp.domain.intake.CourseIntake
@@ -16,7 +12,6 @@ import com.kert0n.medapp.domain.report.CourseInProgress
 import com.kert0n.medapp.feature.course.CourseReallocation
 import java.time.Instant
 import kotlin.uuid.Uuid
-import kotlinx.coroutines.flow.Flow
 
 /**
  * Хранение лечения. Черновик и живой план лежат одной таблицей и различаются тем, где живёт имя,
@@ -25,25 +20,7 @@ import kotlinx.coroutines.flow.Flow
  * Потоки несут проекции — величины для экрана; сущность отдают только `find*`, и действительна
  * она в транзакции сценария, который её читал (PLAN H1).
  */
-interface CourseStorageRepository {
-
-    fun observeDrafts(): Flow<List<CourseDraftProjection>>
-
-    fun observePlan(id: Uuid): Flow<CourseProjection?>
-
-    /**
-     * Обеспечение идущего лечения — величина, которую считает курс по своему прогрессу и по
-     * доступности своих пачек, как её видит человек: с очередью и без чужих броней (PLAN D4, D5).
-     * План, приёмы и пачки читаются одним снимком. `null` — плана нет: лечение не начато или
-     * закончено. Чужая коробка в расчёт не входит.
-     */
-    fun observeCoverage(id: Uuid): Flow<CourseCoverage?>
-
-    /** То же по всем идущим лечениям сразу — списку курсов, где нехватка видна значком (H3 №13). */
-    fun observeCoverages(): Flow<Map<Uuid, CourseCoverage>>
-
-    /** Сокращения обеспечения эпизода по времени — карточке курса (PLAN D5). */
-    fun observeReductions(courseId: Uuid): Flow<List<CoverageReduction>>
+interface CourseRecords : CourseReadings {
 
     /**
      * Сокращения не старше [since] — сверке уведомлений (PLAN D8). Окно есть, потому что событие
@@ -80,11 +57,6 @@ interface CourseStorageRepository {
      */
     @CheckResult
     suspend fun discardDraft(id: Uuid): Boolean
-
-    /** Аналитика читает записи: идущее и законченное лечение для неё одной формы (PLAN H6). */
-    fun observeRecords(): Flow<List<CourseRecordProjection>>
-
-    fun observeRecord(id: Uuid): Flow<CourseRecordProjection?>
 
     suspend fun findRecord(id: Uuid): CourseRecord?
 

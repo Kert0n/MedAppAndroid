@@ -7,12 +7,14 @@ import com.kert0n.medapp.domain.scan.CodeFormat
 import com.kert0n.medapp.domain.scan.ScannedCode
 import com.kert0n.medapp.domain.template.PackageTemplates
 import com.kert0n.medapp.domain.template.TemplateQuery
+import com.kert0n.medapp.feature.medkits.MedKitReadings
 import com.kert0n.medapp.feature.packages.PackageAdding
 import com.kert0n.medapp.feature.packages.PackageDescribing
 import com.kert0n.medapp.feature.packages.PackageReadings
 import com.kert0n.medapp.feature.scan.PackageScanning
 import com.kert0n.medapp.feature.template.TemplateSearching
 import com.kert0n.medapp.feature.time.Today
+import com.kert0n.medapp.feature.value.VocabularyReadings
 import com.kert0n.medapp.presentation.ParsedInput
 import com.kert0n.medapp.presentation.ScreenFailures
 import com.kert0n.medapp.presentation.ScreenReading
@@ -23,8 +25,6 @@ import com.kert0n.medapp.presentation.stateInScreen
 import com.kert0n.medapp.presentation.value.FormPresentationDTO
 import com.kert0n.medapp.presentation.value.UnitPresentationDTO
 import com.kert0n.medapp.presentation.value.toPresentationDTO
-import com.kert0n.medapp.storage.medkit.MedKitStorageRepository
-import com.kert0n.medapp.storage.value.VocabularyStorageRepository
 import dagger.assisted.Assisted
 import dagger.assisted.AssistedFactory
 import dagger.assisted.AssistedInject
@@ -75,8 +75,8 @@ class PackageFormViewModel @AssistedInject constructor(
     private val searching: TemplateSearching,
     private val scanning: PackageScanning,
     private val packages: PackageReadings,
-    private val vocabulary: VocabularyStorageRepository,
-    medKits: MedKitStorageRepository,
+    private val vocabulary: VocabularyReadings,
+    medKits: MedKitReadings,
     today: Today,
     @Assisted private val opened: Opened,
     private val failures: ScreenFailures = ScreenFailures()

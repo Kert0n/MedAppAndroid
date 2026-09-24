@@ -6,7 +6,6 @@ import com.kert0n.medapp.queue.Settlement
 import com.kert0n.medapp.queue.StoredSyncOperation
 import com.kert0n.medapp.queue.Transactions
 import com.kert0n.medapp.queue.intake.IntakeAccounting
-import com.kert0n.medapp.storage.operation.SyncOperationStorageRepository
 import java.time.Clock
 import javax.inject.Inject
 import kotlin.uuid.Uuid
@@ -25,7 +24,7 @@ import kotlin.uuid.Uuid
  * Читает и пишет одной транзакцией (F5): пока человек нажимал, работник мог закрыть строку сам.
  */
 class OperationDismissing @Inject constructor(
-    private val operations: SyncOperationStorageRepository,
+    private val operations: OperationRecords,
     private val queue: QueueStorage,
     private val transactions: Transactions,
     private val clock: Clock

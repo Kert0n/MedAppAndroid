@@ -6,7 +6,6 @@ import com.kert0n.medapp.domain.course.CourseRejected
 import com.kert0n.medapp.domain.course.Revision
 import com.kert0n.medapp.feature.packages.PackageRecords
 import com.kert0n.medapp.queue.Transactions
-import com.kert0n.medapp.storage.course.CourseStorageRepository
 import java.time.Clock
 import javax.inject.Inject
 import kotlin.uuid.Uuid
@@ -24,7 +23,7 @@ import kotlin.uuid.Uuid
  * местной полки команд нет вовсе (E1).
  */
 class CourseActivation @Inject constructor(
-    private val courses: CourseStorageRepository,
+    private val courses: CourseRecords,
     private val packages: PackageRecords,
     private val calendar: CourseCalendar,
     private val following: CourseFollowing,

@@ -78,7 +78,7 @@ class UnplannedIntakeViewModelTest {
      * Приёмы, которые можно записать: подделка отвечает только на тот вопрос, о котором проверка,
      * — «факт записан», — а на остальные падает голосом `UnaskedIntakes`.
      */
-    private class WritableIntakes : IntakeRecords by UnaskedIntakes, IntakeReadings by UnaskedIntakes {
+    private class WritableIntakes : IntakeRecords by UnaskedIntakes {
         val written = mutableListOf<IntakeOutcome>()
         override suspend fun record(outcome: IntakeOutcome): Boolean {
             written += outcome

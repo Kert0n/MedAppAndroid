@@ -1,14 +1,14 @@
 package com.kert0n.medapp.presentation.medkit
 
-import com.kert0n.medapp.presentation.act
-import com.kert0n.medapp.presentation.ScreenFailures
-import com.kert0n.medapp.presentation.ScreenReading
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.kert0n.medapp.feature.medkits.MedKitKeeping
-import com.kert0n.medapp.presentation.ParsedInput
+import com.kert0n.medapp.feature.medkits.MedKitReadings
 import com.kert0n.medapp.feature.time.Today
-import com.kert0n.medapp.storage.medkit.MedKitStorageRepository
+import com.kert0n.medapp.presentation.ParsedInput
+import com.kert0n.medapp.presentation.ScreenFailures
+import com.kert0n.medapp.presentation.ScreenReading
+import com.kert0n.medapp.presentation.act
 import dagger.assisted.Assisted
 import dagger.assisted.AssistedFactory
 import dagger.assisted.AssistedInject
@@ -30,7 +30,7 @@ import kotlinx.coroutines.launch
 @HiltViewModel(assistedFactory = MedKitFormViewModel.Factory::class)
 class MedKitFormViewModel @AssistedInject constructor(
     private val keeping: MedKitKeeping,
-    private val medKits: MedKitStorageRepository,
+    private val medKits: MedKitReadings,
     private val today: Today,
     @Assisted private val medKitId: Uuid?,
     private val failures: ScreenFailures = ScreenFailures()

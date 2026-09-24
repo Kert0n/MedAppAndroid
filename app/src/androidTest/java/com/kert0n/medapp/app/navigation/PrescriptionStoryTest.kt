@@ -1,14 +1,13 @@
 package com.kert0n.medapp.app.navigation
 
-import com.kert0n.medapp.fixture.pressAfterTyping
 import androidx.compose.ui.test.assertIsDisplayed
-import androidx.compose.ui.test.isDialog
-import androidx.compose.ui.test.hasText
 import androidx.compose.ui.test.hasAnyAncestor
 import androidx.compose.ui.test.hasSetTextAction
+import androidx.compose.ui.test.hasText
+import androidx.compose.ui.test.isDialog
 import androidx.compose.ui.test.junit4.v2.createAndroidComposeRule
-import androidx.compose.ui.test.onAllNodesWithText
 import androidx.compose.ui.test.onAllNodesWithContentDescription
+import androidx.compose.ui.test.onAllNodesWithText
 import androidx.compose.ui.test.onFirst
 import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithText
@@ -19,38 +18,40 @@ import androidx.compose.ui.test.performTextReplacement
 import androidx.test.espresso.Espresso.closeSoftKeyboard
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import com.kert0n.medapp.HiltTestActivity
-import com.kert0n.medapp.fixture.CAPSULE_FORM
-import com.kert0n.medapp.fixture.MILLILITRES
-import com.kert0n.medapp.fixture.MOSCOW
-import com.kert0n.medapp.fixture.TABLETS
-import com.kert0n.medapp.fixture.TABLET_FORM
-import com.kert0n.medapp.fixture.StoryWorld
-import com.kert0n.medapp.fixture.courseRepository
-import com.kert0n.medapp.fixture.moscow
+import com.kert0n.medapp.domain.value.QuantityUnit
+import com.kert0n.medapp.feature.connectivity.Connection
 import com.kert0n.medapp.feature.notification.DailyRound
 import com.kert0n.medapp.feature.notification.NotificationReconciliation
 import com.kert0n.medapp.feature.notification.ReminderAnswering
+import com.kert0n.medapp.feature.notification.ReminderReadings
+import com.kert0n.medapp.feature.notification.ReminderRecords
+import com.kert0n.medapp.fixture.CAPSULE_FORM
+import com.kert0n.medapp.fixture.MILLILITRES
+import com.kert0n.medapp.fixture.MOSCOW
+import com.kert0n.medapp.fixture.StoryWorld
+import com.kert0n.medapp.fixture.TABLETS
+import com.kert0n.medapp.fixture.TABLET_FORM
+import com.kert0n.medapp.fixture.courseRepository
+import com.kert0n.medapp.fixture.moscow
+import com.kert0n.medapp.fixture.pressAfterTyping
 import com.kert0n.medapp.platform.time.TimeShifts
 import com.kert0n.medapp.queue.Transactions
-import com.kert0n.medapp.feature.connectivity.Connection
-import com.kert0n.medapp.storage.notification.ReminderStorageRepository
-import com.kert0n.medapp.domain.value.QuantityUnit
 import com.kert0n.medapp.storage.database.MedAppDatabase
 import com.kert0n.medapp.storage.value.toStorageEntity
 import com.kert0n.medapp.ui.theme.MedAppTheme
 import dagger.hilt.android.testing.HiltAndroidRule
 import dagger.hilt.android.testing.HiltAndroidTest
-import javax.inject.Inject
 import java.time.DayOfWeek
 import java.time.LocalDate
 import java.time.ZoneId
 import java.time.format.TextStyle
 import java.util.Locale
+import javax.inject.Inject
+import kotlin.uuid.Uuid
 import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.runBlocking
 import org.junit.After
 import org.junit.Assert.assertEquals
-import kotlin.uuid.Uuid
-import kotlinx.coroutines.runBlocking
 import org.junit.Before
 import org.junit.Rule
 import org.junit.Test
@@ -90,7 +91,7 @@ class PrescriptionStoryTest {
     lateinit var database: MedAppDatabase
 
     @Inject lateinit var connection: Connection
-    @Inject lateinit var reminders: ReminderStorageRepository
+    @Inject lateinit var reminders: ReminderRecords
     @Inject lateinit var reconciliation: NotificationReconciliation
     @Inject lateinit var transactions: Transactions
     @Inject lateinit var shifts: TimeShifts

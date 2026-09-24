@@ -1,37 +1,18 @@
-package com.kert0n.medapp.storage.medkit
+package com.kert0n.medapp.feature.medkits
 
 import androidx.annotation.CheckResult
 import com.kert0n.medapp.domain.medkit.MedKit
-import com.kert0n.medapp.domain.medkit.MedKitProjection
 import com.kert0n.medapp.domain.medkit.MedKitStatus
 import java.time.Instant
-import java.time.LocalDate
 import kotlin.uuid.Uuid
-import kotlinx.coroutines.flow.Flow
 
 /**
  * Хранение аптечек. Отдаёт домен, а не строки: выше по стеку о Room не знают, а сохранённые
  * сведения приходят потоком — «обновить экран после записи» руками не нужно нигде (PLAN H1).
  */
-interface MedKitStorageRepository {
-
-    /**
-     * Потоки несут проекции — величины для экрана; сущность отдаёт `find` в транзакции сценария
-     * (PLAN H1). Вместе с полкой приходит её содержимое — сколько коробок и сколько просрочено на
-     * [today]: день приходит аргументом, потому что база часов не читает (PLAN D2). Полки и их
-     * содержимое читаются одним снимком, и на весь список содержимое считается одним запросом.
-     */
-    fun observeAll(today: LocalDate): Flow<List<MedKitProjection>>
-
-    fun observe(id: Uuid, today: LocalDate): Flow<MedKitProjection?>
+interface MedKitRecords : MedKitReadings {
 
     suspend fun find(id: Uuid): MedKit?
-
-    /**
-     * Когда с аптечкой последний раз сверялись — экрану состояния синхронизации (PLAN H3 №28).
-     * Момент сверки принадлежит доставке, а не аптечке, и в её проекцию не входит.
-     */
-    fun observeSyncedAt(id: Uuid): Flow<Instant?>
 
     /** Новая полка: заводится местной, обвязки синхронизации у неё ещё нет (PLAN D2). */
     suspend fun add(medKit: MedKit)
@@ -71,5 +52,4 @@ interface MedKitStorageRepository {
      * снимать их некому. Незакрытые поручения полки закрывает очередь до этого.
      */
     suspend fun loseAccess(medKitId: Uuid, at: Instant)
-
 }

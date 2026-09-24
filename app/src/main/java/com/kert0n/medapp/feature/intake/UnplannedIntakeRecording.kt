@@ -5,6 +5,7 @@ import com.kert0n.medapp.domain.intake.IntakeRejected
 import com.kert0n.medapp.domain.intake.UnplannedIntake
 import com.kert0n.medapp.domain.value.Dose
 import com.kert0n.medapp.feature.course.CourseFollowing
+import com.kert0n.medapp.feature.course.CourseRecords
 import com.kert0n.medapp.feature.intake.IntakeOutcome
 import com.kert0n.medapp.feature.packages.PackageRecords
 import com.kert0n.medapp.feature.readThisTransaction
@@ -14,7 +15,6 @@ import com.kert0n.medapp.queue.Transactions
 import com.kert0n.medapp.queue.intake.IntakeAccounting
 import com.kert0n.medapp.queue.intake.IntakeSyncState
 import com.kert0n.medapp.queue.pack.PackageSyncCommand
-import com.kert0n.medapp.storage.course.CourseStorageRepository
 import java.time.Clock
 import java.time.Instant
 import javax.inject.Inject
@@ -34,7 +34,7 @@ import kotlin.uuid.Uuid
  */
 class UnplannedIntakeRecording @Inject constructor(
     private val intakes: IntakeRecords,
-    private val courses: CourseStorageRepository,
+    private val courses: CourseRecords,
     private val packages: PackageRecords,
     private val following: CourseFollowing,
     private val queue: QueueService,

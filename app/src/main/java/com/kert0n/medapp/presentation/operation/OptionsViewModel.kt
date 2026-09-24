@@ -1,16 +1,16 @@
 package com.kert0n.medapp.presentation.operation
 
-import com.kert0n.medapp.presentation.stateInScreen
-import com.kert0n.medapp.presentation.ScreenReading
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.kert0n.medapp.domain.notification.NotificationReadiness
+import com.kert0n.medapp.feature.operation.OperationReadings
 import com.kert0n.medapp.platform.settings.AppLanguages
 import com.kert0n.medapp.platform.settings.DevicePermissions
+import com.kert0n.medapp.presentation.ScreenReading
 import com.kert0n.medapp.presentation.settings.LanguageChoice
 import com.kert0n.medapp.presentation.settings.permissionsNow
 import com.kert0n.medapp.presentation.settings.toChoice
-import com.kert0n.medapp.storage.operation.SyncOperationStorageRepository
+import com.kert0n.medapp.presentation.stateInScreen
 import dagger.hilt.android.lifecycle.HiltViewModel
 import javax.inject.Inject
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -26,7 +26,7 @@ import kotlinx.coroutines.flow.stateIn
  */
 @HiltViewModel
 class OptionsViewModel @Inject constructor(
-    operations: SyncOperationStorageRepository,
+    operations: OperationReadings,
     private val permissions: DevicePermissions,
     private val readiness: NotificationReadiness,
     private val languages: AppLanguages

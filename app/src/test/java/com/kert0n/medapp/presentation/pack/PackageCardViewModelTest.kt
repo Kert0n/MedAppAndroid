@@ -3,6 +3,7 @@ package com.kert0n.medapp.presentation.pack
 import com.kert0n.medapp.domain.medkit.MedKit
 import com.kert0n.medapp.domain.medkit.MedKitProjection
 import com.kert0n.medapp.domain.pack.PackageStatus
+import com.kert0n.medapp.feature.medkits.MedKitReadings
 import com.kert0n.medapp.feature.packages.PackageReadings
 import com.kert0n.medapp.feature.packages.PackageRecords
 import com.kert0n.medapp.feature.packages.PackageRemoval
@@ -30,7 +31,6 @@ import com.kert0n.medapp.fixture.pack
 import com.kert0n.medapp.fixture.watching
 import com.kert0n.medapp.queue.QueueService
 import com.kert0n.medapp.queue.Transactions
-import com.kert0n.medapp.storage.medkit.MedKitStorageRepository
 import java.time.Clock
 import java.time.Instant
 import java.time.LocalDate
@@ -57,7 +57,7 @@ class PackageCardViewModelTest {
     private val clock: Clock = Clock.fixed(Instant.parse("2026-09-15T09:00:00Z"), ZoneId.of("Europe/Moscow"))
 
     /** Полки, которые помнят, спрашивали ли их все разом: ради одного имени этого не делают. */
-    private class Counted(private val real: FakeMedKits) : MedKitStorageRepository by real {
+    private class Counted(private val real: FakeMedKits) : MedKitReadings by real {
 
         var askedForAll = 0
 
@@ -87,7 +87,7 @@ class PackageCardViewModelTest {
         records: PackageRecords = stored,
         transactions: Transactions = DirectTransactions,
         freshening: com.kert0n.medapp.feature.operation.Freshening = offlineFreshening(records, clock),
-        medKits: MedKitStorageRepository = this.medKits
+        medKits: MedKitReadings = this.medKits
     ) = PackageCardViewModel(
         removal = PackageRemoval(records, queue, transactions, clock),
         freshening = freshening,

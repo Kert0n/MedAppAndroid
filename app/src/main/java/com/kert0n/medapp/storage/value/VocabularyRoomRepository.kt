@@ -3,13 +3,15 @@ package com.kert0n.medapp.storage.value
 import com.kert0n.medapp.domain.value.DosageForm
 import com.kert0n.medapp.domain.value.QuantityUnit
 import com.kert0n.medapp.domain.value.Vocabulary
+import com.kert0n.medapp.domain.value.VocabularyStore
+import com.kert0n.medapp.feature.value.VocabularyReadings
 import javax.inject.Inject
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.map
 
 class VocabularyRoomRepository @Inject constructor(
     private val vocabulary: VocabularyDao
-) : VocabularyStorageRepository {
+) : VocabularyReadings, VocabularyStore {
 
     override fun observeUnits(): Flow<List<QuantityUnit>> =
         vocabulary.observeUnits().map { rows -> rows.map { it.toDomain() } }

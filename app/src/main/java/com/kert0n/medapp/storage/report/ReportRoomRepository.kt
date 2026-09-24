@@ -1,16 +1,17 @@
 package com.kert0n.medapp.storage.report
 
+import com.kert0n.medapp.domain.course.CourseRecordProjection
 import com.kert0n.medapp.domain.intake.CourseIntake
 import com.kert0n.medapp.domain.intake.Intake
-import com.kert0n.medapp.domain.course.CourseRecordProjection
 import com.kert0n.medapp.domain.intake.UnplannedIntake
 import com.kert0n.medapp.domain.report.DayPlan
 import com.kert0n.medapp.domain.report.FutureSpending
 import com.kert0n.medapp.domain.report.Spending
 import com.kert0n.medapp.domain.report.SpendingHorizon
+import com.kert0n.medapp.domain.report.SpendingPeriod
 import com.kert0n.medapp.domain.report.StockSummary
 import com.kert0n.medapp.domain.value.Vocabulary
-import com.kert0n.medapp.domain.report.SpendingPeriod
+import com.kert0n.medapp.feature.report.ReportReadings
 import com.kert0n.medapp.storage.course.CourseDao
 import com.kert0n.medapp.storage.course.plansInProgress
 import com.kert0n.medapp.storage.database.MedAppDatabase
@@ -32,7 +33,7 @@ class ReportRoomRepository @Inject constructor(
     private val packages: PackageDao,
     private val courses: CourseDao,
     private val vocabulary: VocabularyDao
-) : ReportStorageRepository {
+) : ReportReadings {
 
     override fun observeSpending(period: SpendingPeriod, zone: ZoneId): Flow<Spending> =
         database.observing(*SPENDING_TABLES) { spending(period, zone) }

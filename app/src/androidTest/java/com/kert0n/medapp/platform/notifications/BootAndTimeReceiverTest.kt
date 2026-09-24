@@ -2,29 +2,30 @@ package com.kert0n.medapp.platform.notifications
 
 import android.content.Intent
 import androidx.test.ext.junit.runners.AndroidJUnit4
+import androidx.test.platform.app.InstrumentationRegistry
 import com.kert0n.medapp.domain.notification.NotificationKey
 import com.kert0n.medapp.domain.notification.NotificationTarget
 import com.kert0n.medapp.domain.notification.Reminder
 import com.kert0n.medapp.feature.notification.ReminderOutbox
-import com.kert0n.medapp.storage.notification.ReminderStorageRepository
+import com.kert0n.medapp.feature.notification.ReminderReadings
+import com.kert0n.medapp.feature.notification.ReminderRecords
 import com.kert0n.medapp.fixture.await
 import com.kert0n.medapp.platform.time.TimeShifts
+import dagger.hilt.android.testing.HiltAndroidRule
+import dagger.hilt.android.testing.HiltAndroidTest
+import javax.inject.Inject
 import kotlinx.coroutines.CoroutineStart
 import kotlinx.coroutines.async
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.withTimeoutOrNull
-import dagger.hilt.android.testing.HiltAndroidRule
-import dagger.hilt.android.testing.HiltAndroidTest
-import javax.inject.Inject
 import org.junit.After
-import org.junit.Before
-import org.junit.Rule
-import androidx.test.platform.app.InstrumentationRegistry
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNotNull
 import org.junit.Assert.assertTrue
+import org.junit.Before
+import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
 
@@ -72,7 +73,7 @@ class BootAndTimeReceiverTest {
     }
 
     @Inject
-    lateinit var promises: ReminderStorageRepository
+    lateinit var promises: ReminderRecords
 
     @Inject
     lateinit var alarms: AlarmManagerReminders

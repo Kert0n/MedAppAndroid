@@ -11,7 +11,6 @@ import com.kert0n.medapp.feature.intake.IntakeConfirmation
 import com.kert0n.medapp.feature.intake.IntakeDeclining
 import com.kert0n.medapp.feature.intake.IntakeRecords
 import com.kert0n.medapp.queue.Transactions
-import com.kert0n.medapp.storage.notification.ReminderStorageRepository
 import java.time.Clock
 import java.time.Duration
 import java.time.Instant
@@ -28,7 +27,7 @@ class ReminderAnswering @Inject constructor(
     private val confirmation: IntakeConfirmation,
     private val intakes: IntakeRecords,
     private val promising: ReminderPromising,
-    private val reminders: ReminderStorageRepository,
+    private val reminders: ReminderRecords,
     private val withdrawal: ReminderWithdrawal,
     private val settings: NotificationSettingsSource,
     private val transactions: Transactions,

@@ -5,7 +5,6 @@ import com.kert0n.medapp.domain.medkit.MedKitContents
 import com.kert0n.medapp.domain.medkit.MedKitProjection
 import com.kert0n.medapp.feature.readThisTransaction
 import com.kert0n.medapp.queue.Transactions
-import com.kert0n.medapp.storage.medkit.MedKitStorageRepository
 import java.time.Clock
 import javax.inject.Inject
 import kotlin.uuid.Uuid
@@ -21,7 +20,7 @@ import kotlin.uuid.Uuid
  * чужой пометки или до ответа сервера о публикации, переименованием их не переписывает.
  */
 class MedKitKeeping @Inject constructor(
-    private val medKits: MedKitStorageRepository,
+    private val medKits: MedKitRecords,
     private val transactions: Transactions,
     private val clock: Clock
 ) {

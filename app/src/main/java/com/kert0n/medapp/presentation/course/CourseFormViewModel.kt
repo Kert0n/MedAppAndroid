@@ -1,9 +1,5 @@
 package com.kert0n.medapp.presentation.course
 
-import com.kert0n.medapp.presentation.act
-import com.kert0n.medapp.presentation.ScreenFailures
-import com.kert0n.medapp.presentation.stateInScreen
-import com.kert0n.medapp.presentation.ScreenReading
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.kert0n.medapp.domain.course.CourseDraftProjection
@@ -12,14 +8,18 @@ import com.kert0n.medapp.domain.course.CourseRecordProjection
 import com.kert0n.medapp.feature.course.CourseActivation
 import com.kert0n.medapp.feature.course.CourseAmendment
 import com.kert0n.medapp.feature.course.CourseDrafting
+import com.kert0n.medapp.feature.course.CourseReadings
 import com.kert0n.medapp.feature.course.CourseRenaming
 import com.kert0n.medapp.feature.time.Today
+import com.kert0n.medapp.feature.value.VocabularyReadings
 import com.kert0n.medapp.presentation.ParsedInput
+import com.kert0n.medapp.presentation.ScreenFailures
+import com.kert0n.medapp.presentation.ScreenReading
+import com.kert0n.medapp.presentation.act
+import com.kert0n.medapp.presentation.stateInScreen
 import com.kert0n.medapp.presentation.value.FormPresentationDTO
 import com.kert0n.medapp.presentation.value.UnitPresentationDTO
 import com.kert0n.medapp.presentation.value.toPresentationDTO
-import com.kert0n.medapp.storage.course.CourseStorageRepository
-import com.kert0n.medapp.storage.value.VocabularyStorageRepository
 import dagger.assisted.Assisted
 import dagger.assisted.AssistedFactory
 import dagger.assisted.AssistedInject
@@ -52,8 +52,8 @@ class CourseFormViewModel @AssistedInject constructor(
     private val activation: CourseActivation,
     private val amendment: CourseAmendment,
     private val renaming: CourseRenaming,
-    private val courses: CourseStorageRepository,
-    private val vocabulary: VocabularyStorageRepository,
+    private val courses: CourseReadings,
+    private val vocabulary: VocabularyReadings,
     private val today: Today,
     private val clock: Clock,
     @Assisted private val courseId: Uuid?,

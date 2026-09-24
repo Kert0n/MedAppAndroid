@@ -4,13 +4,13 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.kert0n.medapp.domain.intake.IntakeProjection
 import com.kert0n.medapp.domain.intake.IntakeStatus
+import com.kert0n.medapp.feature.course.CourseReadings
 import com.kert0n.medapp.feature.intake.IntakeReadings
 import com.kert0n.medapp.feature.packages.PackageReadings
 import com.kert0n.medapp.feature.time.Today
 import com.kert0n.medapp.presentation.ScreenReading
 import com.kert0n.medapp.presentation.stateInScreen
 import com.kert0n.medapp.presentation.value.toPresentationDTO
-import com.kert0n.medapp.storage.course.CourseStorageRepository
 import dagger.assisted.Assisted
 import dagger.assisted.AssistedFactory
 import dagger.assisted.AssistedInject
@@ -35,7 +35,7 @@ import kotlinx.coroutines.flow.stateIn
 @HiltViewModel(assistedFactory = IntakeHistoryViewModel.Factory::class)
 class IntakeHistoryViewModel @AssistedInject constructor(
     today: Today,
-    courses: CourseStorageRepository,
+    courses: CourseReadings,
     intakes: IntakeReadings,
     packages: PackageReadings,
     @Assisted("courseId") private val courseId: Uuid?,

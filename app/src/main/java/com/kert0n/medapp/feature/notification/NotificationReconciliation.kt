@@ -8,13 +8,13 @@ import com.kert0n.medapp.domain.notification.NotificationSettingsSource
 import com.kert0n.medapp.domain.notification.NotificationTarget
 import com.kert0n.medapp.domain.notification.Reminder
 import com.kert0n.medapp.domain.pack.ExpiryDate
+import com.kert0n.medapp.feature.course.CourseReadings
+import com.kert0n.medapp.feature.course.CourseRecords
 import com.kert0n.medapp.feature.intake.IntakeRecords
+import com.kert0n.medapp.feature.operation.OperationReadings
 import com.kert0n.medapp.feature.packages.PackageQuery
 import com.kert0n.medapp.feature.packages.PackageReadings
 import com.kert0n.medapp.queue.Transactions
-import com.kert0n.medapp.storage.course.CourseStorageRepository
-import com.kert0n.medapp.storage.notification.ReminderStorageRepository
-import com.kert0n.medapp.storage.operation.SyncOperationStorageRepository
 import java.time.Instant
 import java.time.LocalDate
 import java.time.ZoneId
@@ -42,9 +42,9 @@ import kotlinx.coroutines.flow.first
 class NotificationReconciliation @Inject constructor(
     private val intakes: IntakeRecords,
     private val packages: PackageReadings,
-    private val courses: CourseStorageRepository,
-    private val reminders: ReminderStorageRepository,
-    private val operations: SyncOperationStorageRepository,
+    private val courses: CourseRecords,
+    private val reminders: ReminderRecords,
+    private val operations: OperationReadings,
     private val promising: ReminderPromising,
     private val withdrawal: ReminderWithdrawal,
     private val settings: NotificationSettingsSource,

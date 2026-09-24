@@ -12,6 +12,7 @@ import com.kert0n.medapp.domain.value.Quantity
 import com.kert0n.medapp.feature.course.CourseCalendar
 import com.kert0n.medapp.feature.course.CourseClosing
 import com.kert0n.medapp.feature.course.CourseReallocation
+import com.kert0n.medapp.feature.course.CourseRecords
 import com.kert0n.medapp.feature.course.openPlan
 import com.kert0n.medapp.feature.intake.IntakeOutcome
 import com.kert0n.medapp.feature.notification.ReminderWithdrawal
@@ -23,7 +24,6 @@ import com.kert0n.medapp.queue.Transactions
 import com.kert0n.medapp.queue.intake.IntakeAccounting
 import com.kert0n.medapp.queue.intake.IntakeSyncState
 import com.kert0n.medapp.queue.pack.PackageSyncCommand
-import com.kert0n.medapp.storage.course.CourseStorageRepository
 import java.time.Clock
 import java.time.Instant
 import javax.inject.Inject
@@ -44,7 +44,7 @@ import kotlin.uuid.Uuid
 class IntakeConfirmation @Inject constructor(
     private val intakes: IntakeRecords,
     private val accounts: IntakeAccounts,
-    private val courses: CourseStorageRepository,
+    private val courses: CourseRecords,
     private val packages: PackageRecords,
     private val transactions: Transactions,
     private val queue: QueueService,

@@ -1,9 +1,5 @@
 package com.kert0n.medapp.presentation.medkit
 
-import com.kert0n.medapp.presentation.act
-import com.kert0n.medapp.presentation.ScreenFailures
-import com.kert0n.medapp.presentation.stateInScreen
-import com.kert0n.medapp.presentation.ScreenReading
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.kert0n.medapp.domain.Unavailability
@@ -13,13 +9,17 @@ import com.kert0n.medapp.domain.medkit.MedKitProjection
 import com.kert0n.medapp.domain.medkit.MedKitStatus
 import com.kert0n.medapp.feature.medkits.MedKitInvitation
 import com.kert0n.medapp.feature.medkits.MedKitPublishing
+import com.kert0n.medapp.feature.medkits.MedKitReadings
 import com.kert0n.medapp.feature.time.Today
-import com.kert0n.medapp.storage.medkit.MedKitStorageRepository
-import java.time.ZoneId
+import com.kert0n.medapp.presentation.ScreenFailures
+import com.kert0n.medapp.presentation.ScreenReading
+import com.kert0n.medapp.presentation.act
+import com.kert0n.medapp.presentation.stateInScreen
 import dagger.assisted.Assisted
 import dagger.assisted.AssistedFactory
 import dagger.assisted.AssistedInject
 import dagger.hilt.android.lifecycle.HiltViewModel
+import java.time.ZoneId
 import kotlin.uuid.Uuid
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -46,7 +46,7 @@ import kotlinx.coroutines.launch
 class MedKitSharingViewModel @AssistedInject constructor(
     private val publishing: MedKitPublishing,
     private val invitations: MedKitInvitation,
-    medKits: MedKitStorageRepository,
+    medKits: MedKitReadings,
     today: Today,
     @Assisted private val medKitId: Uuid,
     private val failures: ScreenFailures = ScreenFailures()

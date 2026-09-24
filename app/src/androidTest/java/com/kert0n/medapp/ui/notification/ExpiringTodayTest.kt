@@ -1,7 +1,5 @@
 package com.kert0n.medapp.ui.notification
 
-import kotlinx.coroutines.flow.first
-import kotlinx.coroutines.async
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import androidx.test.ext.junit.runners.AndroidJUnit4
@@ -11,10 +9,13 @@ import com.kert0n.medapp.domain.notification.NotificationKind
 import com.kert0n.medapp.domain.notification.NotificationTarget
 import com.kert0n.medapp.domain.notification.Reminder
 import com.kert0n.medapp.domain.pack.ExpiryDate
+import com.kert0n.medapp.feature.notification.ReminderReadings
+import com.kert0n.medapp.feature.notification.ReminderRecords
 import com.kert0n.medapp.fixture.OTHER_PACK
 import com.kert0n.medapp.fixture.PACK
 import com.kert0n.medapp.fixture.Scenarios
 import com.kert0n.medapp.fixture.TABLET_FORM
+import com.kert0n.medapp.fixture.await
 import com.kert0n.medapp.fixture.awaiting
 import com.kert0n.medapp.fixture.inMemoryDatabase
 import com.kert0n.medapp.fixture.pack
@@ -28,9 +29,10 @@ import java.time.LocalDate
 import kotlin.time.Duration
 import kotlin.time.Duration.Companion.seconds
 import kotlin.uuid.Uuid
+import kotlinx.coroutines.async
 import kotlinx.coroutines.cancel
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.runBlocking
-import com.kert0n.medapp.fixture.await
 import org.junit.After
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
@@ -169,7 +171,7 @@ class ExpiringTodayTest {
 
     /** Отметку показа пишет доставка, а база ей отказывает — полный диск. */
     private fun outboxThatCannotWrite(scenarios: Scenarios) = com.kert0n.medapp.feature.notification.ReminderOutbox(
-        object : com.kert0n.medapp.storage.notification.ReminderStorageRepository by scenarios.reminderStore {
+        object : ReminderRecords by scenarios.reminderStore {
             override suspend fun findAll(keys: Collection<com.kert0n.medapp.domain.notification.NotificationKey>) =
                 throw IllegalStateException("database or disk is full")
         },

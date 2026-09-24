@@ -1,9 +1,11 @@
 package com.kert0n.medapp.storage
 
+import com.kert0n.medapp.feature.course.CourseRecords
 import com.kert0n.medapp.feature.intake.IntakeRecords
+import com.kert0n.medapp.feature.medkits.MedKitRecords
+import com.kert0n.medapp.feature.notification.ReminderRecords
 import com.kert0n.medapp.feature.packages.PackageRecords
-import com.kert0n.medapp.storage.course.CourseStorageRepository
-import com.kert0n.medapp.storage.medkit.MedKitStorageRepository
+import com.kert0n.medapp.feature.report.ReportReadings
 import java.io.File
 import java.lang.reflect.Method
 import org.junit.Assert.assertEquals
@@ -87,52 +89,52 @@ class WriteContractTest {
         "PackageRecords.end" to (Shape.ACTION by "(PackageEnding, Instant): Boolean"),
         "PackageRecords.adjust" to (Shape.ACTION by "(PackageAdjustment, CourseReallocation, Instant): Boolean"),
         // Отчёты
-        "ReportStorageRepository.observeSpending" to (Shape.READ by "(SpendingPeriod, ZoneId): Flow<Spending>"),
-        "ReportStorageRepository.observeFutureSpending" to (Shape.READ by "(SpendingHorizon): Flow<FutureSpending>"),
-        "ReportStorageRepository.observeStockSummary" to (Shape.READ by "(): Flow<StockSummary>"),
-        "ReportStorageRepository.observeDayPlan" to (Shape.READ by "(LocalDate, ZoneId): Flow<DayPlan>"),
+        "ReportReadings.observeSpending" to (Shape.READ by "(SpendingPeriod, ZoneId): Flow<Spending>"),
+        "ReportReadings.observeFutureSpending" to (Shape.READ by "(SpendingHorizon): Flow<FutureSpending>"),
+        "ReportReadings.observeStockSummary" to (Shape.READ by "(): Flow<StockSummary>"),
+        "ReportReadings.observeDayPlan" to (Shape.READ by "(LocalDate, ZoneId): Flow<DayPlan>"),
         // Лечение
-        "CourseStorageRepository.observeDrafts" to (Shape.READ by "(): Flow<List<CourseDraftProjection>>"),
-        "CourseStorageRepository.observePlan" to (Shape.READ by "(Uuid): Flow<CourseProjection>"),
-        "CourseStorageRepository.observeCoverage" to (Shape.READ by "(Uuid): Flow<CourseCoverage>"),
-        "CourseStorageRepository.observeCoverages" to (Shape.READ by "(): Flow<Map<Uuid, CourseCoverage>>"),
-        "CourseStorageRepository.observeReductions" to (Shape.READ by "(Uuid): Flow<List<CoverageReduction>>"),
-        "CourseStorageRepository.reductionsSince" to (Shape.READ by "(Uuid, Instant): List<CoverageReduction>"),
-        "CourseStorageRepository.recentReductions" to (Shape.READ by "(Instant): List<CoverageReduction>"),
-        "CourseStorageRepository.observeRecords" to (Shape.READ by "(): Flow<List<CourseRecordProjection>>"),
-        "CourseStorageRepository.observeRecord" to (Shape.READ by "(Uuid): Flow<CourseRecordProjection>"),
-        "CourseStorageRepository.findDraft" to (Shape.READ by "(Uuid): CourseDraft"),
-        "CourseStorageRepository.findPlan" to (Shape.READ by "(Uuid): Course"),
-        "CourseStorageRepository.planIds" to (Shape.READ by "(): List<Uuid>"),
-        "CourseStorageRepository.findRecord" to (Shape.READ by "(Uuid): CourseRecord"),
-        "CourseStorageRepository.courseHolding" to (Shape.READ by "(Uuid): Uuid"),
-        "CourseStorageRepository.holdersOf" to (Shape.READ by "(Uuid): List<Uuid>"),
-        "CourseStorageRepository.planInProgress" to (Shape.READ by "(Uuid): CourseInProgress"),
-        "CourseStorageRepository.recordReduction" to (Shape.CREATION by "(CoverageReduction): Unit"),
-        "CourseStorageRepository.rename" to (Shape.NAMED_FIELDS by "(Uuid, String, String): Boolean"),
+        "CourseReadings.observeDrafts" to (Shape.READ by "(): Flow<List<CourseDraftProjection>>"),
+        "CourseReadings.observePlan" to (Shape.READ by "(Uuid): Flow<CourseProjection>"),
+        "CourseReadings.observeCoverage" to (Shape.READ by "(Uuid): Flow<CourseCoverage>"),
+        "CourseReadings.observeCoverages" to (Shape.READ by "(): Flow<Map<Uuid, CourseCoverage>>"),
+        "CourseReadings.observeReductions" to (Shape.READ by "(Uuid): Flow<List<CoverageReduction>>"),
+        "CourseRecords.reductionsSince" to (Shape.READ by "(Uuid, Instant): List<CoverageReduction>"),
+        "CourseRecords.recentReductions" to (Shape.READ by "(Instant): List<CoverageReduction>"),
+        "CourseReadings.observeRecords" to (Shape.READ by "(): Flow<List<CourseRecordProjection>>"),
+        "CourseReadings.observeRecord" to (Shape.READ by "(Uuid): Flow<CourseRecordProjection>"),
+        "CourseRecords.findDraft" to (Shape.READ by "(Uuid): CourseDraft"),
+        "CourseRecords.findPlan" to (Shape.READ by "(Uuid): Course"),
+        "CourseRecords.planIds" to (Shape.READ by "(): List<Uuid>"),
+        "CourseRecords.findRecord" to (Shape.READ by "(Uuid): CourseRecord"),
+        "CourseRecords.courseHolding" to (Shape.READ by "(Uuid): Uuid"),
+        "CourseRecords.holdersOf" to (Shape.READ by "(Uuid): List<Uuid>"),
+        "CourseRecords.planInProgress" to (Shape.READ by "(Uuid): CourseInProgress"),
+        "CourseRecords.recordReduction" to (Shape.CREATION by "(CoverageReduction): Unit"),
+        "CourseRecords.rename" to (Shape.NAMED_FIELDS by "(Uuid, String, String): Boolean"),
         // `long` — редакция: `value class Revision` на JVM разворачивается в своё число.
-        "CourseStorageRepository.amend" to (Shape.GUARDED by "(Course, long): Boolean"),
-        "CourseStorageRepository.updateSources" to (Shape.GUARDED by "(Course, long): Boolean"),
-        "CourseStorageRepository.reallocate" to (Shape.ACTION by "(CourseReallocation): Boolean"),
-        "CourseStorageRepository.activate" to (Shape.ACTION by "(CourseDraft\$Activation, List<CourseIntake>): Unit"),
-        "CourseStorageRepository.close" to (Shape.ACTION by "(CourseCompletion\$Closing): Unit"),
+        "CourseRecords.amend" to (Shape.GUARDED by "(Course, long): Boolean"),
+        "CourseRecords.updateSources" to (Shape.GUARDED by "(Course, long): Boolean"),
+        "CourseRecords.reallocate" to (Shape.ACTION by "(CourseReallocation): Boolean"),
+        "CourseRecords.activate" to (Shape.ACTION by "(CourseDraft\$Activation, List<CourseIntake>): Unit"),
+        "CourseRecords.close" to (Shape.ACTION by "(CourseCompletion\$Closing): Unit"),
         // Черновик записывается целиком, но условно по редакции, из которой его правили; новый —
         // только туда, где под его номером ещё ничего нет (PLAN F5).
-        "CourseStorageRepository.saveDraft" to (Shape.GUARDED by "(CourseDraft, Revision): Boolean"),
-        "CourseStorageRepository.discardDraft" to (Shape.NAMED_FIELDS by "(Uuid): Boolean"),
+        "CourseRecords.saveDraft" to (Shape.GUARDED by "(CourseDraft, Revision): Boolean"),
+        "CourseRecords.discardDraft" to (Shape.NAMED_FIELDS by "(Uuid): Boolean"),
         // Аптечка
-        "MedKitStorageRepository.observeAll" to (Shape.READ by "(LocalDate): Flow<List<MedKitProjection>>"),
-        "MedKitStorageRepository.observe" to (Shape.READ by "(Uuid, LocalDate): Flow<MedKitProjection>"),
-        "MedKitStorageRepository.observeSyncedAt" to (Shape.READ by "(Uuid): Flow<Instant>"),
-        "MedKitStorageRepository.find" to (Shape.READ by "(Uuid): MedKit"),
-        "MedKitStorageRepository.delete" to (Shape.NAMED_FIELDS by "(Uuid): Boolean"),
-        "MedKitStorageRepository.mark" to (Shape.NAMED_FIELDS by "(Uuid, MedKitStatus): Boolean"),
-        "MedKitStorageRepository.applyServerParticipants" to (Shape.NAMED_FIELDS by "(Uuid, long, Instant): Unit"),
+        "MedKitReadings.observeAll" to (Shape.READ by "(LocalDate): Flow<List<MedKitProjection>>"),
+        "MedKitReadings.observe" to (Shape.READ by "(Uuid, LocalDate): Flow<MedKitProjection>"),
+        "MedKitReadings.observeSyncedAt" to (Shape.READ by "(Uuid): Flow<Instant>"),
+        "MedKitRecords.find" to (Shape.READ by "(Uuid): MedKit"),
+        "MedKitRecords.delete" to (Shape.NAMED_FIELDS by "(Uuid): Boolean"),
+        "MedKitRecords.mark" to (Shape.NAMED_FIELDS by "(Uuid, MedKitStatus): Boolean"),
+        "MedKitRecords.applyServerParticipants" to (Shape.NAMED_FIELDS by "(Uuid, long, Instant): Unit"),
         // Все серверные полки — утратой доступа разом: решение о нечитаемой учётке (G2).
-        "MedKitStorageRepository.published" to (Shape.READ by "(): List<Uuid>"),
-        "MedKitStorageRepository.loseAccess" to (Shape.NAMED_FIELDS by "(Uuid, Instant): Unit"),
-        "MedKitStorageRepository.add" to (Shape.CREATION by "(MedKit): Unit"),
-        "MedKitStorageRepository.describe" to (Shape.NAMED_FIELDS by "(Uuid, String, String): Boolean"),
+        "MedKitRecords.published" to (Shape.READ by "(): List<Uuid>"),
+        "MedKitRecords.loseAccess" to (Shape.NAMED_FIELDS by "(Uuid, Instant): Unit"),
+        "MedKitRecords.add" to (Shape.CREATION by "(MedKit): Unit"),
+        "MedKitRecords.describe" to (Shape.NAMED_FIELDS by "(Uuid, String, String): Boolean"),
         // Приём
         "IntakeReadings.observeOfCourse" to (Shape.READ by "(Uuid): Flow<List<IntakeProjection>>"),
         "IntakeReadings.observeOfPackage" to (Shape.READ by "(Uuid): Flow<List<IntakeProjection>>"),
@@ -145,20 +147,20 @@ class WriteContractTest {
         "IntakeRecords.record" to (Shape.ACTION by "(IntakeOutcome): Boolean"),
         "IntakeRecords.materialise" to (Shape.CREATION by "(List<CourseIntake>): List<Uuid>"),
         "IntakeRecords.prunePlanned" to (Shape.NAMED_FIELDS by "(Uuid, Set<ScheduledOccurrence>): List<Uuid>"),
-        "ReminderStorageRepository.changes" to (Shape.READ by "(): Flow<Unit>"),
-        "ReminderStorageRepository.groundsChanged" to (Shape.READ by "(): Flow<Unit>"),
-        "ReminderStorageRepository.find" to (Shape.READ by "(NotificationKey): Reminder"),
-        "ReminderStorageRepository.findAll" to (Shape.READ by "(Collection<NotificationKey>): List<Reminder>"),
-        "ReminderStorageRepository.awaiting" to (Shape.READ by "(NoticeDelivery): List<Reminder>"),
-        "ReminderStorageRepository.observeAwaiting" to (Shape.READ by "(NoticeDelivery): Flow<List<PendingNotice>>"),
-        "ReminderStorageRepository.groundless" to (Shape.READ by "(): List<Reminder>"),
-        "ReminderStorageRepository.stale" to (Shape.READ by "(Instant): List<Reminder>"),
-        "ReminderStorageRepository.ofKinds" to (Shape.READ by "(Collection<? extends NotificationKind>): List<Reminder>"),
+        "ReminderReadings.changes" to (Shape.READ by "(): Flow<Unit>"),
+        "ReminderReadings.groundsChanged" to (Shape.READ by "(): Flow<Unit>"),
+        "ReminderRecords.find" to (Shape.READ by "(NotificationKey): Reminder"),
+        "ReminderRecords.findAll" to (Shape.READ by "(Collection<NotificationKey>): List<Reminder>"),
+        "ReminderRecords.awaiting" to (Shape.READ by "(NoticeDelivery): List<Reminder>"),
+        "ReminderReadings.observeAwaiting" to (Shape.READ by "(NoticeDelivery): Flow<List<PendingNotice>>"),
+        "ReminderRecords.groundless" to (Shape.READ by "(): List<Reminder>"),
+        "ReminderRecords.stale" to (Shape.READ by "(Instant): List<Reminder>"),
+        "ReminderRecords.ofKinds" to (Shape.READ by "(Collection<? extends NotificationKind>): List<Reminder>"),
         // Обязательство считает своё состояние само и приходит сюда целиком: спорить с ним нечем.
-        "ReminderStorageRepository.saveAll" to (Shape.IN_TRANSACTION by "(Collection<Reminder>): Unit"),
+        "ReminderRecords.saveAll" to (Shape.IN_TRANSACTION by "(Collection<Reminder>): Unit"),
         // Удаляется то, что перечитано той же транзакцией: отозванное, воскрешённое между гашением и
         // удалением, живёт дальше.
-        "ReminderStorageRepository.deleteAll" to (Shape.IN_TRANSACTION by "(Collection<NotificationKey>): Unit")
+        "ReminderRecords.deleteAll" to (Shape.IN_TRANSACTION by "(Collection<NotificationKey>): Unit")
     )
 
     /**
@@ -173,7 +175,7 @@ class WriteContractTest {
      * сюда, либо объявляется долгом. Молча назвать такую запись действием больше нельзя.
      */
     private val inTransaction: Map<String, Set<String>> = mapOf(
-        "ReminderStorageRepository.saveAll" to setOf(
+        "ReminderRecords.saveAll" to setOf(
             // Завести недостающее и воскресить отозванное.
             "feature/notification/ReminderPromising.kt",
             // Снять обещанное, у которого не стало повода.
@@ -183,7 +185,7 @@ class WriteContractTest {
             // Записать исход показа — перечитав: пока шла система, обязательство могли изменить.
             "feature/notification/ReminderOutbox.kt"
         ),
-        "ReminderStorageRepository.deleteAll" to setOf(
+        "ReminderRecords.deleteAll" to setOf(
             // Забыть отозванное и давнее — перечитав: воскрешённое между гашением и удалением живёт.
             "feature/notification/ReminderOutbox.kt"
         )
@@ -195,15 +197,18 @@ class WriteContractTest {
     ).firstOrNull { it.isDirectory } ?: error("исходники не найдены: проверка прошла бы впустую")
 
     private val ports = listOf(
+        com.kert0n.medapp.feature.course.CourseReadings::class.java,
+        com.kert0n.medapp.feature.medkits.MedKitReadings::class.java,
+        com.kert0n.medapp.feature.notification.ReminderReadings::class.java,
         PackageRecords::class.java,
         com.kert0n.medapp.feature.packages.PackageReadings::class.java,
-        CourseStorageRepository::class.java,
-        MedKitStorageRepository::class.java,
+        CourseRecords::class.java,
+        MedKitRecords::class.java,
         IntakeRecords::class.java,
         com.kert0n.medapp.feature.intake.IntakeReadings::class.java,
         com.kert0n.medapp.feature.intake.IntakeAccounts::class.java,
-        com.kert0n.medapp.storage.report.ReportStorageRepository::class.java,
-        com.kert0n.medapp.storage.notification.ReminderStorageRepository::class.java
+        ReportReadings::class.java,
+        ReminderRecords::class.java
     )
 
     /**

@@ -19,7 +19,7 @@ import kotlin.uuid.Uuid
  * [PackageReadings]. Сущность, отданная [find], действительна в транзакции сценария, который её
  * читал.
  */
-interface PackageRecords {
+interface PackageRecords : PackageReadings {
 
     suspend fun find(id: Uuid): Package?
 

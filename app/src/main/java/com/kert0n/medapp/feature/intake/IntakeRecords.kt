@@ -11,7 +11,7 @@ import kotlin.uuid.Uuid
  * Хранение приёмов. Учёт расхода едет рядом отдельным значением: правила о приёме его не
  * читают, и в доменный тип он не входит (PLAN D6).
  */
-interface IntakeRecords {
+interface IntakeRecords : IntakeReadings {
 
     /** Пункты курса одним чтением — из них сценарий собирает прогресс внутри своей транзакции. */
     suspend fun ofCourse(courseId: Uuid): List<Intake>

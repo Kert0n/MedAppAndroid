@@ -1,14 +1,14 @@
 package com.kert0n.medapp.presentation.operation
 
-import com.kert0n.medapp.presentation.act
-import com.kert0n.medapp.presentation.ScreenFailures
-import com.kert0n.medapp.presentation.stateInScreen
-import com.kert0n.medapp.presentation.ScreenReading
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.kert0n.medapp.feature.operation.OperationDismissing
+import com.kert0n.medapp.feature.operation.OperationReadings
 import com.kert0n.medapp.feature.operation.Refreshing
-import com.kert0n.medapp.storage.operation.SyncOperationStorageRepository
+import com.kert0n.medapp.presentation.ScreenFailures
+import com.kert0n.medapp.presentation.ScreenReading
+import com.kert0n.medapp.presentation.act
+import com.kert0n.medapp.presentation.stateInScreen
 import dagger.hilt.android.lifecycle.HiltViewModel
 import java.time.Instant
 import javax.inject.Inject
@@ -31,7 +31,7 @@ import kotlinx.coroutines.launch
 class SyncStatusViewModel @Inject constructor(
     private val refreshing: Refreshing,
     private val dismissing: OperationDismissing,
-    operations: SyncOperationStorageRepository,
+    operations: OperationReadings,
     private val failures: ScreenFailures = ScreenFailures()
 ) : ViewModel() {
 

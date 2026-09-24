@@ -10,7 +10,6 @@ import com.kert0n.medapp.queue.QueueService
 import com.kert0n.medapp.queue.QueuedCommand
 import com.kert0n.medapp.queue.Transactions
 import com.kert0n.medapp.queue.medkit.MedKitSyncCommand
-import com.kert0n.medapp.storage.medkit.MedKitStorageRepository
 import java.time.Clock
 import javax.inject.Inject
 import kotlin.uuid.Uuid
@@ -41,7 +40,7 @@ import kotlin.uuid.Uuid
  * возвращается на полку, и полка остаётся: иначе сервер выбросил бы её вместе с полкой (PLAN E6).
  */
 class MedKitRemoval @Inject constructor(
-    private val medKits: MedKitStorageRepository,
+    private val medKits: MedKitRecords,
     private val packages: PackageRecords,
     private val removal: PackageRemoval,
     private val relocation: PackageRelocation,

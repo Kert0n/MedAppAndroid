@@ -7,6 +7,8 @@ import com.kert0n.medapp.domain.notification.NotificationTarget
 import com.kert0n.medapp.domain.notification.PendingNotice
 import com.kert0n.medapp.domain.notification.Reminder
 import com.kert0n.medapp.domain.value.Attempts
+import com.kert0n.medapp.feature.notification.ReminderReadings
+import com.kert0n.medapp.feature.notification.ReminderRecords
 import com.kert0n.medapp.storage.database.MedAppDatabase
 import com.kert0n.medapp.storage.database.observing
 import java.time.Instant
@@ -19,7 +21,7 @@ import kotlinx.coroutines.flow.map
 class ReminderRoomRepository @Inject constructor(
     private val database: MedAppDatabase,
     private val reminders: ReminderDao
-) : ReminderStorageRepository {
+) : ReminderRecords, ReminderReadings {
 
     override fun changes(): Flow<Unit> =
         database.invalidationTracker.createFlow("reminders", emitInitialState = true).map { }

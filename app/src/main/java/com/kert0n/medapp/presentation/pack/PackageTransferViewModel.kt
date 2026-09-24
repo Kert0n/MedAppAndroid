@@ -2,6 +2,7 @@ package com.kert0n.medapp.presentation.pack
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.kert0n.medapp.feature.medkits.MedKitReadings
 import com.kert0n.medapp.feature.operation.Freshening
 import com.kert0n.medapp.feature.packages.PackageReadings
 import com.kert0n.medapp.feature.packages.PackageRelocation
@@ -14,7 +15,6 @@ import com.kert0n.medapp.presentation.medkit.MedKitPresentationDTO
 import com.kert0n.medapp.presentation.medkit.toPresentationDTO
 import com.kert0n.medapp.presentation.readAfter
 import com.kert0n.medapp.presentation.stateInScreen
-import com.kert0n.medapp.storage.medkit.MedKitStorageRepository
 import dagger.assisted.Assisted
 import dagger.assisted.AssistedFactory
 import dagger.assisted.AssistedInject
@@ -46,7 +46,7 @@ class PackageTransferViewModel @AssistedInject constructor(
     private val relocation: PackageRelocation,
     freshening: Freshening,
     packages: PackageReadings,
-    medKits: MedKitStorageRepository,
+    medKits: MedKitReadings,
     today: Today,
     @Assisted private val packageId: Uuid,
     private val failures: ScreenFailures = ScreenFailures()

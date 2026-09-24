@@ -62,7 +62,7 @@ class MedKitContentsViewModelTest {
      * Запросы — поток: экран собирает состояние вне главного потока, и запрос к базе приходит
      * не раньше состояния, а рядом с ним, — проверка ждёт запроса, а не читает его наугад.
      */
-    private class Asked(private val real: FakePackages) : PackageRecords by real, PackageReadings by real {
+    private class Asked(private val real: FakePackages) : PackageRecords by real {
 
         val queries = MutableStateFlow<List<PackageQuery>>(emptyList())
 

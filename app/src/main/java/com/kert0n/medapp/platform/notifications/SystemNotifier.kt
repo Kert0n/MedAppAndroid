@@ -18,11 +18,12 @@ import com.kert0n.medapp.domain.notification.NotificationReadiness
 import com.kert0n.medapp.domain.notification.NotificationTarget
 import com.kert0n.medapp.domain.notification.Notifier
 import com.kert0n.medapp.domain.notification.Reminder
+import com.kert0n.medapp.feature.course.CourseReadings
+import com.kert0n.medapp.feature.course.CourseRecords
 import com.kert0n.medapp.feature.intake.IntakeRecords
 import com.kert0n.medapp.feature.packages.PackageReadings
 import com.kert0n.medapp.platform.notifications.NotificationChannels.Companion.id
 import com.kert0n.medapp.platform.settings.AppLanguages
-import com.kert0n.medapp.storage.course.CourseStorageRepository
 import dagger.hilt.android.qualifiers.ApplicationContext
 import java.time.Clock
 import java.time.LocalDate
@@ -49,7 +50,7 @@ import kotlinx.coroutines.flow.first
 class SystemNotifier @Inject constructor(
     @ApplicationContext private val context: Context,
     private val intakes: IntakeRecords,
-    private val courses: CourseStorageRepository,
+    private val courses: CourseRecords,
     private val packages: PackageReadings,
     private val readiness: NotificationReadiness,
     private val languages: AppLanguages,

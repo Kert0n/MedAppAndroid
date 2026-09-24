@@ -1,11 +1,10 @@
 package com.kert0n.medapp.feature.course
 
 import com.kert0n.medapp.queue.Transactions
-import com.kert0n.medapp.storage.course.CourseStorageRepository
 import java.time.Clock
-import kotlin.uuid.Uuid
 import javax.inject.Inject
 import javax.inject.Singleton
+import kotlin.uuid.Uuid
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 
@@ -20,7 +19,7 @@ import kotlinx.coroutines.sync.withLock
  */
 @Singleton
 class CourseUpkeep @Inject constructor(
-    private val courses: CourseStorageRepository,
+    private val courses: CourseRecords,
     private val calendar: CourseCalendar,
     private val transactions: Transactions,
     private val clock: Clock

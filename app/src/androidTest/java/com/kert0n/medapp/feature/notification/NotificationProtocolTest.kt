@@ -134,7 +134,7 @@ class NotificationProtocolTest {
         val real = database.intakeRepository()
         val answering = CoroutineScope(SupervisorJob() + Dispatchers.IO)
         var answer: kotlinx.coroutines.Job? = null
-        val readBeforeTheAnswer = object : IntakeRecords by real, IntakeReadings by real {
+        val readBeforeTheAnswer = object : IntakeRecords by real {
             override suspend fun plannedBefore(until: Instant): List<CourseIntake> {
                 val before = real.plannedBefore(until)
                 if (answer == null && until == Instant.ofEpochMilli(Long.MAX_VALUE)) {

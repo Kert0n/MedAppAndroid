@@ -2,7 +2,6 @@ package com.kert0n.medapp.feature.notification
 
 import com.kert0n.medapp.di.ApplicationScope
 import com.kert0n.medapp.queue.OutboxLoop
-import com.kert0n.medapp.storage.notification.ReminderStorageRepository
 import java.time.Clock
 import java.time.Duration
 import javax.inject.Inject
@@ -18,7 +17,7 @@ import kotlinx.coroutines.flow.stateIn
  * **Когда сверять** — и только это (PLAN D8). Обещанное следует из состояния коробок, лечений,
  * пунктов и очереди; изменилось состояние — обещанное надо сверить, кто бы его ни изменил:
  * человек правкой срока, снимок чужим расходом, работник закрытием операции. Повод приходит
- * сигналом [ReminderStorageRepository.groundsChanged] после коммита, поэтому сценарий после своей
+ * сигналом [ReminderReadings.groundsChanged] после коммита, поэтому сценарий после своей
  * транзакции ничего не зовёт — цикл тот же, что у [ReminderOutbox] и `QueueOutbox` ([OutboxLoop]):
  * сигналы сворачиваются, сбой сверки записан и повторяется по сроку, а не ждёт чужого сигнала.
  *
@@ -31,7 +30,7 @@ import kotlinx.coroutines.flow.stateIn
  */
 @Singleton
 class NotificationUpkeep @Inject constructor(
-    reminders: ReminderStorageRepository,
+    reminders: ReminderReadings,
     private val reconciliation: NotificationReconciliation,
     private val clock: Clock,
     @ApplicationScope scope: CoroutineScope

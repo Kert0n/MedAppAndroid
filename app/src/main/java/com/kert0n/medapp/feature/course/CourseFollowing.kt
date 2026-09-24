@@ -11,7 +11,6 @@ import com.kert0n.medapp.queue.QueueService
 import com.kert0n.medapp.queue.QueuedCommand
 import com.kert0n.medapp.queue.Transactions
 import com.kert0n.medapp.queue.pack.claimChangesSince
-import com.kert0n.medapp.storage.course.CourseStorageRepository
 import java.time.Instant
 import javax.inject.Inject
 import kotlin.uuid.Uuid
@@ -37,7 +36,7 @@ import kotlin.uuid.Uuid
  * коробку изменил, следствие ложится вместе с причиной или не ложится вовсе.
  */
 class CourseFollowing @Inject constructor(
-    private val courses: CourseStorageRepository,
+    private val courses: CourseRecords,
     private val packages: PackageRecords,
     private val calendar: CourseCalendar,
     private val queue: QueueService,

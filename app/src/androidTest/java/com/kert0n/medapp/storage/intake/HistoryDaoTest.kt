@@ -27,6 +27,7 @@ import com.kert0n.medapp.fixture.tablets
 import com.kert0n.medapp.queue.intake.IntakeAccounting
 import com.kert0n.medapp.storage.course.toStorageEntity as toRecordStorageEntity
 import com.kert0n.medapp.storage.database.MedAppDatabase
+import com.kert0n.medapp.storage.operation.syncState
 import com.kert0n.medapp.storage.operation.toStorageEntity
 import com.kert0n.medapp.storage.pack.ClaimsStorageEntity
 import java.time.Instant
@@ -143,7 +144,7 @@ class HistoryDaoTest {
         assertEquals(0, second)
         val stored = requireNotNull(intakes.findEntity(INTAKE))
         assertEquals(IntakeStatus.TAKEN, stored.status)
-        assertEquals(IntakeAccounting.LOCAL_APPLIED, stored.accounting)
+        assertEquals(IntakeAccounting.LOCAL_APPLIED, stored.syncState().accounting)
     }
 
     /**

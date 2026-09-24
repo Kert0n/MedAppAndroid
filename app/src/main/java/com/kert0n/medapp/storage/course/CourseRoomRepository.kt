@@ -15,7 +15,9 @@ import com.kert0n.medapp.domain.intake.CourseIntake
 import com.kert0n.medapp.domain.intake.IntakeAnswer
 import com.kert0n.medapp.domain.report.CourseInProgress
 import com.kert0n.medapp.domain.value.Vocabulary
+import com.kert0n.medapp.feature.course.CourseReadings
 import com.kert0n.medapp.feature.course.CourseReallocation
+import com.kert0n.medapp.feature.course.CourseRecords
 import com.kert0n.medapp.storage.database.MedAppDatabase
 import com.kert0n.medapp.storage.database.observing
 import com.kert0n.medapp.storage.intake.IntakeDao
@@ -36,7 +38,7 @@ class CourseRoomRepository @Inject constructor(
     private val packages: PackageDao,
     private val queue: SyncOperationDao,
     private val vocabulary: VocabularyDao
-) : CourseStorageRepository {
+) : CourseRecords, CourseReadings {
 
     override fun observeDrafts(): Flow<List<CourseDraftProjection>> =
         database.observing(*PLAN_TABLES) {

@@ -1,23 +1,23 @@
 package com.kert0n.medapp.presentation.medkit
 
-import com.kert0n.medapp.presentation.stateInScreen
-import com.kert0n.medapp.presentation.ScreenReading
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
-import com.kert0n.medapp.presentation.ScreenState
+import com.kert0n.medapp.feature.medkits.MedKitReadings
 import com.kert0n.medapp.feature.operation.Freshening
 import com.kert0n.medapp.feature.time.Today
-import com.kert0n.medapp.storage.medkit.MedKitStorageRepository
+import com.kert0n.medapp.presentation.Fresh
+import com.kert0n.medapp.presentation.ScreenReading
+import com.kert0n.medapp.presentation.ScreenState
+import com.kert0n.medapp.presentation.readAfter
+import com.kert0n.medapp.presentation.stateInScreen
 import dagger.hilt.android.lifecycle.HiltViewModel
 import javax.inject.Inject
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.flatMapLatest
-import kotlinx.coroutines.flow.stateIn
-import com.kert0n.medapp.presentation.Fresh
-import com.kert0n.medapp.presentation.readAfter
 import kotlinx.coroutines.flow.map
+import kotlinx.coroutines.flow.stateIn
 
 /**
  * Список аптечек (PLAN H3 №2). Состояние целиком приходит из базы: человек видит не названия, а
@@ -38,7 +38,7 @@ import kotlinx.coroutines.flow.map
 @HiltViewModel
 class MedKitListViewModel @Inject constructor(
     freshening: Freshening,
-    medKits: MedKitStorageRepository,
+    medKits: MedKitReadings,
     today: Today
 ) : ViewModel() {
 

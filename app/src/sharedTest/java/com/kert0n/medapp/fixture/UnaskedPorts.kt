@@ -15,7 +15,8 @@ import com.kert0n.medapp.feature.intake.IntakeOutcome
 import com.kert0n.medapp.feature.intake.IntakeReadings
 import com.kert0n.medapp.feature.intake.IntakeRecords
 import com.kert0n.medapp.feature.intake.RecordedIntake
-import com.kert0n.medapp.storage.notification.ReminderStorageRepository
+import com.kert0n.medapp.feature.notification.ReminderReadings
+import com.kert0n.medapp.feature.notification.ReminderRecords
 import java.time.Instant
 import kotlin.uuid.Uuid
 import kotlinx.coroutines.flow.Flow
@@ -56,7 +57,7 @@ object UnaskedIntakes : IntakeRecords, IntakeReadings {
 }
 
 /** Обязательства уведомлений: те же правила, что у [UnaskedIntakes]. */
-object UnaskedReminders : ReminderStorageRepository {
+object UnaskedReminders : ReminderRecords, ReminderReadings {
 
     override fun changes(): Flow<Unit> = flow { unasked("changes") }
 

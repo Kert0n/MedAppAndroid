@@ -9,9 +9,11 @@ import com.kert0n.medapp.domain.notification.NotificationKey
 import com.kert0n.medapp.domain.notification.NotificationKind
 import com.kert0n.medapp.domain.notification.NotificationTarget
 import com.kert0n.medapp.domain.value.Dose
+import com.kert0n.medapp.feature.course.CourseReadings
 import com.kert0n.medapp.feature.intake.IntakeConfirmation
 import com.kert0n.medapp.feature.intake.IntakeReadings
 import com.kert0n.medapp.feature.notification.ReminderOutbox
+import com.kert0n.medapp.feature.notification.ReminderReadings
 import com.kert0n.medapp.feature.packages.PackageReadings
 import com.kert0n.medapp.feature.time.Today
 import com.kert0n.medapp.presentation.ScreenFailures
@@ -19,8 +21,6 @@ import com.kert0n.medapp.presentation.ScreenReading
 import com.kert0n.medapp.presentation.act
 import com.kert0n.medapp.presentation.intake.toPresentationDTO
 import com.kert0n.medapp.presentation.stateInScreen
-import com.kert0n.medapp.storage.course.CourseStorageRepository
-import com.kert0n.medapp.storage.notification.ReminderStorageRepository
 import dagger.hilt.android.lifecycle.HiltViewModel
 import java.time.Instant
 import javax.inject.Inject
@@ -54,9 +54,9 @@ class MissedIntakesViewModel @Inject constructor(
     private val outbox: ReminderOutbox,
     private val confirmation: IntakeConfirmation,
     today: Today,
-    reminders: ReminderStorageRepository,
+    reminders: ReminderReadings,
     intakes: IntakeReadings,
-    courses: CourseStorageRepository,
+    courses: CourseReadings,
     packages: PackageReadings,
     private val failures: ScreenFailures = ScreenFailures()
 ) : ViewModel() {

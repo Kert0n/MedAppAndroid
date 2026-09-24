@@ -12,12 +12,12 @@ import com.kert0n.medapp.domain.intake.IntakeStatus
 import com.kert0n.medapp.domain.value.Doses
 import com.kert0n.medapp.feature.course.CourseCancellation
 import com.kert0n.medapp.feature.course.CourseOffPlanCounting
+import com.kert0n.medapp.feature.course.CourseReadings
 import com.kert0n.medapp.feature.intake.IntakeReadings
 import com.kert0n.medapp.presentation.ScreenFailures
 import com.kert0n.medapp.presentation.ScreenReading
 import com.kert0n.medapp.presentation.act
 import com.kert0n.medapp.presentation.stateInScreen
-import com.kert0n.medapp.storage.course.CourseStorageRepository
 import dagger.assisted.Assisted
 import dagger.assisted.AssistedFactory
 import dagger.assisted.AssistedInject
@@ -41,7 +41,7 @@ import kotlinx.coroutines.launch
 class CourseCardViewModel @AssistedInject constructor(
     private val cancellation: CourseCancellation,
     private val offPlanCounting: CourseOffPlanCounting,
-    courses: CourseStorageRepository,
+    courses: CourseReadings,
     intakes: IntakeReadings,
     @Assisted private val courseId: Uuid,
     private val failures: ScreenFailures = ScreenFailures()

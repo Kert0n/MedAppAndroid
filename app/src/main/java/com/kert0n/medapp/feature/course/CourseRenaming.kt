@@ -2,7 +2,6 @@ package com.kert0n.medapp.feature.course
 
 import com.kert0n.medapp.feature.readThisTransaction
 import com.kert0n.medapp.queue.Transactions
-import com.kert0n.medapp.storage.course.CourseStorageRepository
 import javax.inject.Inject
 import kotlin.uuid.Uuid
 
@@ -15,7 +14,7 @@ import kotlin.uuid.Uuid
  * где то же имя могло бы разойтись, не существует.
  */
 class CourseRenaming @Inject constructor(
-    private val courses: CourseStorageRepository,
+    private val courses: CourseRecords,
     private val transactions: Transactions
 ) {
 

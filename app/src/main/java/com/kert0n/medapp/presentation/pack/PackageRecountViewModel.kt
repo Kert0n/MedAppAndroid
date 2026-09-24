@@ -5,6 +5,7 @@ import androidx.lifecycle.viewModelScope
 import com.kert0n.medapp.feature.operation.Freshening
 import com.kert0n.medapp.feature.packages.PackageAdjusting
 import com.kert0n.medapp.feature.packages.PackageReadings
+import com.kert0n.medapp.feature.value.VocabularyReadings
 import com.kert0n.medapp.presentation.Fresh
 import com.kert0n.medapp.presentation.ParsedInput
 import com.kert0n.medapp.presentation.ScreenFailures
@@ -15,7 +16,6 @@ import com.kert0n.medapp.presentation.stateInScreen
 import com.kert0n.medapp.presentation.value.QuantityPresentationDTO
 import com.kert0n.medapp.presentation.value.toDomain
 import com.kert0n.medapp.presentation.value.toPresentationDTO
-import com.kert0n.medapp.storage.value.VocabularyStorageRepository
 import dagger.assisted.Assisted
 import dagger.assisted.AssistedFactory
 import dagger.assisted.AssistedInject
@@ -44,7 +44,7 @@ import kotlinx.coroutines.launch
 class PackageRecountViewModel @AssistedInject constructor(
     private val adjusting: PackageAdjusting,
     freshening: Freshening,
-    private val vocabulary: VocabularyStorageRepository,
+    private val vocabulary: VocabularyReadings,
     packages: PackageReadings,
     @Assisted private val packageId: Uuid,
     private val failures: ScreenFailures = ScreenFailures()

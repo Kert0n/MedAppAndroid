@@ -8,6 +8,7 @@ import com.kert0n.medapp.feature.packages.PackageRecords
 import com.kert0n.medapp.feature.scan.PackageScanning
 import com.kert0n.medapp.feature.template.TemplateSearching
 import com.kert0n.medapp.feature.time.Today
+import com.kert0n.medapp.feature.value.VocabularyReadings
 import com.kert0n.medapp.fixture.DirectTransactions
 import com.kert0n.medapp.fixture.FakeFollowing
 import com.kert0n.medapp.fixture.FakeMedKits
@@ -29,7 +30,6 @@ import com.kert0n.medapp.fixture.tablets
 import com.kert0n.medapp.fixture.watching
 import com.kert0n.medapp.presentation.value.toPresentationDTO
 import com.kert0n.medapp.queue.QueueService
-import com.kert0n.medapp.storage.value.VocabularyStorageRepository
 import java.time.Clock
 import java.time.Instant
 import java.time.ZoneId
@@ -60,7 +60,7 @@ class PackageFormViewModelTest {
 
     private fun viewModel(
         opened: PackageFormViewModel.Opened = PackageFormViewModel.Opened(medKitId = HOME_KIT),
-        vocabulary: VocabularyStorageRepository = FakeVocabulary(),
+        vocabulary: VocabularyReadings = FakeVocabulary(),
         packages: PackageReadings = this.packages,
         records: PackageRecords = this.packages
     ) = PackageFormViewModel(

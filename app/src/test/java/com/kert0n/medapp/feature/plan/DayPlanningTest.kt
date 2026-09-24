@@ -6,17 +6,17 @@ import com.kert0n.medapp.domain.report.Spending
 import com.kert0n.medapp.domain.report.SpendingHorizon
 import com.kert0n.medapp.domain.report.SpendingPeriod
 import com.kert0n.medapp.domain.report.StockSummary
+import com.kert0n.medapp.feature.report.ReportReadings
 import com.kert0n.medapp.feature.time.ClockShifts
 import com.kert0n.medapp.feature.time.Today
-import com.kert0n.medapp.storage.report.ReportStorageRepository
 import java.time.Clock
 import java.time.Instant
 import java.time.LocalDate
 import java.time.ZoneId
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.Flow
-import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.MutableSharedFlow
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.flow.take
 import kotlinx.coroutines.flow.toList
@@ -51,7 +51,7 @@ class DayPlanningTest {
     }
 
     /** Чтение, которое только запоминает, о каком дне его спросили. */
-    private class AskedDays : ReportStorageRepository {
+    private class AskedDays : ReportReadings {
         val asked = mutableListOf<Pair<LocalDate, ZoneId>>()
 
         override fun observeDayPlan(date: LocalDate, zone: ZoneId): Flow<DayPlan> {

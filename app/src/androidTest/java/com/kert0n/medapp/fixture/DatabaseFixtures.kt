@@ -96,8 +96,7 @@ fun MedAppDatabase.packageRepository() = FixturePackages(
 class FixturePackages(
     private val database: MedAppDatabase,
     private val repository: com.kert0n.medapp.storage.pack.PackageRoomRepository
-) : com.kert0n.medapp.feature.packages.PackageRecords by repository,
-    com.kert0n.medapp.feature.packages.PackageReadings by repository {
+) : com.kert0n.medapp.feature.packages.PackageRecords by repository {
 
     suspend fun add(pkg: Package, sync: PackageSyncState) = database.withTransaction { database.packages().save(pkg, sync) }
 

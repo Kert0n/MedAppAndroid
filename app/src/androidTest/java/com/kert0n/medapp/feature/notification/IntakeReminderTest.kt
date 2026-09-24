@@ -5,10 +5,11 @@ import com.kert0n.medapp.domain.intake.CourseIntake
 import com.kert0n.medapp.domain.notification.NotificationAction
 import com.kert0n.medapp.domain.notification.NotificationKey
 import com.kert0n.medapp.domain.notification.NotificationKind
-import com.kert0n.medapp.domain.notification.Reminder
 import com.kert0n.medapp.domain.notification.NotificationSettings
+import com.kert0n.medapp.domain.notification.Reminder
 import com.kert0n.medapp.domain.value.Doses
 import com.kert0n.medapp.feature.course.CourseDrafting
+import com.kert0n.medapp.feature.notification.ReminderRecords
 import com.kert0n.medapp.fixture.FakeNotifier
 import com.kert0n.medapp.fixture.FakeReminders
 import com.kert0n.medapp.fixture.FakeSettings
@@ -58,7 +59,7 @@ class IntakeReminderTest {
     private val reminders = FakeReminders()
     private val settings = FakeSettings()
     private lateinit var planning: NotificationReconciliation
-    private lateinit var store: com.kert0n.medapp.storage.notification.ReminderStorageRepository
+    private lateinit var store: ReminderRecords
     private lateinit var outbox: ReminderOutbox
 
     @Before

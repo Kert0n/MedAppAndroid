@@ -6,6 +6,7 @@ import com.kert0n.medapp.feature.intake.IntakeWarning
 import com.kert0n.medapp.feature.intake.UnplannedIntakeRecording
 import com.kert0n.medapp.feature.operation.Freshening
 import com.kert0n.medapp.feature.packages.PackageReadings
+import com.kert0n.medapp.feature.value.VocabularyReadings
 import com.kert0n.medapp.presentation.Fresh
 import com.kert0n.medapp.presentation.ParsedInput
 import com.kert0n.medapp.presentation.ScreenFailures
@@ -17,7 +18,6 @@ import com.kert0n.medapp.presentation.value.ExpiryDatePresentationDTO
 import com.kert0n.medapp.presentation.value.QuantityPresentationDTO
 import com.kert0n.medapp.presentation.value.UnitPresentationDTO
 import com.kert0n.medapp.presentation.value.toPresentationDTO
-import com.kert0n.medapp.storage.value.VocabularyStorageRepository
 import dagger.assisted.Assisted
 import dagger.assisted.AssistedFactory
 import dagger.assisted.AssistedInject
@@ -45,7 +45,7 @@ import kotlinx.coroutines.launch
 @HiltViewModel(assistedFactory = UnplannedIntakeViewModel.Factory::class)
 class UnplannedIntakeViewModel @AssistedInject constructor(
     private val recording: UnplannedIntakeRecording,
-    private val vocabulary: VocabularyStorageRepository,
+    private val vocabulary: VocabularyReadings,
     private val clock: Clock,
     freshening: Freshening,
     packages: PackageReadings,

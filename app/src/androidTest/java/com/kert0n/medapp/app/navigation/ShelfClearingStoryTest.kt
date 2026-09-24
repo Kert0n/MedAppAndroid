@@ -22,6 +22,8 @@ import com.kert0n.medapp.feature.connectivity.Connection
 import com.kert0n.medapp.feature.notification.DailyRound
 import com.kert0n.medapp.feature.notification.NotificationReconciliation
 import com.kert0n.medapp.feature.notification.ReminderAnswering
+import com.kert0n.medapp.feature.notification.ReminderReadings
+import com.kert0n.medapp.feature.notification.ReminderRecords
 import com.kert0n.medapp.fixture.FakeServer
 import com.kert0n.medapp.fixture.MOSCOW
 import com.kert0n.medapp.fixture.SHARED_KIT
@@ -42,7 +44,6 @@ import com.kert0n.medapp.queue.Transactions
 import com.kert0n.medapp.queue.pack.PackageSyncState
 import com.kert0n.medapp.storage.database.MedAppDatabase
 import com.kert0n.medapp.storage.medkit.toStorageEntity as toMedKitStorageEntity
-import com.kert0n.medapp.storage.notification.ReminderStorageRepository
 import com.kert0n.medapp.ui.theme.MedAppTheme
 import dagger.hilt.android.testing.HiltAndroidRule
 import dagger.hilt.android.testing.HiltAndroidTest
@@ -81,7 +82,7 @@ class ShelfClearingStoryTest {
 
     @Inject lateinit var database: MedAppDatabase
     @Inject lateinit var connection: Connection
-    @Inject lateinit var reminders: ReminderStorageRepository
+    @Inject lateinit var reminders: ReminderRecords
     @Inject lateinit var reconciliation: NotificationReconciliation
     @Inject lateinit var transactions: Transactions
     @Inject lateinit var shifts: TimeShifts

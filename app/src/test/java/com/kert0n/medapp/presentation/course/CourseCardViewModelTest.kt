@@ -54,7 +54,7 @@ class CourseCardViewModelTest {
     private val packages = FakePackages()
 
     /** Пункты карточке нужны потоком: пусто — это список без пунктов, а не молчащее чтение. */
-    private object NoIntakes : IntakeRecords by UnaskedIntakes, IntakeReadings by UnaskedIntakes {
+    private object NoIntakes : IntakeRecords by UnaskedIntakes {
         override fun observeOfCourse(courseId: Uuid): Flow<List<IntakeProjection>> = flowOf(emptyList())
     }
 

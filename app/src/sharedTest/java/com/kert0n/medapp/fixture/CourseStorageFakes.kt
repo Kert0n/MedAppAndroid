@@ -12,8 +12,9 @@ import com.kert0n.medapp.domain.course.CoverageReduction
 import com.kert0n.medapp.domain.course.Revision
 import com.kert0n.medapp.domain.intake.CourseIntake
 import com.kert0n.medapp.domain.report.CourseInProgress
+import com.kert0n.medapp.feature.course.CourseReadings
 import com.kert0n.medapp.feature.course.CourseReallocation
-import com.kert0n.medapp.storage.course.CourseStorageRepository
+import com.kert0n.medapp.feature.course.CourseRecords
 import java.time.Instant
 import kotlin.uuid.Uuid
 import kotlinx.coroutines.flow.Flow
@@ -29,7 +30,7 @@ import kotlinx.coroutines.flow.map
  * обеспечение кладёт тест в [coverages]. Плановые пункты активации и закрытия здесь не
  * материализуются: календарь проверяется на себе.
  */
-class FakeCourseStorage : CourseStorageRepository {
+class FakeCourseStorage : CourseRecords, CourseReadings {
 
     val drafts = LinkedHashMap<Uuid, CourseDraft>()
 

@@ -1,11 +1,11 @@
 package com.kert0n.medapp.presentation.course
 
-import com.kert0n.medapp.presentation.stateInScreen
-import com.kert0n.medapp.presentation.ScreenReading
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.kert0n.medapp.feature.course.CourseReadings
+import com.kert0n.medapp.presentation.ScreenReading
 import com.kert0n.medapp.presentation.ScreenState
-import com.kert0n.medapp.storage.course.CourseStorageRepository
+import com.kert0n.medapp.presentation.stateInScreen
 import dagger.hilt.android.lifecycle.HiltViewModel
 import javax.inject.Inject
 import kotlinx.coroutines.flow.SharingStarted
@@ -23,7 +23,7 @@ import kotlinx.coroutines.flow.stateIn
  * черновику: экран не сортирует, а показывает.
  */
 @HiltViewModel
-class CourseListViewModel @Inject constructor(courses: CourseStorageRepository) : ViewModel() {
+class CourseListViewModel @Inject constructor(courses: CourseReadings) : ViewModel() {
 
     /** Что экран читает из базы; не прочиталось — говорит об этом и предлагает повторить. */
     val reading = ScreenReading()

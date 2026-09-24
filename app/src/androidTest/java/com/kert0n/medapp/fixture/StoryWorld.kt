@@ -1,21 +1,21 @@
 package com.kert0n.medapp.fixture
 
 import androidx.compose.runtime.mutableStateOf
+import androidx.test.platform.app.InstrumentationRegistry
 import com.kert0n.medapp.domain.notification.NotificationAction
 import com.kert0n.medapp.domain.notification.NotificationKey
 import com.kert0n.medapp.domain.notification.NotificationKind
 import com.kert0n.medapp.domain.notification.NotificationTarget
 import com.kert0n.medapp.domain.notification.Reminder
+import com.kert0n.medapp.feature.connectivity.Connection
 import com.kert0n.medapp.feature.notification.DailyRound
 import com.kert0n.medapp.feature.notification.NotificationReconciliation
 import com.kert0n.medapp.feature.notification.NotificationUpkeep
 import com.kert0n.medapp.feature.notification.ReminderAnswering
 import com.kert0n.medapp.feature.notification.ReminderOutbox
-import androidx.test.platform.app.InstrumentationRegistry
-import com.kert0n.medapp.feature.connectivity.Connection
+import com.kert0n.medapp.feature.notification.ReminderRecords
 import com.kert0n.medapp.platform.time.TimeShifts
 import com.kert0n.medapp.queue.Transactions
-import com.kert0n.medapp.storage.notification.ReminderStorageRepository
 import java.time.Clock
 import java.time.Instant
 import java.time.ZoneId
@@ -70,7 +70,7 @@ class StoryWorld private constructor(start: Instant, zone: ZoneId) {
      * гаснет в [end], и цикл прошлой истории не будит соседнюю проверку на закрытой базе.
      */
     fun start(
-        reminders: ReminderStorageRepository,
+        reminders: ReminderRecords,
         reconciliation: NotificationReconciliation,
         transactions: Transactions,
         shifts: TimeShifts,

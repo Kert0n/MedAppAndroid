@@ -21,25 +21,27 @@ import com.kert0n.medapp.domain.intake.IntakeStatus
 import com.kert0n.medapp.domain.notification.NotificationChannel
 import com.kert0n.medapp.domain.notification.NotificationKey
 import com.kert0n.medapp.domain.notification.NotificationKind
+import com.kert0n.medapp.feature.connectivity.Connection
 import com.kert0n.medapp.feature.notification.DailyRound
 import com.kert0n.medapp.feature.notification.NotificationReconciliation
 import com.kert0n.medapp.feature.notification.ReminderAnswering
+import com.kert0n.medapp.feature.notification.ReminderReadings
+import com.kert0n.medapp.feature.notification.ReminderRecords
 import com.kert0n.medapp.fixture.MOSCOW
 import com.kert0n.medapp.fixture.StoryWorld
 import com.kert0n.medapp.fixture.TABLET_FORM
 import com.kert0n.medapp.fixture.TestPermissions
-import com.kert0n.medapp.fixture.pack
-import com.kert0n.medapp.fixture.packageRepository
-import com.kert0n.medapp.fixture.tablets
-import com.kert0n.medapp.fixture.storySetting
-import com.kert0n.medapp.fixture.treatmentStarted
+import com.kert0n.medapp.fixture.awaiting
 import com.kert0n.medapp.fixture.intakeOn
 import com.kert0n.medapp.fixture.moscow
-import com.kert0n.medapp.feature.connectivity.Connection
+import com.kert0n.medapp.fixture.pack
+import com.kert0n.medapp.fixture.packageRepository
+import com.kert0n.medapp.fixture.storySetting
+import com.kert0n.medapp.fixture.tablets
+import com.kert0n.medapp.fixture.treatmentStarted
 import com.kert0n.medapp.platform.time.TimeShifts
 import com.kert0n.medapp.queue.Transactions
 import com.kert0n.medapp.storage.database.MedAppDatabase
-import com.kert0n.medapp.storage.notification.ReminderStorageRepository
 import com.kert0n.medapp.ui.theme.MedAppTheme
 import dagger.hilt.android.testing.HiltAndroidRule
 import dagger.hilt.android.testing.HiltAndroidTest
@@ -80,7 +82,7 @@ class NightShiftStoryTest {
 
     @Inject lateinit var database: MedAppDatabase
     @Inject lateinit var connection: Connection
-    @Inject lateinit var reminders: ReminderStorageRepository
+    @Inject lateinit var reminders: ReminderRecords
     @Inject lateinit var reconciliation: NotificationReconciliation
     @Inject lateinit var transactions: Transactions
     @Inject lateinit var shifts: TimeShifts

@@ -11,7 +11,6 @@ import com.kert0n.medapp.domain.value.Doses
 import com.kert0n.medapp.domain.value.doses
 import com.kert0n.medapp.feature.packages.PackageRecords
 import com.kert0n.medapp.queue.Transactions
-import com.kert0n.medapp.storage.course.CourseStorageRepository
 import java.time.Clock
 import javax.inject.Inject
 import kotlin.uuid.Uuid
@@ -28,7 +27,7 @@ import kotlin.uuid.Uuid
  * не ложится, и черновик, ставший лечением, не затирается.
  */
 class CourseDrafting @Inject constructor(
-    private val courses: CourseStorageRepository,
+    private val courses: CourseRecords,
     private val packages: PackageRecords,
     private val transactions: Transactions,
     private val clock: Clock

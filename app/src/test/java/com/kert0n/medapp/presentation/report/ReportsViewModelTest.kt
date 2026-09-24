@@ -6,29 +6,29 @@ import com.kert0n.medapp.domain.report.Spending
 import com.kert0n.medapp.domain.report.SpendingHorizon
 import com.kert0n.medapp.domain.report.SpendingPeriod
 import com.kert0n.medapp.domain.report.StockSummary
+import com.kert0n.medapp.feature.report.ReportReadings
 import com.kert0n.medapp.feature.time.ClockShifts
 import com.kert0n.medapp.feature.time.Today
 import com.kert0n.medapp.presentation.ScreenState
-import com.kert0n.medapp.storage.report.ReportStorageRepository
 import java.time.Clock
 import java.time.Instant
 import java.time.LocalDate
 import java.time.ZoneId
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableSharedFlow
-import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.launch
-import kotlinx.coroutines.test.advanceTimeBy
-import kotlinx.coroutines.test.runCurrent
 import kotlinx.coroutines.test.TestScope
 import kotlinx.coroutines.test.UnconfinedTestDispatcher
+import kotlinx.coroutines.test.advanceTimeBy
 import kotlinx.coroutines.test.resetMain
+import kotlinx.coroutines.test.runCurrent
 import kotlinx.coroutines.test.runTest
 import kotlinx.coroutines.test.setMain
-import org.junit.Assert.assertEquals
 import org.junit.After
+import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
@@ -54,7 +54,7 @@ class ReportsViewModelTest {
      * свой ответ, и пока его не положили, поток молчит — как молчит настоящее чтение, пока база не
      * отдала первый снимок.
      */
-    private class Reads : ReportStorageRepository {
+    private class Reads : ReportReadings {
         val horizons = mutableListOf<SpendingHorizon>()
         val stock = MutableStateFlow(StockSummary.of(emptyList()))
         private val answers = mutableMapOf<SpendingHorizon, MutableSharedFlow<FutureSpending>>()
