@@ -10,6 +10,24 @@ import org.junit.Test
 
 class MedKitTest {
 
+    /**
+     * Экран предлагает сделать полку общей по проекции, а решает сама полка: ответы совпадают при
+     * любой публикации и любой пометке — полке, о которой уже принимается решение (убирают,
+     * публикуют), публикацию не предлагают (замечание разбора #89).
+     */
+    @Test
+    fun theProjectionOffersPublicationExactlyWhenTheShelfAcceptsIt() {
+        for (publication in MedKit.Publication.entries) for (status in MedKitStatus.entries) {
+            val shelf = runCatching { com.kert0n.medapp.fixture.medKit(publication = publication, status = status) }.getOrNull() ?: continue
+            assertEquals(
+                "$publication / $status",
+                shelf.refusesPublication() == null,
+                shelf.projection(MedKitContents(packages = 0, expired = 0)).publishable
+            )
+        }
+    }
+
+
     @Test
     fun describingKeepsPublicationAndClearsLocation() {
         val original = kit(publication = MedKit.Publication.PUBLISHED, participants = 3)
