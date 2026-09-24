@@ -6,12 +6,12 @@ import androidx.datastore.preferences.core.PreferenceDataStoreFactory
 import androidx.datastore.preferences.core.Preferences
 import androidx.datastore.preferences.preferencesDataStoreFile
 import com.kert0n.medapp.domain.notification.NotificationSettingsSource
+import com.kert0n.medapp.feature.settings.AppLanguages
+import com.kert0n.medapp.feature.settings.DevicePermissions
 import com.kert0n.medapp.feature.settings.SettingsStore
 import com.kert0n.medapp.platform.settings.AndroidDevicePermissions
 import com.kert0n.medapp.platform.settings.AppCompatAppLanguages
-import com.kert0n.medapp.platform.settings.AppLanguages
 import com.kert0n.medapp.platform.settings.DataStoreSettings
-import com.kert0n.medapp.platform.settings.DevicePermissions
 import com.kert0n.medapp.platform.settings.StoredNotificationSettings
 import dagger.Module
 import dagger.Provides
@@ -19,9 +19,9 @@ import dagger.hilt.InstallIn
 import dagger.hilt.android.qualifiers.ApplicationContext
 import dagger.hilt.components.SingletonComponent
 import java.io.File
-import kotlinx.coroutines.CoroutineDispatcher
 import javax.inject.Qualifier
 import javax.inject.Singleton
+import kotlinx.coroutines.CoroutineDispatcher
 
 @Qualifier
 @Retention(AnnotationRetention.BINARY)

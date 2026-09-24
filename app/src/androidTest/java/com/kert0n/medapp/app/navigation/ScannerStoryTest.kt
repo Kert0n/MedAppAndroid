@@ -1,6 +1,5 @@
 package com.kert0n.medapp.app.navigation
 
-import com.kert0n.medapp.fixture.pressAfterTyping
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.junit4.v2.createAndroidComposeRule
 import androidx.compose.ui.test.onAllNodesWithText
@@ -11,20 +10,21 @@ import androidx.compose.ui.test.performTextInput
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import com.kert0n.medapp.HiltTestActivity
 import com.kert0n.medapp.domain.scan.PackageCodes
+import com.kert0n.medapp.feature.packages.PackageQuery
 import com.kert0n.medapp.fixture.FakePackageCodes
 import com.kert0n.medapp.fixture.HOME_KIT
 import com.kert0n.medapp.fixture.TABLETS
 import com.kert0n.medapp.fixture.TABLET_FORM
 import com.kert0n.medapp.fixture.medKit
 import com.kert0n.medapp.fixture.packageRepository
+import com.kert0n.medapp.fixture.pressAfterTyping
 import com.kert0n.medapp.storage.database.MedAppDatabase
-import com.kert0n.medapp.storage.pack.PackageQuery
-import java.time.LocalDate
 import com.kert0n.medapp.storage.medkit.toStorageEntity as toMedKitStorageEntity
 import com.kert0n.medapp.storage.value.toStorageEntity
 import com.kert0n.medapp.ui.theme.MedAppTheme
 import dagger.hilt.android.testing.HiltAndroidRule
 import dagger.hilt.android.testing.HiltAndroidTest
+import java.time.LocalDate
 import javax.inject.Inject
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.runBlocking

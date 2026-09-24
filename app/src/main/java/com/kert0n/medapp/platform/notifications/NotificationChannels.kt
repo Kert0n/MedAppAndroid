@@ -1,7 +1,7 @@
 package com.kert0n.medapp.platform.notifications
 
-import android.app.NotificationChannel as SystemChannel
 import android.Manifest
+import android.app.NotificationChannel as SystemChannel
 import android.app.NotificationManager
 import android.content.Context
 import android.content.pm.PackageManager
@@ -12,7 +12,7 @@ import com.kert0n.medapp.R
 import com.kert0n.medapp.domain.notification.NotificationChannel
 import com.kert0n.medapp.domain.notification.NotificationReadiness
 import com.kert0n.medapp.domain.notification.Readiness
-import com.kert0n.medapp.platform.settings.AppLanguages
+import com.kert0n.medapp.feature.settings.AppLanguages
 import dagger.hilt.android.qualifiers.ApplicationContext
 import javax.inject.Inject
 import javax.inject.Singleton

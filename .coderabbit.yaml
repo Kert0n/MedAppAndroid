@@ -31,14 +31,16 @@ reviews:
       instructions: >-
         A scenario is one human action in one transaction: read the entity inside the transaction,
         apply the transition, re-read after each write (readThisTransaction). Outcomes are enums
-        that the screen can tell apart. feature never imports ui, app or platform internals except
-        ports. Text for humans does not belong here.
+        that the screen can tell apart. feature declares the ports it needs in feature/<concept>,
+        cut by consumer (*Records for the scenario, *Readings for screens), and never imports
+        storage, network, platform, ui or app. Text for humans does not belong here.
     - path: "app/src/main/java/com/kert0n/medapp/{presentation,ui}/**"
       instructions: >-
         Screen rules: one ViewModel, one state, one DTO per screen — never a domain entity inside
         state (entities are equal by id and hide content changes). ViewModel receives route data as
         primitives (Uuid?) via assisted injection, never Screen keys. presentation and ui must not
-        import network, storage DAOs/database or queue. The busy flag is set before calling the
+        import network, storage, platform or queue: saved data is read through a scenario's
+        *Readings port. The busy flag is set before calling the
         scenario so a second tap never starts a second job. Before the first read the state is
         loading, never empty or gone. Every scenario outcome is shown, never swallowed. Colour is
         never the only carrier of meaning: icon and words accompany it. Strings live in R.string,
@@ -65,6 +67,15 @@ reviews:
         transaction. Constraints belong to the schema, not to code. Decimal amounts are stored as
         strings with a derived sort key; CAST(... AS REAL) is forbidden. Corrupt stored values
         degrade to "absent", never crash the whole read.
+    - path: "app/src/main/java/com/kert0n/medapp/platform/**"
+      instructions: >-
+        Platform only performs device functions (alarm, shade, key, camera, WorkManager, DataStore)
+        behind ports declared by domain or feature. It never reads data for itself and never names
+        an Android entry class: whom to wake comes from AppEntries.
+    - path: "app/src/main/java/com/kert0n/medapp/app/**"
+      instructions: >-
+        app holds Android entries (Activity, receivers, workers, triggers): each turns a system event
+        into one scenario call and decides nothing itself.
     - path: "app/src/{test,androidTest,sharedTest}/**"
       instructions: >-
         One test per rule, named by the behaviour it stops, with a KDoc saying what would go wrong

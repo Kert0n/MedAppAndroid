@@ -4,7 +4,6 @@ import com.kert0n.medapp.domain.notification.NotificationKind
 import com.kert0n.medapp.domain.notification.NotificationSettingsSource
 import com.kert0n.medapp.domain.notification.Reminder
 import com.kert0n.medapp.queue.Transactions
-import com.kert0n.medapp.storage.notification.ReminderStorageRepository
 import javax.inject.Inject
 
 /**
@@ -26,7 +25,7 @@ import javax.inject.Inject
  * обязательство откатывается вместе с ним.
  */
 class ReminderPromising @Inject constructor(
-    private val reminders: ReminderStorageRepository,
+    private val reminders: ReminderRecords,
     private val settings: NotificationSettingsSource,
     private val transactions: Transactions
 ) {

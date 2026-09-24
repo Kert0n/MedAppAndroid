@@ -1,28 +1,26 @@
 package com.kert0n.medapp.presentation.pack
 
 import com.kert0n.medapp.domain.medkit.MedKit
-import com.kert0n.medapp.domain.pack.Claims
-import com.kert0n.medapp.domain.pack.PackageProjection
 import com.kert0n.medapp.domain.medkit.MedKitContents
 import com.kert0n.medapp.domain.medkit.MedKitProjection
-import com.kert0n.medapp.fixture.projected
+import com.kert0n.medapp.domain.pack.Claims
+import com.kert0n.medapp.domain.pack.PackageProjection
 import com.kert0n.medapp.domain.value.DosageForm
 import com.kert0n.medapp.domain.value.Money
 import com.kert0n.medapp.domain.value.Quantity
 import com.kert0n.medapp.domain.value.QuantityUnit
-import com.kert0n.medapp.presentation.medkit.MedKitPresentationDTO
-import com.kert0n.medapp.presentation.medkit.toPresentationDTO
-
 import com.kert0n.medapp.fixture.HOME_KIT
 import com.kert0n.medapp.fixture.TABLETS_ID
 import com.kert0n.medapp.fixture.TABLET_FORM_ID
-import com.kert0n.medapp.fixture.factsOf
-import com.kert0n.medapp.fixture.pack
 import com.kert0n.medapp.fixture.dose
 import com.kert0n.medapp.fixture.ended
+import com.kert0n.medapp.fixture.factsOf
 import com.kert0n.medapp.fixture.left
+import com.kert0n.medapp.fixture.pack
+import com.kert0n.medapp.fixture.projected
 import com.kert0n.medapp.fixture.tablets
-
+import com.kert0n.medapp.presentation.medkit.MedKitPresentationDTO
+import com.kert0n.medapp.presentation.medkit.toPresentationDTO
 import java.math.BigDecimal
 import java.time.Instant
 import kotlinx.coroutines.ExperimentalCoroutinesApi

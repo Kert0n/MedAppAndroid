@@ -1,0 +1,227 @@
+package com.kert0n.medapp.app.notifications
+
+import android.content.Context
+import androidx.test.ext.junit.runners.AndroidJUnit4
+import androidx.test.platform.app.InstrumentationRegistry
+import androidx.work.Configuration
+import androidx.work.ListenableWorker
+import androidx.work.WorkInfo
+import androidx.work.WorkManager
+import androidx.work.WorkerFactory
+import androidx.work.WorkerParameters
+import androidx.work.testing.TestListenableWorkerBuilder
+import androidx.work.testing.WorkManagerTestInitHelper
+import com.kert0n.medapp.di.EntriesModule
+import com.kert0n.medapp.platform.AppEntries
+import com.kert0n.medapp.domain.intake.CourseIntake
+import com.kert0n.medapp.domain.intake.IntakeStatus
+import com.kert0n.medapp.domain.value.Doses
+import com.kert0n.medapp.feature.course.CourseDrafting
+import com.kert0n.medapp.fixture.FakeSettingsStore
+import com.kert0n.medapp.fixture.PACK
+import com.kert0n.medapp.fixture.Scenarios
+import com.kert0n.medapp.fixture.TABLET_FORM
+import com.kert0n.medapp.fixture.dose
+import com.kert0n.medapp.fixture.inMemoryDatabase
+import com.kert0n.medapp.fixture.intakeRepository
+import com.kert0n.medapp.fixture.pack
+import com.kert0n.medapp.fixture.packageRepository
+import com.kert0n.medapp.fixture.schedule
+import com.kert0n.medapp.fixture.tablets
+import com.kert0n.medapp.platform.notifications.WorkManagerDailySchedule
+import com.kert0n.medapp.storage.database.MedAppDatabase
+import java.time.Clock
+import java.time.Instant
+import java.time.LocalDate
+import java.time.LocalTime
+import java.time.ZoneId
+import java.time.ZoneOffset
+import kotlinx.coroutines.runBlocking
+import org.junit.After
+import org.junit.Assert.assertEquals
+import org.junit.Assert.assertTrue
+import org.junit.Before
+import org.junit.Test
+import org.junit.runner.RunWith
+
+/** Проход дня планировщиком системы: воркер зовёт тот же сценарий, что вход в приложение (PLAN D8). */
+@RunWith(AndroidJUnit4::class)
+class DailyWorkerTest {
+
+    private val context: Context = InstrumentationRegistry.getInstrumentation().targetContext
+    private lateinit var database: MedAppDatabase
+    private lateinit var work: WorkManager
+    private val now: Instant = Instant.parse("2027-03-11T05:00:00Z")
+    private val clock: Clock = Clock.fixed(now, ZoneOffset.UTC)
+
+    @Before
+    fun setUp() {
+        database = inMemoryDatabase()
+        WorkManagerTestInitHelper.initializeTestWorkManager(context, Configuration.Builder().build())
+        work = WorkManager.getInstance(context)
+    }
+
+    @After
+    fun tearDown() = database.close()
+
+    private fun worker(scenarios: Scenarios): DailyWorker =
+        TestListenableWorkerBuilder<DailyWorker>(context)
+            .setWorkerFactory(object : WorkerFactory() {
+                override fun createWorker(appContext: Context, workerClassName: String, workerParameters: WorkerParameters): ListenableWorker =
+                    DailyWorker(appContext, workerParameters, scenarios.dailyRound, scenarios.reminderOutbox, WorkManagerDailySchedule({ work }, clock, EntriesModule.entries()), FakeSettingsStore())
+            })
+            .build()
+
+    @Test
+    fun theWorkerMarksYesterdayMissedAndArmsToday(): Unit = runBlocking {
+        database.packageRepository().add(pack(id = PACK, quantity = tablets("20"), form = TABLET_FORM))
+        val yesterday = Scenarios(database, Instant.parse("2027-03-10T05:00:00Z"))
+        val created = yesterday.courseDrafting.create("Ибупрофен")
+        val draft = (yesterday.courseDrafting.edit(
+            created.id, created.revision,
+            listOf(
+                CourseDrafting.Edit.SetDose(dose("2")), CourseDrafting.Edit.SetForm(TABLET_FORM),
+                CourseDrafting.Edit.SetSchedule(schedule(start = LocalDate.of(2027, 3, 10))),
+                CourseDrafting.Edit.SetTotalDoses(Doses(5)), CourseDrafting.Edit.Attach(PACK, Doses(5))
+            )
+        ) as CourseDrafting.Outcome.Saved).draft
+        yesterday.courseActivation.activate(draft.id, draft.revision)
+        val today = Scenarios(database, now)
+
+        val result = worker(today).doWork()
+
+        assertEquals(ListenableWorker.Result.success(), result)
+        val statuses = database.intakeRepository().ofCourse(draft.id).filterIsInstance<CourseIntake>().associate { it.slot.localDate to it.status }
+        assertEquals(IntakeStatus.MISSED, statuses[LocalDate.of(2027, 3, 10)])
+        assertEquals(IntakeStatus.PLANNED, statuses[LocalDate.of(2027, 3, 11)])
+        // Обещание у каждого планового пункта, и ни одного у вчерашнего пропущенного.
+        val stillPlanned = database.intakeRepository().ofCourse(draft.id).filterIsInstance<CourseIntake>()
+            .filter { it.status == IntakeStatus.PLANNED }.map { it.id }.toSet()
+        assertEquals(
+            stillPlanned,
+            today.reminderStore.ofKinds(listOf(com.kert0n.medapp.domain.notification.NotificationKind.INTAKE_DUE))
+                .filter { it.state == com.kert0n.medapp.domain.notification.Reminder.State.DUE }
+                .map { kotlin.uuid.Uuid.parse(it.key.subject) }.toSet()
+        )
+        // О пропуске скажет попап при входе (C1 «Попап пропущенного»): обещание ждёт его.
+        assertTrue(
+            today.reminderStore.awaiting(com.kert0n.medapp.domain.notification.NoticeDelivery.IN_APP_BANNER)
+                .any { it.kind == com.kert0n.medapp.domain.notification.NotificationKind.INTAKE_MISSED }
+        )
+    }
+
+    /**
+     * Ежедневная работа — единственное, что держит процесс, когда его подняла система: после
+     * загрузки, перевода часов, по расписанию. Кончилась она — процесс вправе умереть, и будильник
+     * к ближайшему приёму к этому мигу обязан стоять.
+     *
+     * Красная проверка: работа сверяла обещания и кончалась, а ставить будильник оставляла циклу
+     * владельца доставки в области приложения; в процессе, который система убила сразу после
+     * работы, утреннее напоминание не приходило.
+     */
+    @Test
+    fun theWorkLeavesTheDayArmed(): Unit = runBlocking {
+        database.packageRepository().add(pack(id = PACK, quantity = tablets("20"), form = TABLET_FORM))
+        val yesterday = Scenarios(database, Instant.parse("2027-03-10T05:00:00Z"))
+        val created = yesterday.courseDrafting.create("Ибупрофен")
+        val draft = (yesterday.courseDrafting.edit(
+            created.id, created.revision,
+            listOf(
+                CourseDrafting.Edit.SetDose(dose("2")), CourseDrafting.Edit.SetForm(TABLET_FORM),
+                CourseDrafting.Edit.SetSchedule(schedule(start = LocalDate.of(2027, 3, 10))),
+                CourseDrafting.Edit.SetTotalDoses(Doses(5)), CourseDrafting.Edit.Attach(PACK, Doses(5))
+            )
+        ) as CourseDrafting.Outcome.Saved).draft
+        yesterday.courseActivation.activate(draft.id, draft.revision)
+        val today = Scenarios(database, now)
+
+        assertEquals(ListenableWorker.Result.success(), worker(today).doWork())
+
+        val next = database.intakeRepository().ofCourse(draft.id).filterIsInstance<CourseIntake>()
+            .filter { it.status == IntakeStatus.PLANNED }.minOf { it.plannedAt }
+        assertEquals("работа кончилась, а будильника к ближайшему приёму нет", next, today.reminders.exactAt)
+    }
+
+    /** Ежедневная задача одна: повторная постановка её не сдвигает; «сейчас» — отдельная разовая. */
+    @Test
+    fun theDailyWorkIsOneAndKept() = runBlocking {
+        val schedule = WorkManagerDailySchedule({ work }, clock, EntriesModule.entries())
+
+        schedule.keepDaily(LocalTime.of(9, 0))
+        val before = work.getWorkInfosForUniqueWork(WorkManagerDailySchedule.DAILY).get().single()
+        schedule.keepDaily(LocalTime.of(9, 0))
+        schedule.runNow()
+
+        val daily = work.getWorkInfosForUniqueWork(WorkManagerDailySchedule.DAILY).get()
+        assertEquals(1, daily.size)
+        assertEquals(before.id, daily.single().id)
+        assertTrue(daily.single().state == WorkInfo.State.ENQUEUED || daily.single().state == WorkInfo.State.RUNNING)
+        assertEquals(1, work.getWorkInfosForUniqueWork(WorkManagerDailySchedule.NOW).get().size)
+    }
+
+    /**
+     * Ежедневная задача прошлой сборки будит её работника; то же время сводки её не спасает —
+     * переехавший работник иначе не проснулся бы ни разу (замечание разбора #88).
+     */
+    @Test
+    fun dailyWorkLeftByAnEarlierBuildWakesTodaysWorker() = runBlocking {
+        val today = EntriesModule.entries()
+        val earlier = AppEntries(today.sync, today.sync, today.reminderWake, today.notificationAction)
+        WorkManagerDailySchedule({ work }, clock, earlier).keepDaily(LocalTime.of(9, 0))
+
+        WorkManagerDailySchedule({ work }, clock, today).keepDaily(LocalTime.of(9, 0))
+
+        val daily = work.getWorkInfosForUniqueWork(WorkManagerDailySchedule.DAILY).get().filter { !it.state.isFinished }
+        assertEquals(1, daily.size)
+        assertTrue(daily.single().tags.toString(), today.daily.name in daily.single().tags)
+    }
+
+    /** Новое время сводки переставляет задачу: она по-прежнему одна и помечена новым временем, а не прежним. */
+    @Test
+    fun aNewDigestTimeMovesTheDailyWork() = runBlocking {
+        val schedule = WorkManagerDailySchedule({ work }, clock, EntriesModule.entries())
+        schedule.keepDaily(LocalTime.of(9, 0))
+
+        schedule.keepDaily(LocalTime.of(18, 0))
+
+        val daily = work.getWorkInfosForUniqueWork(WorkManagerDailySchedule.DAILY).get().filter { !it.state.isFinished }
+        assertEquals(1, daily.size)
+        assertTrue("задача не помечена новым временем", daily.single().tags.any { "18:00@" in it })
+        assertTrue("задача всё ещё помечена прежним временем", daily.single().tags.none { "09:00@" in it })
+    }
+
+    /** Часы, у которых зону можно сменить на ходу, — как у устройства после переезда. */
+    private class MovingClock(private val at: Instant, var current: ZoneId) : Clock() {
+        override fun instant(): Instant = at
+        override fun getZone(): ZoneId = current
+        override fun withZone(zone: ZoneId): Clock = MovingClock(at, zone)
+    }
+
+    /**
+     * **Ежедневная задача стоит на времени в зоне** (C1 «Часы устройства — в его нынешней зоне»).
+     * Сменилась зона — «09:00» уже другой момент, и стоящая задача — не та же: проход дня после
+     * себя переставляет её. Пока метка задачи несла только время, задача считалась той же и
+     * стояла на московские девять во Владивостоке.
+     */
+    @Test
+    fun aZoneChangeReschedulesTheDay() = runBlocking {
+        val moving = MovingClock(now, ZoneId.of("Europe/Moscow"))
+        val schedule = WorkManagerDailySchedule({ work }, moving, EntriesModule.entries())
+        schedule.keepDaily(LocalTime.of(9, 0))
+        val moscow = work.getWorkInfosForUniqueWork(WorkManagerDailySchedule.DAILY).get().single()
+
+        moving.current = ZoneId.of("Asia/Vladivostok")
+        val settings = FakeSettingsStore()
+        val worker = TestListenableWorkerBuilder<DailyWorker>(context)
+            .setWorkerFactory(object : WorkerFactory() {
+                override fun createWorker(appContext: Context, workerClassName: String, workerParameters: WorkerParameters): ListenableWorker =
+                    Scenarios(database, now).let { DailyWorker(appContext, workerParameters, it.dailyRound, it.reminderOutbox, schedule, settings) }
+            })
+            .build()
+        assertEquals(ListenableWorker.Result.success(), worker.doWork())
+
+        val vladivostok = work.getWorkInfosForUniqueWork(WorkManagerDailySchedule.DAILY).get().single { !it.state.isFinished }
+        assertTrue("задача не переставлена после смены зоны", vladivostok.id != moscow.id)
+        assertTrue("метка задачи без зоны: ${vladivostok.tags}", vladivostok.tags.any { "Asia/Vladivostok" in it })
+    }
+}

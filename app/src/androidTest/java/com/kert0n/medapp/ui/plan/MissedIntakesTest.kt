@@ -1,7 +1,5 @@
 package com.kert0n.medapp.ui.plan
 
-import kotlinx.coroutines.flow.first
-import kotlinx.coroutines.async
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import androidx.test.ext.junit.runners.AndroidJUnit4
@@ -9,6 +7,8 @@ import com.kert0n.medapp.domain.intake.CourseIntake
 import com.kert0n.medapp.domain.intake.IntakeStatus
 import com.kert0n.medapp.domain.value.Doses
 import com.kert0n.medapp.feature.course.CourseDrafting
+import com.kert0n.medapp.feature.notification.ReminderReadings
+import com.kert0n.medapp.feature.notification.ReminderRecords
 import com.kert0n.medapp.feature.time.Today
 import com.kert0n.medapp.fixture.HOME_KIT
 import com.kert0n.medapp.fixture.PACK
@@ -38,7 +38,9 @@ import java.time.LocalTime
 import java.time.ZoneOffset
 import kotlin.time.Duration.Companion.seconds
 import kotlin.uuid.Uuid
+import kotlinx.coroutines.async
 import kotlinx.coroutines.cancel
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.runBlocking
 import org.junit.After
 import org.junit.Assert.assertEquals
@@ -280,11 +282,11 @@ class MissedIntakesTest {
 
     /** Отметку показа пишет доставка, а база ей отказывает — полный диск. */
     private fun outboxThatCannotWrite(scenarios: Scenarios) = com.kert0n.medapp.feature.notification.ReminderOutbox(
-        object : com.kert0n.medapp.storage.notification.ReminderStorageRepository by scenarios.reminderStore {
+        object : ReminderRecords by scenarios.reminderStore {
             override suspend fun findAll(keys: Collection<com.kert0n.medapp.domain.notification.NotificationKey>) =
                 throw IllegalStateException("database or disk is full")
         },
-        scenarios.notifier, scenarios.reminders, scenarios.freshness, scenarios.transactions,
+        scenarios.notifier, scenarios.reminderSubjects, scenarios.reminders, scenarios.freshness, scenarios.transactions,
         java.time.Clock.fixed(scenarios.now, java.time.ZoneOffset.UTC),
         kotlinx.coroutines.CoroutineScope(kotlinx.coroutines.SupervisorJob() + kotlinx.coroutines.Dispatchers.Unconfined)
     )

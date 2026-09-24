@@ -3,18 +3,16 @@ package com.kert0n.medapp.domain.pack
 import com.kert0n.medapp.domain.medkit.MedKitStatus
 import com.kert0n.medapp.domain.value.Dose
 import com.kert0n.medapp.domain.value.Money
-
 import com.kert0n.medapp.fixture.HOME_KIT
 import com.kert0n.medapp.fixture.LATER
 import com.kert0n.medapp.fixture.SHARED_KIT
-import com.kert0n.medapp.fixture.factsOf
 import com.kert0n.medapp.fixture.expiry
-import com.kert0n.medapp.fixture.withShared
+import com.kert0n.medapp.fixture.factsOf
 import com.kert0n.medapp.fixture.left
 import com.kert0n.medapp.fixture.medKit
 import com.kert0n.medapp.fixture.pack
 import com.kert0n.medapp.fixture.tablets
-
+import com.kert0n.medapp.fixture.withShared
 import java.math.BigDecimal
 import kotlin.uuid.Uuid
 import org.junit.Assert.assertEquals

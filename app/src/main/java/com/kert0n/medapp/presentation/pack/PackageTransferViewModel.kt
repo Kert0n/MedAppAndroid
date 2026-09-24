@@ -1,18 +1,20 @@
 package com.kert0n.medapp.presentation.pack
 
-import com.kert0n.medapp.presentation.act
-import com.kert0n.medapp.presentation.ScreenFailures
-import com.kert0n.medapp.presentation.stateInScreen
-import com.kert0n.medapp.presentation.ScreenReading
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.kert0n.medapp.feature.medkits.MedKitReadings
 import com.kert0n.medapp.feature.operation.Freshening
+import com.kert0n.medapp.feature.packages.PackageReadings
 import com.kert0n.medapp.feature.packages.PackageRelocation
 import com.kert0n.medapp.feature.time.Today
+import com.kert0n.medapp.presentation.Fresh
+import com.kert0n.medapp.presentation.ScreenFailures
+import com.kert0n.medapp.presentation.ScreenReading
+import com.kert0n.medapp.presentation.act
 import com.kert0n.medapp.presentation.medkit.MedKitPresentationDTO
 import com.kert0n.medapp.presentation.medkit.toPresentationDTO
-import com.kert0n.medapp.storage.medkit.MedKitStorageRepository
-import com.kert0n.medapp.storage.pack.PackageStorageRepository
+import com.kert0n.medapp.presentation.readAfter
+import com.kert0n.medapp.presentation.stateInScreen
 import dagger.assisted.Assisted
 import dagger.assisted.AssistedFactory
 import dagger.assisted.AssistedInject
@@ -26,8 +28,6 @@ import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.flatMapLatest
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
-import com.kert0n.medapp.presentation.Fresh
-import com.kert0n.medapp.presentation.readAfter
 
 /**
  * Перенос упаковки на другую полку (PLAN H3 №11). Перенос двигает место, а не остаток: из
@@ -45,8 +45,8 @@ import com.kert0n.medapp.presentation.readAfter
 class PackageTransferViewModel @AssistedInject constructor(
     private val relocation: PackageRelocation,
     freshening: Freshening,
-    packages: PackageStorageRepository,
-    medKits: MedKitStorageRepository,
+    packages: PackageReadings,
+    medKits: MedKitReadings,
     today: Today,
     @Assisted private val packageId: Uuid,
     private val failures: ScreenFailures = ScreenFailures()

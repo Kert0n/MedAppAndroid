@@ -1,8 +1,8 @@
 package com.kert0n.medapp.feature.settings
 
+import com.kert0n.medapp.feature.delivery.SyncSchedule
 import com.kert0n.medapp.feature.notification.DailySchedule
 import com.kert0n.medapp.feature.notification.NotificationReconciliation
-import com.kert0n.medapp.queue.SyncSchedule
 import java.time.Clock
 import javax.inject.Inject
 

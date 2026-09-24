@@ -2,10 +2,12 @@ package com.kert0n.medapp.storage
 
 import androidx.room.Room
 import androidx.test.platform.app.InstrumentationRegistry
-import com.kert0n.medapp.domain.medkit.MedKit
 import com.kert0n.medapp.domain.course.CourseDraft
 import com.kert0n.medapp.domain.intake.CourseIntake
+import com.kert0n.medapp.domain.medkit.MedKit
 import com.kert0n.medapp.fixture.COURSE
+import com.kert0n.medapp.fixture.FIRST_PLANNED_AT
+import com.kert0n.medapp.fixture.FIRST_SCHEDULED_ON
 import com.kert0n.medapp.fixture.HOME_KIT
 import com.kert0n.medapp.fixture.MILLILITRES
 import com.kert0n.medapp.fixture.OTHER_PACK
@@ -13,14 +15,14 @@ import com.kert0n.medapp.fixture.PACK
 import com.kert0n.medapp.fixture.SHARED_KIT
 import com.kert0n.medapp.fixture.TABLETS
 import com.kert0n.medapp.fixture.TABLET_FORM
-import com.kert0n.medapp.fixture.FIRST_PLANNED_AT
-import com.kert0n.medapp.fixture.FIRST_SCHEDULED_ON
+import com.kert0n.medapp.fixture.VOCABULARY
 import com.kert0n.medapp.fixture.activeCourse
 import com.kert0n.medapp.fixture.courseRecord
 import com.kert0n.medapp.fixture.courseRepository
-import com.kert0n.medapp.fixture.plannedIntake
 import com.kert0n.medapp.fixture.medKit
 import com.kert0n.medapp.fixture.pack
+import com.kert0n.medapp.fixture.plannedIntake
+import com.kert0n.medapp.fixture.save
 import com.kert0n.medapp.fixture.source
 import com.kert0n.medapp.fixture.tablets
 import com.kert0n.medapp.storage.course.toSourceStorageEntities
@@ -28,8 +30,7 @@ import com.kert0n.medapp.storage.course.toStorageEntity as toCourseStorageEntity
 import com.kert0n.medapp.storage.course.toTimeStorageEntities
 import com.kert0n.medapp.storage.database.MedAppDatabase
 import com.kert0n.medapp.storage.medkit.toStorageEntity as toMedKitStorageEntity
-import com.kert0n.medapp.fixture.save
-import com.kert0n.medapp.storage.intake.toStorageEntity as toIntakeStorageEntity
+import com.kert0n.medapp.storage.operation.toStorageEntity as toIntakeStorageEntity
 import com.kert0n.medapp.storage.value.toStorageEntity
 import kotlin.uuid.Uuid
 import kotlinx.coroutines.test.runTest
@@ -38,7 +39,6 @@ import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
 import org.junit.Before
 import org.junit.Test
-import com.kert0n.medapp.fixture.VOCABULARY
 
 /**
  * Домен ссылается объектом, а строки — идентификаторами: сборка разрешает их связями, той же

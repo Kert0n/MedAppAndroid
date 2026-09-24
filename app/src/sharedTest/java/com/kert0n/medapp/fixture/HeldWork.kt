@@ -1,15 +1,12 @@
 package com.kert0n.medapp.fixture
 
-import com.kert0n.medapp.domain.medkit.MedKit
 import com.kert0n.medapp.domain.medkit.MedKitProjection
-import com.kert0n.medapp.domain.medkit.MedKitStatus
 import com.kert0n.medapp.domain.pack.PackageProjection
 import com.kert0n.medapp.domain.value.Vocabulary
+import com.kert0n.medapp.feature.medkits.MedKitReadings
+import com.kert0n.medapp.feature.packages.PackageReadings
+import com.kert0n.medapp.feature.value.VocabularyReadings
 import com.kert0n.medapp.queue.Transactions
-import com.kert0n.medapp.storage.medkit.MedKitStorageRepository
-import com.kert0n.medapp.storage.pack.PackageStorageRepository
-import com.kert0n.medapp.storage.value.VocabularyStorageRepository
-import java.time.Instant
 import java.time.LocalDate
 import kotlin.uuid.Uuid
 import kotlinx.coroutines.flow.Flow
@@ -65,8 +62,8 @@ class HeldTransactions(val door: Held = Held()) : Transactions {
 /** Словарь, чтение которого проверка держит: между нажатием и записью стоит именно оно. */
 class HeldVocabulary(
     val door: Held = Held(),
-    private val real: VocabularyStorageRepository = FakeVocabulary()
-) : VocabularyStorageRepository by real {
+    private val real: VocabularyReadings = FakeVocabulary()
+) : VocabularyReadings by real {
 
     override suspend fun snapshot(): Vocabulary {
         door.pass()
@@ -76,9 +73,9 @@ class HeldVocabulary(
 
 /** Хранилище, первое чтение которого проверка держит: до него экран ещё ничего не знает. */
 class HeldPackages(
-    private val real: PackageStorageRepository,
+    private val real: PackageReadings,
     val door: Held = Held()
-) : PackageStorageRepository by real {
+) : PackageReadings by real {
 
     override fun observe(id: Uuid): Flow<PackageProjection?> = flow {
         door.pass()
@@ -93,9 +90,9 @@ class HeldPackages(
  * карточка, сменившая способ читать полку, зеленела бы на чужом ответе.
  */
 class HeldMedKits(
-    private val real: MedKitStorageRepository,
+    private val real: MedKitReadings,
     val door: Held = Held()
-) : MedKitStorageRepository {
+) : MedKitReadings {
 
     override fun observe(id: Uuid, today: LocalDate): Flow<MedKitProjection?> = flow {
         door.pass()
@@ -104,23 +101,6 @@ class HeldMedKits(
 
     override fun observeAll(today: LocalDate): Flow<List<MedKitProjection>> = flow { notAsked("observeAll") }
 
-    override suspend fun find(id: Uuid): MedKit? = notAsked("find")
-
-    override fun observeSyncedAt(id: Uuid): Flow<Instant?> = flow { notAsked("observeSyncedAt") }
-
-    override suspend fun add(medKit: MedKit) = notAsked("add")
-
-    override suspend fun describe(medKitId: Uuid, name: String, location: String?): Boolean = notAsked("describe")
-
-    override suspend fun delete(id: Uuid): Boolean = notAsked("delete")
-
-    override suspend fun mark(medKitId: Uuid, status: MedKitStatus): Boolean = notAsked("mark")
-
-    override suspend fun applyServerParticipants(id: Uuid, participantCount: Long, syncedAt: Instant) =
-        notAsked("applyServerParticipants")
-
-    override suspend fun published(): List<Uuid> = notAsked("published")
-    override suspend fun loseAccess(medKitId: Uuid, at: Instant) = notAsked("loseAccess")
 
     private fun notAsked(method: String): Nothing =
         error("карточка читает место одним чтением полки, а спросила «$method» — модель разъехалась с проверкой")

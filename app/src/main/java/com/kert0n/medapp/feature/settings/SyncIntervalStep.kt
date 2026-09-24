@@ -1,6 +1,6 @@
 package com.kert0n.medapp.feature.settings
 
-import com.kert0n.medapp.queue.SyncInterval
+import com.kert0n.medapp.feature.settings.SyncInterval
 import kotlin.math.abs
 
 /**

@@ -2,10 +2,14 @@ package com.kert0n.medapp.feature.account
 
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import com.kert0n.medapp.domain.Unavailability
+import com.kert0n.medapp.domain.account.AccountCredentials
 import com.kert0n.medapp.domain.course.CourseDraft
 import com.kert0n.medapp.domain.medkit.MedKit
 import com.kert0n.medapp.domain.value.Vocabulary
 import com.kert0n.medapp.domain.value.VocabularyLibrary
+import com.kert0n.medapp.feature.account.CredentialSource
+import com.kert0n.medapp.feature.account.CredentialsSaved
+import com.kert0n.medapp.feature.account.StoredAccount
 import com.kert0n.medapp.feature.bootstrap.AppStart
 import com.kert0n.medapp.fixture.COURSE
 import com.kert0n.medapp.fixture.HOME_KIT
@@ -31,20 +35,15 @@ import com.kert0n.medapp.fixture.source
 import com.kert0n.medapp.fixture.tablets
 import com.kert0n.medapp.fixture.transactions
 import com.kert0n.medapp.network.account.AccessTokens
-import com.kert0n.medapp.network.account.AccountCredentials
-import com.kert0n.medapp.network.account.AccountRegistration
-import com.kert0n.medapp.network.account.CredentialSource
-import com.kert0n.medapp.network.account.CredentialsSaved
-import com.kert0n.medapp.network.account.ServerDeviceAccount
-import com.kert0n.medapp.network.account.StoredAccount
+import com.kert0n.medapp.network.account.ServerAccounts
 import com.kert0n.medapp.network.server.MedAppApi
 import com.kert0n.medapp.network.server.medAppHttpClient
 import com.kert0n.medapp.queue.StoredSyncOperation
 import com.kert0n.medapp.queue.SyncOperationStatus
 import com.kert0n.medapp.queue.pack.PackageSyncCommand
 import com.kert0n.medapp.storage.database.MedAppDatabase
-import com.kert0n.medapp.storage.intake.toStorageEntity as toIntakeStorageEntity
 import com.kert0n.medapp.storage.medkit.toStorageEntity as toMedKitStorageEntity
+import com.kert0n.medapp.storage.operation.toStorageEntity as toIntakeStorageEntity
 import io.ktor.client.engine.mock.MockEngine
 import io.ktor.client.engine.mock.respond
 import io.ktor.client.request.HttpRequestData
@@ -143,7 +142,7 @@ class AccountReplacementTest {
                 retryDelay = { delayMillis(false) { 0L } }
             )
         )
-        val account = ServerDeviceAccount(AccountRegistration(api, stored, "build-token", AccessTokens(stored)))
+        val account = AccountRegistration(stored, ServerAccounts(api, "build-token", AccessTokens(stored)))
         return AccountReplacement(account, database.abandonment(), AppStart(account, KnownWords()), Clock.fixed(LATER, ZoneOffset.UTC))
     }
 
@@ -156,10 +155,10 @@ class AccountReplacementTest {
     @Test
     fun keyLostWithoutADecisionRegistersNothing() = runTest {
         val stored = Memory(StoredAccount.Unreadable)
-        val start = AppStart(ServerDeviceAccount(AccountRegistration(MedAppApi(medAppHttpClient(MockEngine { request ->
+        val start = AppStart(AccountRegistration(stored, ServerAccounts(MedAppApi(medAppHttpClient(MockEngine { request ->
             requests += "${request.method.value} ${request.url.encodedPath}"
             respond("", HttpStatusCode.Created)
-        }, "https://medapp.test")), stored, "build-token", AccessTokens(stored))), KnownWords())
+        }, "https://medapp.test")), "build-token", AccessTokens(stored))), KnownWords())
 
         assertEquals(AppStart.Outcome.KeyLost, start.begin())
 

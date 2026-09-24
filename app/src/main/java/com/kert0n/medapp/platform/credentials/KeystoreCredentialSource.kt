@@ -8,10 +8,10 @@ import androidx.datastore.preferences.core.stringPreferencesKey
 import com.kert0n.medapp.di.CredentialsFile
 import com.kert0n.medapp.di.CredentialsStore
 import com.kert0n.medapp.di.IoDispatcher
-import com.kert0n.medapp.network.account.AccountCredentials
-import com.kert0n.medapp.network.account.CredentialSource
-import com.kert0n.medapp.network.account.CredentialsSaved
-import com.kert0n.medapp.network.account.StoredAccount
+import com.kert0n.medapp.domain.account.AccountCredentials
+import com.kert0n.medapp.feature.account.CredentialSource
+import com.kert0n.medapp.feature.account.CredentialsSaved
+import com.kert0n.medapp.feature.account.StoredAccount
 import java.io.File
 import java.io.IOException
 import java.security.GeneralSecurityException

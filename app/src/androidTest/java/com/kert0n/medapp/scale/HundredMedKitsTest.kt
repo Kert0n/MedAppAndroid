@@ -11,6 +11,7 @@ import com.kert0n.medapp.domain.pack.Claims
 import com.kert0n.medapp.domain.pack.ExpiryDate
 import com.kert0n.medapp.domain.report.SpendingHorizon
 import com.kert0n.medapp.domain.report.SpendingPeriod
+import com.kert0n.medapp.feature.packages.PackageQuery
 import com.kert0n.medapp.feature.time.Today
 import com.kert0n.medapp.fixture.MOSCOW
 import com.kert0n.medapp.fixture.QuietClock
@@ -40,9 +41,8 @@ import com.kert0n.medapp.queue.ServerSnapshot
 import com.kert0n.medapp.queue.pack.PackageSnapshot
 import com.kert0n.medapp.queue.pack.PackageSyncState
 import com.kert0n.medapp.storage.database.MedAppDatabase
-import com.kert0n.medapp.storage.intake.toStorageEntity
 import com.kert0n.medapp.storage.medkit.toStorageEntity as toMedKitStorageEntity
-import com.kert0n.medapp.storage.pack.PackageQuery
+import com.kert0n.medapp.storage.operation.toStorageEntity
 import java.math.BigDecimal
 import java.time.Clock
 import java.time.Duration

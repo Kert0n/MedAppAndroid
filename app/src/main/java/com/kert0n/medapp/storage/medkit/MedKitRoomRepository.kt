@@ -6,6 +6,8 @@ import com.kert0n.medapp.domain.medkit.MedKit
 import com.kert0n.medapp.domain.medkit.MedKitContents
 import com.kert0n.medapp.domain.medkit.MedKitProjection
 import com.kert0n.medapp.domain.medkit.MedKitStatus
+import com.kert0n.medapp.feature.medkits.MedKitReadings
+import com.kert0n.medapp.feature.medkits.MedKitRecords
 import com.kert0n.medapp.storage.course.CourseDao
 import com.kert0n.medapp.storage.database.MedAppDatabase
 import com.kert0n.medapp.storage.database.observing
@@ -28,7 +30,7 @@ class MedKitRoomRepository @Inject constructor(
     private val vocabulary: VocabularyDao,
     // Лениво: владелец реакции сам зависит от репозиториев (PLAN D5).
     private val following: Provider<PackageFollowing>
-) : MedKitStorageRepository {
+) : MedKitRecords, MedKitReadings {
 
     override suspend fun published(): List<Uuid> =
         medKits.all().filter { it.publication == MedKit.Publication.PUBLISHED }.map { it.id }
@@ -55,8 +57,6 @@ class MedKitRoomRepository @Inject constructor(
         }
 
     override suspend fun find(id: Uuid): MedKit? = medKits.find(id)?.toDomain()
-
-    override fun observeSyncedAt(id: Uuid): Flow<Instant?> = medKits.observe(id).map { it?.syncedAt }
 
     override suspend fun add(medKit: MedKit) = medKits.upsert(medKit.toStorageEntity(syncedAt = null))
 

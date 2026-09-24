@@ -18,11 +18,10 @@ import com.kert0n.medapp.domain.notification.NotificationReadiness
 import com.kert0n.medapp.domain.notification.NotificationTarget
 import com.kert0n.medapp.domain.notification.Notifier
 import com.kert0n.medapp.domain.notification.Reminder
+import com.kert0n.medapp.domain.notification.ReminderSubject
+import com.kert0n.medapp.feature.settings.AppLanguages
+import com.kert0n.medapp.platform.AppEntries
 import com.kert0n.medapp.platform.notifications.NotificationChannels.Companion.id
-import com.kert0n.medapp.storage.course.CourseStorageRepository
-import com.kert0n.medapp.storage.intake.IntakeStorageRepository
-import com.kert0n.medapp.storage.pack.PackageStorageRepository
-import com.kert0n.medapp.platform.settings.AppLanguages
 import dagger.hilt.android.qualifiers.ApplicationContext
 import java.time.Clock
 import java.time.LocalDate
@@ -31,13 +30,11 @@ import java.time.format.FormatStyle
 import javax.inject.Inject
 import javax.inject.Singleton
 import kotlin.uuid.Uuid
-import kotlinx.coroutines.flow.first
 
 /**
  * Системное уведомление из [Reminder]. Чем кончился показ, отвечается значением [Delivery]: «нет
  * разрешения» и «повода больше нет» — разные случаи, и владелец доставки поступает с ними
- * по-разному (PLAN D8, C1).
- * текст — из строк, данные — из чтений хранения,
+ * по-разному (PLAN D8, C1). Текст — из строк, данные — из предмета, который прочитал сценарий,
  * пара `tag = subject`, `id = kind` — из ключа (PLAN D8). В `PendingIntent` едут только
  * идентификаторы: что открыть по ним, решает приложение (G3, H3). Тождество намерения для
  * системы — код запроса и `filterEquals`, extras в него не входят; поэтому полное имя цели
@@ -48,9 +45,7 @@ import kotlinx.coroutines.flow.first
 @Singleton
 class SystemNotifier @Inject constructor(
     @ApplicationContext private val context: Context,
-    private val intakes: IntakeStorageRepository,
-    private val courses: CourseStorageRepository,
-    private val packages: PackageStorageRepository,
+    private val entries: AppEntries,
     private val readiness: NotificationReadiness,
     private val languages: AppLanguages,
     private val clock: Clock
@@ -59,7 +54,7 @@ class SystemNotifier @Inject constructor(
     /** Слова шторки — на языке приложения: до Android 13 контекст процесса сам его не знает. */
     private val words: Context get() = languages.speaking(context)
 
-    override suspend fun show(reminder: Reminder): Delivery {
+    override suspend fun show(reminder: Reminder, subject: ReminderSubject?): Delivery {
         // Проверка стоит здесь, а не в отдельном методе: lint видит её только рядом с `notify`.
         // `POST_NOTIFICATIONS` — разрешение только с Android 13; ниже его нет, и спрашивать надо систему.
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU &&
@@ -70,8 +65,8 @@ class SystemNotifier @Inject constructor(
         // скажет. Спрашиваем тот же ответ, что читает «День»: иначе полка растёт, а день молчит
         // о причине (PLAN C1 «Можно ли сказать — один ответ»).
         if (!readiness.now().canSay(reminder.channel)) return Delivery.NOT_ALLOWED
-        // Текст собирается из чтений по идентификаторам цели: не нашлось — повода больше нет.
-        val text = textOf(reminder) ?: return Delivery.SUBJECT_GONE
+        // Предмет читает сценарий по идентификаторам цели: не нашлось — повода больше нет.
+        val text = textOf(reminder, subject ?: return Delivery.SUBJECT_GONE)
         val builder = NotificationCompat.Builder(context, reminder.channel.id)
             .setSmallIcon(R.drawable.ic_notification_medication)
             .setContentTitle(text.title)
@@ -95,46 +90,38 @@ class SystemNotifier @Inject constructor(
 
     private class Text(val title: String, val body: String)
 
-    /** Данные для текста — чтением по идентификаторам из цели; повода больше нет — показывать нечего. */
-    private suspend fun textOf(notification: Reminder): Text? = when (val target = notification.target) {
-        is NotificationTarget.Intake -> {
-            val intake = intakes.find(target.intakeId) as? com.kert0n.medapp.domain.intake.CourseIntake ?: return null
-            val title = courses.findRecord(intake.courseId)?.title ?: return null
-            val dose = "${intake.plannedAmount.quantity.amount.stripTrailingZeros().toPlainString()} ${intake.plannedAmount.unit.name}"
-            val pkg = intake.plannedPackage?.name
+    /** Текст шторки из предмета обязательства: слова — из строк, данные — от сценария. */
+    private fun textOf(notification: Reminder, subject: ReminderSubject): Text = when (subject) {
+        is ReminderSubject.Intake -> {
+            val dose = "${subject.dose.quantity.amount.stripTrailingZeros().toPlainString()} ${subject.dose.unit.name}"
             when (notification.kind) {
                 NotificationKind.INTAKE_DECISION -> Text(
-                    words.getString(R.string.notice_intake_decision_title, title),
+                    words.getString(R.string.notice_intake_decision_title, subject.course),
                     words.getString(R.string.notice_intake_decision_body)
                 )
                 NotificationKind.INTAKE_DUE -> Text(
-                    words.getString(R.string.notice_intake_due_title, title),
-                    if (pkg != null) words.getString(R.string.notice_intake_due_body, dose, pkg) else words.getString(R.string.notice_intake_due_unsupplied, dose)
+                    words.getString(R.string.notice_intake_due_title, subject.course),
+                    if (subject.pack != null) words.getString(R.string.notice_intake_due_body, dose, subject.pack) else words.getString(R.string.notice_intake_due_unsupplied, dose)
                 )
-                else -> Text(words.getString(R.string.notice_intake_missed_title, title), words.getString(R.string.notice_intake_missed_body, dose))
+                else -> Text(words.getString(R.string.notice_intake_missed_title, subject.course), words.getString(R.string.notice_intake_missed_body, dose))
             }
         }
-        is NotificationTarget.PackageCard -> {
-            val pkg = packages.observe(target.packageId).first() ?: return null
-            val expiresOn = pkg.facts.expiresOn ?: return null
-            val until = expiresOn.lastDay.format(DATE.withLocale(words.resources.configuration.locales[0]))
+        is ReminderSubject.Expiry -> {
+            val until = subject.expiresOn.lastDay.format(DATE.withLocale(words.resources.configuration.locales[0]))
             Text(
                 when (notification.kind) {
                     // Заранее — окно, и сколько дней осталось, говорит срок на день показа.
-                    NotificationKind.EXPIRY_SOURCE_3D -> expiresOn.daysLeftOn(LocalDate.now(clock)).toInt().let { days ->
-                        words.resources.getQuantityString(R.plurals.notice_expiry_ahead_title, days, days, pkg.name)
+                    NotificationKind.EXPIRY_SOURCE_3D -> subject.expiresOn.daysLeftOn(LocalDate.now(clock)).toInt().let { days ->
+                        words.resources.getQuantityString(R.plurals.notice_expiry_ahead_title, days, days, subject.pack)
                     }
-                    NotificationKind.EXPIRY_SOURCE_1D -> words.getString(R.string.notice_expiry_1d_title, pkg.name)
-                    else -> words.getString(R.string.notice_expiry_today_title, pkg.name)
+                    NotificationKind.EXPIRY_SOURCE_1D -> words.getString(R.string.notice_expiry_1d_title, subject.pack)
+                    else -> words.getString(R.string.notice_expiry_today_title, subject.pack)
                 },
                 words.getString(R.string.notice_expiry_body, until)
             )
         }
-        is NotificationTarget.CourseSources -> {
-            val record = courses.findRecord(target.courseId) ?: return null
-            val coverage = courses.observeCoverage(target.courseId).first()
-            val zone = record.prescription.schedule.zone
-            val until = coverage?.coveredUntil?.atZone(zone)?.toLocalDate()?.format(DATE.withLocale(words.resources.configuration.locales[0]))
+        is ReminderSubject.Coverage -> {
+            val until = subject.coveredUntil?.format(DATE.withLocale(words.resources.configuration.locales[0]))
             val body = if (until != null) words.getString(R.string.notice_coverage_body_until, until) else words.getString(R.string.notice_coverage_body_none)
             Text(
                 words.getString(
@@ -143,13 +130,13 @@ class SystemNotifier @Inject constructor(
                         NotificationKind.COVERAGE_3D -> R.string.notice_coverage_3d_title
                         else -> R.string.notice_coverage_end_title
                     },
-                    record.title
+                    subject.course
                 ),
                 body
             )
         }
-        is NotificationTarget.DayPlan -> Text(words.getString(R.string.notice_digest_title), words.getString(R.string.notice_digest_body, target.date.format(DATE.withLocale(words.resources.configuration.locales[0]))))
-        NotificationTarget.SyncStatus -> Text(words.getString(R.string.notice_sync_attention_title), words.getString(R.string.notice_sync_attention_body))
+        is ReminderSubject.DayPlan -> Text(words.getString(R.string.notice_digest_title), words.getString(R.string.notice_digest_body, subject.date.format(DATE.withLocale(words.resources.configuration.locales[0]))))
+        ReminderSubject.SyncStatus -> Text(words.getString(R.string.notice_sync_attention_title), words.getString(R.string.notice_sync_attention_body))
     }
 
     /**
@@ -167,10 +154,10 @@ class SystemNotifier @Inject constructor(
 
     /** Действие без экрана едет своему приёмнику; в extras — только идентификатор пункта (G3). */
     private fun actionIntent(intakeId: Uuid, action: NotificationAction, key: NotificationKey): PendingIntent {
-        val intent = Intent(context, NotificationActionReceiver::class.java)
+        val intent = Intent(context, entries.notificationAction)
             .setAction(action.name)
             .setIdentifier(identity(key, action))
-            .putExtra(NotificationActionReceiver.EXTRA_INTAKE_ID, intakeId.toString())
+            .putExtra(EXTRA_INTAKE_ID, intakeId.toString())
         return PendingIntent.getBroadcast(context, key.hashCode() * 31 + action.ordinal, intent, PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE)
     }
 
@@ -187,5 +174,8 @@ class SystemNotifier @Inject constructor(
 
     companion object {
         private val DATE: DateTimeFormatter = DateTimeFormatter.ofLocalizedDate(FormatStyle.MEDIUM)
+
+        /** Пункт приёма в действии шторки — единственное, что едет в extras (G3). */
+        const val EXTRA_INTAKE_ID = "intake_id"
     }
 }

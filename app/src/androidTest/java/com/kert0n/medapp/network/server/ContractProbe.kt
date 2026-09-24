@@ -4,7 +4,7 @@ import com.kert0n.medapp.domain.value.Dose
 import com.kert0n.medapp.domain.value.Quantity
 import com.kert0n.medapp.domain.value.QuantityUnit
 import com.kert0n.medapp.fixture.ProbeAccounts
-import com.kert0n.medapp.network.account.AccountCredentials
+import com.kert0n.medapp.domain.account.AccountCredentials
 import com.kert0n.medapp.network.delivery.toPreparedRequest
 import com.kert0n.medapp.network.medkit.MedKitPostNetworkDTO
 import com.kert0n.medapp.network.medkit.MembershipPostNetworkDTO

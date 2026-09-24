@@ -27,7 +27,6 @@ import kotlinx.coroutines.test.runTest
 import org.junit.After
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNotNull
-import org.junit.Assert.assertNull
 import org.junit.Before
 import org.junit.Test
 import org.junit.runner.RunWith
@@ -52,19 +51,6 @@ class MedKitRoomRepositoryTest {
     @After
     fun closeDatabase() {
         database.close()
-    }
-
-    /**
-     * Момент сверки — обвязка доставки, а не доменное поле аптечки: у него свой метод для экрана
-     * состояния синхронизации (PLAN E4, H3 №28).
-     */
-    @Test
-    fun theMomentOfTheLastSyncIsObservedByItsOwnMethod() = runTest {
-        assertNull(medKits.observeSyncedAt(HOME_KIT).first())
-
-        medKits.applyServerParticipants(HOME_KIT, participantCount = 2, syncedAt = at)
-
-        assertEquals(at, medKits.observeSyncedAt(HOME_KIT).first())
     }
 
     /**

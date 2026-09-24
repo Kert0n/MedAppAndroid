@@ -1,6 +1,9 @@
 package com.kert0n.medapp.storage.operation
 
 import androidx.room.withTransaction
+import com.kert0n.medapp.feature.operation.OperationReadings
+import com.kert0n.medapp.feature.operation.OperationRecords
+import com.kert0n.medapp.feature.operation.OutstandingOperation
 import com.kert0n.medapp.queue.RefusalReason
 import com.kert0n.medapp.queue.StoredSyncOperation
 import com.kert0n.medapp.queue.SyncCommand
@@ -26,7 +29,7 @@ class SyncOperationRoomRepository @Inject constructor(
     private val database: MedAppDatabase,
     private val queue: SyncOperationDao,
     private val vocabulary: VocabularyDao
-) : SyncOperationStorageRepository {
+) : OperationRecords, OperationReadings {
 
     override suspend fun enqueue(
         id: Uuid,

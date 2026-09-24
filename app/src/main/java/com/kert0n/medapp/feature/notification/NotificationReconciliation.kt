@@ -1,26 +1,25 @@
 package com.kert0n.medapp.feature.notification
 
+import com.kert0n.medapp.domain.course.CourseCoverage
 import com.kert0n.medapp.domain.notification.NotificationKey
 import com.kert0n.medapp.domain.notification.NotificationKind
 import com.kert0n.medapp.domain.notification.NotificationSettings
 import com.kert0n.medapp.domain.notification.NotificationSettingsSource
 import com.kert0n.medapp.domain.notification.NotificationTarget
 import com.kert0n.medapp.domain.notification.Reminder
-import com.kert0n.medapp.domain.course.CourseCoverage
 import com.kert0n.medapp.domain.pack.ExpiryDate
-import com.kert0n.medapp.storage.course.CourseStorageRepository
-import com.kert0n.medapp.storage.intake.IntakeStorageRepository
-import com.kert0n.medapp.storage.pack.PackageQuery
-import com.kert0n.medapp.storage.notification.ReminderStorageRepository
-import com.kert0n.medapp.storage.pack.PackageStorageRepository
-import com.kert0n.medapp.storage.operation.SyncOperationStorageRepository
+import com.kert0n.medapp.feature.course.CourseRecords
+import com.kert0n.medapp.feature.intake.IntakeRecords
+import com.kert0n.medapp.feature.operation.OperationRecords
+import com.kert0n.medapp.feature.packages.PackageQuery
+import com.kert0n.medapp.feature.packages.PackageReadings
 import com.kert0n.medapp.queue.Transactions
+import java.time.Instant
 import java.time.LocalDate
 import java.time.ZoneId
-import kotlinx.coroutines.flow.first
-import java.time.Instant
 import javax.inject.Inject
 import kotlin.uuid.Uuid
+import kotlinx.coroutines.flow.first
 
 /**
  * **Что должно быть обещано сейчас** — и только это (PLAN D8): недостающее заводится, лишнее
@@ -40,11 +39,11 @@ import kotlin.uuid.Uuid
  * (`NotificationOwnershipTest`).
  */
 class NotificationReconciliation @Inject constructor(
-    private val intakes: IntakeStorageRepository,
-    private val packages: PackageStorageRepository,
-    private val courses: CourseStorageRepository,
-    private val reminders: ReminderStorageRepository,
-    private val operations: SyncOperationStorageRepository,
+    private val intakes: IntakeRecords,
+    private val packages: PackageReadings,
+    private val courses: CourseRecords,
+    private val reminders: ReminderRecords,
+    private val operations: OperationRecords,
     private val promising: ReminderPromising,
     private val withdrawal: ReminderWithdrawal,
     private val settings: NotificationSettingsSource,

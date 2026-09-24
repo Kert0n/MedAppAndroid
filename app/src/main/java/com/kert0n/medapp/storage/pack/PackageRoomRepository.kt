@@ -11,10 +11,12 @@ import com.kert0n.medapp.domain.pack.PackageEnding
 import com.kert0n.medapp.domain.pack.PackageFacts
 import com.kert0n.medapp.domain.pack.PackageProjection
 import com.kert0n.medapp.domain.pack.PackageStatus
-import com.kert0n.medapp.queue.pack.PackageSnapshot
-import com.kert0n.medapp.queue.pack.PackageSyncState
+import com.kert0n.medapp.feature.course.CourseReallocation
+import com.kert0n.medapp.feature.packages.PackageAdjustment
+import com.kert0n.medapp.feature.packages.PackageQuery
+import com.kert0n.medapp.feature.packages.PackageReadings
+import com.kert0n.medapp.feature.packages.PackageRecords
 import com.kert0n.medapp.storage.course.CourseDao
-import com.kert0n.medapp.storage.course.CourseReallocation
 import com.kert0n.medapp.storage.course.availabilityOf
 import com.kert0n.medapp.storage.course.toSourceStorageEntities
 import com.kert0n.medapp.storage.course.toStorageEntity as toCourseStorageEntity
@@ -22,6 +24,7 @@ import com.kert0n.medapp.storage.database.MedAppDatabase
 import com.kert0n.medapp.storage.database.observing
 import com.kert0n.medapp.storage.intake.IntakeDao
 import com.kert0n.medapp.storage.operation.SyncOperationDao
+import com.kert0n.medapp.storage.operation.projectionsOf
 import com.kert0n.medapp.storage.value.VocabularyDao
 import java.time.Instant
 import java.time.LocalDate
@@ -40,7 +43,7 @@ class PackageRoomRepository @Inject constructor(
     private val vocabulary: VocabularyDao,
     // Лениво: владелец реакции сам зависит от этого репозитория (PLAN D5).
     private val following: Provider<PackageFollowing>
-) : PackageStorageRepository {
+) : PackageRecords, PackageReadings {
 
     /**
      * Снимок словаря читается после строки, а не вместе с ней, и это безопасно: словарь только
@@ -57,9 +60,7 @@ class PackageRoomRepository @Inject constructor(
     override fun list(query: PackageQuery, today: LocalDate): Flow<List<PackageProjection>> =
         onChange { listing(query, today) }
 
-    override suspend fun add(pkg: Package, sync: PackageSyncState) = save(pkg, sync)
-
-    private suspend fun save(pkg: Package, sync: PackageSyncState) = packages.save(pkg, sync)
+    override suspend fun add(pkg: Package) = packages.save(pkg)
 
     override suspend fun describe(packageId: Uuid, facts: PackageFacts): Boolean =
         change(packageId) { it.describe(facts) }
@@ -103,12 +104,9 @@ class PackageRoomRepository @Inject constructor(
         database.withTransaction {
             val stored = packages.find(packageId) ?: return@withTransaction false
             val changed = transition(stored.toDomain(vocabulary.snapshot()))
-            save(changed, stored.pack.syncState())
+            packages.save(changed, keeping = stored.pack)
             true
         }
-
-    override suspend fun applySnapshot(snapshot: PackageSnapshot, observedAt: Instant): SnapshotApplied =
-        database.withTransaction { packages.applySnapshot(snapshot, observedAt) }
 
     override suspend fun saveClaims(packageId: Uuid, claims: Claims?) {
         if (claims == null) packages.deleteClaims(packageId)
@@ -124,7 +122,7 @@ class PackageRoomRepository @Inject constructor(
         when (val after = adjustment.applyTo(stored.toDomain(vocabulary.snapshot()))) {
             is PackageAfter.Left -> {
                 // Версии и время сверки остаются те, что записал снимок сервера: их двигает сеть (E4).
-                save(after.pkg, stored.pack.syncState())
+                packages.save(after.pkg, keeping = stored.pack)
                 // Пересчитанное обеспечение относится к пережившей переход коробке. У кончившейся
                 // источник уже снят доменным переходом внутри конца, и считать по ней нечего.
                 reallocation?.let { (plan, expected) ->
@@ -159,9 +157,6 @@ class PackageRoomRepository @Inject constructor(
      * принадлежат доставке, а не пачке, и нужны они одному экрану состояния синхронизации
      * (PLAN E4, H3 №28). `null` — пачки больше нет.
      */
-    override fun observeSyncState(id: Uuid): Flow<PackageSyncState?> =
-        packages.observe(id).map { it?.pack?.syncState() }
-
     /**
      * Список — готовые проекции одним чтением. «Есть свободное» запросом не выражается: это
      * вычитание чужих броней и выделения из оценки количества, а оценка зависит от очереди

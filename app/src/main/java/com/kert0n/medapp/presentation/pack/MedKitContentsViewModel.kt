@@ -1,23 +1,23 @@
 package com.kert0n.medapp.presentation.pack
 
-import com.kert0n.medapp.presentation.act
-import com.kert0n.medapp.presentation.ScreenFailures
-import com.kert0n.medapp.presentation.stateInScreen
-import com.kert0n.medapp.presentation.ScreenReading
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.kert0n.medapp.domain.pack.ExpiryDate
 import com.kert0n.medapp.domain.pack.PackageProjection
+import com.kert0n.medapp.feature.course.CourseReadings
+import com.kert0n.medapp.feature.medkits.MedKitReadings
 import com.kert0n.medapp.feature.medkits.MedKitRemoval
+import com.kert0n.medapp.feature.packages.PackageQuery
+import com.kert0n.medapp.feature.packages.PackageReadings
 import com.kert0n.medapp.feature.time.Today
+import com.kert0n.medapp.presentation.ScreenFailures
+import com.kert0n.medapp.presentation.ScreenReading
+import com.kert0n.medapp.presentation.act
 import com.kert0n.medapp.presentation.medkit.MedKitPresentationDTO
 import com.kert0n.medapp.presentation.medkit.toPresentationDTO
+import com.kert0n.medapp.presentation.stateInScreen
 import com.kert0n.medapp.presentation.value.FormPresentationDTO
 import com.kert0n.medapp.presentation.value.toPresentationDTO
-import com.kert0n.medapp.storage.course.CourseStorageRepository
-import com.kert0n.medapp.storage.medkit.MedKitStorageRepository
-import com.kert0n.medapp.storage.pack.PackageQuery
-import com.kert0n.medapp.storage.pack.PackageStorageRepository
 import dagger.assisted.Assisted
 import dagger.assisted.AssistedFactory
 import dagger.assisted.AssistedInject
@@ -51,9 +51,9 @@ import kotlinx.coroutines.launch
 @HiltViewModel(assistedFactory = MedKitContentsViewModel.Factory::class)
 class MedKitContentsViewModel @AssistedInject constructor(
     private val removal: MedKitRemoval,
-    packages: PackageStorageRepository,
-    medKits: MedKitStorageRepository,
-    courses: CourseStorageRepository,
+    packages: PackageReadings,
+    medKits: MedKitReadings,
+    courses: CourseReadings,
     today: Today,
     @Assisted private val medKitId: Uuid?,
     private val failures: ScreenFailures = ScreenFailures()

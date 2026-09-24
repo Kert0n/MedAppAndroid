@@ -4,15 +4,15 @@ import com.kert0n.medapp.domain.medkit.MedKit
 import com.kert0n.medapp.domain.medkit.MedKitRef
 import com.kert0n.medapp.domain.pack.Package
 import com.kert0n.medapp.domain.pack.PackageStatus
+import com.kert0n.medapp.feature.course.CourseRecords
+import com.kert0n.medapp.feature.medkits.MedKitRecords
+import com.kert0n.medapp.feature.packages.PackageAdjustment
+import com.kert0n.medapp.feature.packages.PackageRecords
 import com.kert0n.medapp.feature.readThisTransaction
 import com.kert0n.medapp.queue.QueueService
 import com.kert0n.medapp.queue.QueuedCommand
 import com.kert0n.medapp.queue.Transactions
 import com.kert0n.medapp.queue.pack.PackageSyncCommand
-import com.kert0n.medapp.storage.course.CourseStorageRepository
-import com.kert0n.medapp.storage.medkit.MedKitStorageRepository
-import com.kert0n.medapp.storage.pack.PackageAdjustment
-import com.kert0n.medapp.storage.pack.PackageStorageRepository
 import java.time.Clock
 import java.time.Instant
 import javax.inject.Inject
@@ -38,9 +38,9 @@ import kotlin.uuid.Uuid
  * снимает пометку закрытие последней её команды (PLAN E1).
  */
 class PackageRelocation @Inject constructor(
-    private val packages: PackageStorageRepository,
-    private val medKits: MedKitStorageRepository,
-    private val courses: CourseStorageRepository,
+    private val packages: PackageRecords,
+    private val medKits: MedKitRecords,
+    private val courses: CourseRecords,
     private val queue: QueueService,
     private val transactions: Transactions,
     private val clock: Clock

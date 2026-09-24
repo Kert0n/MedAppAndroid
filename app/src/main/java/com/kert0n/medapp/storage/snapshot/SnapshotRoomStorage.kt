@@ -14,8 +14,8 @@ import com.kert0n.medapp.storage.medkit.MedKitDao
 import com.kert0n.medapp.storage.medkit.loseAccess
 import com.kert0n.medapp.storage.medkit.toStorageEntity
 import com.kert0n.medapp.storage.operation.SyncOperationDao
+import com.kert0n.medapp.storage.operation.applySnapshot
 import com.kert0n.medapp.storage.pack.PackageDao
-import com.kert0n.medapp.storage.pack.applySnapshot
 import com.kert0n.medapp.storage.pack.end
 import com.kert0n.medapp.storage.value.VocabularyDao
 import java.time.Instant

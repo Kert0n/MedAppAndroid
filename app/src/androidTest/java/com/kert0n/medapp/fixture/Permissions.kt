@@ -3,6 +3,7 @@ package com.kert0n.medapp.fixture
 import android.Manifest
 import android.os.Build
 import androidx.test.platform.app.InstrumentationRegistry
+import com.kert0n.medapp.feature.settings.PermissionStates
 
 /**
  * Разрешение на уведомления для проверок, которые проходят **через начало лечения**.
@@ -27,13 +28,13 @@ fun allowNotifications() {
  * Разрешения, о которых проверка не спрашивает: всё позволено. Отказ — предмет своих проверок, и
  * там он называется явно.
  */
-object AllAllowed : com.kert0n.medapp.platform.settings.DevicePermissions, com.kert0n.medapp.domain.notification.NotificationReadiness {
+object AllAllowed : com.kert0n.medapp.feature.settings.DevicePermissions, com.kert0n.medapp.domain.notification.NotificationReadiness {
 
     override fun now() = com.kert0n.medapp.domain.notification.Readiness(allowed = true)
 
-    override fun current() = com.kert0n.medapp.platform.settings.PermissionStates(
+    override fun current() = com.kert0n.medapp.feature.settings.PermissionStates(
         notifications = true,
         exactAlarms = true,
-        camera = com.kert0n.medapp.platform.settings.CameraAccess.GRANTED
+        camera = com.kert0n.medapp.feature.settings.CameraAccess.GRANTED
     )
 }

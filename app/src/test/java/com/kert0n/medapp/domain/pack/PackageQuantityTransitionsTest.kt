@@ -1,15 +1,13 @@
 package com.kert0n.medapp.domain.pack
 
 import com.kert0n.medapp.domain.value.Quantity
-
 import com.kert0n.medapp.fixture.TABLETS
-import com.kert0n.medapp.fixture.millilitres
-import com.kert0n.medapp.fixture.pack
 import com.kert0n.medapp.fixture.dose
 import com.kert0n.medapp.fixture.ended
 import com.kert0n.medapp.fixture.left
+import com.kert0n.medapp.fixture.millilitres
+import com.kert0n.medapp.fixture.pack
 import com.kert0n.medapp.fixture.tablets
-
 import org.junit.Assert.assertEquals
 import org.junit.Test
 

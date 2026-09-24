@@ -1,7 +1,6 @@
 package com.kert0n.medapp.domain.pack
 
 import com.kert0n.medapp.fixture.pack
-
 import java.math.BigDecimal
 import org.junit.Assert.assertEquals
 import org.junit.Test

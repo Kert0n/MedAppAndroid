@@ -5,13 +5,13 @@ import com.kert0n.medapp.domain.pack.Package
 import com.kert0n.medapp.domain.pack.PackageAfter
 import com.kert0n.medapp.domain.pack.PackageStatus
 import com.kert0n.medapp.domain.value.Quantity
+import com.kert0n.medapp.feature.packages.PackageAdjustment
+import com.kert0n.medapp.feature.packages.PackageRecords
 import com.kert0n.medapp.feature.readThisTransaction
 import com.kert0n.medapp.queue.QueueService
 import com.kert0n.medapp.queue.QueuedCommand
 import com.kert0n.medapp.queue.Transactions
 import com.kert0n.medapp.queue.pack.PackageSyncCommand
-import com.kert0n.medapp.storage.pack.PackageAdjustment
-import com.kert0n.medapp.storage.pack.PackageStorageRepository
 import java.time.Clock
 import java.time.Instant
 import javax.inject.Inject
@@ -32,7 +32,7 @@ import kotlin.uuid.Uuid
  * Лечение, державшее коробку, зажимается под новую доступность ([CourseFollowing], D5).
  */
 class PackageAdjusting @Inject constructor(
-    private val packages: PackageStorageRepository,
+    private val packages: PackageRecords,
     private val following: PackageFollowing,
     private val queue: QueueService,
     private val transactions: Transactions,

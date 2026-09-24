@@ -10,6 +10,7 @@ import com.kert0n.medapp.queue.SyncCommand
 import com.kert0n.medapp.queue.SyncOperation
 import com.kert0n.medapp.queue.SyncOperationState
 import com.kert0n.medapp.queue.SyncOperationStatus
+import com.kert0n.medapp.queue.intake.IntakeAccounting
 import com.kert0n.medapp.storage.pack.PackageDao
 import java.time.Instant
 import kotlin.uuid.Uuid
@@ -291,4 +292,11 @@ interface SyncOperationDao {
 
     @Query("SELECT depends_on_id FROM sync_operation_dependencies WHERE operation_id = :id")
     suspend fun dependenciesOf(id: Uuid): List<Uuid>
+
+    /**
+     * Учёт расхода у приёма, который поставил операцию [operationId]: применён или отказан — что
+     * именно, решила очередь. Меняется только ожидающий: учтённое дважды не учитывается.
+     */
+    @Query("UPDATE intakes SET accounting = :accounting WHERE operation_id = :operationId AND accounting = 'PENDING'")
+    suspend fun setIntakeAccounting(operationId: Uuid, accounting: IntakeAccounting): Int
 }

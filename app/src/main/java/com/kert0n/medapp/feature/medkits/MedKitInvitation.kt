@@ -5,7 +5,6 @@ import com.kert0n.medapp.domain.Unavailability
 import com.kert0n.medapp.domain.medkit.Invitation
 import com.kert0n.medapp.domain.medkit.MedKitInvitations
 import com.kert0n.medapp.queue.SnapshotApplier
-import com.kert0n.medapp.storage.medkit.MedKitStorageRepository
 import java.time.Clock
 import java.time.Duration
 import javax.inject.Inject
@@ -24,7 +23,7 @@ import kotlin.uuid.Uuid
  * читает полный снимок, и полка уходит из списка сразу, а не при следующем фоновом заходе (E4).
  */
 class MedKitInvitation @Inject constructor(
-    private val medKits: MedKitStorageRepository,
+    private val medKits: MedKitRecords,
     private val invitations: MedKitInvitations,
     private val snapshots: SnapshotApplier,
     @InvitationTerm private val term: Duration,

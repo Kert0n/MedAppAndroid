@@ -2,18 +2,20 @@
 
 package com.kert0n.medapp.network.server
 
+import com.kert0n.medapp.domain.account.AccountCredentials
+import com.kert0n.medapp.domain.account.AccountReadiness
+import com.kert0n.medapp.feature.account.AccountRegistration
+import com.kert0n.medapp.feature.account.CredentialSource
+import com.kert0n.medapp.feature.account.CredentialsSaved
+import com.kert0n.medapp.feature.account.StoredAccount
 import com.kert0n.medapp.network.account.AccessTokenThrottled
 import com.kert0n.medapp.network.account.AccessTokenUnavailable
 import com.kert0n.medapp.network.account.AccessTokens
-import com.kert0n.medapp.network.account.AccountCredentials
-import com.kert0n.medapp.network.account.CredentialSource
-import com.kert0n.medapp.network.account.CredentialsSaved
-import com.kert0n.medapp.network.account.StoredAccount
+import com.kert0n.medapp.network.account.ServerAccounts
 import io.ktor.client.HttpClient
 import io.ktor.client.engine.mock.MockEngine
 import io.ktor.client.engine.mock.MockRequestHandleScope
 import io.ktor.client.engine.mock.respond
-import com.kert0n.medapp.network.account.AccountRegistration
 import io.ktor.client.plugins.contentnegotiation.ContentNegotiation
 import io.ktor.client.plugins.defaultRequest
 import io.ktor.client.request.HttpRequestData
@@ -28,8 +30,8 @@ import io.ktor.serialization.kotlinx.json.json
 import io.ktor.utils.io.ByteChannel
 import java.util.Base64
 import java.util.concurrent.atomic.AtomicInteger
-import kotlin.time.Duration.Companion.seconds
 import kotlin.coroutines.cancellation.CancellationException
+import kotlin.time.Duration.Companion.seconds
 import kotlin.uuid.Uuid
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.CoroutineStart
@@ -420,7 +422,7 @@ class MedAppAuthTest {
         client.get("/v1/users/me")
         stored.account = StoredAccount.Unreadable
 
-        assertEquals(AccountRegistration.Outcome.Ready, AccountRegistration(MedAppApi(client), stored, "build-token", tokens).replaceUnreadable())
+        assertEquals(AccountReadiness.Ready, AccountRegistration(stored, ServerAccounts(MedAppApi(client), "build-token", tokens)).replaceUnreadable())
         client.get("/v1/users/me")
 
         assertEquals("после замены учётки запрос идёт со старым пропуском", listOf("Bearer t1", "Bearer t2"), seenAuthorization)

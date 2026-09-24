@@ -29,4 +29,9 @@ data class IntakeSyncState(
             "ожидающий расход называет свою операцию"
         }
     }
+
+    /** Учёт говорит о расходе одного приёма, и приложить его к другому нельзя. */
+    fun requireOf(intakeId: Uuid) {
+        require(this.intakeId == intakeId) { "учёт расхода принадлежит своему приёму" }
+    }
 }

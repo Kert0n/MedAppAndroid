@@ -1,16 +1,16 @@
 package com.kert0n.medapp.presentation.report
 
-import com.kert0n.medapp.presentation.stateInScreen
-import com.kert0n.medapp.presentation.ScreenReading
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.kert0n.medapp.domain.attempt
 import com.kert0n.medapp.domain.report.SpendingHorizon
 import com.kert0n.medapp.domain.report.SpendingPeriod
+import com.kert0n.medapp.feature.report.ReportReadings
 import com.kert0n.medapp.feature.time.Day
 import com.kert0n.medapp.feature.time.Today
+import com.kert0n.medapp.presentation.ScreenReading
 import com.kert0n.medapp.presentation.ScreenState
-import com.kert0n.medapp.storage.report.ReportStorageRepository
+import com.kert0n.medapp.presentation.stateInScreen
 import dagger.hilt.android.lifecycle.HiltViewModel
 import java.time.LocalDate
 import javax.inject.Inject
@@ -44,7 +44,7 @@ import kotlinx.coroutines.flow.stateIn
 @OptIn(ExperimentalCoroutinesApi::class)
 @HiltViewModel
 class ReportsViewModel @Inject constructor(
-    private val reports: ReportStorageRepository,
+    private val reports: ReportReadings,
     today: Today
 ) : ViewModel() {
 

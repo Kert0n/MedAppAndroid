@@ -2,15 +2,15 @@ package com.kert0n.medapp.presentation.operation
 
 import com.kert0n.medapp.domain.notification.NotificationReadiness
 import com.kert0n.medapp.domain.notification.Readiness
+import com.kert0n.medapp.feature.settings.AppLanguage
+import com.kert0n.medapp.feature.settings.CameraAccess
+import com.kert0n.medapp.feature.settings.DevicePermissions
+import com.kert0n.medapp.feature.settings.PermissionStates
 import com.kert0n.medapp.fixture.FakeAppLanguages
 import com.kert0n.medapp.fixture.FakeSyncOperations
 import com.kert0n.medapp.fixture.MainDispatcherRule
 import com.kert0n.medapp.fixture.awaiting
 import com.kert0n.medapp.fixture.watching
-import com.kert0n.medapp.platform.settings.AppLanguage
-import com.kert0n.medapp.platform.settings.CameraAccess
-import com.kert0n.medapp.platform.settings.DevicePermissions
-import com.kert0n.medapp.platform.settings.PermissionStates
 import com.kert0n.medapp.presentation.settings.LanguageChoice
 import org.junit.Assert.assertEquals
 import org.junit.Rule

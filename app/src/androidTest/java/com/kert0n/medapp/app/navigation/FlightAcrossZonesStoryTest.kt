@@ -15,9 +15,13 @@ import com.kert0n.medapp.domain.intake.IntakeStatus
 import com.kert0n.medapp.domain.notification.NotificationAction
 import com.kert0n.medapp.domain.notification.NotificationKind
 import com.kert0n.medapp.domain.notification.NotificationTarget
+import com.kert0n.medapp.feature.connectivity.Connection
 import com.kert0n.medapp.feature.notification.DailyRound
 import com.kert0n.medapp.feature.notification.NotificationReconciliation
 import com.kert0n.medapp.feature.notification.ReminderAnswering
+import com.kert0n.medapp.feature.notification.ReminderReadings
+import com.kert0n.medapp.feature.notification.ReminderRecords
+import com.kert0n.medapp.feature.notification.ReminderSubjects
 import com.kert0n.medapp.fixture.MOSCOW
 import com.kert0n.medapp.fixture.StoryWorld
 import com.kert0n.medapp.fixture.TABLET_FORM
@@ -28,11 +32,9 @@ import com.kert0n.medapp.fixture.packageRepository
 import com.kert0n.medapp.fixture.storySetting
 import com.kert0n.medapp.fixture.tablets
 import com.kert0n.medapp.fixture.treatmentStarted
-import com.kert0n.medapp.feature.connectivity.Connection
 import com.kert0n.medapp.platform.time.TimeShifts
 import com.kert0n.medapp.queue.Transactions
 import com.kert0n.medapp.storage.database.MedAppDatabase
-import com.kert0n.medapp.storage.notification.ReminderStorageRepository
 import com.kert0n.medapp.ui.theme.MedAppTheme
 import dagger.hilt.android.testing.HiltAndroidRule
 import dagger.hilt.android.testing.HiltAndroidTest
@@ -74,12 +76,13 @@ class FlightAcrossZonesStoryTest {
 
     @Inject lateinit var database: MedAppDatabase
     @Inject lateinit var connection: Connection
-    @Inject lateinit var reminders: ReminderStorageRepository
+    @Inject lateinit var reminders: ReminderRecords
     @Inject lateinit var reconciliation: NotificationReconciliation
     @Inject lateinit var transactions: Transactions
     @Inject lateinit var shifts: TimeShifts
     @Inject lateinit var round: DailyRound
     @Inject lateinit var answering: ReminderAnswering
+    @Inject lateinit var subjects: ReminderSubjects
 
     private val WAIT = 10_000L
     private val box = Uuid.random()
@@ -90,7 +93,7 @@ class FlightAcrossZonesStoryTest {
         hilt.inject()
         // Новый телефон на Android 14: точные будильники приложению не разрешены.
         world.alarms.canBeExact = false
-        world.start(reminders, reconciliation, transactions, shifts, round, answering, connection)
+        world.start(reminders, reconciliation, transactions, shifts, round, answering, subjects, connection)
         runBlocking {
             database.storySetting()
             database.packageRepository().add(pack(id = box, name = "Эналаприл", quantity = tablets("30"), form = TABLET_FORM))

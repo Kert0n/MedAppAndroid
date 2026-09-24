@@ -2,10 +2,11 @@ package com.kert0n.medapp.platform.notifications
 
 import androidx.work.ExistingPeriodicWorkPolicy
 import androidx.work.ExistingWorkPolicy
-import androidx.work.OneTimeWorkRequestBuilder
-import androidx.work.PeriodicWorkRequestBuilder
+import androidx.work.OneTimeWorkRequest
+import androidx.work.PeriodicWorkRequest
 import androidx.work.WorkManager
 import com.kert0n.medapp.feature.notification.DailySchedule
+import com.kert0n.medapp.platform.AppEntries
 import java.time.Clock
 import java.time.Duration
 import java.time.LocalTime
@@ -26,18 +27,20 @@ import kotlinx.coroutines.flow.first
  */
 class WorkManagerDailySchedule @Inject constructor(
     private val workManager: Provider<WorkManager>,
-    private val clock: Clock
+    private val clock: Clock,
+    private val entries: AppEntries
 ) : DailySchedule {
 
     private val work: WorkManager get() = workManager.get()
 
     override suspend fun keepDaily(at: LocalTime) {
         val standing = work.getWorkInfosForUniqueWorkFlow(DAILY).first().firstOrNull { !it.state.isFinished }
-        if (standing != null && atTag(at) in standing.tags) return
+        // Задача прошлой сборки будит её работника — оставлять её нельзя и с тем же временем.
+        if (standing != null && atTag(at) in standing.tags && entries.daily.name in standing.tags) return
         val now = clock.instant().atZone(clock.zone)
         var first = now.with(at)
         if (!first.isAfter(now)) first = first.plusDays(1)
-        val request = PeriodicWorkRequestBuilder<DailyWorker>(Duration.ofDays(1))
+        val request = PeriodicWorkRequest.Builder(entries.daily, Duration.ofDays(1))
             .setInitialDelay(Duration.between(now, first))
             .addTag(atTag(at))
             .build()
@@ -52,7 +55,7 @@ class WorkManagerDailySchedule @Inject constructor(
     private fun atTag(at: LocalTime): String = "$AT${at.truncatedTo(ChronoUnit.MINUTES)}@${clock.zone.id}"
 
     override fun runNow() {
-        work.enqueueUniqueWork(NOW, ExistingWorkPolicy.REPLACE, OneTimeWorkRequestBuilder<DailyWorker>().build())
+        work.enqueueUniqueWork(NOW, ExistingWorkPolicy.REPLACE, OneTimeWorkRequest.Builder(entries.daily).build())
     }
 
     companion object {

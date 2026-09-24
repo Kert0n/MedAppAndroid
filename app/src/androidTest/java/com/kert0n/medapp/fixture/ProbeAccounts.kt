@@ -2,10 +2,10 @@ package com.kert0n.medapp.fixture
 
 import androidx.test.platform.app.InstrumentationRegistry
 import com.kert0n.medapp.network.account.AccessTokens
-import com.kert0n.medapp.network.account.AccountCredentials
-import com.kert0n.medapp.network.account.CredentialSource
-import com.kert0n.medapp.network.account.CredentialsSaved
-import com.kert0n.medapp.network.account.StoredAccount
+import com.kert0n.medapp.domain.account.AccountCredentials
+import com.kert0n.medapp.feature.account.CredentialSource
+import com.kert0n.medapp.feature.account.CredentialsSaved
+import com.kert0n.medapp.feature.account.StoredAccount
 import com.kert0n.medapp.network.server.ApiFailure
 import com.kert0n.medapp.network.server.ApiResult
 import com.kert0n.medapp.network.server.MedAppApi

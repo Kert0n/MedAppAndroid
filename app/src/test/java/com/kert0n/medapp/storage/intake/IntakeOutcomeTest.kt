@@ -1,12 +1,13 @@
 package com.kert0n.medapp.storage.intake
 
+import com.kert0n.medapp.domain.intake.IntakeStatus
+import com.kert0n.medapp.feature.intake.IntakeOutcome
 import com.kert0n.medapp.fixture.INTAKE
 import com.kert0n.medapp.fixture.LATER
 import com.kert0n.medapp.fixture.PACK
 import com.kert0n.medapp.fixture.dose
 import com.kert0n.medapp.fixture.pack
 import com.kert0n.medapp.fixture.plannedIntake
-import com.kert0n.medapp.domain.intake.IntakeStatus
 import com.kert0n.medapp.queue.intake.IntakeAccounting
 import com.kert0n.medapp.queue.intake.IntakeSyncState
 import kotlin.uuid.Uuid

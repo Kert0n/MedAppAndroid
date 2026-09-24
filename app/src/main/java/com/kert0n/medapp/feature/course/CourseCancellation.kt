@@ -3,9 +3,8 @@ package com.kert0n.medapp.feature.course
 import com.kert0n.medapp.domain.course.CourseCompletion
 import com.kert0n.medapp.domain.course.CourseRecord
 import com.kert0n.medapp.domain.intake.CourseIntake
+import com.kert0n.medapp.feature.intake.IntakeRecords
 import com.kert0n.medapp.queue.Transactions
-import com.kert0n.medapp.storage.course.CourseStorageRepository
-import com.kert0n.medapp.storage.intake.IntakeStorageRepository
 import java.time.Clock
 import javax.inject.Inject
 import kotlin.uuid.Uuid
@@ -17,8 +16,8 @@ import kotlin.uuid.Uuid
  * трогает. Черновик не отменяют, а удаляют: отменять в нём нечего.
  */
 class CourseCancellation @Inject constructor(
-    private val courses: CourseStorageRepository,
-    private val intakes: IntakeStorageRepository,
+    private val courses: CourseRecords,
+    private val intakes: IntakeRecords,
     private val calendar: CourseCalendar,
     private val closing: CourseClosing,
     private val transactions: Transactions,

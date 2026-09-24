@@ -1,9 +1,9 @@
 package com.kert0n.medapp.feature.account
 
+import com.kert0n.medapp.feature.medkits.MedKitRecords
 import com.kert0n.medapp.queue.QueueStorage
 import com.kert0n.medapp.queue.Transactions
 import com.kert0n.medapp.queue.abandoned
-import com.kert0n.medapp.storage.medkit.MedKitStorageRepository
 import java.time.Instant
 import javax.inject.Inject
 
@@ -14,7 +14,7 @@ import javax.inject.Inject
  * сколько полок ушло; повтор без серверных полок ничего не делает.
  */
 class ServerAbandonment @Inject constructor(
-    private val medKits: MedKitStorageRepository,
+    private val medKits: MedKitRecords,
     private val queue: QueueStorage,
     private val transactions: Transactions
 ) {

@@ -8,6 +8,7 @@ import com.kert0n.medapp.domain.notification.NotificationSettingsSource
 import com.kert0n.medapp.domain.notification.Notifier
 import com.kert0n.medapp.domain.notification.Reminder
 import com.kert0n.medapp.domain.notification.ReminderAlarms
+import com.kert0n.medapp.domain.notification.ReminderSubject
 import java.time.Instant
 
 /**
@@ -43,7 +44,7 @@ class FakeNotifier(var allowed: Boolean = true) : Notifier {
     /** То же для показа: человек отвечает, пока система рисует карточку. */
     var onShow: (suspend (Reminder) -> Unit)? = null
 
-    override suspend fun show(reminder: Reminder): Delivery {
+    override suspend fun show(reminder: Reminder, subject: ReminderSubject?): Delivery {
         if (reminder.key in failing) error("показ сорвался: ${reminder.key}")
         if (!allowed || allowedWhen?.invoke(reminder) == false) return Delivery.NOT_ALLOWED
         if (reminder.key in vanished) return Delivery.SUBJECT_GONE

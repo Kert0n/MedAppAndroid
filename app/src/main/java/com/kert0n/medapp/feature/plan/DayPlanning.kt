@@ -1,9 +1,9 @@
 package com.kert0n.medapp.feature.plan
 
 import com.kert0n.medapp.domain.report.DayPlan
+import com.kert0n.medapp.feature.report.ReportReadings
 import com.kert0n.medapp.feature.time.Day
 import com.kert0n.medapp.feature.time.Today
-import com.kert0n.medapp.storage.report.ReportStorageRepository
 import javax.inject.Inject
 import javax.inject.Singleton
 import kotlinx.coroutines.ExperimentalCoroutinesApi
@@ -28,7 +28,7 @@ import kotlinx.coroutines.flow.map
 @Singleton
 class DayPlanning @Inject constructor(
     private val today: Today,
-    private val reports: ReportStorageRepository
+    private val reports: ReportReadings
 ) {
 
     /**

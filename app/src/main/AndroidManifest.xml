@@ -48,15 +48,15 @@
 
         <!-- Будильник: сработал — владелец доставки читает обязательства и говорит наступившее (PLAN D8). -->
         <receiver
-            android:name=".platform.notifications.ReminderWakeReceiver"
+            android:name=".app.notifications.ReminderWakeReceiver"
             android:exported="false" />
         <!-- «Принял», «Пропустить», «Отложить» с уведомления — тем же путём, что экран (PLAN D8). -->
         <receiver
-            android:name=".platform.notifications.NotificationActionReceiver"
+            android:name=".app.notifications.NotificationActionReceiver"
             android:exported="false" />
         <!-- После загрузки, перевода часов и смены зоны будильники строятся заново из базы (PLAN D8). -->
         <receiver
-            android:name=".platform.notifications.BootAndTimeReceiver"
+            android:name=".app.notifications.BootAndTimeReceiver"
             android:exported="true">
             <intent-filter>
                 <action android:name="android.intent.action.BOOT_COMPLETED" />

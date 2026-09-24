@@ -1,18 +1,17 @@
 package com.kert0n.medapp.feature.notification
 
-import com.kert0n.medapp.domain.attempt
 import com.kert0n.medapp.di.ApplicationScope
-import com.kert0n.medapp.domain.notification.NoticeDelivery
-import com.kert0n.medapp.domain.notification.NotificationKind
-import com.kert0n.medapp.domain.notification.Freshness
+import com.kert0n.medapp.domain.attempt
 import com.kert0n.medapp.domain.notification.Delivery
-import com.kert0n.medapp.domain.notification.Reminder
+import com.kert0n.medapp.domain.notification.Freshness
+import com.kert0n.medapp.domain.notification.NoticeDelivery
 import com.kert0n.medapp.domain.notification.NotificationKey
+import com.kert0n.medapp.domain.notification.NotificationKind
 import com.kert0n.medapp.domain.notification.Notifier
+import com.kert0n.medapp.domain.notification.Reminder
 import com.kert0n.medapp.domain.notification.ReminderAlarms
+import com.kert0n.medapp.feature.notification.ReminderRecords
 import com.kert0n.medapp.queue.OutboxLoop
-import com.kert0n.medapp.storage.notification.ReminderStorageRepository
-import kotlinx.coroutines.flow.update
 import java.time.Clock
 import java.time.Duration
 import java.time.Instant
@@ -25,13 +24,14 @@ import kotlinx.coroutines.ensureActive
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 
 /**
  * **Единственный владелец показа и будильника** (PLAN D8). Обязательство уже лежит в таблице;
  * забирает его не тот, кто положил, а тот, кто следит за таблицей: сигнал
- * [ReminderStorageRepository.changes] приходит после коммита по определению, и гонки «разбудили до
+ * [ReminderRecords.changes] приходит после коммита по определению, и гонки «разбудили до
  * фиксации» нет (F5). Поэтому сценарий, изменивший календарь, ничего не зовёт после транзакции —
  * правило, которое нельзя было проверить, заменено механизмом.
  *
@@ -41,8 +41,9 @@ import kotlinx.coroutines.sync.withLock
  */
 @Singleton
 class ReminderOutbox @Inject constructor(
-    private val reminders: ReminderStorageRepository,
+    private val reminders: ReminderRecords,
     private val notifier: Notifier,
+    private val subjects: ReminderSubjects,
     private val alarms: ReminderAlarms,
     private val freshness: Freshness,
     private val transactions: com.kert0n.medapp.queue.Transactions,
@@ -112,7 +113,7 @@ class ReminderOutbox @Inject constructor(
         var blocked = 0
         for (reminder in due) {
             // Сбой одного показа не уносит остальные: работник очереди изолирует свои так же (E4).
-            val outcome = attempt { notifier.show(reminder) }.getOrElse { Delivery.FAILED }
+            val outcome = attempt { notifier.show(reminder, subjects.of(reminder.target)) }.getOrElse { Delivery.FAILED }
             if (outcome == Delivery.NOT_ALLOWED) {
                 // Показать нечем: обязательство ждёт листа приёмов, и будильника оно не попросит.
                 blocked++

@@ -1,6 +1,6 @@
 package com.kert0n.medapp.network.server
 
-import com.kert0n.medapp.network.account.AccountCredentials
+import com.kert0n.medapp.domain.account.AccountCredentials
 import com.kert0n.medapp.network.medkit.MedKitPostNetworkDTO
 import com.kert0n.medapp.network.pack.PackageSyncNetworkDTO
 import com.kert0n.medapp.network.pack.PackagePatchNetworkDTO

@@ -4,8 +4,8 @@ import android.os.Build
 import androidx.lifecycle.ViewModel
 import com.kert0n.medapp.domain.notification.NotificationChannel
 import com.kert0n.medapp.domain.notification.NotificationReadiness
-import com.kert0n.medapp.platform.settings.CameraAccess
-import com.kert0n.medapp.platform.settings.DevicePermissions
+import com.kert0n.medapp.feature.settings.CameraAccess
+import com.kert0n.medapp.feature.settings.DevicePermissions
 import dagger.hilt.android.lifecycle.HiltViewModel
 import javax.inject.Inject
 import kotlinx.coroutines.flow.MutableStateFlow

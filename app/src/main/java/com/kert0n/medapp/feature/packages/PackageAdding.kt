@@ -3,12 +3,12 @@ package com.kert0n.medapp.feature.packages
 import com.kert0n.medapp.domain.pack.Package
 import com.kert0n.medapp.domain.pack.PackageFacts
 import com.kert0n.medapp.domain.value.Quantity
+import com.kert0n.medapp.feature.medkits.MedKitRecords
+import com.kert0n.medapp.feature.packages.PackageRecords
 import com.kert0n.medapp.queue.QueueService
 import com.kert0n.medapp.queue.QueuedCommand
 import com.kert0n.medapp.queue.Transactions
 import com.kert0n.medapp.queue.pack.PackageSyncCommand
-import com.kert0n.medapp.storage.medkit.MedKitStorageRepository
-import com.kert0n.medapp.storage.pack.PackageStorageRepository
 import java.time.Clock
 import javax.inject.Inject
 import kotlin.uuid.Uuid
@@ -25,8 +25,8 @@ import kotlin.uuid.Uuid
  * серверу о своём содержимом без этой коробки (E5, E6).
  */
 class PackageAdding @Inject constructor(
-    private val packages: PackageStorageRepository,
-    private val medKits: MedKitStorageRepository,
+    private val packages: PackageRecords,
+    private val medKits: MedKitRecords,
     private val queue: QueueService,
     private val transactions: Transactions,
     private val clock: Clock

@@ -4,7 +4,6 @@ import com.kert0n.medapp.domain.notification.NotificationKey
 import com.kert0n.medapp.domain.notification.NotificationKind
 import com.kert0n.medapp.domain.notification.Reminder
 import com.kert0n.medapp.queue.Transactions
-import com.kert0n.medapp.storage.notification.ReminderStorageRepository
 import javax.inject.Inject
 import kotlin.uuid.Uuid
 
@@ -18,7 +17,7 @@ import kotlin.uuid.Uuid
  * звать систему из сценария не нужно (F5).
  */
 class ReminderWithdrawal @Inject constructor(
-    private val reminders: ReminderStorageRepository,
+    private val reminders: ReminderRecords,
     private val transactions: Transactions
 ) {
 

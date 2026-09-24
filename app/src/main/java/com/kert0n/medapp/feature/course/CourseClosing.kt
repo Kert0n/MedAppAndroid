@@ -3,7 +3,6 @@ package com.kert0n.medapp.feature.course
 import com.kert0n.medapp.domain.course.Course
 import com.kert0n.medapp.domain.course.CourseCompletion
 import com.kert0n.medapp.domain.pack.PackageRef
-import com.kert0n.medapp.storage.course.CourseStorageRepository
 import java.time.Instant
 import javax.inject.Inject
 import kotlin.uuid.Uuid
@@ -15,7 +14,7 @@ import kotlin.uuid.Uuid
  * наступил и каким исходом, решают [CourseCompletion] и отмена, здесь только запись.
  */
 class CourseClosing @Inject constructor(
-    private val courses: CourseStorageRepository,
+    private val courses: CourseRecords,
     private val following: CourseFollowing,
     private val reminders: com.kert0n.medapp.feature.notification.ReminderWithdrawal
 ) {

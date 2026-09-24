@@ -1,17 +1,20 @@
 package com.kert0n.medapp.storage.pack
 
+import com.kert0n.medapp.feature.packages.PackageQuery
 import com.kert0n.medapp.fixture.COURSE
 import com.kert0n.medapp.fixture.HOME_KIT
 import com.kert0n.medapp.fixture.MILLILITRES
 import com.kert0n.medapp.fixture.SHARED_KIT
 import com.kert0n.medapp.fixture.TABLET_FORM
+import com.kert0n.medapp.fixture.TABLET_FORM_ID
+import com.kert0n.medapp.fixture.VOCABULARY
 import com.kert0n.medapp.fixture.activeCourse
 import com.kert0n.medapp.fixture.expiry
 import com.kert0n.medapp.fixture.inMemoryDatabase
-import com.kert0n.medapp.fixture.save
 import com.kert0n.medapp.fixture.medKit
 import com.kert0n.medapp.fixture.millilitres
 import com.kert0n.medapp.fixture.pack
+import com.kert0n.medapp.fixture.save
 import com.kert0n.medapp.fixture.source
 import com.kert0n.medapp.fixture.tablets
 import com.kert0n.medapp.storage.course.ActivePackageAssignmentStorageEntity
@@ -27,8 +30,6 @@ import org.junit.After
 import org.junit.Assert.assertEquals
 import org.junit.Before
 import org.junit.Test
-import com.kert0n.medapp.fixture.VOCABULARY
-import com.kert0n.medapp.fixture.TABLET_FORM_ID
 
 /**
  * Один запрос отвечает на поиск, фильтр и сортировку сразу, и просроченные идут первыми при

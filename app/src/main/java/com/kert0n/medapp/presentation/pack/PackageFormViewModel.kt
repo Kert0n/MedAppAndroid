@@ -1,30 +1,30 @@
 package com.kert0n.medapp.presentation.pack
 
-import com.kert0n.medapp.presentation.act
-import com.kert0n.medapp.presentation.ScreenFailures
-import com.kert0n.medapp.presentation.stateInScreen
-import com.kert0n.medapp.presentation.ScreenReading
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.kert0n.medapp.domain.Unavailability
 import com.kert0n.medapp.domain.scan.CodeFormat
 import com.kert0n.medapp.domain.scan.ScannedCode
+import com.kert0n.medapp.domain.template.PackageTemplates
+import com.kert0n.medapp.domain.template.TemplateQuery
+import com.kert0n.medapp.feature.medkits.MedKitReadings
 import com.kert0n.medapp.feature.packages.PackageAdding
 import com.kert0n.medapp.feature.packages.PackageDescribing
+import com.kert0n.medapp.feature.packages.PackageReadings
 import com.kert0n.medapp.feature.scan.PackageScanning
 import com.kert0n.medapp.feature.template.TemplateSearching
 import com.kert0n.medapp.feature.time.Today
-import com.kert0n.medapp.domain.Unavailability
-import com.kert0n.medapp.domain.template.PackageTemplates
-import com.kert0n.medapp.domain.template.TemplateQuery
+import com.kert0n.medapp.feature.value.VocabularyReadings
 import com.kert0n.medapp.presentation.ParsedInput
+import com.kert0n.medapp.presentation.ScreenFailures
+import com.kert0n.medapp.presentation.ScreenReading
+import com.kert0n.medapp.presentation.act
 import com.kert0n.medapp.presentation.medkit.MedKitPresentationDTO
 import com.kert0n.medapp.presentation.medkit.toPresentationDTO
+import com.kert0n.medapp.presentation.stateInScreen
 import com.kert0n.medapp.presentation.value.FormPresentationDTO
 import com.kert0n.medapp.presentation.value.UnitPresentationDTO
 import com.kert0n.medapp.presentation.value.toPresentationDTO
-import com.kert0n.medapp.storage.medkit.MedKitStorageRepository
-import com.kert0n.medapp.storage.pack.PackageStorageRepository
-import com.kert0n.medapp.storage.value.VocabularyStorageRepository
 import dagger.assisted.Assisted
 import dagger.assisted.AssistedFactory
 import dagger.assisted.AssistedInject
@@ -35,16 +35,16 @@ import kotlin.uuid.Uuid
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.Flow
-import kotlinx.coroutines.flow.distinctUntilChanged
-import kotlinx.coroutines.flow.flow
-import kotlinx.coroutines.flow.flowOf
-import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.flatMapLatest
+import kotlinx.coroutines.flow.flow
+import kotlinx.coroutines.flow.flowOf
+import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 
@@ -74,9 +74,9 @@ class PackageFormViewModel @AssistedInject constructor(
     private val describing: PackageDescribing,
     private val searching: TemplateSearching,
     private val scanning: PackageScanning,
-    private val packages: PackageStorageRepository,
-    private val vocabulary: VocabularyStorageRepository,
-    medKits: MedKitStorageRepository,
+    private val packages: PackageReadings,
+    private val vocabulary: VocabularyReadings,
+    medKits: MedKitReadings,
     today: Today,
     @Assisted private val opened: Opened,
     private val failures: ScreenFailures = ScreenFailures()

@@ -6,6 +6,7 @@ import android.content.Context
 import android.content.Intent
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import androidx.test.platform.app.InstrumentationRegistry
+import com.kert0n.medapp.di.EntriesModule
 import java.time.Instant
 import kotlinx.coroutines.test.runTest
 import org.junit.After
@@ -27,7 +28,7 @@ import org.junit.runner.RunWith
 class AlarmManagerRemindersTest {
 
     private val context: Context = InstrumentationRegistry.getInstrumentation().targetContext
-    private val reminders = AlarmManagerReminders(context)
+    private val reminders = AlarmManagerReminders(context, EntriesModule.entries())
 
     @After
     fun tearDown() = runTest {
@@ -65,7 +66,7 @@ class AlarmManagerRemindersTest {
 
         val only = PendingIntent.getBroadcast(
             context, AlarmManagerReminders.REQUEST_EXACT,
-            AlarmManagerReminders.wakeIntent(context, exact = true),
+            AlarmManagerReminders.wakeIntent(context, EntriesModule.entries(), exact = true),
             PendingIntent.FLAG_NO_CREATE or PendingIntent.FLAG_IMMUTABLE
         )
         assertNotNull("точная постановка ровно одна и найдена своим кодом", only)
@@ -97,8 +98,8 @@ class AlarmManagerRemindersTest {
             PendingIntent.FLAG_NO_CREATE or PendingIntent.FLAG_IMMUTABLE
         )
 
-        assertNotNull(lookup(AlarmManagerReminders.wakeIntent(context, exact = true)))
-        assertEquals(null, lookup(AlarmManagerReminders.wakeIntent(context, exact = true).setAction("com.kert0n.medapp.SOMETHING_ELSE")))
-        assertEquals(null, lookup(AlarmManagerReminders.wakeIntent(context, exact = false)))
+        assertNotNull(lookup(AlarmManagerReminders.wakeIntent(context, EntriesModule.entries(), exact = true)))
+        assertEquals(null, lookup(AlarmManagerReminders.wakeIntent(context, EntriesModule.entries(), exact = true).setAction("com.kert0n.medapp.SOMETHING_ELSE")))
+        assertEquals(null, lookup(AlarmManagerReminders.wakeIntent(context, EntriesModule.entries(), exact = false)))
     }
 }

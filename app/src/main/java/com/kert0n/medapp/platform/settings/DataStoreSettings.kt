@@ -1,6 +1,5 @@
 package com.kert0n.medapp.platform.settings
 
-import com.kert0n.medapp.domain.attempt
 import androidx.datastore.core.CorruptionException
 import androidx.datastore.core.DataStore
 import androidx.datastore.preferences.core.MutablePreferences
@@ -11,11 +10,12 @@ import androidx.datastore.preferences.core.intPreferencesKey
 import androidx.datastore.preferences.core.longPreferencesKey
 import com.kert0n.medapp.di.IoDispatcher
 import com.kert0n.medapp.di.SettingsFile
+import com.kert0n.medapp.domain.attempt
 import com.kert0n.medapp.domain.notification.NotificationSettings
 import com.kert0n.medapp.feature.settings.AppSettings
 import com.kert0n.medapp.feature.settings.SettingsSaved
 import com.kert0n.medapp.feature.settings.SettingsStore
-import com.kert0n.medapp.queue.SyncInterval
+import com.kert0n.medapp.feature.settings.SyncInterval
 import java.io.File
 import java.io.IOException
 import java.time.LocalTime

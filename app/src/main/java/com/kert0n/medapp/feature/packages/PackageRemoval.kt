@@ -2,12 +2,12 @@ package com.kert0n.medapp.feature.packages
 
 import com.kert0n.medapp.domain.pack.Package
 import com.kert0n.medapp.domain.pack.PackageStatus
+import com.kert0n.medapp.feature.packages.PackageRecords
 import com.kert0n.medapp.feature.readThisTransaction
 import com.kert0n.medapp.queue.QueueService
 import com.kert0n.medapp.queue.QueuedCommand
 import com.kert0n.medapp.queue.Transactions
 import com.kert0n.medapp.queue.pack.PackageSyncCommand
-import com.kert0n.medapp.storage.pack.PackageStorageRepository
 import java.time.Clock
 import java.time.Instant
 import javax.inject.Inject
@@ -26,7 +26,7 @@ import kotlin.uuid.Uuid
  * до ответа нельзя, а отказ полки снимает пометку, и человек решает заново.
  */
 class PackageRemoval @Inject constructor(
-    private val packages: PackageStorageRepository,
+    private val packages: PackageRecords,
     private val queue: QueueService,
     private val transactions: Transactions,
     private val clock: Clock

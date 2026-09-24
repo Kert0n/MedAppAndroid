@@ -3,24 +3,25 @@ package com.kert0n.medapp.presentation.intake
 import com.kert0n.medapp.domain.intake.IntakeRejected
 import com.kert0n.medapp.domain.pack.Claims
 import com.kert0n.medapp.domain.pack.ExpiryDate
-import com.kert0n.medapp.feature.intake.UnplannedIntakeRecording
-import com.kert0n.medapp.storage.intake.IntakeOutcome
-import com.kert0n.medapp.storage.intake.IntakeStorageRepository
 import com.kert0n.medapp.feature.course.CourseCalendar
 import com.kert0n.medapp.feature.course.CourseFollowing
+import com.kert0n.medapp.feature.intake.IntakeOutcome
+import com.kert0n.medapp.feature.intake.IntakeReadings
+import com.kert0n.medapp.feature.intake.IntakeRecords
+import com.kert0n.medapp.feature.intake.UnplannedIntakeRecording
 import com.kert0n.medapp.feature.notification.ReminderPromising
 import com.kert0n.medapp.feature.notification.ReminderWithdrawal
-import com.kert0n.medapp.fixture.FakeCourseStorage
-import com.kert0n.medapp.fixture.QuietNotificationSettings
-import com.kert0n.medapp.fixture.UnaskedReminders
 import com.kert0n.medapp.fixture.DirectTransactions
+import com.kert0n.medapp.fixture.FakeCourseStorage
 import com.kert0n.medapp.fixture.FakePackages
 import com.kert0n.medapp.fixture.FakeQueue
 import com.kert0n.medapp.fixture.FakeVocabulary
 import com.kert0n.medapp.fixture.MainDispatcherRule
 import com.kert0n.medapp.fixture.PACK
+import com.kert0n.medapp.fixture.QuietNotificationSettings
 import com.kert0n.medapp.fixture.TABLETS
 import com.kert0n.medapp.fixture.UnaskedIntakes
+import com.kert0n.medapp.fixture.UnaskedReminders
 import com.kert0n.medapp.fixture.awaiting
 import com.kert0n.medapp.fixture.dose
 import com.kert0n.medapp.fixture.pack
@@ -77,7 +78,7 @@ class UnplannedIntakeViewModelTest {
      * Приёмы, которые можно записать: подделка отвечает только на тот вопрос, о котором проверка,
      * — «факт записан», — а на остальные падает голосом `UnaskedIntakes`.
      */
-    private class WritableIntakes : IntakeStorageRepository by UnaskedIntakes {
+    private class WritableIntakes : IntakeRecords by UnaskedIntakes {
         val written = mutableListOf<IntakeOutcome>()
         override suspend fun record(outcome: IntakeOutcome): Boolean {
             written += outcome

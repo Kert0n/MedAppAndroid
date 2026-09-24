@@ -4,7 +4,7 @@ import com.kert0n.medapp.di.MedAppHttp
 import com.kert0n.medapp.network.account.AccessTokenNetworkDTO
 import com.kert0n.medapp.network.account.AccessTokenThrottled
 import com.kert0n.medapp.network.account.AccessTokenUnavailable
-import com.kert0n.medapp.network.account.AccountCredentials
+import com.kert0n.medapp.domain.account.AccountCredentials
 import com.kert0n.medapp.network.account.AccountPostNetworkDTO
 import com.kert0n.medapp.network.account.AccountSnapshotNetworkDTO
 import com.kert0n.medapp.network.medkit.InvitationNetworkDTO

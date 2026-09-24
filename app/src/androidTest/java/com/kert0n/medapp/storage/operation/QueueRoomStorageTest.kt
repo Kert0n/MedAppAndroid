@@ -54,8 +54,9 @@ import com.kert0n.medapp.storage.course.toSourceStorageEntities
 import com.kert0n.medapp.storage.course.toStorageEntity as toCourseStorageEntity
 import com.kert0n.medapp.storage.course.toTimeStorageEntities
 import com.kert0n.medapp.storage.database.MedAppDatabase
-import com.kert0n.medapp.storage.intake.toStorageEntity as toIntakeStorageEntity
 import com.kert0n.medapp.storage.medkit.toStorageEntity as toMedKitStorageEntity
+import com.kert0n.medapp.storage.operation.toStorageEntity
+import com.kert0n.medapp.storage.operation.toStorageEntity as toIntakeStorageEntity
 import com.kert0n.medapp.storage.pack.toStorageEntity
 import java.math.BigDecimal
 import java.time.Instant
@@ -194,7 +195,7 @@ class QueueRoomStorageTest {
         // Счёт попыток — вход задержки повтора, и только он: закрытой операции повторяться
         // незачем, поэтому закрытие его не двигает (PLAN E2, E3).
         assertEquals(Attempts(0), stored.operation.attempts)
-        assertEquals(IntakeAccounting.REMOTE_APPLIED, requireNotNull(database.intakes().findEntity(INTAKE)).accounting)
+        assertEquals(IntakeAccounting.REMOTE_APPLIED, requireNotNull(database.intakes().findEntity(INTAKE)).syncState().accounting)
         assertEquals(IntakeStatus.TAKEN, requireNotNull(database.intakes().findEntity(INTAKE)).status)
         assertTrue(storage.ready(at.plusSeconds(600)).isEmpty())
     }
@@ -425,7 +426,7 @@ class QueueRoomStorageTest {
         assertEquals("INSUFFICIENT", refused.operation.lastError)
         assertEquals(SyncOperationStatus.REFUSED, dependent.operation.status)
         assertEquals(RefusalReason.SUPERSEDED, dependent.operation.refusalReason)
-        assertEquals(IntakeAccounting.REMOTE_REFUSED, requireNotNull(database.intakes().findEntity(INTAKE)).accounting)
+        assertEquals(IntakeAccounting.REMOTE_REFUSED, requireNotNull(database.intakes().findEntity(INTAKE)).syncState().accounting)
         assertEquals(tablets("17"), requireNotNull(database.packages().find(PACK)).toDomain(VOCABULARY).quantity)
         assertTrue(storage.ready(at.plusSeconds(600)).isEmpty())
     }
@@ -446,7 +447,7 @@ class QueueRoomStorageTest {
         assertEquals(Take.Closed(Delivery.Refused(RefusalReason.UNIT_CHANGED, PackageState.None)), take)
         val stored = requireNotNull(database.syncOperations().find(operation)).toDomain(VOCABULARY) as StoredSyncOperation.Readable
         assertEquals(SyncOperationStatus.REFUSED, stored.operation.status)
-        assertEquals(IntakeAccounting.REMOTE_REFUSED, requireNotNull(database.intakes().findEntity(INTAKE)).accounting)
+        assertEquals(IntakeAccounting.REMOTE_REFUSED, requireNotNull(database.intakes().findEntity(INTAKE)).syncState().accounting)
         assertEquals(com.kert0n.medapp.fixture.millilitres("17"), requireNotNull(database.packages().find(PACK)).toDomain(VOCABULARY).quantity)
         // Отправки не было вовсе: подготовка закрыла операцию сама, и попытке взяться неоткуда.
         assertEquals(Attempts(0), stored.operation.attempts)

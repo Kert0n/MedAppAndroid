@@ -14,11 +14,6 @@ import com.kert0n.medapp.domain.pack.PackageProjection
 import com.kert0n.medapp.domain.pack.PackageStatus
 import com.kert0n.medapp.domain.value.Quantity
 import com.kert0n.medapp.domain.value.Vocabulary
-import com.kert0n.medapp.queue.PackageQueueState
-import com.kert0n.medapp.queue.StoredSyncOperation
-import com.kert0n.medapp.queue.pack.PackageSnapshot
-import com.kert0n.medapp.queue.pack.PackageSyncCommand
-import com.kert0n.medapp.queue.pack.PackageSyncState
 import com.kert0n.medapp.storage.course.CourseDao
 import com.kert0n.medapp.storage.database.chunkedForQuery
 import com.kert0n.medapp.storage.intake.IntakeDao
@@ -297,72 +292,17 @@ interface PackageDao {
 }
 
 /**
- * Проекции пачек одним чтением на порцию: оценка количества — незакрытые команды поверх
- * подтверждённого остатка по возрастанию номера (команда, которую нечем прочитать после
- * обновления приложения, в число не входит — PLAN E1, F4); выделение и держащий курс — из
- * назначения активному курсу; последний мой приём — по приёмам из коробки (PLAN D4). Спрашивать
- * очередь, выделения и приёмы про каждую пачку значило бы двести запросов там, где хватает
- * одного; порядок по `sequence` внутри пачки группировка сохраняет.
- *
- * Зовётся внутри уже открытой транзакции того, кто читает: списка пачек и обеспечения курса.
- */
-suspend fun PackageDao.projectionsOf(
-    packages: List<Package>,
-    queue: SyncOperationDao,
-    intakes: IntakeDao,
-    words: Vocabulary
-): List<PackageProjection> {
-    val ids = packages.map { it.id }
-    val allocations = ids.chunkedForQuery().flatMap { allocationsOf(it) }.associateBy { it.packageId }
-    val unclosed = ids.chunkedForQuery()
-        .flatMap { queue.unclosedOfPackages(it) }
-        .groupBy { requireNotNull(it.operation.packageId) { "операция пачки называет свою пачку" } }
-    val lastUsed = ids.chunkedForQuery().flatMap { intakes.lastTakenFrom(it) }.associate { it.packageId to it.lastUsedAt }
-    return packages.map { pkg ->
-        val state = PackageQueueState(pkg, commandsOf(unclosed[pkg.id].orEmpty(), words))
-        val allocation = allocations[pkg.id]
-        val availability = PackageAvailability(
-            pkg = pkg,
-            effective = state.amount,
-            myAllocation = allocation?.allocated(words, pkg.quantity.unit) ?: Quantity.zero(pkg.quantity.unit)
-        )
-        pkg.projection(
-            availability = availability,
-            hasUnconfirmedChanges = state.hasUnconfirmedChanges,
-            holdingCourseId = allocation?.courseId,
-            lastUsedAt = lastUsed[pkg.id]
-        )
-    }
-}
-
-/** Команды пачки из строк очереди; нечитаемую после обновления приложения пропускаем (PLAN F4). */
-private fun commandsOf(rows: List<SyncOperationStorageRow>, words: Vocabulary): List<PackageSyncCommand> =
-    rows.mapNotNull {
-        (it.toDomain(words) as? StoredSyncOperation.Readable)?.operation?.command as? PackageSyncCommand
-    }
-
-/**
- * Снимок пачки, разрешённый в домен, — в базу. Единственная дверь: половины расходятся только
- * тут, и только по своим версиям, поэтому версия картины броней всегда описывает ту картину,
- * что лежит рядом (PLAN B3, E1). Серверное число ложится только через неё — полным снимком,
- * чтением перед отправкой или ответом на команду; чужое изменение просто становится нашим
- * числом, истории у коробки нет (D7).
- *
- * Зовётся внутри уже открытой транзакции того, кто снимок кладёт.
- */
-suspend fun PackageDao.applySnapshot(snapshot: PackageSnapshot, observedAt: Instant): SnapshotApplied =
-    applySnapshot(
-        snapshot.pack.toStorageEntity(snapshot.sync),
-        snapshot.pack.claims?.toStorageEntity(snapshot.pack.id),
-        observedAt
-    )
-
-/**
  * Пачка целиком: запись о коробке, живая строка и личные сведения собираются из одной сущности.
  * Порознь их не бывает, и раскладывать пачку на три строки каждому вызывающему незачем (PLAN F1).
+ * [keeping] — прочитанная строка, чьё знание о сервере переносится как есть: правка человека его
+ * не трогает (PLAN E4).
  */
-suspend fun PackageDao.save(pkg: Package, sync: PackageSyncState = PackageSyncState(pkg.id)) =
-    save(pkg.record.toStorageEntity(), pkg.toStorageEntity(sync), pkg.toDetailsStorageEntity())
+suspend fun PackageDao.save(pkg: Package, keeping: PackageStorageEntity? = null) =
+    save(
+        pkg.record.toStorageEntity(),
+        pkg.toStorageEntity(keeping?.version, keeping?.claimsVersion, keeping?.syncedAt),
+        pkg.toDetailsStorageEntity()
+    )
 
 /**
  * Дверь конца коробки — одна на все причины (PLAN D3, D5): сначала лечение теряет источник у

@@ -8,10 +8,10 @@ import androidx.datastore.preferences.preferencesDataStoreFile
 import com.kert0n.medapp.di.CredentialsFile
 import com.kert0n.medapp.di.CredentialsModule
 import com.kert0n.medapp.di.CredentialsStore
-import com.kert0n.medapp.network.account.AccountCredentials
-import com.kert0n.medapp.network.account.CredentialSource
-import com.kert0n.medapp.network.account.CredentialsSaved
-import com.kert0n.medapp.network.account.StoredAccount
+import com.kert0n.medapp.domain.account.AccountCredentials
+import com.kert0n.medapp.feature.account.CredentialSource
+import com.kert0n.medapp.feature.account.CredentialsSaved
+import com.kert0n.medapp.feature.account.StoredAccount
 import com.kert0n.medapp.platform.credentials.KeystoreCredentialSource
 import com.kert0n.medapp.platform.credentials.KeystoreKey
 import dagger.Module

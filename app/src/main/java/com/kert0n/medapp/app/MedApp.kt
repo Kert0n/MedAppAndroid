@@ -3,19 +3,19 @@ package com.kert0n.medapp.app
 import android.app.Application
 import androidx.hilt.work.HiltWorkerFactory
 import androidx.work.Configuration
-import com.kert0n.medapp.platform.connectivity.SyncTriggers
-import com.kert0n.medapp.platform.notifications.NotificationChannels
+import com.kert0n.medapp.di.ApplicationScope
+import com.kert0n.medapp.feature.delivery.SyncSchedule
 import com.kert0n.medapp.feature.notification.DailySchedule
 import com.kert0n.medapp.feature.notification.NotificationUpkeep
 import com.kert0n.medapp.feature.notification.ReminderOutbox
-import com.kert0n.medapp.di.ApplicationScope
 import com.kert0n.medapp.feature.settings.SettingsStore
-import kotlinx.coroutines.CoroutineScope
-import kotlinx.coroutines.launch
+import com.kert0n.medapp.app.connectivity.SyncTriggers
+import com.kert0n.medapp.platform.notifications.NotificationChannels
 import com.kert0n.medapp.queue.QueueOutbox
-import com.kert0n.medapp.queue.SyncSchedule
 import dagger.hilt.android.HiltAndroidApp
 import javax.inject.Inject
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.launch
 
 /**
  * Точка входа графа зависимостей. Всё, что живёт дольше экрана — база, клиенты, очередь —

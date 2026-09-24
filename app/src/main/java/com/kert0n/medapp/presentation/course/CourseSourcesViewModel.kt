@@ -1,9 +1,5 @@
 package com.kert0n.medapp.presentation.course
 
-import com.kert0n.medapp.presentation.act
-import com.kert0n.medapp.presentation.ScreenFailures
-import com.kert0n.medapp.presentation.stateInScreen
-import com.kert0n.medapp.presentation.ScreenReading
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.kert0n.medapp.domain.course.CourseCoverage
@@ -13,15 +9,19 @@ import com.kert0n.medapp.domain.pack.PackageProjection
 import com.kert0n.medapp.domain.value.Dose
 import com.kert0n.medapp.domain.value.Doses
 import com.kert0n.medapp.feature.course.CourseDrafting
+import com.kert0n.medapp.feature.course.CourseReadings
 import com.kert0n.medapp.feature.course.SourceEditing
 import com.kert0n.medapp.feature.course.SourceEstimates
+import com.kert0n.medapp.feature.medkits.MedKitReadings
+import com.kert0n.medapp.feature.packages.PackageQuery
+import com.kert0n.medapp.feature.packages.PackageReadings
 import com.kert0n.medapp.feature.time.Today
+import com.kert0n.medapp.presentation.ScreenFailures
+import com.kert0n.medapp.presentation.ScreenReading
+import com.kert0n.medapp.presentation.act
+import com.kert0n.medapp.presentation.stateInScreen
 import com.kert0n.medapp.presentation.value.QuantityPresentationDTO
 import com.kert0n.medapp.presentation.value.toPresentationDTO
-import com.kert0n.medapp.storage.course.CourseStorageRepository
-import com.kert0n.medapp.storage.medkit.MedKitStorageRepository
-import com.kert0n.medapp.storage.pack.PackageQuery
-import com.kert0n.medapp.storage.pack.PackageStorageRepository
 import dagger.assisted.Assisted
 import dagger.assisted.AssistedFactory
 import dagger.assisted.AssistedInject
@@ -58,9 +58,9 @@ class CourseSourcesViewModel @AssistedInject constructor(
     private val drafting: CourseDrafting,
     private val sources: SourceEditing,
     private val estimates: SourceEstimates,
-    courses: CourseStorageRepository,
-    packages: PackageStorageRepository,
-    medKits: MedKitStorageRepository,
+    courses: CourseReadings,
+    packages: PackageReadings,
+    medKits: MedKitReadings,
     today: Today,
     @Assisted private val courseId: Uuid,
     private val failures: ScreenFailures = ScreenFailures()

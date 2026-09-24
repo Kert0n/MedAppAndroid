@@ -32,6 +32,7 @@ import com.kert0n.medapp.queue.pack.PackageSnapshot
 import com.kert0n.medapp.queue.pack.PackageSyncState
 import com.kert0n.medapp.storage.database.MedAppDatabase
 import com.kert0n.medapp.storage.medkit.toStorageEntity as toMedKitStorageEntity
+import com.kert0n.medapp.storage.operation.applySnapshot
 import java.math.BigDecimal
 import java.time.Instant
 import java.time.LocalDate

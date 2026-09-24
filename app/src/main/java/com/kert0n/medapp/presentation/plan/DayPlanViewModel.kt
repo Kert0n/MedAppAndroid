@@ -1,23 +1,22 @@
 package com.kert0n.medapp.presentation.plan
 
-import com.kert0n.medapp.presentation.act
-import com.kert0n.medapp.presentation.ScreenFailures
-import com.kert0n.medapp.presentation.stateInScreen
-import com.kert0n.medapp.presentation.ScreenReading
-import com.kert0n.medapp.presentation.intake.toPresentationDTO
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
-import com.kert0n.medapp.domain.report.DayPlan
-import kotlinx.coroutines.flow.map
 import com.kert0n.medapp.domain.notification.NotificationChannel
 import com.kert0n.medapp.domain.notification.NotificationReadiness
+import com.kert0n.medapp.domain.report.DayPlan
 import com.kert0n.medapp.domain.value.Dose
 import com.kert0n.medapp.feature.intake.IntakeConfirmation
 import com.kert0n.medapp.feature.intake.IntakeDeclining
 import com.kert0n.medapp.feature.plan.DayPlanning
+import com.kert0n.medapp.feature.settings.DevicePermissions
 import com.kert0n.medapp.feature.time.Today
-import com.kert0n.medapp.platform.settings.DevicePermissions
+import com.kert0n.medapp.presentation.ScreenFailures
+import com.kert0n.medapp.presentation.ScreenReading
 import com.kert0n.medapp.presentation.ScreenState
+import com.kert0n.medapp.presentation.act
+import com.kert0n.medapp.presentation.intake.toPresentationDTO
+import com.kert0n.medapp.presentation.stateInScreen
 import dagger.hilt.android.lifecycle.HiltViewModel
 import java.time.Clock
 import java.time.ZoneId
@@ -27,6 +26,7 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 

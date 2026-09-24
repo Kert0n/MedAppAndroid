@@ -1,8 +1,8 @@
 package com.kert0n.medapp.presentation.settings
 
 import androidx.lifecycle.ViewModel
-import com.kert0n.medapp.platform.settings.AppLanguage
-import com.kert0n.medapp.platform.settings.AppLanguages
+import com.kert0n.medapp.feature.settings.AppLanguage
+import com.kert0n.medapp.feature.settings.AppLanguages
 import dagger.hilt.android.lifecycle.HiltViewModel
 import javax.inject.Inject
 import kotlinx.coroutines.flow.MutableStateFlow

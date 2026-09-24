@@ -4,23 +4,26 @@ import androidx.room.withTransaction
 import com.kert0n.medapp.domain.course.Course
 import com.kert0n.medapp.domain.course.CourseCompletion
 import com.kert0n.medapp.domain.course.CourseCoverage
-import com.kert0n.medapp.domain.course.CoverageReduction
 import com.kert0n.medapp.domain.course.CourseDraft
 import com.kert0n.medapp.domain.course.CourseDraftProjection
 import com.kert0n.medapp.domain.course.CourseProjection
-import com.kert0n.medapp.domain.course.CourseRecordProjection
 import com.kert0n.medapp.domain.course.CourseRecord
+import com.kert0n.medapp.domain.course.CourseRecordProjection
+import com.kert0n.medapp.domain.course.CoverageReduction
 import com.kert0n.medapp.domain.course.Revision
 import com.kert0n.medapp.domain.intake.CourseIntake
 import com.kert0n.medapp.domain.intake.IntakeAnswer
 import com.kert0n.medapp.domain.report.CourseInProgress
 import com.kert0n.medapp.domain.value.Vocabulary
+import com.kert0n.medapp.feature.course.CourseReadings
+import com.kert0n.medapp.feature.course.CourseReallocation
+import com.kert0n.medapp.feature.course.CourseRecords
 import com.kert0n.medapp.storage.database.MedAppDatabase
 import com.kert0n.medapp.storage.database.observing
-import com.kert0n.medapp.storage.pack.PackageDao
-import com.kert0n.medapp.storage.operation.SyncOperationDao
 import com.kert0n.medapp.storage.intake.IntakeDao
-import com.kert0n.medapp.storage.intake.toStorageEntity as toIntakeStorageEntity
+import com.kert0n.medapp.storage.operation.SyncOperationDao
+import com.kert0n.medapp.storage.operation.toStorageEntity as toIntakeStorageEntity
+import com.kert0n.medapp.storage.pack.PackageDao
 import com.kert0n.medapp.storage.value.VocabularyDao
 import java.time.Instant
 import javax.inject.Inject
@@ -35,7 +38,7 @@ class CourseRoomRepository @Inject constructor(
     private val packages: PackageDao,
     private val queue: SyncOperationDao,
     private val vocabulary: VocabularyDao
-) : CourseStorageRepository {
+) : CourseRecords, CourseReadings {
 
     override fun observeDrafts(): Flow<List<CourseDraftProjection>> =
         database.observing(*PLAN_TABLES) {

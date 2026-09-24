@@ -1,11 +1,13 @@
 package com.kert0n.medapp.presentation.medkit
 
 import com.kert0n.medapp.domain.medkit.MedKitContents
+import com.kert0n.medapp.feature.medkits.MedKitReadings
+import com.kert0n.medapp.feature.medkits.MedKitRecords
 import com.kert0n.medapp.feature.time.Today
 import com.kert0n.medapp.fixture.FakeMedKits
 import com.kert0n.medapp.fixture.HOME_KIT
-import com.kert0n.medapp.fixture.QuietClock
 import com.kert0n.medapp.fixture.MainDispatcherRule
+import com.kert0n.medapp.fixture.QuietClock
 import com.kert0n.medapp.fixture.awaiting
 import com.kert0n.medapp.fixture.medKit
 import com.kert0n.medapp.fixture.watching
@@ -89,7 +91,7 @@ class MedKitListViewModelTest {
      */
     @Test
     fun aListThatCannotBeReadSaysSoAndTheAppStays() {
-        val broken = object : com.kert0n.medapp.storage.medkit.MedKitStorageRepository by medKits {
+        val broken = object : MedKitRecords by medKits {
             override fun observeAll(today: java.time.LocalDate) =
                 kotlinx.coroutines.flow.flow<List<com.kert0n.medapp.domain.medkit.MedKitProjection>> { throw IllegalStateException("file is not a database") }
         }

@@ -11,6 +11,7 @@ import com.kert0n.medapp.storage.intake.IntakeStorageRow
 import com.kert0n.medapp.storage.intake.toStorageEntity
 import com.kert0n.medapp.storage.medkit.MedKitStorageEntity
 import com.kert0n.medapp.storage.medkit.toStorageEntity as toMedKitStorageEntity
+import com.kert0n.medapp.storage.operation.toStorageEntity
 import com.kert0n.medapp.storage.pack.PackageRefStorageRow
 import com.kert0n.medapp.storage.pack.PackageStorageRow
 import com.kert0n.medapp.storage.pack.toDetailsStorageEntity

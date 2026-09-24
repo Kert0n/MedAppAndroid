@@ -2,8 +2,8 @@ package com.kert0n.medapp.di
 
 import android.content.Context
 import androidx.work.WorkManager
+import com.kert0n.medapp.feature.delivery.SyncSchedule
 import com.kert0n.medapp.platform.background.WorkManagerSyncSchedule
-import com.kert0n.medapp.queue.SyncSchedule
 import dagger.Module
 import dagger.Provides
 import dagger.hilt.InstallIn

@@ -5,10 +5,11 @@ import com.kert0n.medapp.domain.intake.CourseIntake
 import com.kert0n.medapp.domain.notification.NotificationAction
 import com.kert0n.medapp.domain.notification.NotificationKey
 import com.kert0n.medapp.domain.notification.NotificationKind
-import com.kert0n.medapp.domain.notification.Reminder
 import com.kert0n.medapp.domain.notification.NotificationSettings
+import com.kert0n.medapp.domain.notification.Reminder
 import com.kert0n.medapp.domain.value.Doses
 import com.kert0n.medapp.feature.course.CourseDrafting
+import com.kert0n.medapp.feature.notification.ReminderRecords
 import com.kert0n.medapp.fixture.FakeNotifier
 import com.kert0n.medapp.fixture.FakeReminders
 import com.kert0n.medapp.fixture.FakeSettings
@@ -58,7 +59,7 @@ class IntakeReminderTest {
     private val reminders = FakeReminders()
     private val settings = FakeSettings()
     private lateinit var planning: NotificationReconciliation
-    private lateinit var store: com.kert0n.medapp.storage.notification.ReminderStorageRepository
+    private lateinit var store: ReminderRecords
     private lateinit var outbox: ReminderOutbox
 
     @Before
@@ -73,7 +74,7 @@ class IntakeReminderTest {
 
     /** Владелец доставки с остановленными на [at] часами: обязательство наступает в свой момент. */
     private fun outboxAt(at: Instant) = ReminderOutbox(
-        store, notifier, reminders, com.kert0n.medapp.fixture.FakeFreshness(), database.transactions(),
+        store, notifier, com.kert0n.medapp.feature.notification.ReminderSubjects(database.intakeRepository(), database.courseRepository(), database.packageRepository()), reminders, com.kert0n.medapp.fixture.FakeFreshness(), database.transactions(),
         Clock.fixed(at, ZoneOffset.UTC),
         kotlinx.coroutines.CoroutineScope(kotlinx.coroutines.SupervisorJob() + kotlinx.coroutines.Dispatchers.Unconfined)
     )

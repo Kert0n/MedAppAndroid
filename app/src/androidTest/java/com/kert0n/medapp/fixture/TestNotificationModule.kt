@@ -3,9 +3,10 @@ package com.kert0n.medapp.fixture
 import com.kert0n.medapp.di.ClockModule
 import com.kert0n.medapp.di.NotificationModule
 import com.kert0n.medapp.domain.notification.Freshness
-import com.kert0n.medapp.domain.notification.Notifier
 import com.kert0n.medapp.domain.notification.NotificationReadiness
+import com.kert0n.medapp.domain.notification.Notifier
 import com.kert0n.medapp.domain.notification.ReminderAlarms
+import com.kert0n.medapp.feature.delivery.Synchronization
 import com.kert0n.medapp.feature.notification.DailySchedule
 import com.kert0n.medapp.feature.time.ClockShifts
 import com.kert0n.medapp.platform.notifications.AlarmManagerReminders
@@ -13,7 +14,6 @@ import com.kert0n.medapp.platform.notifications.SystemNotifier
 import com.kert0n.medapp.platform.notifications.WorkManagerDailySchedule
 import com.kert0n.medapp.platform.time.DeviceClock
 import com.kert0n.medapp.platform.time.TimeShifts
-import com.kert0n.medapp.queue.Synchronization
 import dagger.Module
 import dagger.Provides
 import dagger.hilt.components.SingletonComponent

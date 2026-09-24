@@ -31,7 +31,20 @@ import com.kert0n.medapp.domain.report.CourseInProgress
 import com.kert0n.medapp.domain.value.DosageForm
 import com.kert0n.medapp.domain.value.QuantityUnit
 import com.kert0n.medapp.domain.value.Vocabulary
-import com.kert0n.medapp.network.server.RawResponse
+import com.kert0n.medapp.domain.value.VocabularyStore
+import com.kert0n.medapp.feature.course.CourseReadings
+import com.kert0n.medapp.feature.course.CourseReallocation
+import com.kert0n.medapp.feature.course.CourseRecords
+import com.kert0n.medapp.feature.medkits.MedKitReadings
+import com.kert0n.medapp.feature.medkits.MedKitRecords
+import com.kert0n.medapp.feature.operation.OperationReadings
+import com.kert0n.medapp.feature.operation.OperationRecords
+import com.kert0n.medapp.feature.operation.OutstandingOperation
+import com.kert0n.medapp.feature.packages.PackageAdjustment
+import com.kert0n.medapp.feature.packages.PackageQuery
+import com.kert0n.medapp.feature.packages.PackageReadings
+import com.kert0n.medapp.feature.packages.PackageRecords
+import com.kert0n.medapp.feature.value.VocabularyReadings
 import com.kert0n.medapp.queue.QueueStorage
 import com.kert0n.medapp.queue.QueuedCommand
 import com.kert0n.medapp.queue.Receipt
@@ -42,17 +55,6 @@ import com.kert0n.medapp.queue.SyncOperation
 import com.kert0n.medapp.queue.SyncOperationStatus
 import com.kert0n.medapp.queue.Transactions
 import com.kert0n.medapp.queue.pack.PackageSnapshot
-import com.kert0n.medapp.queue.pack.PackageSyncState
-import com.kert0n.medapp.storage.course.CourseReallocation
-import com.kert0n.medapp.storage.course.CourseStorageRepository
-import com.kert0n.medapp.storage.medkit.MedKitStorageRepository
-import com.kert0n.medapp.storage.operation.OutstandingOperation
-import com.kert0n.medapp.storage.operation.SyncOperationStorageRepository
-import com.kert0n.medapp.storage.pack.PackageAdjustment
-import com.kert0n.medapp.storage.pack.PackageQuery
-import com.kert0n.medapp.storage.pack.PackageStorageRepository
-import com.kert0n.medapp.storage.pack.SnapshotApplied
-import com.kert0n.medapp.storage.value.VocabularyStorageRepository
 import java.time.Instant
 import java.time.LocalDate
 import kotlin.uuid.Uuid
@@ -69,7 +71,7 @@ import kotlinx.coroutines.flow.map
  * проверяются на ней (`PackageQueryDaoTest`), оценка очереди — свёртке команд (`PackageQueueState`),
  * откат половины записи — транзакции. Здесь отвечают за состав и за то, что запись видна.
  */
-class FakePackages(vararg packs: Package) : PackageStorageRepository {
+class FakePackages(vararg packs: Package) : PackageRecords, PackageReadings {
 
     private val stored = LinkedHashMap<Uuid, Package>()
 
@@ -98,7 +100,7 @@ class FakePackages(vararg packs: Package) : PackageStorageRepository {
     override fun list(query: PackageQuery, today: LocalDate): Flow<List<PackageProjection>> =
         changes.map { matching(query).map { it.seen() } }
 
-    override suspend fun add(pkg: Package, sync: PackageSyncState) = write(pkg)
+    override suspend fun add(pkg: Package) = write(pkg)
 
     override suspend fun describe(packageId: Uuid, facts: PackageFacts): Boolean =
         change(packageId) { it.describe(facts) }
@@ -123,12 +125,6 @@ class FakePackages(vararg packs: Package) : PackageStorageRepository {
 
     override suspend fun contentsOf(medKitId: Uuid): List<Package> =
         stored.values.filter { it.medKit.id == medKitId }
-
-    override suspend fun applySnapshot(snapshot: PackageSnapshot, observedAt: Instant): SnapshotApplied =
-        SnapshotApplied(pack = false, claims = false)
-
-    override fun observeSyncState(id: Uuid): Flow<PackageSyncState?> =
-        changes.map { stored[id]?.let { PackageSyncState(it.id) } }
 
     override suspend fun saveClaims(packageId: Uuid, claims: Claims?) = Unit
 
@@ -189,7 +185,7 @@ class FakePackages(vararg packs: Package) : PackageStorageRepository {
  * здесь его приносит [contents], а не выдумывает подделка: «12 упаковок, 2 просрочены» на пустом
  * хранилище было бы неправдой, которую тест принял бы за правду.
  */
-class FakeMedKits(vararg kits: MedKit) : MedKitStorageRepository {
+class FakeMedKits(vararg kits: MedKit) : MedKitRecords, MedKitReadings {
 
     private val stored = LinkedHashMap<Uuid, MedKit>()
 
@@ -212,7 +208,6 @@ class FakeMedKits(vararg kits: MedKit) : MedKitStorageRepository {
 
     override suspend fun find(id: Uuid): MedKit? = stored[id]
 
-    override fun observeSyncedAt(id: Uuid): Flow<Instant?> = changes.map { null }
 
     override suspend fun add(medKit: MedKit) {
         stored[medKit.id] = medKit
@@ -263,7 +258,7 @@ class FakeVocabulary(
     private val snapshot: Vocabulary = VOCABULARY,
     private val units: List<QuantityUnit> = listOf(TABLETS, MILLILITRES),
     private val forms: List<DosageForm> = listOf(TABLET_FORM, CAPSULE_FORM)
-) : VocabularyStorageRepository {
+) : VocabularyReadings, VocabularyStore {
 
     override suspend fun snapshot(): Vocabulary = snapshot
 
@@ -358,7 +353,7 @@ class FakeFollowing : PackageFollowing {
  * Остальные двери падают, а не отвечают выдуманным: сценарий, который сюда заглянул, пришёл не
  * за тем, чем занят экран, и молчаливый пустой ответ спрятал бы это от проверки.
  */
-class FakeCourses : CourseStorageRepository {
+class FakeCourses : CourseRecords, CourseReadings {
 
     /** Записи эпизодов по тождеству: карточка коробки называет держащее лечение именем. */
     val records = mutableMapOf<Uuid, CourseRecordProjection>()
@@ -425,7 +420,7 @@ class FakeCourses : CourseStorageRepository {
  * спрашивают у самой очереди, а не у экрана. Незаданное падает сразу, а не отвечает пустым
  * (разбор #51 «Заглушки портов падают сразу»).
  */
-class FakeSyncOperations(troubles: List<OutstandingOperation> = emptyList()) : SyncOperationStorageRepository {
+class FakeSyncOperations(troubles: List<OutstandingOperation> = emptyList()) : OperationRecords, OperationReadings {
 
     val troubles = MutableStateFlow(troubles)
 

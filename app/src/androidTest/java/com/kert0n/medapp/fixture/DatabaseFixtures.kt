@@ -1,13 +1,25 @@
 package com.kert0n.medapp.fixture
 
 import androidx.room.Room
+import androidx.room.withTransaction
 import androidx.test.platform.app.InstrumentationRegistry
+import com.kert0n.medapp.domain.pack.Package
+import com.kert0n.medapp.queue.pack.PackageSnapshot
+import com.kert0n.medapp.queue.pack.PackageSyncState
 import com.kert0n.medapp.storage.database.MedAppDatabase
 import com.kert0n.medapp.storage.medkit.toStorageEntity as toMedKitStorageEntity
+import com.kert0n.medapp.storage.operation.applySnapshot
+import com.kert0n.medapp.storage.operation.save
+import com.kert0n.medapp.storage.operation.syncState
+import com.kert0n.medapp.storage.operation.toStorageEntity
+import com.kert0n.medapp.storage.operation.toStorageEntity as toPackageStorageEntity
 import com.kert0n.medapp.storage.pack.toDetailsStorageEntity as toPackageDetailsStorageEntity
-import com.kert0n.medapp.storage.pack.toStorageEntity as toPackageStorageEntity
 import com.kert0n.medapp.storage.pack.toStorageEntity as toRecordStorageEntity
 import com.kert0n.medapp.storage.value.toStorageEntity
+import java.time.Instant
+import kotlin.uuid.Uuid
+import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.runBlocking
 
 /**
@@ -69,9 +81,30 @@ suspend fun rejectedByDatabase(block: suspend () -> Unit): Throwable =
  * Репозитории поверх открытой базы. Транзакции F5 идут через несколько таблиц, поэтому у их
  * владельцев несколько DAO; собирать их в каждом тесте заново значило бы повторять граф руками.
  */
-fun MedAppDatabase.packageRepository() = com.kert0n.medapp.storage.pack.PackageRoomRepository(
-    this, packages(), courses(), syncOperations(), intakes(), vocabulary(), javax.inject.Provider { courseFollowing() }
+fun MedAppDatabase.packageRepository() = FixturePackages(
+    this,
+    com.kert0n.medapp.storage.pack.PackageRoomRepository(
+        this, packages(), courses(), syncOperations(), intakes(), vocabulary(), javax.inject.Provider { courseFollowing() }
+    )
 )
+
+/**
+ * Хранение упаковок для проверок: оба порта сценария — настоящим репозиторием, и два входа,
+ * которых у сценария нет, — завести коробку, которую сервер уже знает, и прочитать знание о ней.
+ * Это язык журнала (`storage/operation`): коробку с версиями заводит снимок, а не человек.
+ */
+class FixturePackages(
+    private val database: MedAppDatabase,
+    private val repository: com.kert0n.medapp.storage.pack.PackageRoomRepository
+) : com.kert0n.medapp.feature.packages.PackageRecords by repository {
+
+    suspend fun add(pkg: Package, sync: PackageSyncState) = database.withTransaction { database.packages().save(pkg, sync) }
+
+    suspend fun applySnapshot(snapshot: PackageSnapshot, observedAt: Instant) =
+        database.withTransaction { database.packages().applySnapshot(snapshot, observedAt) }
+
+    fun observeSyncState(id: Uuid): Flow<PackageSyncState?> = database.packages().observe(id).map { it?.pack?.syncState() }
+}
 
 fun MedAppDatabase.courseRepository() = com.kert0n.medapp.storage.course.CourseRoomRepository(
     this, courses(), intakes(), packages(), syncOperations(), vocabulary()
@@ -220,7 +253,7 @@ class Scenarios(
         courses, database.intakeRepository(), packages, courseCalendar, courseFollowing, courseClosing, transactions, clock
     )
     val intakeConfirmation = com.kert0n.medapp.feature.intake.IntakeConfirmation(
-        database.intakeRepository(), courses, packages, transactions, queue, courseClosing, courseCalendar, reminderWithdrawal, clock
+        database.intakeRepository(), database.intakeAccounts(), courses, packages, transactions, queue, courseClosing, courseCalendar, reminderWithdrawal, clock
     )
     val notificationReconciliation = com.kert0n.medapp.feature.notification.NotificationReconciliation(
         database.intakeRepository(), packages, courses, reminderStore, database.queueRepository(), reminderPromising, reminderWithdrawal,
@@ -235,8 +268,11 @@ class Scenarios(
      * Владелец показа и будильника. В проверках его проход зовут явно: так видно, что показ —
      * отдельный шаг, а не побочное действие прохода дня.
      */
+    val reminderSubjects = com.kert0n.medapp.feature.notification.ReminderSubjects(
+        database.intakeRepository(), database.courseRepository(), database.packageRepository()
+    )
     val reminderOutbox = com.kert0n.medapp.feature.notification.ReminderOutbox(
-        reminderStore, notifier, reminders, freshness, transactions, clock,
+        reminderStore, notifier, reminderSubjects, reminders, freshness, transactions, clock,
         kotlinx.coroutines.CoroutineScope(kotlinx.coroutines.SupervisorJob() + kotlinx.coroutines.Dispatchers.Unconfined)
     )
 }
@@ -251,3 +287,6 @@ fun com.kert0n.medapp.feature.intake.IntakeConfirmation.Outcome.confirmed(): com
 /** Отказ сценария приёма по пункту курса — его причина. */
 fun com.kert0n.medapp.feature.intake.IntakeConfirmation.Outcome.rejected(): com.kert0n.medapp.domain.intake.IntakeRejected.Reason =
     (this as? com.kert0n.medapp.feature.intake.IntakeConfirmation.Outcome.Rejected)?.reason ?: error("ожидался отказ, а не $this")
+
+/** Учёт расхода приёма — у журнала, как у приложения. */
+fun MedAppDatabase.intakeAccounts() = com.kert0n.medapp.storage.operation.IntakeAccountsRoomRepository(intakes())
