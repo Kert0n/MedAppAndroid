@@ -73,6 +73,25 @@ class DecisionOwnershipTest {
         )
     }
 
+    /**
+     * Экран проверяет **ввод** — пустое поле, ноль, не то число, — а о данных спрашивает домен:
+     * пригодна ли коробка, годится ли в источник, та ли единица, сколько осталось, можно ли
+     * сделать полку общей, есть ли чужие брони (AGENTS «Описание», язык слоёв).
+     */
+    @Test
+    fun screensAskTheDomainAboutData() {
+        val reads = Regex(
+            "\\.status\\.(allowsUse|allowsDecision)\\b|\\bstatus\\s*(==|!=)\\s*\\w+Status\\.|" +
+                "\\bstate\\s*(==|!=)\\s*\\w+\\.State\\.|\\bunit\\s*(==|!=)\\s*[\\w.]+\\.unit\\b|" +
+                "\\.(reservedByOthers|myAllocation|effective|availableToMe)\\??\\.isZero\\b|\\bpublication\\s*(==|!=)"
+        )
+        assertEquals(
+            "экран сам решает о данных",
+            sortedSetOf<String>(),
+            filesUnder("presentation/", reads) + filesUnder("ui/", reads)
+        )
+    }
+
     private val mayReadState: Set<String> = setOf(
         "feature/intake/RecordedIntake.kt",
         "feature/intake/IntakeOutcome.kt"
