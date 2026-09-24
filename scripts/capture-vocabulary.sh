@@ -2,29 +2,36 @@
 # Снимает встроенный снимок словарей с сервера из local.properties учёткой пробного
 # пользователя A и кладёт его в app/src/main/assets/vocabulary.json.
 #
-# Происхождение — адрес и дата снятия — записывается в сам снимок: идентификаторы серверные,
-# и сверять их придётся с тем же сервером. Поэтому во встроенный ассет пишется только снимок
-# с боевого адреса; для любого другого сервера путь вывода называется явно аргументом.
+# Происхождение и дата снятия записываются в сам снимок: идентификаторы серверные, и сверять их
+# придётся с тем же сервером. Во встроенный ассет пишется только снимок с боевого сервера:
+# MEDAPP_BASE_URL должен совпасть с MEDAPP_PRODUCTION_URL (оба в local.properties), и в ассет уходит
+# метка `production`, не адрес. Для любого другого сервера путь вывода называется аргументом, и туда
+# пишется его адрес.
 #
 # Учётка и пропуск на экран не выводятся.
 set -euo pipefail
 cd "$(dirname "$0")/.."
 
 props=local.properties
-production=https://medapp.ru.net
 asset=app/src/main/assets/vocabulary.json
 prop() { grep -E "^$1=" "$props" | head -1 | cut -d= -f2- || true; }
 
 base=$(prop MEDAPP_BASE_URL)
-base=${base:-$production}
+if [ -z "$base" ]; then
+    echo "MEDAPP_BASE_URL не задан в $props" >&2
+    exit 1
+fi
 out=${1:-}
+origin=$base
 if [ -z "$out" ]; then
-    if [ "$base" != "$production" ]; then
-        echo "Снимок с $base во встроенный ассет не кладут: идентификаторы у каждого сервера свои." >&2
-        echo "Назовите файл вывода явно: $0 <путь>" >&2
+    production=$(prop MEDAPP_PRODUCTION_URL)
+    if [ -z "$production" ] || [ "$base" != "$production" ]; then
+        echo "Во встроенный ассет идёт только боевой сервер: MEDAPP_BASE_URL не совпал с MEDAPP_PRODUCTION_URL." >&2
+        echo "Для другого сервера назовите файл вывода явно: $0 <путь>" >&2
         exit 1
     fi
     out=$asset
+    origin=production
 fi
 
 login=$(prop MEDAPP_PROBE_A_LOGIN)
@@ -52,7 +59,7 @@ mkdir -p "$(dirname "$out")"
 tmp=$(mktemp "$(dirname "$out")/vocabulary.XXXXXX")
 trap 'rm -f "$tmp"' EXIT
 
-UNITS="$units" FORMS="$forms" ORIGIN="$base" python3 - > "$tmp" <<'PY'
+UNITS="$units" FORMS="$forms" ORIGIN="$origin" python3 - > "$tmp" <<'PY'
 import datetime
 import json
 import os

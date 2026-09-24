@@ -1,4 +1,4 @@
-package com.kert0n.medapp.network.crpt
+package com.kert0n.medapp.network.marking
 
 import com.kert0n.medapp.domain.scan.DataMatrixCode
 import com.kert0n.medapp.domain.scan.PackageCodes
@@ -10,14 +10,14 @@ import java.time.LocalDate
 import javax.inject.Inject
 
 /**
- * «Честный знак» как исполнитель порта домена (PLAN H5, H1): ответ переводится в предложение
+ * Реестр маркировки как исполнитель порта домена (PLAN H5, H1): ответ переводится в предложение
  * полей, коды и форма ответа за границу сети не уходят. Форма сопоставляется со словарём по
  * снимку: дочитывать его ради подсказки незачем; текст формы из реестра
  * остаётся рядом — словари получены разными путями, и совпадение имён не обещано. Отсутствующее
  * не придумывается: чего в ответе нет, того нет и в предложении.
  */
-class CrptPackageCodes @Inject constructor(
-    private val api: CrptApi,
+class MarkingPackageCodes @Inject constructor(
+    private val api: MarkingApi,
     private val vocabulary: VocabularyResolver,
     private val clock: Clock
 ) : PackageCodes {
@@ -28,28 +28,28 @@ class CrptPackageCodes @Inject constructor(
         // день считается **в московских сутках** — тех же, в которых реестр называет дату продажи.
         // Часы устройства стоят в своей зоне, и под полночь «сегодня» у них другое число: честная
         // покупка сегодняшнего московского дня оказалась бы будущей и пропала (разбор #55).
-        is CrptCheck.Body -> PackageCodes.Lookup.Found(
-            check.dto.toSuggestion(vocabulary.snapshot(), LocalDate.now(clock.withZone(CRPT_ZONE)))
+        is MarkingCheck.Body -> PackageCodes.Lookup.Found(
+            check.dto.toSuggestion(vocabulary.snapshot(), LocalDate.now(clock.withZone(MARKING_ZONE)))
         )
-        CrptCheck.NotFound -> PackageCodes.Lookup.NotFound
-        is CrptCheck.Unavailable -> PackageCodes.Lookup.Unavailable(check.reason)
+        MarkingCheck.NotFound -> PackageCodes.Lookup.NotFound
+        is MarkingCheck.Unavailable -> PackageCodes.Lookup.Unavailable(check.reason)
     }
 }
 
 /**
- * Категории, которые «Честный знак» считает лекарствами и близким к ним (H5); остальное —
+ * Категории, которые реестр маркировки считает лекарствами и близким к ним (H5); остальное —
  * предупреждение «это не лекарство».
  */
 internal val MEDICINE_CATEGORIES = setOf("drugs", "bio", "antiseptic")
 
-internal fun CrptCheckNetworkDTO.toSuggestion(words: Vocabulary, today: LocalDate): PackageSuggestion {
+internal fun MarkingCheckNetworkDTO.toSuggestion(words: Vocabulary, today: LocalDate): PackageSuggestion {
     val attributes = attributes
     val pharmacy = pharmacy
     val formText = pharmacy?.form.orNullIfBlank() ?: attributes[FORM_LABEL]
     return PackageSuggestion(
         name = productName.orNullIfBlank() ?: pharmacy?.title.orNullIfBlank(),
         formText = formText,
-        form = formText?.let { CrptFormMapper.resolve(it, words) },
+        form = formText?.let { MarkingFormMapper.resolve(it, words) },
         manufacturer = attributes[MANUFACTURER_LABEL] ?: attributes.byLabel(MANUFACTURER_ROOTS),
         country = chip(COUNTRY_CHIP) ?: attributes.byLabel(COUNTRY_ROOTS),
         expiresOn = expiresOn(),

@@ -52,7 +52,7 @@
   description: "Очередь, снимки, конфликты и установление исхода операций"
 - name: "area: scanner"
   color: "006b75"
-  description: "CameraX, распознавание кодов и интеграция CRPT"
+  description: "CameraX, распознавание кодов и проверка маркировки"
 - name: "area: notifications"
   color: "006b75"
   description: "Напоминания, баннеры, будильники и дедупликация"

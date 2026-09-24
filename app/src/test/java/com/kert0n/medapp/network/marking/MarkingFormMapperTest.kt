@@ -1,4 +1,4 @@
-package com.kert0n.medapp.network.crpt
+package com.kert0n.medapp.network.marking
 
 import com.kert0n.medapp.domain.value.DosageForm
 import com.kert0n.medapp.domain.value.Vocabulary
@@ -13,11 +13,11 @@ import org.junit.Assert.assertNotNull
 import org.junit.Assert.assertNull
 import org.junit.Test
 
-/** Старые 208 названий — входные варианты CRPT, а не список форм клиента. */
-class CrptFormMapperTest {
+/** Старые 208 названий — входные варианты реестра, а не список форм клиента. */
+class MarkingFormMapperTest {
     private val mapping = listOf(
-        File("src/test/resources/crpt/detailed-form-mapping.tsv"),
-        File("app/src/test/resources/crpt/detailed-form-mapping.tsv")
+        File("src/test/resources/marking/detailed-form-mapping.tsv"),
+        File("app/src/test/resources/marking/detailed-form-mapping.tsv")
     ).firstOrNull(File::isFile) ?: error("нет таблицы ожиданий для подробных форм")
 
     private val names = listOf(
@@ -35,7 +35,7 @@ class CrptFormMapperTest {
         val rows = mapping.readLines().map { it.split('\t') }
         assertEquals(208, rows.size)
         for ((raw, canonical) in rows) {
-            assertEquals(raw, words.formWithName(canonical), CrptFormMapper.resolve(raw, words))
+            assertEquals(raw, words.formWithName(canonical), MarkingFormMapper.resolve(raw, words))
         }
     }
 
@@ -52,7 +52,7 @@ class CrptFormMapperTest {
             "капсулы/таблетки" to "капсулы"
         )
         for ((raw, canonical) in examples) {
-            assertEquals(raw, words.formWithName(canonical), CrptFormMapper.resolve(raw, words))
+            assertEquals(raw, words.formWithName(canonical), MarkingFormMapper.resolve(raw, words))
         }
     }
 
@@ -77,7 +77,7 @@ class CrptFormMapperTest {
         )
 
         for ((raw, canonical) in mapping.readLines().map { it.split('\t') }) {
-            val found = CrptFormMapper.resolve(raw, snapshot)
+            val found = MarkingFormMapper.resolve(raw, snapshot)
             assertNotNull("«$raw» не нашлось во встроенном снимке", found)
             assertEquals(raw, canonical, found?.name)
         }
@@ -85,9 +85,9 @@ class CrptFormMapperTest {
 
     @Test
     fun unknownTextOrMissingServerBaseCreatesNoForm() {
-        assertNull(CrptFormMapper.resolve("неведомая форма", words))
-        assertNull(CrptFormMapper.resolve("т.", words))
-        assertNull(CrptFormMapper.resolve("   ", words))
-        assertNull(CrptFormMapper.resolve("пластырь", Vocabulary(emptyList(), forms.filter { it.name != "другие" })))
+        assertNull(MarkingFormMapper.resolve("неведомая форма", words))
+        assertNull(MarkingFormMapper.resolve("т.", words))
+        assertNull(MarkingFormMapper.resolve("   ", words))
+        assertNull(MarkingFormMapper.resolve("пластырь", Vocabulary(emptyList(), forms.filter { it.name != "другие" })))
     }
 }

@@ -19,7 +19,7 @@ class VocabularySnapshotNetworkDTOTest {
         capturedOn: String = "2026-09-10",
         units: String = """[{"id":"$unit","name":"таб"}]"""
     ) = """
-        {"origin":"https://medapp.ru.net","capturedOn":"$capturedOn","version":$version,
+        {"origin":"production","capturedOn":"$capturedOn","version":$version,
          "quantityUnits":$units,"formTypes":[{"id":"$form","name":"таблетки"}]}
     """
 
@@ -30,7 +30,7 @@ class VocabularySnapshotNetworkDTOTest {
     fun snapshotCarriesItsOrigin() {
         val read = read(snapshot())
 
-        assertEquals("https://medapp.ru.net", read.origin)
+        assertEquals("production", read.origin)
         assertEquals("2026-09-10", read.capturedOn)
         assertEquals("таб", read.quantityUnits.single().toQuantityUnit().name)
         assertEquals("таблетки", read.formTypes.single().toDosageForm().name)

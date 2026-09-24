@@ -8,11 +8,11 @@ import com.kert0n.medapp.domain.value.QuantityUnit
 import com.kert0n.medapp.domain.value.Vocabulary
 import com.kert0n.medapp.domain.value.VocabularyStore
 import com.kert0n.medapp.feature.scan.PackageScanning
-import com.kert0n.medapp.network.crpt.CrptApi
-import com.kert0n.medapp.network.crpt.CrptFixtures
-import com.kert0n.medapp.network.crpt.CrptPackageCodes
+import com.kert0n.medapp.network.marking.MarkingApi
+import com.kert0n.medapp.network.marking.MarkingFixtures
+import com.kert0n.medapp.network.marking.MarkingPackageCodes
 import com.kert0n.medapp.network.server.MedAppApi
-import com.kert0n.medapp.network.server.crptHttpClient
+import com.kert0n.medapp.network.server.markingHttpClient
 import com.kert0n.medapp.network.server.medAppHttpClient
 import com.kert0n.medapp.network.value.VocabularyResolver
 import io.ktor.client.engine.mock.MockEngine
@@ -53,20 +53,20 @@ class ScanStoryTest {
     private val asked = mutableListOf<HttpRequestData>()
 
     private fun scanning(answer: (HttpRequestData) -> Pair<String, HttpStatusCode>): PackageScanning {
-        val crpt = CrptApi(crptHttpClient(MockEngine { request ->
+        val marking = MarkingApi(markingHttpClient(MockEngine { request ->
             asked += request
             val (body, status) = answer(request)
             respond(body, status, headersOf(HttpHeaders.ContentType, "application/json"))
-        }, "https://crpt.test"))
+        }, "https://marking.test"))
         val medApp = MedAppApi(medAppHttpClient(MockEngine { respond("", HttpStatusCode.NoContent) }, "https://medapp.test"))
-        return PackageScanning(CrptPackageCodes(crpt, VocabularyResolver(Store(words), medApp), CLOCK))
+        return PackageScanning(MarkingPackageCodes(marking, VocabularyResolver(Store(words), medApp), CLOCK))
     }
 
-    private fun dataMatrix(text: String = CrptFixtures.SCANNED) = ScannedCode(CodeFormat.DATA_MATRIX, text)
+    private fun dataMatrix(text: String = MarkingFixtures.SCANNED) = ScannedCode(CodeFormat.DATA_MATRIX, text)
 
     @Test
     fun aFullAnswerBecomesASuggestionWithTheFormGuessAndTheRegistryText() = runTest {
-        val outcome = scanning { CrptFixtures.found to HttpStatusCode.OK }.lookup(dataMatrix()) as PackageScanning.Outcome.Suggested
+        val outcome = scanning { MarkingFixtures.found to HttpStatusCode.OK }.lookup(dataMatrix()) as PackageScanning.Outcome.Suggested
 
         assertEquals("Цетрин", outcome.suggestion.name)
         assertEquals(tablets, outcome.suggestion.form)
@@ -94,14 +94,14 @@ class ScanStoryTest {
 
     @Test
     fun anUnknownCodeIsNotFound() = runTest {
-        assertEquals(PackageScanning.Outcome.NotFound, scanning { CrptFixtures.notFound to HttpStatusCode.OK }.lookup(dataMatrix()))
+        assertEquals(PackageScanning.Outcome.NotFound, scanning { MarkingFixtures.notFound to HttpStatusCode.OK }.lookup(dataMatrix()))
         assertEquals(PackageScanning.Outcome.NotFound, scanning { "" to HttpStatusCode.NotFound }.lookup(dataMatrix()))
     }
 
     /** EAN-13 не наш код: «не поддерживается», и в реестр ничего не уходит — трафик бережём. */
     @Test
     fun aBarcodeIsUnsupportedWithoutAnyRequest() = runTest {
-        val outcome = scanning { CrptFixtures.found to HttpStatusCode.OK }.lookup(ScannedCode(CodeFormat.OTHER, "4601234567890"))
+        val outcome = scanning { MarkingFixtures.found to HttpStatusCode.OK }.lookup(ScannedCode(CodeFormat.OTHER, "4601234567890"))
 
         assertEquals(PackageScanning.Outcome.Unsupported, outcome)
         assertEquals(0, asked.size)
@@ -110,7 +110,7 @@ class ScanStoryTest {
     /** Реестр отказал по месту (`451`) — недоступность с причиной, а не «не найдено». */
     @Test
     fun aRefusedRegistryIsUnavailableWithItsReason() = runTest {
-        val outcome = scanning { "" to CrptApi.UNAVAILABLE_FOR_LEGAL_REASONS }.lookup(dataMatrix())
+        val outcome = scanning { "" to MarkingApi.UNAVAILABLE_FOR_LEGAL_REASONS }.lookup(dataMatrix())
 
         assertEquals(PackageScanning.Outcome.Unavailable(Unavailability.SERVER_REFUSED_US), outcome)
     }

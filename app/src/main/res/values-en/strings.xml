@@ -650,7 +650,7 @@
     <string name="scanner_camera_settings">Open settings</string>
     <string name="scanner_camera_absent">This device has no camera. Add medicines to a kit — just as without a code.</string>
     <string name="scanner_unsupported">This code is not supported: medicine packages carry a DataMatrix code.</string>
-    <string name="pack_scan_asking">Asking the Chestny Znak registry about the code…</string>
+    <string name="pack_scan_asking">Checking the marking code on the package…</string>
     <string name="pack_scan_not_found">The registry does not know this code — fill in the fields yourself.</string>
     <string name="pack_scan_unavailable">The registry did not answer: %1$s. Fill in the fields yourself.</string>
     <!-- Reports -->

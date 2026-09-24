@@ -29,6 +29,6 @@ class BuildConfigTest {
     @Test
     fun serverAddressesAreHttps() {
         assertTrue(BuildConfig.BASE_URL.startsWith("https://"))
-        assertTrue(BuildConfig.CRPT_BASE_URL.startsWith("https://"))
+        assertTrue(BuildConfig.MARKING_URL.startsWith("https://"))
     }
 }

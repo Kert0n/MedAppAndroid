@@ -54,8 +54,8 @@ class CodeFormatTest {
      *
      * Разделителей GS в нарисованном коде нет, и это ограничение **рисовалки**, а не разбора:
      * ZXing рисует обычный DataMatrix без FNC1, а такой символ не читает и сам ML Kit. Настоящий
-     * код «Честного знака» — GS1 с FNC1, и то, что он уходит в реестр байт в байт, держит
-     * `CrptCheckRequestNetworkDTOTest`.
+     * код реестра маркировки — GS1 с FNC1, и то, что он уходит в реестр байт в байт, держит
+     * `MarkingCheckRequestNetworkDTOTest`.
      */
     @Test
     fun aDataMatrixIsReadAsItIsPrinted() {

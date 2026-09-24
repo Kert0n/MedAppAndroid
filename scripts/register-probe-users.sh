@@ -16,7 +16,10 @@ props=local.properties
 prop() { grep -E "^$1=" "$props" | head -1 | cut -d= -f2- || true; }
 
 base=$(prop MEDAPP_BASE_URL)
-base=${base:-https://medapp.ru.net}
+if [ -z "$base" ]; then
+    echo "MEDAPP_BASE_URL не задан в $props" >&2
+    exit 1
+fi
 token=$(prop MEDAPP_REGISTRATION_TOKEN)
 if [ -z "$token" ]; then
     echo "MEDAPP_REGISTRATION_TOKEN не задан в $props" >&2

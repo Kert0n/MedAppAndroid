@@ -3,7 +3,7 @@ package com.kert0n.medapp.domain.scan
 import com.kert0n.medapp.domain.Unavailability
 
 /**
- * Что говорит код с коробки. Спросить можно только «Честный знак», поэтому действие выполняет
+ * Что говорит код с коробки. Спросить можно только реестр маркировки, поэтому действие выполняет
  * сеть, а домен называет его и исходы (PLAN H1, H5) — как справочник у `PackageTemplates`.
  */
 interface PackageCodes {
