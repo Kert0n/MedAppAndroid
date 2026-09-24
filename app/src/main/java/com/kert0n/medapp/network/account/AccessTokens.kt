@@ -1,6 +1,9 @@
 package com.kert0n.medapp.network.account
 
+import com.kert0n.medapp.domain.account.AccountCredentials
 import com.kert0n.medapp.domain.attempt
+import com.kert0n.medapp.feature.account.CredentialSource
+import com.kert0n.medapp.feature.account.StoredAccount
 import javax.inject.Inject
 import javax.inject.Provider
 import javax.inject.Singleton

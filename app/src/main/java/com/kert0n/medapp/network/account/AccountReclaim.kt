@@ -1,5 +1,7 @@
 package com.kert0n.medapp.network.account
 
+import com.kert0n.medapp.domain.account.AccountCredentials
+
 /**
  * Вернуть серверу учётку, которую он забыл: зарегистрировать **те же** логин и пароль (PLAN B1, G2;
  * решение владельца 2026-09-23). `true` — сервер снова знает эту учётку, и пропуск по ней можно

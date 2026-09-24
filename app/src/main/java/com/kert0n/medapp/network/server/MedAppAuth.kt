@@ -5,7 +5,7 @@ import com.kert0n.medapp.network.account.AccessTokenNetworkDTO
 import com.kert0n.medapp.network.account.AccessTokenThrottled
 import com.kert0n.medapp.network.account.AccessTokenUnavailable
 import com.kert0n.medapp.network.account.AccessTokens
-import com.kert0n.medapp.network.account.AccountCredentials
+import com.kert0n.medapp.domain.account.AccountCredentials
 import io.ktor.client.call.body
 import io.ktor.client.plugins.api.Send
 import io.ktor.client.plugins.api.createClientPlugin

@@ -1,6 +1,14 @@
-package com.kert0n.medapp.network.account
+package com.kert0n.medapp.feature.account
 
+import com.kert0n.medapp.domain.Unavailability
+import com.kert0n.medapp.domain.account.AccountCredentials
+import com.kert0n.medapp.domain.account.AccountReadiness
+import com.kert0n.medapp.feature.account.CredentialSource
+import com.kert0n.medapp.feature.account.CredentialsSaved
+import com.kert0n.medapp.feature.account.StoredAccount
 import com.kert0n.medapp.network.account.AccessTokens
+import com.kert0n.medapp.network.account.AccountPostNetworkDTO
+import com.kert0n.medapp.network.account.ServerAccounts
 import com.kert0n.medapp.network.server.ApiFailure
 import com.kert0n.medapp.network.server.MedAppApi
 import com.kert0n.medapp.network.server.REGISTRATION_TOKEN_HEADER
@@ -62,8 +70,7 @@ class AccountRegistrationTest {
         stored: Memory,
         register: HttpStatusCode = HttpStatusCode.Created,
         token: HttpStatusCode = HttpStatusCode.OK
-    ) = AccountRegistration(
-        MedAppApi(
+    ) = AccountRegistration(stored, ServerAccounts(MedAppApi(
             medAppHttpClient(
                 MockEngine { request ->
                     requests += "${request.method.value} ${request.url.encodedPath}"
@@ -82,11 +89,7 @@ class AccountRegistrationTest {
                 },
                 "https://medapp.test"
             )
-        ),
-        stored,
-        registrationToken = "build-token",
-        tokens = AccessTokens(stored)
-    )
+        ), "build-token", AccessTokens(stored)))
 
     private val registrationTokens = mutableListOf<String?>()
 
@@ -100,7 +103,7 @@ class AccountRegistrationTest {
     fun absentAccountIsInventedStoredAndThenRegistered() = runTest {
         val stored = Memory(StoredAccount.Absent)
 
-        assertEquals(AccountRegistration.Outcome.Ready, registration(stored).ensure())
+        assertEquals(AccountReadiness.Ready, registration(stored).ensure())
 
         val account = (stored.account as StoredAccount.Present).credentials
         assertTrue("пароль уехал на сервер", bodies.single().contains(account.password))
@@ -119,7 +122,7 @@ class AccountRegistrationTest {
 
         val outcome = registration(stored, register = HttpStatusCode.Conflict).ensure()
 
-        assertEquals(AccountRegistration.Outcome.Ready, outcome)
+        assertEquals(AccountReadiness.Ready, outcome)
         assertEquals(StoredAccount.Present(kept), stored.account)
         assertTrue("повтор той же учёткой", bodies.single().contains("$login"))
         assertEquals(listOf("POST /v1/auth/register", "POST /v1/auth/token"), requests)
@@ -130,7 +133,7 @@ class AccountRegistrationTest {
     fun replacingTheUnreadableForgetsItAndRegistersAnew() = runTest {
         val stored = Memory(StoredAccount.Unreadable)
 
-        assertEquals(AccountRegistration.Outcome.Ready, registration(stored).replaceUnreadable())
+        assertEquals(AccountReadiness.Ready, registration(stored).replaceUnreadable())
 
         assertEquals(1, stored.forgotten)
         val account = (stored.account as StoredAccount.Present).credentials
@@ -149,7 +152,7 @@ class AccountRegistrationTest {
 
         val outcome = registration(stored, register = HttpStatusCode.Conflict).replaceUnreadable()
 
-        assertEquals(AccountRegistration.Outcome.Ready, outcome)
+        assertEquals(AccountReadiness.Ready, outcome)
         assertEquals(0, stored.forgotten)
         assertEquals(StoredAccount.Present(kept), stored.account)
         assertTrue("повтор той же учёткой", bodies.single().contains("$login"))
@@ -161,7 +164,7 @@ class AccountRegistrationTest {
         val kept = AccountCredentials(login, password)
         val stored = Memory(StoredAccount.Present(kept))
 
-        assertEquals(AccountRegistration.Outcome.Ready, registration(stored).replaceUnreadable())
+        assertEquals(AccountReadiness.Ready, registration(stored).replaceUnreadable())
 
         assertEquals(0, stored.forgotten)
         assertEquals(StoredAccount.Present(kept), stored.account)
@@ -173,7 +176,7 @@ class AccountRegistrationTest {
     fun anUnreadableThatCannotBeForgottenIsNotStored() = runTest {
         val stored = Memory(StoredAccount.Unreadable, writable = false)
 
-        assertEquals(AccountRegistration.Outcome.NotStored, registration(stored).replaceUnreadable())
+        assertEquals(AccountReadiness.NotReady(Unavailability.DEVICE_STORAGE), registration(stored).replaceUnreadable())
 
         assertEquals(emptyList<String>(), requests)
     }
@@ -190,7 +193,7 @@ class AccountRegistrationTest {
             token = HttpStatusCode.Unauthorized
         ).ensure()
 
-        assertEquals(AccountRegistration.Outcome.Failed(ApiFailure.Conflict), outcome)
+        assertEquals(AccountReadiness.NotReady(Unavailability.SERVER_SILENT), outcome)
         assertEquals(StoredAccount.Pending(kept), stored.account)
     }
 
@@ -198,7 +201,7 @@ class AccountRegistrationTest {
     fun confirmedAccountIsNotRegisteredAgain() = runTest {
         val stored = Memory(StoredAccount.Present(AccountCredentials(login, password)))
 
-        assertEquals(AccountRegistration.Outcome.Ready, registration(stored).ensure())
+        assertEquals(AccountReadiness.Ready, registration(stored).ensure())
 
         assertEquals(emptyList<String>(), requests)
     }
@@ -207,7 +210,7 @@ class AccountRegistrationTest {
     fun unreadableAccountIsNotReplacedSilently() = runTest {
         val stored = Memory(StoredAccount.Unreadable)
 
-        assertEquals(AccountRegistration.Outcome.Unreadable, registration(stored).ensure())
+        assertEquals(AccountReadiness.KeyLost, registration(stored).ensure())
 
         assertEquals(emptyList<String>(), requests)
         assertEquals(StoredAccount.Unreadable, stored.account)
@@ -219,8 +222,8 @@ class AccountRegistrationTest {
         val stored = Memory(StoredAccount.Absent, writable = false)
         val registration = registration(stored)
 
-        assertEquals(AccountRegistration.Outcome.NotStored, registration.ensure())
-        assertEquals(AccountRegistration.Outcome.NotStored, registration.ensure())
+        assertEquals(AccountReadiness.NotReady(Unavailability.DEVICE_STORAGE), registration.ensure())
+        assertEquals(AccountReadiness.NotReady(Unavailability.DEVICE_STORAGE), registration.ensure())
 
         assertEquals(StoredAccount.Absent, stored.account)
         assertEquals(emptyList<String>(), requests)
@@ -233,7 +236,7 @@ class AccountRegistrationTest {
 
         val outcome = registration(stored, register = HttpStatusCode.Forbidden).ensure()
 
-        assertEquals(AccountRegistration.Outcome.Failed(ApiFailure.RegistrationRefused), outcome)
+        assertEquals(AccountReadiness.NotReady(Unavailability.SERVER_REFUSED_US), outcome)
         assertTrue("данные остались: $stored", stored.account is StoredAccount.Pending)
     }
 
@@ -243,7 +246,7 @@ class AccountRegistrationTest {
 
         val outcomes = List(4) { async { registration.ensure() } }.awaitAll()
 
-        assertEquals(List(4) { AccountRegistration.Outcome.Ready }, outcomes)
+        assertEquals(List(4) { AccountReadiness.Ready }, outcomes)
         assertEquals(1, requests.size)
     }
 

@@ -5,7 +5,7 @@ import androidx.datastore.core.DataStore
 import androidx.datastore.preferences.core.PreferenceDataStoreFactory
 import androidx.datastore.preferences.core.Preferences
 import androidx.datastore.preferences.preferencesDataStoreFile
-import com.kert0n.medapp.network.account.CredentialSource
+import com.kert0n.medapp.feature.account.CredentialSource
 import com.kert0n.medapp.platform.credentials.KeystoreCredentialSource
 import com.kert0n.medapp.platform.credentials.KeystoreKey
 import dagger.Binds
@@ -27,8 +27,9 @@ annotation class CredentialsStore
 annotation class CredentialsFile
 
 /**
- * Сеть получает учётку через свой порт, а хранит её платформа. Файл DataStore лежит в каталоге
- * `datastore`, который правила резервного копирования исключают (PLAN G2).
+ * Учётку ведёт сценарий регистрации, хранит её платформа, а сеть читает её для пропуска — через
+ * порт сценария. Файл DataStore лежит в каталоге `datastore`, который правила резервного
+ * копирования исключают (PLAN G2).
  */
 @Module
 @InstallIn(SingletonComponent::class)

@@ -1,7 +1,12 @@
 package com.kert0n.medapp.network.account
 
 import com.kert0n.medapp.domain.Unavailability
+import com.kert0n.medapp.domain.account.AccountCredentials
 import com.kert0n.medapp.domain.account.AccountReadiness
+import com.kert0n.medapp.feature.account.AccountRegistration
+import com.kert0n.medapp.feature.account.CredentialSource
+import com.kert0n.medapp.feature.account.CredentialsSaved
+import com.kert0n.medapp.feature.account.StoredAccount
 import com.kert0n.medapp.network.server.MedAppApi
 import com.kert0n.medapp.network.server.medAppHttpClient
 import io.ktor.client.engine.mock.MockEngine
@@ -20,7 +25,7 @@ import org.junit.Test
  * границу сети не уходят (PLAN B5, H1). Саму механику знакомства проверяет
  * `AccountRegistrationTest` — здесь только перевод.
  */
-class ServerDeviceAccountTest {
+class ServerAccountsTest {
 
     private class Memory(var account: StoredAccount, private val writable: Boolean = true) : CredentialSource {
         override suspend fun read(): StoredAccount = account
@@ -44,9 +49,7 @@ class ServerDeviceAccountTest {
         }
     }
 
-    private fun account(stored: Memory, answer: (String) -> Pair<String, HttpStatusCode>) = ServerDeviceAccount(
-        AccountRegistration(
-            MedAppApi(
+    private fun account(stored: Memory, answer: (String) -> Pair<String, HttpStatusCode>) = AccountRegistration(stored, ServerAccounts(MedAppApi(
                 medAppHttpClient(
                     MockEngine { request ->
                         val (body, status) = answer(request.url.encodedPath)
@@ -54,12 +57,7 @@ class ServerDeviceAccountTest {
                     },
                     "https://example.invalid"
                 )
-            ),
-            stored,
-            "токен",
-            AccessTokens(stored)
-        )
-    )
+            ), "токен", AccessTokens(stored)))
 
     private val registered: (String) -> Pair<String, HttpStatusCode> = { path ->
         if (path == "/v1/auth/token") """{"accessToken":"t"}""" to HttpStatusCode.OK

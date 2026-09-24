@@ -3,6 +3,9 @@ package com.kert0n.medapp.network.account
 import androidx.datastore.preferences.core.PreferenceDataStoreFactory
 import androidx.test.platform.app.InstrumentationRegistry
 import com.kert0n.medapp.BuildConfig
+import com.kert0n.medapp.domain.account.AccountReadiness
+import com.kert0n.medapp.feature.account.AccountRegistration
+import com.kert0n.medapp.feature.account.StoredAccount
 import com.kert0n.medapp.network.server.ApiFailure
 import com.kert0n.medapp.network.server.ApiResult
 import com.kert0n.medapp.network.server.MedAppApi
@@ -56,12 +59,12 @@ class RegistrationProbe {
             )
             val tokens = AccessTokens(credentials)
             val api = MedAppApi(medAppHttpClient(OkHttp.create(), baseUrl!!, tokens = tokens))
-            val registration = AccountRegistration(api, credentials, BuildConfig.REGISTRATION_TOKEN, tokens)
+            val registration = AccountRegistration(credentials, ServerAccounts(api, BuildConfig.REGISTRATION_TOKEN, tokens))
 
-            assertEquals(AccountRegistration.Outcome.Ready, registration.ensure())
+            assertEquals(AccountReadiness.Ready, registration.ensure())
             val stored = credentials.read()
             assertTrue("придуманная учётка сохранена и подтверждена", stored is StoredAccount.Present)
-            assertEquals(AccountRegistration.Outcome.Ready, registration.ensure())
+            assertEquals(AccountReadiness.Ready, registration.ensure())
 
             val snapshot = api.snapshot()
             assertTrue("сохранённая учётка принята сервером: $snapshot", snapshot is ApiResult.Success)

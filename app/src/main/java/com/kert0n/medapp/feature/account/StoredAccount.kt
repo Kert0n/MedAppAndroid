@@ -1,4 +1,6 @@
-package com.kert0n.medapp.network.account
+package com.kert0n.medapp.feature.account
+
+import com.kert0n.medapp.domain.account.AccountCredentials
 
 /**
  * Что устройство знает о своей учётке. Случаев четыре, потому что поведение у них разное: нет

@@ -2,9 +2,13 @@
 
 package com.kert0n.medapp.network.account
 
+import com.kert0n.medapp.domain.account.AccountCredentials
+import com.kert0n.medapp.feature.account.CredentialSource
+import com.kert0n.medapp.feature.account.CredentialsSaved
+import com.kert0n.medapp.feature.account.StoredAccount
+import com.kert0n.medapp.network.server.MedAppApi
 import com.kert0n.medapp.network.server.REGISTRATION_TOKEN_HEADER
 import com.kert0n.medapp.network.server.medAppHttpClient
-import com.kert0n.medapp.network.server.MedAppApi
 import io.ktor.client.HttpClient
 import io.ktor.client.engine.mock.MockEngine
 import io.ktor.client.engine.mock.respond
@@ -132,10 +136,10 @@ class ForgottenAccountTest {
      * регистрацией, а регистрация ходит через этот же клиент.
      */
     private fun client(server: Server, stored: Stored): HttpClient {
-        lateinit var registration: AccountRegistration
+        lateinit var registration: ServerAccounts
         val tokens = AccessTokens(stored, Provider<AccountReclaim> { registration })
         val client = client(server, tokens)
-        registration = AccountRegistration(MedAppApi(client), stored, "build-token", tokens)
+        registration = ServerAccounts(MedAppApi(client), "build-token", tokens)
         return client
     }
 

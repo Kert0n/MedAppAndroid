@@ -1,4 +1,4 @@
-package com.kert0n.medapp.network.account
+package com.kert0n.medapp.feature.account
 
 /**
  * Легла ли запись учётки на устройство. Случая два, и дальше делается разное: [SAVED] — можно

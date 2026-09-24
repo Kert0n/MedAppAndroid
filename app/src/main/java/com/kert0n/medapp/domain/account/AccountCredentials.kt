@@ -1,4 +1,4 @@
-package com.kert0n.medapp.network.account
+package com.kert0n.medapp.domain.account
 
 import java.security.SecureRandom
 import java.util.Base64
@@ -10,8 +10,8 @@ import kotlin.uuid.Uuid
  * повтор идёт теми же данными, а сервер отвечает «такая уже есть». Пароль секретен и в `toString`
  * не показывается.
  *
- * Пределы пароля — правило регистрации, и держит их её форма ([AccountPostNetworkDTO]): учётка,
- * заведённая когда-то с другим паролем, остаётся рабочей, и читать её это не мешает.
+ * Пределы пароля — правило регистрации, и держит их её сетевая форма: учётка, заведённая когда-то
+ * с другим паролем, остаётся рабочей, и читать её это не мешает.
  */
 data class AccountCredentials(val login: Uuid, val password: String) {
 

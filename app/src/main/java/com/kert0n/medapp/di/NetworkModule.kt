@@ -2,13 +2,12 @@ package com.kert0n.medapp.di
 
 import android.util.Log
 import com.kert0n.medapp.BuildConfig
-import com.kert0n.medapp.domain.account.DeviceAccount
 import com.kert0n.medapp.domain.medkit.MedKitInvitations
 import com.kert0n.medapp.domain.value.VocabularyLibrary
+import com.kert0n.medapp.feature.account.AccountServer
 import com.kert0n.medapp.network.account.AccessTokens
 import com.kert0n.medapp.network.account.AccountReclaim
-import com.kert0n.medapp.network.account.AccountRegistration
-import com.kert0n.medapp.network.account.ServerDeviceAccount
+import com.kert0n.medapp.network.account.ServerAccounts
 import com.kert0n.medapp.network.delivery.CourierDoor
 import com.kert0n.medapp.network.delivery.MedAppCourier
 import com.kert0n.medapp.network.delivery.MedAppDoor
@@ -71,9 +70,9 @@ object NetworkModule {
         tokens = tokens
     )
 
-    /** Забытую сервером учётку возвращает регистрация — тем же путём, что недописанную. */
+    /** Забытую сервером учётку возвращает тот же звонок, что регистрирует недописанную. */
     @Provides
-    fun accountReclaim(registration: AccountRegistration): AccountReclaim = registration
+    fun accountReclaim(implementation: ServerAccounts): AccountReclaim = implementation
 
     /** Лог HTTP в debug; секреты из него вычищает клиент, а не этот адаптер. */
     private object LogcatLogger : Logger {
@@ -116,12 +115,12 @@ object NetworkModule {
     fun register(implementation: MedAppRegister): Register = implementation
 
     /**
-     * Доменные порты, которые выполняет сеть: знакомство устройства с сервером и пополнение
+     * Порты, которые выполняет сеть: знакомство с сервером для сценария регистрации и пополнение
      * словаря. Сценарии видят порт, а не провод (PLAN H1).
      */
     @Provides
     @Singleton
-    fun deviceAccount(implementation: ServerDeviceAccount): DeviceAccount = implementation
+    fun accountServer(implementation: ServerAccounts): AccountServer = implementation
 
     @Provides
     @Singleton
