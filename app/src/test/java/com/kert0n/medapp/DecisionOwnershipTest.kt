@@ -53,6 +53,31 @@ class DecisionOwnershipTest {
         )
     }
 
+    /**
+     * Сценарий ветвится по **ответу** вещи на заданный ей вопрос — `refuses…()`, `Result`, решение
+     * очереди, — но не читает её состояние сам и не складывает правило из фактов: пригодна ли
+     * коробка, занята ли полка решением, идёт ли лечение, та ли это полка, кончилась ли коробка.
+     * Такое правило, собранное в сценарии, повторяется в каждом, кто о вещи спрашивает.
+     * Исключения — типы сценария, держащие свой инвариант: [mayReadState].
+     */
+    @Test
+    fun scenariosAskThingsInsteadOfReadingThem() {
+        val reads = Regex(
+            "\\.status\\.(allowsUse|allowsDecision)\\b|\\.isOpen\\b|\\bstatus\\s*(==|!=)\\s*IntakeStatus\\.|" +
+                "\\bstate\\s*(==|!=)\\s*Reminder\\.State\\.|\\.id\\s*[!=]=\\s*[\\w.]*medKit\\.id\\b|\\.isZero\\b"
+        )
+        assertEquals(
+            "сценарий сам читает состояние вещи",
+            sortedSetOf<String>(),
+            filesUnder("feature/", reads) - mayReadState
+        )
+    }
+
+    private val mayReadState: Set<String> = setOf(
+        "feature/intake/RecordedIntake.kt",
+        "feature/intake/IntakeOutcome.kt"
+    )
+
     private fun filesUnder(root: String, pattern: Regex, withoutBranchHeads: Boolean = false) = kotlinFiles()
         .filter { (path, _) -> path.startsWith(root) }
         .filter { (_, text) -> (if (withoutBranchHeads) text.replace(branchHead, "") else text).contains(pattern) }
