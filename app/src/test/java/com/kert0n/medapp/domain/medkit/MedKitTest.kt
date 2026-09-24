@@ -18,7 +18,7 @@ class MedKitTest {
     @Test
     fun theProjectionOffersPublicationExactlyWhenTheShelfAcceptsIt() {
         for (publication in MedKit.Publication.entries) for (status in MedKitStatus.entries) {
-            val shelf = runCatching { com.kert0n.medapp.fixture.medKit(publication = publication, status = status) }.getOrNull() ?: continue
+            val shelf = com.kert0n.medapp.fixture.medKit(publication = publication, status = status)
             assertEquals(
                 "$publication / $status",
                 shelf.refusesPublication() == null,
