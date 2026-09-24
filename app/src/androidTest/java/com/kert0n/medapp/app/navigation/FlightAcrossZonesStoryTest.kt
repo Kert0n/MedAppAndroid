@@ -21,6 +21,7 @@ import com.kert0n.medapp.feature.notification.NotificationReconciliation
 import com.kert0n.medapp.feature.notification.ReminderAnswering
 import com.kert0n.medapp.feature.notification.ReminderReadings
 import com.kert0n.medapp.feature.notification.ReminderRecords
+import com.kert0n.medapp.feature.notification.ReminderSubjects
 import com.kert0n.medapp.fixture.MOSCOW
 import com.kert0n.medapp.fixture.StoryWorld
 import com.kert0n.medapp.fixture.TABLET_FORM
@@ -81,6 +82,7 @@ class FlightAcrossZonesStoryTest {
     @Inject lateinit var shifts: TimeShifts
     @Inject lateinit var round: DailyRound
     @Inject lateinit var answering: ReminderAnswering
+    @Inject lateinit var subjects: ReminderSubjects
 
     private val WAIT = 10_000L
     private val box = Uuid.random()
@@ -91,7 +93,7 @@ class FlightAcrossZonesStoryTest {
         hilt.inject()
         // Новый телефон на Android 14: точные будильники приложению не разрешены.
         world.alarms.canBeExact = false
-        world.start(reminders, reconciliation, transactions, shifts, round, answering, connection)
+        world.start(reminders, reconciliation, transactions, shifts, round, answering, subjects, connection)
         runBlocking {
             database.storySetting()
             database.packageRepository().add(pack(id = box, name = "Эналаприл", quantity = tablets("30"), form = TABLET_FORM))

@@ -303,7 +303,7 @@ class NotificationProtocolTest {
     fun whatBecomesDueDuringTheRefreshIsShownInTheSamePass() = runBlocking {
         val clock = com.kert0n.medapp.fixture.TickingClock(now)
         val outbox = ReminderOutbox(
-            scenarios.reminderStore, scenarios.notifier, scenarios.reminders, scenarios.freshness, scenarios.transactions,
+            scenarios.reminderStore, scenarios.notifier, scenarios.reminderSubjects, scenarios.reminders, scenarios.freshness, scenarios.transactions,
             clock, mechanisms.scope
         )
         val ripe = intake(now)                       // уже наступил — ради него и ждут свежесть

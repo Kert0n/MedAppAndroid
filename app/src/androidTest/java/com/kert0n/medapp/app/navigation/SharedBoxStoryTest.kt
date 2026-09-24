@@ -18,6 +18,7 @@ import com.kert0n.medapp.feature.notification.NotificationReconciliation
 import com.kert0n.medapp.feature.notification.ReminderAnswering
 import com.kert0n.medapp.feature.notification.ReminderReadings
 import com.kert0n.medapp.feature.notification.ReminderRecords
+import com.kert0n.medapp.feature.notification.ReminderSubjects
 import com.kert0n.medapp.feature.packages.PackageAdjusting
 import com.kert0n.medapp.fixture.FakeServer
 import com.kert0n.medapp.fixture.MOSCOW
@@ -89,6 +90,7 @@ class SharedBoxStoryTest {
     @Inject lateinit var shifts: TimeShifts
     @Inject lateinit var round: DailyRound
     @Inject lateinit var answering: ReminderAnswering
+    @Inject lateinit var subjects: ReminderSubjects
 
     private val WAIT = 10_000L
     private val server = FakeServer()
@@ -103,7 +105,7 @@ class SharedBoxStoryTest {
     @Before
     fun setUp() {
         hilt.inject()
-        world.start(reminders, reconciliation, transactions, shifts, round, answering, connection)
+        world.start(reminders, reconciliation, transactions, shifts, round, answering, subjects, connection)
         runBlocking {
             database.storySetting()
             val packages = database.packageRepository()

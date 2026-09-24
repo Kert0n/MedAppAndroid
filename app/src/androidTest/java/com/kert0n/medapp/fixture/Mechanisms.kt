@@ -30,7 +30,7 @@ class Mechanisms(scenarios: Scenarios, at: java.time.Instant) : AutoCloseable {
     val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
 
     val outbox: ReminderOutbox = ReminderOutbox(
-        scenarios.reminderStore, scenarios.notifier, scenarios.reminders, scenarios.freshness,
+        scenarios.reminderStore, scenarios.notifier, scenarios.reminderSubjects, scenarios.reminders, scenarios.freshness,
         scenarios.transactions, Clock.fixed(at, scenarios.zone), scope
     ).also { it.start() }
 

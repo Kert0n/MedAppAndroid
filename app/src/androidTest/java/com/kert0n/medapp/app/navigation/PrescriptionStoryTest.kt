@@ -25,6 +25,7 @@ import com.kert0n.medapp.feature.notification.NotificationReconciliation
 import com.kert0n.medapp.feature.notification.ReminderAnswering
 import com.kert0n.medapp.feature.notification.ReminderReadings
 import com.kert0n.medapp.feature.notification.ReminderRecords
+import com.kert0n.medapp.feature.notification.ReminderSubjects
 import com.kert0n.medapp.fixture.CAPSULE_FORM
 import com.kert0n.medapp.fixture.MILLILITRES
 import com.kert0n.medapp.fixture.MOSCOW
@@ -97,6 +98,7 @@ class PrescriptionStoryTest {
     @Inject lateinit var shifts: TimeShifts
     @Inject lateinit var round: DailyRound
     @Inject lateinit var answering: ReminderAnswering
+    @Inject lateinit var subjects: ReminderSubjects
 
     /**
      * Словарь — как на боевом сервере: таблетки считают **штуками**. Фикстурная единица зовётся
@@ -114,7 +116,7 @@ class PrescriptionStoryTest {
     @Before
     fun setUp() {
         hilt.inject()
-        world.start(reminders, reconciliation, transactions, shifts, round, answering, connection)
+        world.start(reminders, reconciliation, transactions, shifts, round, answering, subjects, connection)
         runBlocking {
             database.vocabulary().save(
                 units = listOf(pieces, TABLETS, MILLILITRES).map { it.toStorageEntity() },

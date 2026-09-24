@@ -27,6 +27,7 @@ import com.kert0n.medapp.feature.notification.NotificationReconciliation
 import com.kert0n.medapp.feature.notification.ReminderAnswering
 import com.kert0n.medapp.feature.notification.ReminderReadings
 import com.kert0n.medapp.feature.notification.ReminderRecords
+import com.kert0n.medapp.feature.notification.ReminderSubjects
 import com.kert0n.medapp.fixture.MOSCOW
 import com.kert0n.medapp.fixture.StoryWorld
 import com.kert0n.medapp.fixture.TABLET_FORM
@@ -88,6 +89,7 @@ class NightShiftStoryTest {
     @Inject lateinit var shifts: TimeShifts
     @Inject lateinit var round: DailyRound
     @Inject lateinit var answering: ReminderAnswering
+    @Inject lateinit var subjects: ReminderSubjects
 
     private val WAIT = 10_000L
 
@@ -101,7 +103,7 @@ class NightShiftStoryTest {
     @Before
     fun setUp() {
         hilt.inject()
-        world.start(reminders, reconciliation, transactions, shifts, round, answering, connection)
+        world.start(reminders, reconciliation, transactions, shifts, round, answering, subjects, connection)
         // В раздевалке, в перчатках: системный вопрос смахнут не читая.
         TestPermissions.notifications = false
         runBlocking {

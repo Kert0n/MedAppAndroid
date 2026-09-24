@@ -74,7 +74,7 @@ class IntakeReminderTest {
 
     /** Владелец доставки с остановленными на [at] часами: обязательство наступает в свой момент. */
     private fun outboxAt(at: Instant) = ReminderOutbox(
-        store, notifier, reminders, com.kert0n.medapp.fixture.FakeFreshness(), database.transactions(),
+        store, notifier, com.kert0n.medapp.feature.notification.ReminderSubjects(database.intakeRepository(), database.courseRepository(), database.packageRepository()), reminders, com.kert0n.medapp.fixture.FakeFreshness(), database.transactions(),
         Clock.fixed(at, ZoneOffset.UTC),
         kotlinx.coroutines.CoroutineScope(kotlinx.coroutines.SupervisorJob() + kotlinx.coroutines.Dispatchers.Unconfined)
     )

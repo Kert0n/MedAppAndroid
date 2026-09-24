@@ -14,6 +14,7 @@ import com.kert0n.medapp.feature.notification.NotificationUpkeep
 import com.kert0n.medapp.feature.notification.ReminderAnswering
 import com.kert0n.medapp.feature.notification.ReminderOutbox
 import com.kert0n.medapp.feature.notification.ReminderRecords
+import com.kert0n.medapp.feature.notification.ReminderSubjects
 import com.kert0n.medapp.platform.time.TimeShifts
 import com.kert0n.medapp.queue.Transactions
 import java.time.Clock
@@ -76,13 +77,14 @@ class StoryWorld private constructor(start: Instant, zone: ZoneId) {
         shifts: TimeShifts,
         round: DailyRound,
         answering: ReminderAnswering,
+        subjects: ReminderSubjects,
         connection: Connection
     ) {
         takeTheNetworkAway(connection)
         this.shifts = shifts
         this.round = round
         this.answering = answering
-        outbox = ReminderOutbox(reminders, shade, alarms, freshness, transactions, clock, scope).also { it.start() }
+        outbox = ReminderOutbox(reminders, shade, subjects, alarms, freshness, transactions, clock, scope).also { it.start() }
         upkeep = NotificationUpkeep(reminders, reconciliation, clock, scope).also { it.start() }
         runBlocking { await("владельцы доставки встали") { outbox.ready.value && upkeep.ready.value } }
     }

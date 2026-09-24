@@ -16,6 +16,7 @@ import com.kert0n.medapp.domain.notification.NotificationKind
 import com.kert0n.medapp.domain.notification.NotificationTarget
 import com.kert0n.medapp.domain.notification.Reminder
 import com.kert0n.medapp.domain.pack.ExpiryDate
+import com.kert0n.medapp.feature.notification.ReminderSubjects
 import com.kert0n.medapp.fixture.FakeAppLanguages
 import com.kert0n.medapp.fixture.PACK
 import com.kert0n.medapp.fixture.courseRepository
@@ -61,7 +62,7 @@ class SystemNotifierTest {
     fun setUp() = runTest {
         database = inMemoryDatabase()
         database.packageRepository().add(pack(quantity = tablets("20"), expiresOn = expiry))
-        notifier = SystemNotifier(context, EntriesModule.entries(), database.intakeRepository(), database.courseRepository(), database.packageRepository(), NotificationChannels(context, FakeAppLanguages()), FakeAppLanguages(), java.time.Clock.fixed(planned.dueAt, java.time.ZoneOffset.UTC))
+        notifier = SystemNotifier(context, EntriesModule.entries(), NotificationChannels(context, FakeAppLanguages()), FakeAppLanguages(), java.time.Clock.fixed(planned.dueAt, java.time.ZoneOffset.UTC))
         NotificationChannels(context, FakeAppLanguages()).ensure()
         manager.cancelAll()
     }
@@ -323,4 +324,8 @@ class SystemNotifierTest {
             NotificationChannels(context, FakeAppLanguages()).ensure()
         }
     }
+
+    /** Предмет читает сценарий, как в приложении; проверка смотрит, что из него собрала шторка. */
+    private suspend fun SystemNotifier.show(reminder: com.kert0n.medapp.domain.notification.Reminder) =
+        show(reminder, ReminderSubjects(database.intakeRepository(), database.courseRepository(), database.packageRepository()).of(reminder.target))
 }

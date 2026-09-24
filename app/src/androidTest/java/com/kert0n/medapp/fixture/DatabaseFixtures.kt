@@ -268,8 +268,11 @@ class Scenarios(
      * Владелец показа и будильника. В проверках его проход зовут явно: так видно, что показ —
      * отдельный шаг, а не побочное действие прохода дня.
      */
+    val reminderSubjects = com.kert0n.medapp.feature.notification.ReminderSubjects(
+        database.intakeRepository(), database.courseRepository(), database.packageRepository()
+    )
     val reminderOutbox = com.kert0n.medapp.feature.notification.ReminderOutbox(
-        reminderStore, notifier, reminders, freshness, transactions, clock,
+        reminderStore, notifier, reminderSubjects, reminders, freshness, transactions, clock,
         kotlinx.coroutines.CoroutineScope(kotlinx.coroutines.SupervisorJob() + kotlinx.coroutines.Dispatchers.Unconfined)
     )
 }

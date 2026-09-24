@@ -286,7 +286,7 @@ class MissedIntakesTest {
             override suspend fun findAll(keys: Collection<com.kert0n.medapp.domain.notification.NotificationKey>) =
                 throw IllegalStateException("database or disk is full")
         },
-        scenarios.notifier, scenarios.reminders, scenarios.freshness, scenarios.transactions,
+        scenarios.notifier, scenarios.reminderSubjects, scenarios.reminders, scenarios.freshness, scenarios.transactions,
         java.time.Clock.fixed(scenarios.now, java.time.ZoneOffset.UTC),
         kotlinx.coroutines.CoroutineScope(kotlinx.coroutines.SupervisorJob() + kotlinx.coroutines.Dispatchers.Unconfined)
     )

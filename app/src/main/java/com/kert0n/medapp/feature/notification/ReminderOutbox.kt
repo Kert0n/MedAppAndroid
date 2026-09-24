@@ -44,6 +44,7 @@ import kotlinx.coroutines.sync.withLock
 class ReminderOutbox @Inject constructor(
     private val reminders: ReminderRecords,
     private val notifier: Notifier,
+    private val subjects: ReminderSubjects,
     private val alarms: ReminderAlarms,
     private val freshness: Freshness,
     private val transactions: com.kert0n.medapp.queue.Transactions,
@@ -113,7 +114,7 @@ class ReminderOutbox @Inject constructor(
         var blocked = 0
         for (reminder in due) {
             // Сбой одного показа не уносит остальные: работник очереди изолирует свои так же (E4).
-            val outcome = attempt { notifier.show(reminder) }.getOrElse { Delivery.FAILED }
+            val outcome = attempt { notifier.show(reminder, subjects.of(reminder.target)) }.getOrElse { Delivery.FAILED }
             if (outcome == Delivery.NOT_ALLOWED) {
                 // Показать нечем: обязательство ждёт листа приёмов, и будильника оно не попросит.
                 blocked++

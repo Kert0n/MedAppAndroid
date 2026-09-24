@@ -6,7 +6,11 @@ package com.kert0n.medapp.domain.notification
  */
 interface Notifier {
 
-    suspend fun show(reminder: Reminder): Delivery
+    /**
+     * Сказать обязательство о его [subject]. Предмета нет — повода больше нет; но разрешение
+     * спрашивается раньше: непоказуемое ждёт, а не забывается.
+     */
+    suspend fun show(reminder: Reminder, subject: ReminderSubject?): Delivery
 
     suspend fun dismiss(key: NotificationKey)
 }
