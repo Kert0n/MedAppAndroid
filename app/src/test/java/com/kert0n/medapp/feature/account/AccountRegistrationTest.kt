@@ -41,7 +41,8 @@ class AccountRegistrationTest {
 
     private class Memory(
         var account: StoredAccount,
-        private val writable: Boolean = true
+        private val writable: Boolean = true,
+        private val confirmable: Boolean = true
     ) : CredentialSource {
         override suspend fun read(): StoredAccount = account
         override suspend fun save(credentials: AccountCredentials): CredentialsSaved {
@@ -51,6 +52,7 @@ class AccountRegistrationTest {
         }
 
         override suspend fun confirm(): CredentialsSaved {
+            if (!confirmable) return CredentialsSaved.LOST
             (account as? StoredAccount.Pending)?.let { account = StoredAccount.Present(it.credentials) }
             return CredentialsSaved.SAVED
         }
@@ -181,6 +183,21 @@ class AccountRegistrationTest {
         assertEquals(emptyList<String>(), requests)
     }
 
+    /**
+     * Сервер принял учётку, а подтверждение не легло: пропуск выдаётся только подтверждённой, так
+     * что работать ещё нечем. Это исход хранилища, и данные остаются теми же — следующая
+     * настройка повторит их и получит `409` (замечание разбора #88).
+     */
+    @Test
+    fun anUnconfirmedAccountIsNotReadyYet() = runTest {
+        val stored = Memory(StoredAccount.Absent, confirmable = false)
+
+        val outcome = registration(stored).ensure()
+
+        assertEquals(AccountReadiness.NotReady(Unavailability.DEVICE_STORAGE), outcome)
+        assertTrue(stored.account is StoredAccount.Pending)
+    }
+
     /** Логин занят чужой учёткой: пропуск не выдан, и новых данных поверх не придумывают. */
     @Test
     fun aForeignLoginIsARefusalNotASecondAccount() = runTest {
@@ -193,7 +210,8 @@ class AccountRegistrationTest {
             token = HttpStatusCode.Unauthorized
         ).ensure()
 
-        assertEquals(AccountReadiness.NotReady(Unavailability.SERVER_SILENT), outcome)
+        // Повтор теми же данными не поможет: логин не наш, и это отказ, а не молчание сервера.
+        assertEquals(AccountReadiness.NotReady(Unavailability.SERVER_REFUSED_US), outcome)
         assertEquals(StoredAccount.Pending(kept), stored.account)
     }
 
