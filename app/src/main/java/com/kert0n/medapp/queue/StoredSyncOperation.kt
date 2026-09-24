@@ -1,6 +1,7 @@
 package com.kert0n.medapp.queue
 
 import com.kert0n.medapp.domain.value.VocabularyMiss
+import com.kert0n.medapp.queue.intake.IntakeAccounting
 import kotlin.uuid.Uuid
 
 /**
@@ -60,3 +61,16 @@ fun StoredSyncOperation.abandoned(): Settlement = when (this) {
     is StoredSyncOperation.Readable -> Delivery.AccessLost.settlement(operation.command)
     is StoredSyncOperation.Stale, is StoredSyncOperation.Unreadable -> Settlement(Settlement.Transition.Close.AccessLost)
 }
+
+/**
+ * Чем закрыть нечитаемую строку, которую человек разобрал сам: реестр её не принял, расход её
+ * приёма считается отвергнутым, а зависящие от неё строки закрываются следом (PLAN E3, E6).
+ */
+fun StoredSyncOperation.Unreadable.dismissed(): Settlement = Settlement(
+    Settlement.Transition.Close.Refused(RefusalReason.UNREADABLE),
+    listOf(
+        Settlement.Effect.Account(IntakeAccounting.REMOTE_REFUSED),
+        Settlement.Effect.Cascade(Settlement.Transition.Close.Refused(RefusalReason.SUPERSEDED), IntakeAccounting.REMOTE_REFUSED),
+        Settlement.Effect.Settled
+    )
+)

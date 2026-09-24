@@ -68,9 +68,9 @@ class ReminderAnswering @Inject constructor(
     /** Отказ человека: пункт становится пропуском, и напоминать о нём больше нечего. */
     suspend fun skip(intakeId: Uuid): Response = transactions.run {
         when (declining.decline(intakeId, clock.instant())) {
-            IntakeDeclining.Outcome.DECLINED, IntakeDeclining.Outcome.ALREADY_ANSWERED -> Response.Done
+            IntakeDeclining.Outcome.Declined, IntakeDeclining.Outcome.AlreadyAnswered -> Response.Done
             // Курса или пункта больше нет — напоминать не о чем, и говорить человеку нечего.
-            IntakeDeclining.Outcome.EPISODE_CLOSED, IntakeDeclining.Outcome.GONE -> {
+            is IntakeDeclining.Outcome.Rejected, IntakeDeclining.Outcome.Gone -> {
                 withdrawal.withdraw(intakeId)
                 Response.Done
             }

@@ -42,7 +42,8 @@ data class Prescription(
          */
         const val MAX_TOTAL_DOSES = 10_000
 
-        /** Назначают ли столько доз: черновик и идущее лечение спрашивают это здесь, а не решают сами. */
-        fun allows(totalDoses: Doses): Boolean = totalDoses.count <= MAX_TOTAL_DOSES
+        /** Назначают ли столько доз: черновик, идущее лечение и форма спрашивают это здесь, а не решают сами. */
+        fun refusesTotal(totalDoses: Doses): CourseRejected.Reason? =
+            CourseRejected.Reason.TOTAL_DOSES_TOO_MANY.takeIf { totalDoses.count > MAX_TOTAL_DOSES }
     }
 }

@@ -1,6 +1,7 @@
 package com.kert0n.medapp.feature.intake
 
 import com.kert0n.medapp.domain.intake.CourseIntake
+import com.kert0n.medapp.domain.intake.IntakeRejected
 import com.kert0n.medapp.domain.intake.IntakeStatus
 import com.kert0n.medapp.feature.course.CourseCalendar
 import com.kert0n.medapp.feature.course.CourseRecords
@@ -33,28 +34,34 @@ class IntakeDeclining @Inject constructor(
 ) {
 
     suspend fun decline(intakeId: Uuid, at: Instant): Outcome = transactions.run {
-        val intake = intakes.find(intakeId) as? CourseIntake ?: return@run Outcome.GONE
-        val record = courses.findRecord(intake.courseId) ?: return@run Outcome.GONE
-        if (!record.isOpen) return@run Outcome.EPISODE_CLOSED
-        if (intake.status != IntakeStatus.PLANNED) return@run Outcome.ALREADY_ANSWERED
+        val intake = intakes.find(intakeId) as? CourseIntake ?: return@run Outcome.Gone
+        val record = courses.findRecord(intake.courseId) ?: return@run Outcome.Gone
+        record.refusesAnswers()?.let { return@run Outcome.Rejected(it) }
+        if (intake.status != IntakeStatus.PLANNED) return@run Outcome.AlreadyAnswered
         val course = courses.openPlan(intake.courseId)
         val now = clock.instant()
         // Сначала сам пункт: отмеченный неответом прошлый пункт отказа уже не принял бы, и момент
         // человека пропал бы. Остальное прошлое — следом, до достройки окна (F4).
         val declined = intakes.record(IntakeOutcome(intake.miss(at), expected = setOf(IntakeStatus.PLANNED), recordedAt = now))
-        if (!declined) return@run Outcome.ALREADY_ANSWERED
+        if (!declined) return@run Outcome.AlreadyAnswered
         // Ответ дан — напоминать больше нечего. Той же транзакцией: откат уносит отзыв вместе с
         // ответом, а гасит карточку владелец доставки уже после коммита (PLAN D8, F5).
         reminders.withdraw(intakeId)
         calendar.missOverdue(course, now)
         // Доза уехала вперёд: окно календаря достраивается на один пункт (F4).
         calendar.extend(course, now)
-        Outcome.DECLINED
+        Outcome.Declined
     }
 
     /**
      * Чем кончилось. Отказано — пункт показан пропущенным; уже отвечен — экран показывает то, что
-     * записано; эпизод закрыт — план ответов не принимает (D6); пункта или эпизода нет — закрыть.
+     * записано; отказ домена — эпизод закрыт, план ответов не принимает (D6); пункта или эпизода
+     * нет — закрыть.
      */
-    enum class Outcome { DECLINED, ALREADY_ANSWERED, EPISODE_CLOSED, GONE }
+    sealed interface Outcome {
+        data object Declined : Outcome
+        data object AlreadyAnswered : Outcome
+        data class Rejected(val reason: IntakeRejected.Reason) : Outcome
+        data object Gone : Outcome
+    }
 }

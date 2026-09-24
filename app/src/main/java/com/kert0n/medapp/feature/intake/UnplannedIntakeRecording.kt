@@ -3,6 +3,7 @@ package com.kert0n.medapp.feature.intake
 import com.kert0n.medapp.domain.intake.IntakeProjection
 import com.kert0n.medapp.domain.intake.IntakeRejected
 import com.kert0n.medapp.domain.intake.UnplannedIntake
+import com.kert0n.medapp.domain.pack.Package
 import com.kert0n.medapp.domain.value.Dose
 import com.kert0n.medapp.feature.course.CourseFollowing
 import com.kert0n.medapp.feature.course.CourseRecords
@@ -46,11 +47,10 @@ class UnplannedIntakeRecording @Inject constructor(
         at: Instant,
         acknowledged: Boolean = false
     ): Outcome = transactions.run {
-        val pkg = packages.find(packageId) ?: return@run Outcome.Rejected(IntakeRejected.Reason.PACKAGE_UNUSABLE)
-        val taken = pkg.take(amount, at).getOrElse { return@run Outcome.Rejected((it as IntakeRejected).reason) }
+        val pkg = Package.present(packages.find(packageId)).getOrElse { return@run Outcome.Rejected((it as IntakeRejected).reason) }
         val spending = queue.spending(pkg)
-        val spendsLocally = spending == Spending.LOCAL
-        if (spendsLocally && !pkg.quantity.covers(amount)) return@run Outcome.Rejected(IntakeRejected.Reason.INSUFFICIENT)
+        val taken = pkg.take(amount, at, countedHere = spending == Spending.LOCAL)
+            .getOrElse { return@run Outcome.Rejected((it as IntakeRejected).reason) }
         // Занятое — моё выделение и чужие брони, посчитанные от того же числа, которое человек
         // видит на экране: решает он по нему (PLAN D4).
         val seen = packages.projection(pkg.id).readThisTransaction("пачка").availability

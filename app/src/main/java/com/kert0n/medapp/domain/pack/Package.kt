@@ -111,6 +111,24 @@ class Package(
         else -> Result.success(TakenDose(ref, amount, at))
     }
 
+    companion object {
+
+        /** Коробка, прочитанная по идентификатору снаружи: её может уже не быть (PLAN D3). */
+        fun present(found: Package?): Result<Package> =
+            found?.let { Result.success(it) } ?: Result.failure(IntakeRejected(IntakeRejected.Reason.PACKAGE_UNUSABLE))
+    }
+
+    /**
+     * Тот же акт из коробки, чей остаток считается здесь же ([countedHere]): списать больше, чем в
+     * ней есть, нечем. У коробки, которую знает сервер, истина по количеству — он, и нехватку
+     * отвечает он (PLAN E3).
+     */
+    fun take(amount: Dose, at: Instant, countedHere: Boolean): Result<TakenDose> =
+        take(amount, at).mapCatching { taken ->
+            if (countedHere && !quantity.covers(amount)) throw IntakeRejected(IntakeRejected.Reason.INSUFFICIENT)
+            taken
+        }
+
     /**
      * Расход — приём, плановый или разовый. В минус не списывает (PLAN D5). Учётная запись о нём —
      * сам приём (PLAN D6, H6).

@@ -23,12 +23,9 @@ import java.time.ZoneId
 import javax.inject.Inject
 import kotlin.uuid.Uuid
 import kotlinx.coroutines.flow.MutableStateFlow
-import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.map
-import kotlinx.coroutines.flow.stateIn
-import kotlinx.coroutines.launch
 
 /**
  * Страницы дня (PLAN H3 №12): что у человека назначено, что уже принято — и быстрый ответ прямо в
@@ -189,10 +186,10 @@ class DayPlanViewModel @Inject constructor(
     /** Чем кончился отказ. Записанный отказ приходит чтением; остальное — словами. */
     private fun told(outcome: IntakeDeclining.Outcome) {
         message.value = when (outcome) {
-            IntakeDeclining.Outcome.DECLINED -> return
-            IntakeDeclining.Outcome.ALREADY_ANSWERED -> DayMessage.AlreadyAnswered
-            IntakeDeclining.Outcome.EPISODE_CLOSED -> DayMessage.EpisodeClosed
-            IntakeDeclining.Outcome.GONE -> DayMessage.Gone
+            IntakeDeclining.Outcome.Declined -> return
+            IntakeDeclining.Outcome.AlreadyAnswered -> DayMessage.AlreadyAnswered
+            is IntakeDeclining.Outcome.Rejected -> DayMessage.EpisodeClosed
+            IntakeDeclining.Outcome.Gone -> DayMessage.Gone
         }
     }
 
