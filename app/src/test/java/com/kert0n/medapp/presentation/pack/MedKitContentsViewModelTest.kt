@@ -3,6 +3,9 @@ package com.kert0n.medapp.presentation.pack
 import com.kert0n.medapp.domain.medkit.MedKitStatus
 import com.kert0n.medapp.domain.pack.PackageProjection
 import com.kert0n.medapp.feature.medkits.MedKitRemoval
+import com.kert0n.medapp.feature.packages.PackageQuery
+import com.kert0n.medapp.feature.packages.PackageReadings
+import com.kert0n.medapp.feature.packages.PackageRecords
 import com.kert0n.medapp.feature.packages.PackageRelocation
 import com.kert0n.medapp.feature.packages.PackageRemoval
 import com.kert0n.medapp.feature.time.Today
@@ -27,8 +30,6 @@ import com.kert0n.medapp.fixture.watching
 import com.kert0n.medapp.presentation.value.toPresentationDTO
 import com.kert0n.medapp.queue.QueueService
 import com.kert0n.medapp.queue.Transactions
-import com.kert0n.medapp.storage.pack.PackageQuery
-import com.kert0n.medapp.storage.pack.PackageStorageRepository
 import java.time.Clock
 import java.time.Instant
 import java.time.LocalDate
@@ -61,7 +62,7 @@ class MedKitContentsViewModelTest {
      * Запросы — поток: экран собирает состояние вне главного потока, и запрос к базе приходит
      * не раньше состояния, а рядом с ним, — проверка ждёт запроса, а не читает его наугад.
      */
-    private class Asked(private val real: FakePackages) : PackageStorageRepository by real {
+    private class Asked(private val real: FakePackages) : PackageRecords by real, PackageReadings by real {
 
         val queries = MutableStateFlow<List<PackageQuery>>(emptyList())
 

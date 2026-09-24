@@ -1,6 +1,5 @@
 package com.kert0n.medapp.app.navigation
 
-import com.kert0n.medapp.fixture.pressAfterTyping
 import androidx.compose.ui.semantics.SemanticsProperties
 import androidx.compose.ui.semantics.getOrNull
 import androidx.compose.ui.test.hasText
@@ -20,10 +19,12 @@ import com.kert0n.medapp.domain.value.Quantity
 import com.kert0n.medapp.feature.connectivity.Connection
 import com.kert0n.medapp.feature.medkits.MedKitInvitation
 import com.kert0n.medapp.feature.medkits.MedKitPublishing
+import com.kert0n.medapp.feature.packages.PackageReadings
 import com.kert0n.medapp.fixture.ProbeAccounts
 import com.kert0n.medapp.fixture.medKit
 import com.kert0n.medapp.fixture.pack
 import com.kert0n.medapp.fixture.packageRepository
+import com.kert0n.medapp.fixture.pressAfterTyping
 import com.kert0n.medapp.fixture.storySetting
 import com.kert0n.medapp.network.medkit.MembershipPostNetworkDTO
 import com.kert0n.medapp.network.pack.PackageSyncNetworkDTO
@@ -36,7 +37,6 @@ import com.kert0n.medapp.queue.QueueOutbox
 import com.kert0n.medapp.queue.Synchronization
 import com.kert0n.medapp.storage.database.MedAppDatabase
 import com.kert0n.medapp.storage.medkit.toStorageEntity
-import com.kert0n.medapp.storage.pack.PackageStorageRepository
 import com.kert0n.medapp.storage.value.toStorageEntity
 import com.kert0n.medapp.ui.theme.MedAppTheme
 import dagger.hilt.android.testing.HiltAndroidRule
@@ -44,8 +44,8 @@ import dagger.hilt.android.testing.HiltAndroidTest
 import java.math.BigDecimal
 import javax.inject.Inject
 import kotlin.uuid.Uuid
-import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.withTimeout
 import org.junit.After
@@ -79,7 +79,7 @@ class UnsteadyConnectionStoryTest {
     val compose = createAndroidComposeRule<HiltTestActivity>()
 
     @Inject lateinit var database: MedAppDatabase
-    @Inject lateinit var packages: PackageStorageRepository
+    @Inject lateinit var packages: PackageReadings
     @Inject lateinit var connection: Connection
     @Inject lateinit var outbox: QueueOutbox
     @Inject lateinit var triggers: SyncTriggers

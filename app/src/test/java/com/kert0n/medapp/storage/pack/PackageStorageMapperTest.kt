@@ -18,6 +18,8 @@ import com.kert0n.medapp.fixture.toStorageRow
 import com.kert0n.medapp.queue.ResourceVersion
 import com.kert0n.medapp.queue.pack.PackageSyncState
 import com.kert0n.medapp.storage.medkit.toStorageEntity as toMedKitStorageEntity
+import com.kert0n.medapp.storage.operation.syncState
+import com.kert0n.medapp.storage.operation.toStorageEntity
 import com.kert0n.medapp.storage.pack.toStorageEntity
 import java.math.BigDecimal
 import java.time.Instant

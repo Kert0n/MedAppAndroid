@@ -1,18 +1,20 @@
 package com.kert0n.medapp.presentation.pack
 
-import com.kert0n.medapp.presentation.act
-import com.kert0n.medapp.presentation.ScreenFailures
-import com.kert0n.medapp.presentation.stateInScreen
-import com.kert0n.medapp.presentation.ScreenReading
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.kert0n.medapp.feature.operation.Freshening
 import com.kert0n.medapp.feature.packages.PackageAdjusting
+import com.kert0n.medapp.feature.packages.PackageReadings
+import com.kert0n.medapp.presentation.Fresh
 import com.kert0n.medapp.presentation.ParsedInput
+import com.kert0n.medapp.presentation.ScreenFailures
+import com.kert0n.medapp.presentation.ScreenReading
+import com.kert0n.medapp.presentation.act
+import com.kert0n.medapp.presentation.readAfter
+import com.kert0n.medapp.presentation.stateInScreen
 import com.kert0n.medapp.presentation.value.QuantityPresentationDTO
 import com.kert0n.medapp.presentation.value.toDomain
 import com.kert0n.medapp.presentation.value.toPresentationDTO
-import com.kert0n.medapp.storage.pack.PackageStorageRepository
 import com.kert0n.medapp.storage.value.VocabularyStorageRepository
 import dagger.assisted.Assisted
 import dagger.assisted.AssistedFactory
@@ -25,8 +27,6 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
-import com.kert0n.medapp.presentation.Fresh
-import com.kert0n.medapp.presentation.readAfter
 
 /**
  * Пересчёт (PLAN H3 №9): человек посчитал и увидел не то число, что записано. Он называет то,
@@ -45,7 +45,7 @@ class PackageRecountViewModel @AssistedInject constructor(
     private val adjusting: PackageAdjusting,
     freshening: Freshening,
     private val vocabulary: VocabularyStorageRepository,
-    packages: PackageStorageRepository,
+    packages: PackageReadings,
     @Assisted private val packageId: Uuid,
     private val failures: ScreenFailures = ScreenFailures()
 ) : ViewModel() {

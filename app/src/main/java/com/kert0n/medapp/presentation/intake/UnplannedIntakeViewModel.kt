@@ -1,20 +1,22 @@
 package com.kert0n.medapp.presentation.intake
 
-import com.kert0n.medapp.presentation.act
-import com.kert0n.medapp.presentation.ScreenFailures
-import com.kert0n.medapp.presentation.stateInScreen
-import com.kert0n.medapp.presentation.ScreenReading
-import com.kert0n.medapp.presentation.value.ExpiryDatePresentationDTO
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.kert0n.medapp.feature.intake.IntakeWarning
 import com.kert0n.medapp.feature.intake.UnplannedIntakeRecording
 import com.kert0n.medapp.feature.operation.Freshening
+import com.kert0n.medapp.feature.packages.PackageReadings
+import com.kert0n.medapp.presentation.Fresh
 import com.kert0n.medapp.presentation.ParsedInput
+import com.kert0n.medapp.presentation.ScreenFailures
+import com.kert0n.medapp.presentation.ScreenReading
+import com.kert0n.medapp.presentation.act
+import com.kert0n.medapp.presentation.readAfter
+import com.kert0n.medapp.presentation.stateInScreen
+import com.kert0n.medapp.presentation.value.ExpiryDatePresentationDTO
 import com.kert0n.medapp.presentation.value.QuantityPresentationDTO
 import com.kert0n.medapp.presentation.value.UnitPresentationDTO
 import com.kert0n.medapp.presentation.value.toPresentationDTO
-import com.kert0n.medapp.storage.pack.PackageStorageRepository
 import com.kert0n.medapp.storage.value.VocabularyStorageRepository
 import dagger.assisted.Assisted
 import dagger.assisted.AssistedFactory
@@ -28,8 +30,6 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
-import com.kert0n.medapp.presentation.Fresh
-import com.kert0n.medapp.presentation.readAfter
 
 /**
  * Разовый приём из коробки (PLAN H3 №10, D6). Человек выпил таблетку просто так — вне всякого
@@ -48,7 +48,7 @@ class UnplannedIntakeViewModel @AssistedInject constructor(
     private val vocabulary: VocabularyStorageRepository,
     private val clock: Clock,
     freshening: Freshening,
-    packages: PackageStorageRepository,
+    packages: PackageReadings,
     @Assisted private val packageId: Uuid,
     private val failures: ScreenFailures = ScreenFailures()
 ) : ViewModel() {

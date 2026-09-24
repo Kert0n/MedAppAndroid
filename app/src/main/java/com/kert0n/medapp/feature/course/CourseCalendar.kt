@@ -5,19 +5,19 @@ import com.kert0n.medapp.domain.course.CourseProgress
 import com.kert0n.medapp.domain.course.ScheduledOccurrence
 import com.kert0n.medapp.domain.intake.CourseIntake
 import com.kert0n.medapp.domain.intake.IntakeStatus
-import com.kert0n.medapp.domain.pack.Availability
-import com.kert0n.medapp.domain.pack.PackageAvailability
-import com.kert0n.medapp.domain.value.Doses
-import com.kert0n.medapp.domain.value.Quantity
-import com.kert0n.medapp.storage.intake.IntakeOutcome
 import com.kert0n.medapp.domain.notification.NotificationKey
 import com.kert0n.medapp.domain.notification.NotificationKind
 import com.kert0n.medapp.domain.notification.NotificationTarget
 import com.kert0n.medapp.domain.notification.Reminder
-import com.kert0n.medapp.storage.intake.IntakeStorageRepository
+import com.kert0n.medapp.domain.pack.Availability
+import com.kert0n.medapp.domain.pack.PackageAvailability
+import com.kert0n.medapp.domain.value.Doses
+import com.kert0n.medapp.domain.value.Quantity
 import com.kert0n.medapp.feature.notification.ReminderPromising
 import com.kert0n.medapp.feature.notification.ReminderWithdrawal
-import com.kert0n.medapp.storage.pack.PackageStorageRepository
+import com.kert0n.medapp.feature.packages.PackageRecords
+import com.kert0n.medapp.storage.intake.IntakeOutcome
+import com.kert0n.medapp.storage.intake.IntakeStorageRepository
 import java.time.Duration
 import java.time.Instant
 import javax.inject.Inject
@@ -35,7 +35,7 @@ import kotlin.uuid.Uuid
  */
 class CourseCalendar @Inject constructor(
     private val intakes: IntakeStorageRepository,
-    private val packages: PackageStorageRepository,
+    private val packages: PackageRecords,
     private val promising: ReminderPromising,
     private val withdrawal: ReminderWithdrawal
 ) {

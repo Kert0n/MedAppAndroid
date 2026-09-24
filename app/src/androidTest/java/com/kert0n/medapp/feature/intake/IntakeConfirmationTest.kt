@@ -1,23 +1,23 @@
 package com.kert0n.medapp.feature.intake
 
-import com.kert0n.medapp.feature.intake.IntakeWarning
-import com.kert0n.medapp.domain.pack.ExpiryDate
-import com.kert0n.medapp.fixture.factsOf
-import com.kert0n.medapp.fixture.confirmed
-import com.kert0n.medapp.fixture.rejected
 import com.kert0n.medapp.domain.course.CourseDraft
 import com.kert0n.medapp.domain.course.CourseRecord
+import com.kert0n.medapp.domain.course.Revision
 import com.kert0n.medapp.domain.course.ScheduledOccurrence
 import com.kert0n.medapp.domain.intake.CourseIntake
 import com.kert0n.medapp.domain.intake.IntakeRejected
 import com.kert0n.medapp.domain.intake.IntakeStatus
 import com.kert0n.medapp.domain.medkit.MedKit
+import com.kert0n.medapp.domain.pack.ExpiryDate
 import com.kert0n.medapp.domain.value.Doses
 import com.kert0n.medapp.feature.course.CourseCalendar
 import com.kert0n.medapp.feature.course.CourseClosing
 import com.kert0n.medapp.feature.course.CourseFollowing
+import com.kert0n.medapp.feature.intake.IntakeWarning
+import com.kert0n.medapp.feature.packages.PackageAdjustment
 import com.kert0n.medapp.fixture.COURSE
 import com.kert0n.medapp.fixture.FIRST_PLANNED_AT
+import com.kert0n.medapp.fixture.FixturePackages
 import com.kert0n.medapp.fixture.INTAKE
 import com.kert0n.medapp.fixture.LATER
 import com.kert0n.medapp.fixture.OTHER_INTAKE
@@ -26,9 +26,11 @@ import com.kert0n.medapp.fixture.PACK
 import com.kert0n.medapp.fixture.VOCABULARY
 import com.kert0n.medapp.fixture.activeCourse
 import com.kert0n.medapp.fixture.closing
+import com.kert0n.medapp.fixture.confirmed
 import com.kert0n.medapp.fixture.courseRecord
 import com.kert0n.medapp.fixture.courseRepository
 import com.kert0n.medapp.fixture.dose
+import com.kert0n.medapp.fixture.factsOf
 import com.kert0n.medapp.fixture.inMemoryDatabase
 import com.kert0n.medapp.fixture.intakeRepository
 import com.kert0n.medapp.fixture.medKit
@@ -37,14 +39,15 @@ import com.kert0n.medapp.fixture.pack
 import com.kert0n.medapp.fixture.packageRepository
 import com.kert0n.medapp.fixture.plannedIntake
 import com.kert0n.medapp.fixture.queueStorage
-import com.kert0n.medapp.fixture.transactions
+import com.kert0n.medapp.fixture.rejected
 import com.kert0n.medapp.fixture.schedule
 import com.kert0n.medapp.fixture.source
 import com.kert0n.medapp.fixture.tablets
-import com.kert0n.medapp.queue.intake.IntakeAccounting
+import com.kert0n.medapp.fixture.transactions
 import com.kert0n.medapp.queue.QueueService
 import com.kert0n.medapp.queue.StoredSyncOperation
 import com.kert0n.medapp.queue.SyncCommand
+import com.kert0n.medapp.queue.intake.IntakeAccounting
 import com.kert0n.medapp.queue.pack.PackageSyncCommand
 import com.kert0n.medapp.storage.course.CourseRoomRepository
 import com.kert0n.medapp.storage.database.MedAppDatabase
@@ -56,8 +59,6 @@ import java.math.BigDecimal
 import java.time.Clock
 import java.time.Instant
 import java.time.ZoneOffset
-import com.kert0n.medapp.domain.course.Revision
-import com.kert0n.medapp.storage.pack.PackageAdjustment
 import kotlin.uuid.Uuid
 import kotlinx.coroutines.test.runTest
 import org.junit.After
@@ -77,7 +78,7 @@ class IntakeConfirmationTest {
     private lateinit var database: MedAppDatabase
     private lateinit var courses: CourseRoomRepository
     private lateinit var intakes: IntakeRoomRepository
-    private lateinit var packages: PackageRoomRepository
+    private lateinit var packages: FixturePackages
     private lateinit var confirmation: IntakeConfirmation
 
     private val now: Instant = Instant.parse("2027-03-10T12:00:00Z")

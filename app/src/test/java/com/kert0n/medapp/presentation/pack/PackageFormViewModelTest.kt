@@ -3,6 +3,8 @@ package com.kert0n.medapp.presentation.pack
 import com.kert0n.medapp.domain.pack.Package
 import com.kert0n.medapp.feature.packages.PackageAdding
 import com.kert0n.medapp.feature.packages.PackageDescribing
+import com.kert0n.medapp.feature.packages.PackageReadings
+import com.kert0n.medapp.feature.packages.PackageRecords
 import com.kert0n.medapp.feature.scan.PackageScanning
 import com.kert0n.medapp.feature.template.TemplateSearching
 import com.kert0n.medapp.feature.time.Today
@@ -27,8 +29,6 @@ import com.kert0n.medapp.fixture.tablets
 import com.kert0n.medapp.fixture.watching
 import com.kert0n.medapp.presentation.value.toPresentationDTO
 import com.kert0n.medapp.queue.QueueService
-import com.kert0n.medapp.queue.pack.PackageSyncState
-import com.kert0n.medapp.storage.pack.PackageStorageRepository
 import com.kert0n.medapp.storage.value.VocabularyStorageRepository
 import java.time.Clock
 import java.time.Instant
@@ -61,10 +61,11 @@ class PackageFormViewModelTest {
     private fun viewModel(
         opened: PackageFormViewModel.Opened = PackageFormViewModel.Opened(medKitId = HOME_KIT),
         vocabulary: VocabularyStorageRepository = FakeVocabulary(),
-        packages: PackageStorageRepository = this.packages
+        packages: PackageReadings = this.packages,
+        records: PackageRecords = this.packages
     ) = PackageFormViewModel(
-        adding = PackageAdding(packages, medKits, queue, DirectTransactions, clock),
-        describing = PackageDescribing(packages, FakeFollowing(), queue, DirectTransactions, clock),
+        adding = PackageAdding(records, medKits, queue, DirectTransactions, clock),
+        describing = PackageDescribing(records, FakeFollowing(), queue, DirectTransactions, clock),
         searching = TemplateSearching(FakePackageTemplates()),
         scanning = PackageScanning(codes),
         packages = packages,
@@ -175,15 +176,15 @@ class PackageFormViewModelTest {
      */
     @Test
     fun aWriteThatFailsLeavesTheFormToTryAgain() {
-        val failing = object : PackageStorageRepository by packages {
-            override suspend fun add(pkg: Package, sync: PackageSyncState) =
+        val failing = object : PackageRecords by packages {
+            override suspend fun add(pkg: Package) =
                 throw IllegalStateException("database or disk is full")
         }
         val escaped = mutableListOf<Throwable>()
         val before = Thread.getDefaultUncaughtExceptionHandler()
         Thread.setDefaultUncaughtExceptionHandler { _, e -> escaped += e }
         val state = try {
-            val model = viewModel(packages = failing)
+            val model = viewModel(records = failing)
             watching(model.state) { state ->
                 val ready = state.awaiting { it.units.isNotEmpty() }
                 model.edit(filled(ready))

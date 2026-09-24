@@ -1,9 +1,5 @@
 package com.kert0n.medapp.presentation.notification
 
-import com.kert0n.medapp.presentation.act
-import com.kert0n.medapp.presentation.ScreenFailures
-import com.kert0n.medapp.presentation.stateInScreen
-import com.kert0n.medapp.presentation.ScreenReading
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.kert0n.medapp.domain.notification.NoticeDelivery
@@ -11,10 +7,14 @@ import com.kert0n.medapp.domain.notification.NotificationKey
 import com.kert0n.medapp.domain.notification.NotificationKind
 import com.kert0n.medapp.domain.notification.NotificationTarget
 import com.kert0n.medapp.feature.notification.ReminderOutbox
+import com.kert0n.medapp.feature.packages.PackageReadings
+import com.kert0n.medapp.presentation.ScreenFailures
+import com.kert0n.medapp.presentation.ScreenReading
+import com.kert0n.medapp.presentation.act
 import com.kert0n.medapp.presentation.pack.PackagePresentationDTO
 import com.kert0n.medapp.presentation.pack.toPresentationDTO
+import com.kert0n.medapp.presentation.stateInScreen
 import com.kert0n.medapp.storage.notification.ReminderStorageRepository
-import com.kert0n.medapp.storage.pack.PackageStorageRepository
 import dagger.hilt.android.lifecycle.HiltViewModel
 import javax.inject.Inject
 import kotlinx.coroutines.ExperimentalCoroutinesApi
@@ -45,7 +45,7 @@ import kotlinx.coroutines.launch
 class ExpiringTodayViewModel @Inject constructor(
     private val outbox: ReminderOutbox,
     private val reminders: ReminderStorageRepository,
-    private val packages: PackageStorageRepository,
+    private val packages: PackageReadings,
     private val failures: ScreenFailures = ScreenFailures()
 ) : ViewModel() {
 

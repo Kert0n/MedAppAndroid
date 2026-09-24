@@ -3,7 +3,9 @@ package com.kert0n.medapp.storage.pack
 import com.kert0n.medapp.domain.medkit.MedKit
 import com.kert0n.medapp.domain.pack.Claims
 import com.kert0n.medapp.domain.value.Money
+import com.kert0n.medapp.feature.packages.PackageQuery
 import com.kert0n.medapp.fixture.COURSE
+import com.kert0n.medapp.fixture.FixturePackages
 import com.kert0n.medapp.fixture.HOME_KIT
 import com.kert0n.medapp.fixture.INTAKE
 import com.kert0n.medapp.fixture.OTHER_INTAKE
@@ -33,6 +35,8 @@ import com.kert0n.medapp.storage.course.toStorageEntity as toCourseStorageEntity
 import com.kert0n.medapp.storage.database.MedAppDatabase
 import com.kert0n.medapp.storage.medkit.toStorageEntity as toMedKitStorageEntity
 import com.kert0n.medapp.storage.operation.SyncOperationRoomRepository
+import com.kert0n.medapp.storage.operation.applySnapshot
+import com.kert0n.medapp.storage.operation.syncState
 import java.math.BigDecimal
 import java.time.Instant
 import java.time.LocalDate
@@ -55,7 +59,7 @@ import org.junit.Test
 class PackageRoomRepositoryTest {
 
     private lateinit var database: MedAppDatabase
-    private lateinit var repository: PackageRoomRepository
+    private lateinit var repository: FixturePackages
     private lateinit var queue: SyncOperationRoomRepository
 
     private val today = LocalDate.of(2027, 3, 1)

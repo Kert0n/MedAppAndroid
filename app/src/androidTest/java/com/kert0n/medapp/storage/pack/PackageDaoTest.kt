@@ -22,6 +22,8 @@ import com.kert0n.medapp.queue.ResourceVersion
 import com.kert0n.medapp.queue.pack.PackageSyncState
 import com.kert0n.medapp.storage.database.MedAppDatabase
 import com.kert0n.medapp.storage.medkit.toStorageEntity as toMedKitStorageEntity
+import com.kert0n.medapp.storage.operation.syncState
+import com.kert0n.medapp.storage.operation.toStorageEntity
 import java.math.BigDecimal
 import java.time.Instant
 import kotlin.uuid.Uuid

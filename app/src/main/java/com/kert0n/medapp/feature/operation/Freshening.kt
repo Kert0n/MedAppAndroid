@@ -3,9 +3,9 @@ package com.kert0n.medapp.feature.operation
 import com.kert0n.medapp.di.ApplicationScope
 import com.kert0n.medapp.domain.attempt
 import com.kert0n.medapp.feature.connectivity.Connection
+import com.kert0n.medapp.feature.packages.PackageRecords
 import com.kert0n.medapp.queue.Rereading
 import com.kert0n.medapp.queue.Transactions
-import com.kert0n.medapp.storage.pack.PackageStorageRepository
 import java.time.Clock
 import java.time.Duration
 import java.time.Instant
@@ -42,7 +42,7 @@ import kotlinx.coroutines.withContext
 class Freshening @Inject constructor(
     private val rereading: Rereading,
     private val connection: Connection,
-    private val packages: PackageStorageRepository,
+    private val packages: PackageRecords,
     private val transactions: Transactions,
     private val clock: Clock,
     @ApplicationScope private val scope: CoroutineScope

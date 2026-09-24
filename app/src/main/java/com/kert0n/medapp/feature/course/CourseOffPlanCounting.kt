@@ -7,12 +7,12 @@ import com.kert0n.medapp.domain.course.CourseRecord
 import com.kert0n.medapp.domain.course.Revision
 import com.kert0n.medapp.domain.intake.CourseIntake
 import com.kert0n.medapp.domain.value.Doses
+import com.kert0n.medapp.feature.course.CourseReallocation
+import com.kert0n.medapp.feature.packages.PackageRecords
 import com.kert0n.medapp.feature.readThisTransaction
 import com.kert0n.medapp.queue.Transactions
-import com.kert0n.medapp.storage.course.CourseReallocation
 import com.kert0n.medapp.storage.course.CourseStorageRepository
 import com.kert0n.medapp.storage.intake.IntakeStorageRepository
-import com.kert0n.medapp.storage.pack.PackageStorageRepository
 import java.time.Clock
 import javax.inject.Inject
 import kotlin.uuid.Uuid
@@ -31,7 +31,7 @@ import kotlin.uuid.Uuid
 class CourseOffPlanCounting @Inject constructor(
     private val courses: CourseStorageRepository,
     private val intakes: IntakeStorageRepository,
-    private val packages: PackageStorageRepository,
+    private val packages: PackageRecords,
     private val calendar: CourseCalendar,
     private val following: CourseFollowing,
     private val closing: CourseClosing,

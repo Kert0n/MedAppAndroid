@@ -1,4 +1,4 @@
-package com.kert0n.medapp.storage.pack
+package com.kert0n.medapp.feature.packages
 
 import androidx.annotation.CheckResult
 import com.kert0n.medapp.domain.course.Course
@@ -9,27 +9,17 @@ import com.kert0n.medapp.domain.pack.PackageEnding
 import com.kert0n.medapp.domain.pack.PackageFacts
 import com.kert0n.medapp.domain.pack.PackageProjection
 import com.kert0n.medapp.domain.pack.PackageStatus
-import com.kert0n.medapp.queue.pack.PackageSnapshot
-import com.kert0n.medapp.queue.pack.PackageSyncState
-import com.kert0n.medapp.storage.course.CourseReallocation
+import com.kert0n.medapp.feature.course.CourseReallocation
 import java.time.Instant
-import java.time.LocalDate
 import kotlin.uuid.Uuid
-import kotlinx.coroutines.flow.Flow
 
 /**
- * Хранение упаковок. Собирает пачку из трёх её таблиц — серверной части, личных сведений и
- * картины броней (PLAN F1, H1). Потоки несут проекции — величины для экрана, собранные одним
- * чтением в одной транзакции: пачка вместе с доступностью — оценкой количества, чужими бронями
- * и занятым активным курсом (PLAN D4). Сущность отдаёт [find], и действительна она в
- * транзакции сценария, который её читал.
- *
- * Оценку количества считает очередь: репозиторий берёт незакрытые команды по номеру и сворачивает
- * их существующим `PackageQueueState`, а домену отдаёт готовое число (PLAN E1).
+ * Что сценарию нужно от хранения упаковок: сущность внутри его транзакции и переходы, записанные
+ * одной дверью (PLAN F1, F5). Объявляет сценарий, исполняет хранение; чтения для экрана —
+ * [PackageReadings]. Сущность, отданная [find], действительна в транзакции сценария, который её
+ * читал.
  */
-interface PackageStorageRepository {
-
-    fun observe(id: Uuid): Flow<PackageProjection?>
+interface PackageRecords {
 
     suspend fun find(id: Uuid): Package?
 
@@ -39,15 +29,12 @@ interface PackageStorageRepository {
      */
     suspend fun projection(id: Uuid): PackageProjection?
 
-    /** Список экрана: `today` приходит аргументом, потому что база системных часов не читает. */
-    fun list(query: PackageQuery, today: LocalDate): Flow<List<PackageProjection>>
-
     /**
-     * Заведение пачки: своей — без обвязки синхронизации, чужой — вместе со снимком сервера.
+     * Заведение своей пачки — без знания о сервере: чужую заводит снимок сервера.
      * Правка существующей идёт своими операциями: у них есть предусловия, а у общей записи их
      * нет, и она молча обнуляла бы то, чего действие человека не касается.
      */
-    suspend fun add(pkg: Package, sync: PackageSyncState = PackageSyncState(pkg.id))
+    suspend fun add(pkg: Package)
 
     /**
      * Правка описательных сведений. Остаток, обвязка синхронизации и картина броней не
@@ -105,20 +92,6 @@ interface PackageStorageRepository {
      * транзакции: переставляет или выбрасывает каждую доменным переходом (PLAN E6).
      */
     suspend fun contentsOf(medKitId: Uuid): List<Package>
-
-    /**
-     * Снимок переписывает серверную часть целиком и не касается личных сведений (PLAN E4).
-     * Половины применяются порознь, каждая по своей версии: запоздалая свежую не откатывает, и
-     * версия картины броней никогда не расходится с самой картиной (PLAN B3, E1).
-     */
-    suspend fun applySnapshot(snapshot: PackageSnapshot, observedAt: Instant): SnapshotApplied
-
-    /**
-     * Обвязка синхронизации пачки для экрана состояния синхронизации (PLAN H3 №28): версии и
-     * момент последней сверки. Своим методом, а не полем проекции — они принадлежат доставке, а
-     * не пачке, и остальным экранам не нужны. `null` — пачки больше нет.
-     */
-    fun observeSyncState(id: Uuid): Flow<PackageSyncState?>
 
     /** `null` снимает картину броней: аптечка не опубликована либо доступ утрачен. */
     suspend fun saveClaims(packageId: Uuid, claims: Claims?)

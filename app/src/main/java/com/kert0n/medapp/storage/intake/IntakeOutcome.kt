@@ -5,9 +5,9 @@ import com.kert0n.medapp.domain.intake.Intake
 import com.kert0n.medapp.domain.intake.IntakeStatus
 import com.kert0n.medapp.domain.intake.TakenDose
 import com.kert0n.medapp.domain.intake.UnplannedIntake
+import com.kert0n.medapp.feature.course.CourseReallocation
 import com.kert0n.medapp.queue.intake.IntakeAccounting
 import com.kert0n.medapp.queue.intake.IntakeSyncState
-import com.kert0n.medapp.storage.course.CourseReallocation
 import java.time.Instant
 
 /**

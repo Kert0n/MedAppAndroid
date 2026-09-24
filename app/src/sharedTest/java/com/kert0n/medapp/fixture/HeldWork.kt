@@ -5,9 +5,9 @@ import com.kert0n.medapp.domain.medkit.MedKitProjection
 import com.kert0n.medapp.domain.medkit.MedKitStatus
 import com.kert0n.medapp.domain.pack.PackageProjection
 import com.kert0n.medapp.domain.value.Vocabulary
+import com.kert0n.medapp.feature.packages.PackageReadings
 import com.kert0n.medapp.queue.Transactions
 import com.kert0n.medapp.storage.medkit.MedKitStorageRepository
-import com.kert0n.medapp.storage.pack.PackageStorageRepository
 import com.kert0n.medapp.storage.value.VocabularyStorageRepository
 import java.time.Instant
 import java.time.LocalDate
@@ -76,9 +76,9 @@ class HeldVocabulary(
 
 /** Хранилище, первое чтение которого проверка держит: до него экран ещё ничего не знает. */
 class HeldPackages(
-    private val real: PackageStorageRepository,
+    private val real: PackageReadings,
     val door: Held = Held()
-) : PackageStorageRepository by real {
+) : PackageReadings by real {
 
     override fun observe(id: Uuid): Flow<PackageProjection?> = flow {
         door.pass()

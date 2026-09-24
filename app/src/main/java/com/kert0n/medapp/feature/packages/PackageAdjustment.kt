@@ -1,4 +1,4 @@
-package com.kert0n.medapp.storage.pack
+package com.kert0n.medapp.feature.packages
 
 import com.kert0n.medapp.domain.medkit.MedKitRef
 import com.kert0n.medapp.domain.pack.Package

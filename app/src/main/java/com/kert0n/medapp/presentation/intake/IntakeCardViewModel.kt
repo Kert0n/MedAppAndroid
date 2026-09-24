@@ -1,29 +1,31 @@
 package com.kert0n.medapp.presentation.intake
 
-import com.kert0n.medapp.presentation.act
-import com.kert0n.medapp.presentation.ScreenFailures
-import com.kert0n.medapp.presentation.stateInScreen
-import com.kert0n.medapp.presentation.ScreenReading
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.kert0n.medapp.domain.course.CourseSource
 import com.kert0n.medapp.domain.intake.IntakeProjection
-import com.kert0n.medapp.domain.pack.ExpiryDate
 import com.kert0n.medapp.domain.intake.IntakeRejected
 import com.kert0n.medapp.domain.intake.IntakeStatus
+import com.kert0n.medapp.domain.pack.ExpiryDate
 import com.kert0n.medapp.domain.value.Dose
 import com.kert0n.medapp.feature.intake.IntakeConfirmation
-import com.kert0n.medapp.feature.intake.IntakeWarning
 import com.kert0n.medapp.feature.intake.IntakeDeclining
+import com.kert0n.medapp.feature.intake.IntakeWarning
 import com.kert0n.medapp.feature.operation.Freshening
+import com.kert0n.medapp.feature.packages.PackageReadings
 import com.kert0n.medapp.feature.time.Today
+import com.kert0n.medapp.presentation.Fresh
 import com.kert0n.medapp.presentation.ParsedInput
+import com.kert0n.medapp.presentation.ScreenFailures
+import com.kert0n.medapp.presentation.ScreenReading
+import com.kert0n.medapp.presentation.act
+import com.kert0n.medapp.presentation.readAfter
+import com.kert0n.medapp.presentation.stateInScreen
 import com.kert0n.medapp.presentation.value.QuantityPresentationDTO
 import com.kert0n.medapp.presentation.value.toDomain
 import com.kert0n.medapp.presentation.value.toPresentationDTO
 import com.kert0n.medapp.storage.course.CourseStorageRepository
 import com.kert0n.medapp.storage.intake.IntakeStorageRepository
-import com.kert0n.medapp.storage.pack.PackageStorageRepository
 import com.kert0n.medapp.storage.value.VocabularyStorageRepository
 import dagger.assisted.Assisted
 import dagger.assisted.AssistedFactory
@@ -38,14 +40,12 @@ import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.distinctUntilChanged
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.flatMapLatest
 import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.flow.map
-import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
-import com.kert0n.medapp.presentation.Fresh
-import com.kert0n.medapp.presentation.readAfter
 
 /**
  * Карточка пункта плана (PLAN H3 №18): тот же ответ, что и в строке дня, но набранный руками —
@@ -71,7 +71,7 @@ class IntakeCardViewModel @AssistedInject constructor(
     private val clock: Clock,
     courses: CourseStorageRepository,
     intakes: IntakeStorageRepository,
-    packages: PackageStorageRepository,
+    packages: PackageReadings,
     @Assisted private val intakeId: Uuid,
     private val failures: ScreenFailures = ScreenFailures()
 ) : ViewModel() {

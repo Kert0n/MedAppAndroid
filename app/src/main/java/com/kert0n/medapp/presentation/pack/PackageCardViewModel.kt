@@ -1,19 +1,21 @@
 package com.kert0n.medapp.presentation.pack
 
-import com.kert0n.medapp.presentation.act
-import com.kert0n.medapp.presentation.ScreenFailures
-import com.kert0n.medapp.presentation.stateInScreen
-import com.kert0n.medapp.presentation.ScreenReading
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.kert0n.medapp.domain.medkit.MedKitProjection
 import com.kert0n.medapp.domain.pack.PackageProjection
 import com.kert0n.medapp.feature.operation.Freshening
+import com.kert0n.medapp.feature.packages.PackageReadings
 import com.kert0n.medapp.feature.packages.PackageRemoval
 import com.kert0n.medapp.feature.time.Today
+import com.kert0n.medapp.presentation.Fresh
+import com.kert0n.medapp.presentation.ScreenFailures
+import com.kert0n.medapp.presentation.ScreenReading
+import com.kert0n.medapp.presentation.act
+import com.kert0n.medapp.presentation.readAfter
+import com.kert0n.medapp.presentation.stateInScreen
 import com.kert0n.medapp.storage.course.CourseStorageRepository
 import com.kert0n.medapp.storage.medkit.MedKitStorageRepository
-import com.kert0n.medapp.storage.pack.PackageStorageRepository
 import com.kert0n.medapp.storage.operation.SyncOperationStorageRepository
 import dagger.assisted.Assisted
 import dagger.assisted.AssistedFactory
@@ -32,8 +34,6 @@ import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
-import com.kert0n.medapp.presentation.Fresh
-import com.kert0n.medapp.presentation.readAfter
 
 /**
  * Карточка упаковки (PLAN H3 №6). Первым — сколько есть; остальное человек читает вторым
@@ -51,7 +51,7 @@ import com.kert0n.medapp.presentation.readAfter
 class PackageCardViewModel @AssistedInject constructor(
     private val removal: PackageRemoval,
     freshening: Freshening,
-    packages: PackageStorageRepository,
+    packages: PackageReadings,
     medKits: MedKitStorageRepository,
     courses: CourseStorageRepository,
     operations: SyncOperationStorageRepository,

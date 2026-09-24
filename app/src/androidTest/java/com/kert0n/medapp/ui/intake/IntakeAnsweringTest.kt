@@ -9,6 +9,8 @@ import com.kert0n.medapp.domain.pack.ExpiryDate
 import com.kert0n.medapp.domain.value.Doses
 import com.kert0n.medapp.feature.course.CourseDrafting
 import com.kert0n.medapp.feature.course.SourceEditing
+import com.kert0n.medapp.feature.packages.PackageReadings
+import com.kert0n.medapp.feature.packages.PackageRecords
 import com.kert0n.medapp.feature.plan.DayPlanning
 import com.kert0n.medapp.feature.time.Today
 import com.kert0n.medapp.fixture.AllAllowed
@@ -28,8 +30,8 @@ import com.kert0n.medapp.fixture.reportRepository
 import com.kert0n.medapp.fixture.schedule
 import com.kert0n.medapp.fixture.tablets
 import com.kert0n.medapp.fixture.watching
-import com.kert0n.medapp.presentation.intake.IntakeCardViewModel
 import com.kert0n.medapp.presentation.ScreenState
+import com.kert0n.medapp.presentation.intake.IntakeCardViewModel
 import com.kert0n.medapp.presentation.plan.DayItemPresentationDTO
 import com.kert0n.medapp.presentation.plan.DayPagePresentationDTO
 import com.kert0n.medapp.presentation.plan.DayPlanViewModel
@@ -396,7 +398,7 @@ class IntakeAnsweringTest {
         val intakeId = firstIntake(started()).id
         val server = com.kert0n.medapp.fixture.RereadingServer(clock)
         server.hold()
-        val known = object : com.kert0n.medapp.storage.pack.PackageStorageRepository by database.packageRepository() {
+        val known = object : PackageRecords by database.packageRepository() {
             override suspend fun answersToServer(packageId: Uuid): Boolean = true
         }
         val model = cardModel(intakeId, com.kert0n.medapp.fixture.onlineFreshening(server, known, clock))

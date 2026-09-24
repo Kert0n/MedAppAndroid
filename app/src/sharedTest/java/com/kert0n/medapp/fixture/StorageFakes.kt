@@ -31,6 +31,11 @@ import com.kert0n.medapp.domain.report.CourseInProgress
 import com.kert0n.medapp.domain.value.DosageForm
 import com.kert0n.medapp.domain.value.QuantityUnit
 import com.kert0n.medapp.domain.value.Vocabulary
+import com.kert0n.medapp.feature.course.CourseReallocation
+import com.kert0n.medapp.feature.packages.PackageAdjustment
+import com.kert0n.medapp.feature.packages.PackageQuery
+import com.kert0n.medapp.feature.packages.PackageReadings
+import com.kert0n.medapp.feature.packages.PackageRecords
 import com.kert0n.medapp.network.server.RawResponse
 import com.kert0n.medapp.queue.QueueStorage
 import com.kert0n.medapp.queue.QueuedCommand
@@ -42,16 +47,10 @@ import com.kert0n.medapp.queue.SyncOperation
 import com.kert0n.medapp.queue.SyncOperationStatus
 import com.kert0n.medapp.queue.Transactions
 import com.kert0n.medapp.queue.pack.PackageSnapshot
-import com.kert0n.medapp.queue.pack.PackageSyncState
-import com.kert0n.medapp.storage.course.CourseReallocation
 import com.kert0n.medapp.storage.course.CourseStorageRepository
 import com.kert0n.medapp.storage.medkit.MedKitStorageRepository
 import com.kert0n.medapp.storage.operation.OutstandingOperation
 import com.kert0n.medapp.storage.operation.SyncOperationStorageRepository
-import com.kert0n.medapp.storage.pack.PackageAdjustment
-import com.kert0n.medapp.storage.pack.PackageQuery
-import com.kert0n.medapp.storage.pack.PackageStorageRepository
-import com.kert0n.medapp.storage.pack.SnapshotApplied
 import com.kert0n.medapp.storage.value.VocabularyStorageRepository
 import java.time.Instant
 import java.time.LocalDate
@@ -69,7 +68,7 @@ import kotlinx.coroutines.flow.map
  * проверяются на ней (`PackageQueryDaoTest`), оценка очереди — свёртке команд (`PackageQueueState`),
  * откат половины записи — транзакции. Здесь отвечают за состав и за то, что запись видна.
  */
-class FakePackages(vararg packs: Package) : PackageStorageRepository {
+class FakePackages(vararg packs: Package) : PackageRecords, PackageReadings {
 
     private val stored = LinkedHashMap<Uuid, Package>()
 
@@ -98,7 +97,7 @@ class FakePackages(vararg packs: Package) : PackageStorageRepository {
     override fun list(query: PackageQuery, today: LocalDate): Flow<List<PackageProjection>> =
         changes.map { matching(query).map { it.seen() } }
 
-    override suspend fun add(pkg: Package, sync: PackageSyncState) = write(pkg)
+    override suspend fun add(pkg: Package) = write(pkg)
 
     override suspend fun describe(packageId: Uuid, facts: PackageFacts): Boolean =
         change(packageId) { it.describe(facts) }
@@ -123,12 +122,6 @@ class FakePackages(vararg packs: Package) : PackageStorageRepository {
 
     override suspend fun contentsOf(medKitId: Uuid): List<Package> =
         stored.values.filter { it.medKit.id == medKitId }
-
-    override suspend fun applySnapshot(snapshot: PackageSnapshot, observedAt: Instant): SnapshotApplied =
-        SnapshotApplied(pack = false, claims = false)
-
-    override fun observeSyncState(id: Uuid): Flow<PackageSyncState?> =
-        changes.map { stored[id]?.let { PackageSyncState(it.id) } }
 
     override suspend fun saveClaims(packageId: Uuid, claims: Claims?) = Unit
 

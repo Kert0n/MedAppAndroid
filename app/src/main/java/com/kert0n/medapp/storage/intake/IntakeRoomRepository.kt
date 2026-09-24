@@ -128,7 +128,7 @@ class IntakeRoomRepository @Inject constructor(
                 // курса двигает то, когда мы узнали (PLAN D5).
                 is PackageAfter.Ended -> packages.end(spent.ending, following.get(), courses, outcome.recordedAt)
                 // Расход не трогает обвязку доставки: версия и картина броней остаются прежними (E3).
-                is PackageAfter.Left -> packages.save(spent.pkg, it.pack.syncState())
+                is PackageAfter.Left -> packages.save(spent.pkg, keeping = it.pack)
             }
         }
         outcome.reallocation?.let { (course, expected) ->

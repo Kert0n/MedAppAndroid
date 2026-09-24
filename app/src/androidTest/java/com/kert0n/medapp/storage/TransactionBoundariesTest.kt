@@ -7,7 +7,10 @@ import com.kert0n.medapp.domain.intake.IntakeStatus
 import com.kert0n.medapp.domain.intake.UnplannedIntake
 import com.kert0n.medapp.domain.medkit.MedKit
 import com.kert0n.medapp.domain.value.doses
+import com.kert0n.medapp.feature.course.CourseReallocation
+import com.kert0n.medapp.feature.packages.PackageAdjustment
 import com.kert0n.medapp.fixture.COURSE
+import com.kert0n.medapp.fixture.FixturePackages
 import com.kert0n.medapp.fixture.HOME_KIT
 import com.kert0n.medapp.fixture.INTAKE
 import com.kert0n.medapp.fixture.LATER
@@ -42,7 +45,6 @@ import com.kert0n.medapp.queue.intake.IntakeSyncState
 import com.kert0n.medapp.queue.pack.PackageSyncCommand
 import com.kert0n.medapp.queue.pack.PackageSyncState
 import com.kert0n.medapp.storage.course.ActivePackageAssignmentStorageEntity
-import com.kert0n.medapp.storage.course.CourseReallocation
 import com.kert0n.medapp.storage.course.CourseRoomRepository
 import com.kert0n.medapp.storage.course.CourseStorageEntity
 import com.kert0n.medapp.storage.course.toStorageEntity as toCourseStorageEntity
@@ -50,7 +52,7 @@ import com.kert0n.medapp.storage.database.MedAppDatabase
 import com.kert0n.medapp.storage.intake.IntakeOutcome
 import com.kert0n.medapp.storage.intake.IntakeRoomRepository
 import com.kert0n.medapp.storage.medkit.toStorageEntity as toMedKitStorageEntity
-import com.kert0n.medapp.storage.pack.PackageAdjustment
+import com.kert0n.medapp.storage.operation.syncState
 import com.kert0n.medapp.storage.pack.PackageRoomRepository
 import java.time.Instant
 import kotlin.uuid.Uuid
@@ -71,7 +73,7 @@ import org.junit.Test
 class TransactionBoundariesTest {
 
     private lateinit var database: MedAppDatabase
-    private lateinit var packages: PackageRoomRepository
+    private lateinit var packages: FixturePackages
     private lateinit var courses: CourseRoomRepository
     private lateinit var intakes: IntakeRoomRepository
     private lateinit var queue: QueueService

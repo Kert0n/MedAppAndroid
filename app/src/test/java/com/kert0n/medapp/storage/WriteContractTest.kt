@@ -1,9 +1,9 @@
 package com.kert0n.medapp.storage
 
+import com.kert0n.medapp.feature.packages.PackageRecords
 import com.kert0n.medapp.storage.course.CourseStorageRepository
 import com.kert0n.medapp.storage.intake.IntakeStorageRepository
 import com.kert0n.medapp.storage.medkit.MedKitStorageRepository
-import com.kert0n.medapp.storage.pack.PackageStorageRepository
 import java.io.File
 import java.lang.reflect.Method
 import org.junit.Assert.assertEquals
@@ -73,21 +73,19 @@ class WriteContractTest {
 
     private val contract: Map<String, Clause> = mapOf(
         // Лекарство
-        "PackageStorageRepository.observe" to (Shape.READ by "(Uuid): Flow<PackageProjection>"),
-        "PackageStorageRepository.find" to (Shape.READ by "(Uuid): Package"),
-        "PackageStorageRepository.projection" to (Shape.READ by "(Uuid): PackageProjection"),
-        "PackageStorageRepository.list" to (Shape.READ by "(PackageQuery, LocalDate): Flow<List<PackageProjection>>"),
-        "PackageStorageRepository.contentsOf" to (Shape.READ by "(Uuid): List<Package>"),
-        "PackageStorageRepository.observeSyncState" to (Shape.READ by "(Uuid): Flow<PackageSyncState>"),
-        "PackageStorageRepository.answersToServer" to (Shape.READ by "(Uuid): Boolean"),
-        "PackageStorageRepository.availabilityFor" to (Shape.READ by "(Course): Availability"),
-        "PackageStorageRepository.add" to (Shape.CREATION by "(Package, PackageSyncState): Unit"),
-        "PackageStorageRepository.describe" to (Shape.NAMED_FIELDS by "(Uuid, PackageFacts): Boolean"),
-        "PackageStorageRepository.saveClaims" to (Shape.NAMED_FIELDS by "(Uuid, Claims): Unit"),
-        "PackageStorageRepository.mark" to (Shape.NAMED_FIELDS by "(Uuid, PackageStatus, Uuid): Boolean"),
-        "PackageStorageRepository.end" to (Shape.ACTION by "(PackageEnding, Instant): Boolean"),
-        "PackageStorageRepository.adjust" to (Shape.ACTION by "(PackageAdjustment, CourseReallocation, Instant): Boolean"),
-        "PackageStorageRepository.applySnapshot" to (Shape.SNAPSHOT by "(PackageSnapshot, Instant): SnapshotApplied"),
+        "PackageReadings.observe" to (Shape.READ by "(Uuid): Flow<PackageProjection>"),
+        "PackageRecords.find" to (Shape.READ by "(Uuid): Package"),
+        "PackageRecords.projection" to (Shape.READ by "(Uuid): PackageProjection"),
+        "PackageReadings.list" to (Shape.READ by "(PackageQuery, LocalDate): Flow<List<PackageProjection>>"),
+        "PackageRecords.contentsOf" to (Shape.READ by "(Uuid): List<Package>"),
+        "PackageRecords.answersToServer" to (Shape.READ by "(Uuid): Boolean"),
+        "PackageRecords.availabilityFor" to (Shape.READ by "(Course): Availability"),
+        "PackageRecords.add" to (Shape.CREATION by "(Package): Unit"),
+        "PackageRecords.describe" to (Shape.NAMED_FIELDS by "(Uuid, PackageFacts): Boolean"),
+        "PackageRecords.saveClaims" to (Shape.NAMED_FIELDS by "(Uuid, Claims): Unit"),
+        "PackageRecords.mark" to (Shape.NAMED_FIELDS by "(Uuid, PackageStatus, Uuid): Boolean"),
+        "PackageRecords.end" to (Shape.ACTION by "(PackageEnding, Instant): Boolean"),
+        "PackageRecords.adjust" to (Shape.ACTION by "(PackageAdjustment, CourseReallocation, Instant): Boolean"),
         // Отчёты
         "ReportStorageRepository.observeSpending" to (Shape.READ by "(SpendingPeriod, ZoneId): Flow<Spending>"),
         "ReportStorageRepository.observeFutureSpending" to (Shape.READ by "(SpendingHorizon): Flow<FutureSpending>"),
@@ -197,7 +195,8 @@ class WriteContractTest {
     ).firstOrNull { it.isDirectory } ?: error("исходники не найдены: проверка прошла бы впустую")
 
     private val ports = listOf(
-        PackageStorageRepository::class.java,
+        PackageRecords::class.java,
+        com.kert0n.medapp.feature.packages.PackageReadings::class.java,
         CourseStorageRepository::class.java,
         MedKitStorageRepository::class.java,
         IntakeStorageRepository::class.java,

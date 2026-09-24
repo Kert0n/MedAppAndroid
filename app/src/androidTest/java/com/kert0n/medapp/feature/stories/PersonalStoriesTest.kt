@@ -3,7 +3,6 @@ package com.kert0n.medapp.feature.stories
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import com.kert0n.medapp.domain.intake.IntakeProjection
 import com.kert0n.medapp.domain.intake.IntakeStatus
-import com.kert0n.medapp.feature.intake.IntakeWarning
 import com.kert0n.medapp.domain.notification.NoticeDelivery
 import com.kert0n.medapp.domain.notification.NotificationKey
 import com.kert0n.medapp.domain.notification.NotificationKind
@@ -15,9 +14,11 @@ import com.kert0n.medapp.domain.report.SpendingPeriod
 import com.kert0n.medapp.domain.value.Doses
 import com.kert0n.medapp.domain.value.Money
 import com.kert0n.medapp.feature.course.CourseDrafting
+import com.kert0n.medapp.feature.intake.IntakeWarning
 import com.kert0n.medapp.feature.intake.UnplannedIntakeRecording
 import com.kert0n.medapp.feature.packages.PackageAdding
 import com.kert0n.medapp.feature.packages.PackageAdjusting
+import com.kert0n.medapp.feature.packages.PackageQuery
 import com.kert0n.medapp.fixture.HOME_KIT
 import com.kert0n.medapp.fixture.Mechanisms
 import com.kert0n.medapp.fixture.Scenarios
@@ -34,7 +35,6 @@ import com.kert0n.medapp.fixture.reportRepository
 import com.kert0n.medapp.fixture.schedule
 import com.kert0n.medapp.fixture.tablets
 import com.kert0n.medapp.storage.database.MedAppDatabase
-import com.kert0n.medapp.storage.pack.PackageQuery
 import java.math.BigDecimal
 import java.time.Instant
 import java.time.LocalDate

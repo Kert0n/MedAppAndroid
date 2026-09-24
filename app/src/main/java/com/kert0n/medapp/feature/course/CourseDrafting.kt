@@ -9,9 +9,9 @@ import com.kert0n.medapp.domain.value.DosageForm
 import com.kert0n.medapp.domain.value.Dose
 import com.kert0n.medapp.domain.value.Doses
 import com.kert0n.medapp.domain.value.doses
+import com.kert0n.medapp.feature.packages.PackageRecords
 import com.kert0n.medapp.queue.Transactions
 import com.kert0n.medapp.storage.course.CourseStorageRepository
-import com.kert0n.medapp.storage.pack.PackageStorageRepository
 import java.time.Clock
 import javax.inject.Inject
 import kotlin.uuid.Uuid
@@ -29,7 +29,7 @@ import kotlin.uuid.Uuid
  */
 class CourseDrafting @Inject constructor(
     private val courses: CourseStorageRepository,
-    private val packages: PackageStorageRepository,
+    private val packages: PackageRecords,
     private val transactions: Transactions,
     private val clock: Clock
 ) {

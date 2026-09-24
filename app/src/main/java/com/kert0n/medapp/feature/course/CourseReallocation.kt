@@ -1,4 +1,4 @@
-package com.kert0n.medapp.storage.course
+package com.kert0n.medapp.feature.course
 
 import com.kert0n.medapp.domain.course.Course
 import com.kert0n.medapp.domain.course.Revision

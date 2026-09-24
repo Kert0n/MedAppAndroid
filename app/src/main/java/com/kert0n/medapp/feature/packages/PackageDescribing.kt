@@ -3,12 +3,12 @@ package com.kert0n.medapp.feature.packages
 import com.kert0n.medapp.domain.course.PackageFollowing
 import com.kert0n.medapp.domain.pack.PackageFacts
 import com.kert0n.medapp.domain.pack.PackageStatus
+import com.kert0n.medapp.feature.packages.PackageRecords
 import com.kert0n.medapp.feature.readThisTransaction
 import com.kert0n.medapp.queue.QueueService
 import com.kert0n.medapp.queue.QueuedCommand
 import com.kert0n.medapp.queue.Transactions
 import com.kert0n.medapp.queue.pack.PackageSyncCommand
-import com.kert0n.medapp.storage.pack.PackageStorageRepository
 import java.time.Clock
 import javax.inject.Inject
 import kotlin.uuid.Uuid
@@ -30,7 +30,7 @@ import kotlin.uuid.Uuid
  * серверная форма выдавалась бы за очищенную.
  */
 class PackageDescribing @Inject constructor(
-    private val packages: PackageStorageRepository,
+    private val packages: PackageRecords,
     private val following: PackageFollowing,
     private val queue: QueueService,
     private val transactions: Transactions,

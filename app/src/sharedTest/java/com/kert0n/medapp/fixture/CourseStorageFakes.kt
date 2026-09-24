@@ -12,7 +12,7 @@ import com.kert0n.medapp.domain.course.CoverageReduction
 import com.kert0n.medapp.domain.course.Revision
 import com.kert0n.medapp.domain.intake.CourseIntake
 import com.kert0n.medapp.domain.report.CourseInProgress
-import com.kert0n.medapp.storage.course.CourseReallocation
+import com.kert0n.medapp.feature.course.CourseReallocation
 import com.kert0n.medapp.storage.course.CourseStorageRepository
 import java.time.Instant
 import kotlin.uuid.Uuid

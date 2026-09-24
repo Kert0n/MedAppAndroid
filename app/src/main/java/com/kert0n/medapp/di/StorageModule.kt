@@ -3,6 +3,8 @@ package com.kert0n.medapp.di
 import com.kert0n.medapp.domain.course.PackageFollowing
 import com.kert0n.medapp.domain.value.VocabularyStore
 import com.kert0n.medapp.feature.course.CourseFollowing
+import com.kert0n.medapp.feature.packages.PackageReadings
+import com.kert0n.medapp.feature.packages.PackageRecords
 import com.kert0n.medapp.queue.QueueBacklog
 import com.kert0n.medapp.queue.QueueStorage
 import com.kert0n.medapp.queue.SnapshotStorage
@@ -21,7 +23,6 @@ import com.kert0n.medapp.storage.operation.QueueRoomStorage
 import com.kert0n.medapp.storage.operation.SyncOperationRoomRepository
 import com.kert0n.medapp.storage.operation.SyncOperationStorageRepository
 import com.kert0n.medapp.storage.pack.PackageRoomRepository
-import com.kert0n.medapp.storage.pack.PackageStorageRepository
 import com.kert0n.medapp.storage.report.ReportRoomRepository
 import com.kert0n.medapp.storage.report.ReportStorageRepository
 import com.kert0n.medapp.storage.snapshot.SnapshotRoomStorage
@@ -49,7 +50,10 @@ abstract class StorageModule {
 
     @Binds
     @Singleton
-    abstract fun packages(implementation: PackageRoomRepository): PackageStorageRepository
+    abstract fun packages(implementation: PackageRoomRepository): PackageRecords
+
+    @Binds
+    abstract fun packageReadings(implementation: PackageRoomRepository): PackageReadings
 
     @Binds
     @Singleton

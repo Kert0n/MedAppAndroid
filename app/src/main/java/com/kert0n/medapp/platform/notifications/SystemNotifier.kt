@@ -18,11 +18,11 @@ import com.kert0n.medapp.domain.notification.NotificationReadiness
 import com.kert0n.medapp.domain.notification.NotificationTarget
 import com.kert0n.medapp.domain.notification.Notifier
 import com.kert0n.medapp.domain.notification.Reminder
+import com.kert0n.medapp.feature.packages.PackageReadings
 import com.kert0n.medapp.platform.notifications.NotificationChannels.Companion.id
+import com.kert0n.medapp.platform.settings.AppLanguages
 import com.kert0n.medapp.storage.course.CourseStorageRepository
 import com.kert0n.medapp.storage.intake.IntakeStorageRepository
-import com.kert0n.medapp.storage.pack.PackageStorageRepository
-import com.kert0n.medapp.platform.settings.AppLanguages
 import dagger.hilt.android.qualifiers.ApplicationContext
 import java.time.Clock
 import java.time.LocalDate
@@ -50,7 +50,7 @@ class SystemNotifier @Inject constructor(
     @ApplicationContext private val context: Context,
     private val intakes: IntakeStorageRepository,
     private val courses: CourseStorageRepository,
-    private val packages: PackageStorageRepository,
+    private val packages: PackageReadings,
     private val readiness: NotificationReadiness,
     private val languages: AppLanguages,
     private val clock: Clock

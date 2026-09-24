@@ -9,8 +9,6 @@ import com.kert0n.medapp.domain.pack.Package
 import com.kert0n.medapp.domain.pack.PackageSharedFacts
 import com.kert0n.medapp.domain.pack.PackageStatus
 import com.kert0n.medapp.domain.value.Vocabulary
-import com.kert0n.medapp.queue.ResourceVersion
-import com.kert0n.medapp.queue.pack.PackageSyncState
 import com.kert0n.medapp.storage.medkit.MedKitStorageEntity
 import com.kert0n.medapp.storage.value.DosageFormStorageEntity
 import com.kert0n.medapp.storage.value.QuantityUnitStorageEntity
@@ -27,8 +25,9 @@ import kotlin.uuid.Uuid
  * лежат отдельной строкой, иначе срок годности и цена стирались бы при каждом обновлении
  * (PLAN F1).
  *
- * `version`, `claims_version` и `synced_at` — обвязка доставки: это `PackageSyncState` сетевого
- * слоя, а не свойство пачки.
+ * `version`, `claims_version` и `synced_at` — знание очереди о сервере, а не свойство пачки:
+ * колонки лежат здесь, один к одному со строкой коробки, а понимает их журнал
+ * (`storage/operation`) — пачка их только переносит, не толкуя.
  *
  * Две производные колонки существуют ради одного запроса списка (PLAN H4). `quantity_sort` —
  * то же число, дополненное нулями до предельной ширины величины, поэтому порядок по остатку
@@ -112,18 +111,14 @@ class PackageStorageEntity(
         country = country,
         description = description
     )
-
-    fun syncState(): PackageSyncState = PackageSyncState(
-        packageId = id,
-        version = version?.let(::ResourceVersion),
-        claimsVersion = claimsVersion?.let(::ResourceVersion),
-        syncedAt = syncedAt
-    )
 }
 
-fun Package.toStorageEntity(sync: PackageSyncState = PackageSyncState(id)): PackageStorageEntity {
-    require(sync.packageId == id) { "обвязка синхронизации принадлежит своей пачке" }
-    return PackageStorageEntity(
+/**
+ * Пачка в строку. Знание о сервере приходит готовыми колонками: у своей пачки его нет, у
+ * известной серверу его переносят из прочитанной строки — пачка его не толкует.
+ */
+fun Package.toStorageEntity(version: Long? = null, claimsVersion: Long? = null, syncedAt: Instant? = null): PackageStorageEntity =
+    PackageStorageEntity(
         id = id,
         medKitId = medKit.id,
         name = facts.name,
@@ -136,10 +131,9 @@ fun Package.toStorageEntity(sync: PackageSyncState = PackageSyncState(id)): Pack
         manufacturer = facts.manufacturer,
         country = facts.country,
         description = facts.description,
-        version = sync.version?.number,
-        claimsVersion = sync.claimsVersion?.number,
-        syncedAt = sync.syncedAt,
+        version = version,
+        claimsVersion = claimsVersion,
+        syncedAt = syncedAt,
         status = status,
         decidedBy = decidedBy
     )
-}
