@@ -60,8 +60,4 @@ class NotificationActionReceiver : BroadcastReceiver() {
             }
         }
     }
-
-    companion object {
-        private const val TAG = "MedAppNotifications"
-    }
 }

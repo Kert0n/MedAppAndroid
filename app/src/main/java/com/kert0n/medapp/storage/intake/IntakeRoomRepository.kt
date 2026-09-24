@@ -71,7 +71,7 @@ class IntakeRoomRepository @Inject constructor(
     override suspend fun find(id: Uuid): Intake? = intakes.find(id)?.toDomain(vocabulary.snapshot())
 
     override suspend fun save(recorded: RecordedIntake) =
-        intakes.upsert(recorded.intake.toStorageEntity(recorded.sync))
+        intakes.upsert(recorded.toStorageEntity())
 
     override suspend fun materialise(planned: List<CourseIntake>): List<Uuid> =
         intakes.insertPlannedIfMissing(planned.map { it.toStorageEntity() })
@@ -106,7 +106,7 @@ class IntakeRoomRepository @Inject constructor(
             null
         }
         val applied = if (intake is UnplannedIntake) {
-            intakes.insertIfMissing(intake.toStorageEntity(outcome.sync)) != -1L
+            intakes.insertIfMissing(outcome.recorded.toStorageEntity()) != -1L
         } else {
             val taken = intake.taken
             intakes.answerIfStatusIs(

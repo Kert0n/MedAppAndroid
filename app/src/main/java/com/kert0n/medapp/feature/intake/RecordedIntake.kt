@@ -17,7 +17,7 @@ class RecordedIntake(
     val sync: IntakeSyncState = IntakeSyncState(intake.id)
 ) {
     init {
-        require(sync.intakeId == intake.id) { "учёт расхода принадлежит своему приёму" }
+        sync.requireOf(intake.id)
         require(
             intake.status != IntakeStatus.TAKEN ||
                 sync.accounting != IntakeAccounting.NOT_APPLICABLE

@@ -1,6 +1,7 @@
 package com.kert0n.medapp.storage.operation
 
 import com.kert0n.medapp.domain.intake.Intake
+import com.kert0n.medapp.feature.intake.RecordedIntake
 import com.kert0n.medapp.queue.intake.IntakeAccounting
 import com.kert0n.medapp.queue.intake.IntakeSyncState
 import com.kert0n.medapp.storage.intake.IntakeStorageEntity
@@ -19,9 +20,12 @@ fun IntakeStorageEntity.syncState(): IntakeSyncState = IntakeSyncState(
     operationId = operationId
 )
 
+/** Приём в строку вместе с учётом его расхода; пару держит [RecordedIntake]. */
+fun RecordedIntake.toStorageEntity(): IntakeStorageEntity = intake.toStorageEntity(sync)
+
 /** Приём в строку вместе с учётом его расхода; без учёта — расхода нет. */
 fun Intake.toStorageEntity(sync: IntakeSyncState = IntakeSyncState(id)): IntakeStorageEntity {
-    require(sync.intakeId == id) { "учёт расхода принадлежит своему приёму" }
+    sync.requireOf(id)
     return toStorageEntity(sync.accountingColumn(), sync.operationId)
 }
 

@@ -34,4 +34,5 @@ internal fun BroadcastReceiver.passHoldingTheProcess(outbox: ReminderOutbox, fai
     }
 }
 
-private const val TAG = "MedAppNotifications"
+/** Метка журнала входов шторки и будильника. */
+internal const val TAG = "MedAppNotifications"
