@@ -139,11 +139,7 @@ class MedKit(
     enum class ReceivingRefusal { SAME_SHELF, BUSY }
 
     /** Что мешает сделать полку общей: о ней уже принимается решение, или она и так общая (PLAN E5). */
-    fun refusesPublication(): PublicationRefusal? = when {
-        !decidable -> PublicationRefusal.BUSY
-        publication == Publication.PUBLISHED -> PublicationRefusal.ALREADY_SHARED
-        else -> null
-    }
+    fun refusesPublication(): PublicationRefusal? = refusesPublication(publication, status)
 
     /** Оставить остальным можно только общую полку: у местной остальных нет (PLAN E6). */
     val mayBeLeftToOthers: Boolean get() = publication == Publication.PUBLISHED
@@ -228,6 +224,13 @@ class MedKit(
          * решению о публикации. Вопрос очереди, а не учёта: до ответа на публикацию к серверу едет
          * только то, чем полка и её содержимое станут ему известны (PLAN E5).
          */
+        /** Правило публикации одним местом — и для полки, и для её проекции на экране. */
+        fun refusesPublication(publication: Publication, status: MedKitStatus): PublicationRefusal? = when {
+            !status.allowsDecision -> PublicationRefusal.BUSY
+            publication == Publication.PUBLISHED -> PublicationRefusal.ALREADY_SHARED
+            else -> null
+        }
+
         fun acceptsCommands(publication: Publication, status: MedKitStatus): Boolean =
             publication == Publication.PUBLISHED || status == MedKitStatus.PUBLISHING
     }
