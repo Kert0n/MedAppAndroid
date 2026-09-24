@@ -1,6 +1,6 @@
 package com.kert0n.medapp
 
-import com.kert0n.medapp.platform.settings.AppLanguage
+import com.kert0n.medapp.feature.settings.AppLanguage
 import java.io.File
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue

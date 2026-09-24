@@ -1,7 +1,7 @@
 package com.kert0n.medapp.presentation.settings
 
+import com.kert0n.medapp.feature.settings.AppLanguage
 import com.kert0n.medapp.fixture.FakeAppLanguages
-import com.kert0n.medapp.platform.settings.AppLanguage
 import org.junit.Assert.assertEquals
 import org.junit.Test
 

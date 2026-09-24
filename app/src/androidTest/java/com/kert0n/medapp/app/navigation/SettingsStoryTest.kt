@@ -1,6 +1,5 @@
 package com.kert0n.medapp.app.navigation
 
-import com.kert0n.medapp.fixture.pressAfterTyping
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.assertIsSelected
 import androidx.compose.ui.test.hasText
@@ -13,10 +12,11 @@ import androidx.compose.ui.test.performTextReplacement
 import androidx.lifecycle.Lifecycle
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import com.kert0n.medapp.HiltTestActivity
+import com.kert0n.medapp.feature.settings.AppLanguage
 import com.kert0n.medapp.feature.settings.SettingsStore
 import com.kert0n.medapp.fixture.TestLanguages
 import com.kert0n.medapp.fixture.TestPermissions
-import com.kert0n.medapp.platform.settings.AppLanguage
+import com.kert0n.medapp.fixture.pressAfterTyping
 import com.kert0n.medapp.ui.theme.MedAppTheme
 import dagger.hilt.android.testing.HiltAndroidRule
 import dagger.hilt.android.testing.HiltAndroidTest

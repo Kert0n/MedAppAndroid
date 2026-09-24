@@ -1,7 +1,6 @@
 package com.kert0n.medapp.presentation.value
 
 import com.kert0n.medapp.domain.pack.ExpiryDate
-
 import java.time.LocalDate
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue

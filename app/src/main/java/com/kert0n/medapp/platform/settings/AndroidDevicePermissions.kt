@@ -6,6 +6,9 @@ import android.content.pm.PackageManager
 import androidx.core.content.ContextCompat
 import com.kert0n.medapp.domain.notification.NotificationReadiness
 import com.kert0n.medapp.domain.notification.ReminderAlarms
+import com.kert0n.medapp.feature.settings.CameraAccess
+import com.kert0n.medapp.feature.settings.DevicePermissions
+import com.kert0n.medapp.feature.settings.PermissionStates
 import dagger.hilt.android.qualifiers.ApplicationContext
 import javax.inject.Inject
 

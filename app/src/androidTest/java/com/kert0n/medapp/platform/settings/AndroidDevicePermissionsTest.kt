@@ -1,16 +1,17 @@
 package com.kert0n.medapp.platform.settings
 
-import com.kert0n.medapp.fixture.FakeAppLanguages
 import android.Manifest
 import android.content.ContextWrapper
 import android.content.pm.PackageManager
 import androidx.core.app.NotificationManagerCompat
 import androidx.core.content.ContextCompat
 import androidx.test.platform.app.InstrumentationRegistry
+import com.kert0n.medapp.feature.settings.CameraAccess
+import com.kert0n.medapp.fixture.FakeAppLanguages
 import com.kert0n.medapp.fixture.FakeReminders
-import org.junit.Assume.assumeTrue
 import com.kert0n.medapp.platform.notifications.NotificationChannels
 import org.junit.Assert.assertEquals
+import org.junit.Assume.assumeTrue
 import org.junit.Test
 
 /**

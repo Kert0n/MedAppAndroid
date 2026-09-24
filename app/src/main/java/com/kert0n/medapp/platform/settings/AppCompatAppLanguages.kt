@@ -6,6 +6,8 @@ import android.os.Build
 import android.os.LocaleList
 import androidx.appcompat.app.AppCompatDelegate
 import androidx.core.os.LocaleListCompat
+import com.kert0n.medapp.feature.settings.AppLanguage
+import com.kert0n.medapp.feature.settings.AppLanguages
 import javax.inject.Inject
 
 /**

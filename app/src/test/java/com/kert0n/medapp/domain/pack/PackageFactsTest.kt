@@ -1,15 +1,13 @@
 package com.kert0n.medapp.domain.pack
 
 import com.kert0n.medapp.domain.value.Money
-
 import com.kert0n.medapp.fixture.TABLET_FORM
+import com.kert0n.medapp.fixture.dose
 import com.kert0n.medapp.fixture.expiry
 import com.kert0n.medapp.fixture.factsOf
-import com.kert0n.medapp.fixture.withShared
 import com.kert0n.medapp.fixture.pack
-import com.kert0n.medapp.fixture.dose
 import com.kert0n.medapp.fixture.tablets
-
+import com.kert0n.medapp.fixture.withShared
 import java.math.BigDecimal
 import java.time.LocalDate
 import org.junit.Assert.assertEquals

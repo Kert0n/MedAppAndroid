@@ -1,7 +1,6 @@
 package com.kert0n.medapp.presentation.value
 
 import com.kert0n.medapp.domain.value.Money
-
 import java.math.BigDecimal
 import java.util.Currency
 import java.util.concurrent.Callable

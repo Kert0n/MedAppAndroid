@@ -22,8 +22,8 @@ import com.kert0n.medapp.feature.course.CourseReadings
 import com.kert0n.medapp.feature.course.CourseRecords
 import com.kert0n.medapp.feature.intake.IntakeRecords
 import com.kert0n.medapp.feature.packages.PackageReadings
+import com.kert0n.medapp.feature.settings.AppLanguages
 import com.kert0n.medapp.platform.notifications.NotificationChannels.Companion.id
-import com.kert0n.medapp.platform.settings.AppLanguages
 import dagger.hilt.android.qualifiers.ApplicationContext
 import java.time.Clock
 import java.time.LocalDate

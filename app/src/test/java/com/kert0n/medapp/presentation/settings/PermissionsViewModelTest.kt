@@ -3,9 +3,9 @@ package com.kert0n.medapp.presentation.settings
 import com.kert0n.medapp.domain.notification.NotificationChannel
 import com.kert0n.medapp.domain.notification.NotificationReadiness
 import com.kert0n.medapp.domain.notification.Readiness
-import com.kert0n.medapp.platform.settings.CameraAccess
-import com.kert0n.medapp.platform.settings.DevicePermissions
-import com.kert0n.medapp.platform.settings.PermissionStates
+import com.kert0n.medapp.feature.settings.CameraAccess
+import com.kert0n.medapp.feature.settings.DevicePermissions
+import com.kert0n.medapp.feature.settings.PermissionStates
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue

@@ -2,17 +2,15 @@ package com.kert0n.medapp.domain.pack
 
 import com.kert0n.medapp.domain.medkit.MedKit
 import com.kert0n.medapp.domain.value.Quantity
-
 import com.kert0n.medapp.fixture.HOME_KIT
 import com.kert0n.medapp.fixture.PACK
 import com.kert0n.medapp.fixture.TABLETS
 import com.kert0n.medapp.fixture.TABLET_FORM
-import com.kert0n.medapp.fixture.medKit
-import com.kert0n.medapp.fixture.pack
 import com.kert0n.medapp.fixture.dose
 import com.kert0n.medapp.fixture.left
+import com.kert0n.medapp.fixture.medKit
+import com.kert0n.medapp.fixture.pack
 import com.kert0n.medapp.fixture.tablets
-
 import java.time.Instant
 import kotlin.uuid.Uuid
 import org.junit.Assert.assertEquals

@@ -2,9 +2,9 @@ package com.kert0n.medapp.presentation.scan
 
 import com.kert0n.medapp.domain.scan.CodeFormat
 import com.kert0n.medapp.domain.scan.ScannedCode
-import com.kert0n.medapp.platform.settings.CameraAccess
-import com.kert0n.medapp.platform.settings.DevicePermissions
-import com.kert0n.medapp.platform.settings.PermissionStates
+import com.kert0n.medapp.feature.settings.CameraAccess
+import com.kert0n.medapp.feature.settings.DevicePermissions
+import com.kert0n.medapp.feature.settings.PermissionStates
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNull

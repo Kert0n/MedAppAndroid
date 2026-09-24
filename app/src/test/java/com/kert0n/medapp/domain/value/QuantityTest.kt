@@ -1,10 +1,9 @@
 package com.kert0n.medapp.domain.value
 
-import com.kert0n.medapp.fixture.TABLETS
 import com.kert0n.medapp.fixture.MILLILITRES
+import com.kert0n.medapp.fixture.TABLETS
 import com.kert0n.medapp.fixture.millilitres
 import com.kert0n.medapp.fixture.tablets
-
 import java.math.BigDecimal
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse

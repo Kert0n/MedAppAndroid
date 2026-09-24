@@ -1,4 +1,4 @@
-package com.kert0n.medapp.platform.settings
+package com.kert0n.medapp.feature.settings
 
 /**
  * Что система разрешила приложению (PLAN H3 №27). Не наши данные, а её состояние: читается, а

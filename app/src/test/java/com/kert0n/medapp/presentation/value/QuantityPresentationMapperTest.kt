@@ -8,7 +8,6 @@ import com.kert0n.medapp.fixture.TABLETS_ID
 import com.kert0n.medapp.fixture.VOCABULARY
 import com.kert0n.medapp.fixture.tablets
 import kotlin.uuid.Uuid
-
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
 import org.junit.Test

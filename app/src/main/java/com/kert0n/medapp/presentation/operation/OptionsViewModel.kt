@@ -4,8 +4,8 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.kert0n.medapp.domain.notification.NotificationReadiness
 import com.kert0n.medapp.feature.operation.OperationReadings
-import com.kert0n.medapp.platform.settings.AppLanguages
-import com.kert0n.medapp.platform.settings.DevicePermissions
+import com.kert0n.medapp.feature.settings.AppLanguages
+import com.kert0n.medapp.feature.settings.DevicePermissions
 import com.kert0n.medapp.presentation.ScreenReading
 import com.kert0n.medapp.presentation.settings.LanguageChoice
 import com.kert0n.medapp.presentation.settings.permissionsNow

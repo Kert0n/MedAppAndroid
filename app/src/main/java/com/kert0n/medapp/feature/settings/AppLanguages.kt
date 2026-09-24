@@ -1,4 +1,4 @@
-package com.kert0n.medapp.platform.settings
+package com.kert0n.medapp.feature.settings
 
 import android.content.Context
 
