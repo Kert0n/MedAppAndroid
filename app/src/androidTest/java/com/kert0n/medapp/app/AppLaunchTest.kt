@@ -5,7 +5,7 @@ import androidx.test.ext.junit.runners.AndroidJUnit4
 import androidx.test.platform.app.InstrumentationRegistry
 import androidx.hilt.work.HiltWorkerFactory
 import androidx.work.testing.TestListenableWorkerBuilder
-import com.kert0n.medapp.platform.background.SyncWorker
+import com.kert0n.medapp.app.background.SyncWorker
 import dagger.hilt.android.testing.HiltAndroidRule
 import dagger.hilt.android.testing.HiltAndroidTest
 import kotlinx.coroutines.CoroutineDispatcher

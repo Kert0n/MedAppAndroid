@@ -1,4 +1,4 @@
-package com.kert0n.medapp.platform.connectivity
+package com.kert0n.medapp.app.connectivity
 
 import androidx.lifecycle.DefaultLifecycleObserver
 import androidx.lifecycle.LifecycleOwner

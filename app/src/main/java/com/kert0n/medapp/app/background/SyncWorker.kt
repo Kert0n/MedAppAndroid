@@ -1,4 +1,4 @@
-package com.kert0n.medapp.platform.background
+package com.kert0n.medapp.app.background
 
 import android.content.Context
 import androidx.hilt.work.HiltWorker
@@ -7,6 +7,7 @@ import androidx.work.WorkerParameters
 import com.kert0n.medapp.feature.course.CourseUpkeep
 import com.kert0n.medapp.feature.delivery.Synchronization
 import com.kert0n.medapp.feature.settings.SettingsStore
+import com.kert0n.medapp.platform.background.WorkManagerSyncSchedule
 import dagger.assisted.Assisted
 import dagger.assisted.AssistedInject
 import java.time.Clock
@@ -34,7 +35,7 @@ class SyncWorker @AssistedInject constructor(
 ) : CoroutineWorker(context, parameters) {
 
     override suspend fun doWork(): Result {
-        val comeBack = inputData.getBoolean(COME_BACK, false)
+        val comeBack = inputData.getBoolean(WorkManagerSyncSchedule.COME_BACK_INPUT, false)
         // Календарь приводится в порядок при любом заходе: это локально, и недавний снимок его не
         // заменяет — день мог кончиться с тех пор (PLAN F4).
         upkeep.keepUp()
@@ -47,9 +48,5 @@ class SyncWorker @AssistedInject constructor(
     private suspend fun refreshedRecently(): Boolean {
         val refreshedAt = synchronization.state.value.refreshedAt ?: return false
         return Duration.between(refreshedAt, clock.instant()) < settings.current().syncInterval.duration.dividedBy(2)
-    }
-
-    companion object {
-        const val COME_BACK = "come_back"
     }
 }

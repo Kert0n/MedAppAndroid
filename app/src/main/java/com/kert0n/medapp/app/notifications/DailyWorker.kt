@@ -1,4 +1,4 @@
-package com.kert0n.medapp.platform.notifications
+package com.kert0n.medapp.app.notifications
 
 import android.content.Context
 import androidx.hilt.work.HiltWorker

@@ -1,15 +1,16 @@
-package com.kert0n.medapp.platform.notifications
+package com.kert0n.medapp.app.notifications
 
-import com.kert0n.medapp.domain.attempt
 import android.content.BroadcastReceiver
 import android.content.Context
 import android.content.Intent
 import android.util.Log
+import com.kert0n.medapp.domain.attempt
 import com.kert0n.medapp.domain.notification.NotificationAction
 import com.kert0n.medapp.domain.notification.NotificationKey
 import com.kert0n.medapp.domain.notification.NotificationKind
 import com.kert0n.medapp.domain.notification.Notifier
 import com.kert0n.medapp.feature.notification.ReminderAnswering
+import com.kert0n.medapp.platform.notifications.SystemNotifier
 import dagger.hilt.android.AndroidEntryPoint
 import javax.inject.Inject
 import kotlin.uuid.Uuid
@@ -39,7 +40,7 @@ class NotificationActionReceiver : BroadcastReceiver() {
 
     override fun onReceive(context: Context, intent: Intent) {
         val action = intent.action?.let { name -> NotificationAction.entries.firstOrNull { it.name == name } } ?: return
-        val intakeId = intent.getStringExtra(EXTRA_INTAKE_ID)?.let { attempt { Uuid.parse(it) }.getOrNull() } ?: return
+        val intakeId = intent.getStringExtra(SystemNotifier.EXTRA_INTAKE_ID)?.let { attempt { Uuid.parse(it) }.getOrNull() } ?: return
         val pending = goAsync()
         CoroutineScope(SupervisorJob() + Dispatchers.IO).launch {
             try {
@@ -62,6 +63,5 @@ class NotificationActionReceiver : BroadcastReceiver() {
 
     companion object {
         private const val TAG = "MedAppNotifications"
-        const val EXTRA_INTAKE_ID = "intake_id"
     }
 }

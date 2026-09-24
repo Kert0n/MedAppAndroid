@@ -1,6 +1,5 @@
 package com.kert0n.medapp.platform.notifications
 
-import com.kert0n.medapp.fixture.FakeAppLanguages
 import android.Manifest
 import android.app.NotificationManager
 import android.content.Context
@@ -8,12 +7,16 @@ import android.content.pm.PackageManager
 import androidx.core.content.ContextCompat
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import androidx.test.platform.app.InstrumentationRegistry
+import com.kert0n.medapp.app.notifications.NotificationActionReceiver
+import com.kert0n.medapp.di.EntriesModule
 import com.kert0n.medapp.domain.notification.NoticeDelivery
 import com.kert0n.medapp.domain.notification.NotificationChannel
 import com.kert0n.medapp.domain.notification.NotificationKey
 import com.kert0n.medapp.domain.notification.NotificationKind
 import com.kert0n.medapp.domain.notification.NotificationTarget
 import com.kert0n.medapp.domain.notification.Reminder
+import com.kert0n.medapp.domain.pack.ExpiryDate
+import com.kert0n.medapp.fixture.FakeAppLanguages
 import com.kert0n.medapp.fixture.PACK
 import com.kert0n.medapp.fixture.courseRepository
 import com.kert0n.medapp.fixture.inMemoryDatabase
@@ -22,7 +25,6 @@ import com.kert0n.medapp.fixture.pack
 import com.kert0n.medapp.fixture.packageRepository
 import com.kert0n.medapp.fixture.tablets
 import com.kert0n.medapp.platform.notifications.NotificationChannels.Companion.id
-import com.kert0n.medapp.domain.pack.ExpiryDate
 import com.kert0n.medapp.storage.database.MedAppDatabase
 import java.time.Instant
 import java.time.LocalDate
@@ -59,7 +61,7 @@ class SystemNotifierTest {
     fun setUp() = runTest {
         database = inMemoryDatabase()
         database.packageRepository().add(pack(quantity = tablets("20"), expiresOn = expiry))
-        notifier = SystemNotifier(context, database.intakeRepository(), database.courseRepository(), database.packageRepository(), NotificationChannels(context, FakeAppLanguages()), FakeAppLanguages(), java.time.Clock.fixed(planned.dueAt, java.time.ZoneOffset.UTC))
+        notifier = SystemNotifier(context, EntriesModule.entries(), database.intakeRepository(), database.courseRepository(), database.packageRepository(), NotificationChannels(context, FakeAppLanguages()), FakeAppLanguages(), java.time.Clock.fixed(planned.dueAt, java.time.ZoneOffset.UTC))
         NotificationChannels(context, FakeAppLanguages()).ensure()
         manager.cancelAll()
     }

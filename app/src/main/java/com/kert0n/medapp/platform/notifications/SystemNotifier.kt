@@ -23,6 +23,7 @@ import com.kert0n.medapp.feature.course.CourseRecords
 import com.kert0n.medapp.feature.intake.IntakeRecords
 import com.kert0n.medapp.feature.packages.PackageReadings
 import com.kert0n.medapp.feature.settings.AppLanguages
+import com.kert0n.medapp.platform.AppEntries
 import com.kert0n.medapp.platform.notifications.NotificationChannels.Companion.id
 import dagger.hilt.android.qualifiers.ApplicationContext
 import java.time.Clock
@@ -49,6 +50,7 @@ import kotlinx.coroutines.flow.first
 @Singleton
 class SystemNotifier @Inject constructor(
     @ApplicationContext private val context: Context,
+    private val entries: AppEntries,
     private val intakes: IntakeRecords,
     private val courses: CourseRecords,
     private val packages: PackageReadings,
@@ -168,10 +170,10 @@ class SystemNotifier @Inject constructor(
 
     /** Действие без экрана едет своему приёмнику; в extras — только идентификатор пункта (G3). */
     private fun actionIntent(intakeId: Uuid, action: NotificationAction, key: NotificationKey): PendingIntent {
-        val intent = Intent(context, NotificationActionReceiver::class.java)
+        val intent = Intent(context, entries.notificationAction)
             .setAction(action.name)
             .setIdentifier(identity(key, action))
-            .putExtra(NotificationActionReceiver.EXTRA_INTAKE_ID, intakeId.toString())
+            .putExtra(EXTRA_INTAKE_ID, intakeId.toString())
         return PendingIntent.getBroadcast(context, key.hashCode() * 31 + action.ordinal, intent, PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE)
     }
 
@@ -188,5 +190,8 @@ class SystemNotifier @Inject constructor(
 
     companion object {
         private val DATE: DateTimeFormatter = DateTimeFormatter.ofLocalizedDate(FormatStyle.MEDIUM)
+
+        /** Пункт приёма в действии шторки — единственное, что едет в extras (G3). */
+        const val EXTRA_INTAKE_ID = "intake_id"
     }
 }

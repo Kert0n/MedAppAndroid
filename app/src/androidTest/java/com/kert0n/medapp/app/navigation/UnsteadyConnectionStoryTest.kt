@@ -33,7 +33,7 @@ import com.kert0n.medapp.network.server.ApiFailure
 import com.kert0n.medapp.network.server.ApiResult
 import com.kert0n.medapp.network.value.toDosageForm
 import com.kert0n.medapp.network.value.toQuantityUnit
-import com.kert0n.medapp.platform.connectivity.SyncTriggers
+import com.kert0n.medapp.app.connectivity.SyncTriggers
 import com.kert0n.medapp.queue.QueueOutbox
 import com.kert0n.medapp.storage.database.MedAppDatabase
 import com.kert0n.medapp.storage.medkit.toStorageEntity

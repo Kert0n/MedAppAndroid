@@ -1,4 +1,4 @@
-package com.kert0n.medapp.platform.notifications
+package com.kert0n.medapp.app.notifications
 
 import android.content.Context
 import android.content.Intent
@@ -6,6 +6,7 @@ import androidx.test.ext.junit.runners.AndroidJUnit4
 import androidx.test.platform.app.InstrumentationRegistry
 import com.kert0n.medapp.feature.notification.ReminderOutbox
 import com.kert0n.medapp.fixture.await
+import com.kert0n.medapp.platform.notifications.AlarmManagerReminders
 import dagger.hilt.android.testing.HiltAndroidRule
 import dagger.hilt.android.testing.HiltAndroidTest
 import javax.inject.Inject
@@ -47,7 +48,7 @@ class ReminderWakeReceiverTest {
     fun theAlarmReachesTheOutboxThroughTheRealBroadcast() {
         val before = outbox.state.value.passes
 
-        context.sendBroadcast(Intent(context, ReminderWakeReceiver::class.java).setAction(ReminderWakeReceiver.ACTION))
+        context.sendBroadcast(Intent(context, ReminderWakeReceiver::class.java).setAction(AlarmManagerReminders.ACTION))
 
         runBlocking { await("проход по будильнику") { outbox.state.value.passes > before } }
     }

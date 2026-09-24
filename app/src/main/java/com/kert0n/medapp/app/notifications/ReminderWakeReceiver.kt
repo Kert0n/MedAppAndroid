@@ -1,9 +1,10 @@
-package com.kert0n.medapp.platform.notifications
+package com.kert0n.medapp.app.notifications
 
 import android.content.BroadcastReceiver
 import android.content.Context
 import android.content.Intent
 import com.kert0n.medapp.feature.notification.ReminderOutbox
+import com.kert0n.medapp.platform.notifications.AlarmManagerReminders
 import dagger.hilt.android.AndroidEntryPoint
 import javax.inject.Inject
 
@@ -22,11 +23,7 @@ class ReminderWakeReceiver : BroadcastReceiver() {
     lateinit var outbox: ReminderOutbox
 
     override fun onReceive(context: Context, intent: Intent) {
-        if (intent.action != ACTION) return
+        if (intent.action != AlarmManagerReminders.ACTION) return
         passHoldingTheProcess(outbox, "проход по будильнику не удался")
-    }
-
-    companion object {
-        const val ACTION = "com.kert0n.medapp.REMINDERS_DUE"
     }
 }

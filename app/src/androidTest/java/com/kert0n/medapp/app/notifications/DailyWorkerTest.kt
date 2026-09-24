@@ -1,4 +1,4 @@
-package com.kert0n.medapp.platform.notifications
+package com.kert0n.medapp.app.notifications
 
 import android.content.Context
 import androidx.test.ext.junit.runners.AndroidJUnit4
@@ -11,12 +11,13 @@ import androidx.work.WorkerFactory
 import androidx.work.WorkerParameters
 import androidx.work.testing.TestListenableWorkerBuilder
 import androidx.work.testing.WorkManagerTestInitHelper
+import com.kert0n.medapp.di.EntriesModule
 import com.kert0n.medapp.domain.intake.CourseIntake
 import com.kert0n.medapp.domain.intake.IntakeStatus
 import com.kert0n.medapp.domain.value.Doses
 import com.kert0n.medapp.feature.course.CourseDrafting
-import com.kert0n.medapp.fixture.PACK
 import com.kert0n.medapp.fixture.FakeSettingsStore
+import com.kert0n.medapp.fixture.PACK
 import com.kert0n.medapp.fixture.Scenarios
 import com.kert0n.medapp.fixture.TABLET_FORM
 import com.kert0n.medapp.fixture.dose
@@ -26,6 +27,7 @@ import com.kert0n.medapp.fixture.pack
 import com.kert0n.medapp.fixture.packageRepository
 import com.kert0n.medapp.fixture.schedule
 import com.kert0n.medapp.fixture.tablets
+import com.kert0n.medapp.platform.notifications.WorkManagerDailySchedule
 import com.kert0n.medapp.storage.database.MedAppDatabase
 import java.time.Clock
 import java.time.Instant
@@ -65,7 +67,7 @@ class DailyWorkerTest {
         TestListenableWorkerBuilder<DailyWorker>(context)
             .setWorkerFactory(object : WorkerFactory() {
                 override fun createWorker(appContext: Context, workerClassName: String, workerParameters: WorkerParameters): ListenableWorker =
-                    DailyWorker(appContext, workerParameters, scenarios.dailyRound, scenarios.reminderOutbox, WorkManagerDailySchedule({ work }, clock), FakeSettingsStore())
+                    DailyWorker(appContext, workerParameters, scenarios.dailyRound, scenarios.reminderOutbox, WorkManagerDailySchedule({ work }, clock, EntriesModule.entries()), FakeSettingsStore())
             })
             .build()
 
@@ -142,7 +144,7 @@ class DailyWorkerTest {
     /** Ежедневная задача одна: повторная постановка её не сдвигает; «сейчас» — отдельная разовая. */
     @Test
     fun theDailyWorkIsOneAndKept() = runBlocking {
-        val schedule = WorkManagerDailySchedule({ work }, clock)
+        val schedule = WorkManagerDailySchedule({ work }, clock, EntriesModule.entries())
 
         schedule.keepDaily(LocalTime.of(9, 0))
         val before = work.getWorkInfosForUniqueWork(WorkManagerDailySchedule.DAILY).get().single()
@@ -159,7 +161,7 @@ class DailyWorkerTest {
     /** Новое время сводки переставляет задачу: она по-прежнему одна и помечена новым временем, а не прежним. */
     @Test
     fun aNewDigestTimeMovesTheDailyWork() = runBlocking {
-        val schedule = WorkManagerDailySchedule({ work }, clock)
+        val schedule = WorkManagerDailySchedule({ work }, clock, EntriesModule.entries())
         schedule.keepDaily(LocalTime.of(9, 0))
 
         schedule.keepDaily(LocalTime.of(18, 0))
@@ -186,7 +188,7 @@ class DailyWorkerTest {
     @Test
     fun aZoneChangeReschedulesTheDay() = runBlocking {
         val moving = MovingClock(now, ZoneId.of("Europe/Moscow"))
-        val schedule = WorkManagerDailySchedule({ work }, moving)
+        val schedule = WorkManagerDailySchedule({ work }, moving, EntriesModule.entries())
         schedule.keepDaily(LocalTime.of(9, 0))
         val moscow = work.getWorkInfosForUniqueWork(WorkManagerDailySchedule.DAILY).get().single()
 

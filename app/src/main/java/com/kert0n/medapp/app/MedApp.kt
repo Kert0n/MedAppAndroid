@@ -9,7 +9,7 @@ import com.kert0n.medapp.feature.notification.DailySchedule
 import com.kert0n.medapp.feature.notification.NotificationUpkeep
 import com.kert0n.medapp.feature.notification.ReminderOutbox
 import com.kert0n.medapp.feature.settings.SettingsStore
-import com.kert0n.medapp.platform.connectivity.SyncTriggers
+import com.kert0n.medapp.app.connectivity.SyncTriggers
 import com.kert0n.medapp.platform.notifications.NotificationChannels
 import com.kert0n.medapp.queue.QueueOutbox
 import dagger.hilt.android.HiltAndroidApp

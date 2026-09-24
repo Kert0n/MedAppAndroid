@@ -1,4 +1,4 @@
-package com.kert0n.medapp.platform.notifications
+package com.kert0n.medapp.app.notifications
 
 import android.content.Intent
 import androidx.test.ext.junit.runners.AndroidJUnit4
@@ -10,6 +10,7 @@ import com.kert0n.medapp.feature.notification.ReminderOutbox
 import com.kert0n.medapp.feature.notification.ReminderReadings
 import com.kert0n.medapp.feature.notification.ReminderRecords
 import com.kert0n.medapp.fixture.await
+import com.kert0n.medapp.platform.notifications.AlarmManagerReminders
 import com.kert0n.medapp.platform.time.TimeShifts
 import dagger.hilt.android.testing.HiltAndroidRule
 import dagger.hilt.android.testing.HiltAndroidTest

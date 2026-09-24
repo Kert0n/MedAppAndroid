@@ -11,6 +11,8 @@ import androidx.work.WorkerFactory
 import androidx.work.WorkerParameters
 import androidx.work.testing.TestListenableWorkerBuilder
 import androidx.work.workDataOf
+import com.kert0n.medapp.app.background.SyncWorker
+import com.kert0n.medapp.di.EntriesModule
 import com.kert0n.medapp.feature.delivery.Synchronization
 import com.kert0n.medapp.feature.settings.AppSettings
 import com.kert0n.medapp.feature.settings.SyncInterval
@@ -125,7 +127,7 @@ class SyncBackgroundTest {
 
     private fun worker(synchronization: Synchronization, comeBack: Boolean, at: Instant = now): SyncWorker =
         TestListenableWorkerBuilder<SyncWorker>(context)
-            .setInputData(workDataOf(SyncWorker.COME_BACK to comeBack))
+            .setInputData(workDataOf(WorkManagerSyncSchedule.COME_BACK_INPUT to comeBack))
             .setWorkerFactory(object : WorkerFactory() {
                 override fun createWorker(appContext: Context, workerClassName: String, workerParameters: WorkerParameters): ListenableWorker =
                     SyncWorker(appContext, workerParameters, synchronization, Scenarios(database, now).courseUpkeep, settings, Clock.fixed(at, ZoneOffset.UTC))
@@ -152,7 +154,7 @@ class SyncBackgroundTest {
     /** Регулярный заход один на процесс и при связи: повторный вызов его не сдвигает и не множит. */
     @Test
     fun theRegularRoundIsOneAndNeedsConnection() = runBlocking {
-        val schedule = WorkManagerSyncSchedule({ work }, clock)
+        val schedule = WorkManagerSyncSchedule({ work }, clock, EntriesModule.entries())
 
         schedule.keepRegular(SyncInterval.DEFAULT)
         schedule.keepRegular(SyncInterval.DEFAULT)
@@ -170,7 +172,7 @@ class SyncBackgroundTest {
      */
     @Test
     fun aNewIntervalUpdatesTheSameWork() = runBlocking {
-        val schedule = WorkManagerSyncSchedule({ work }, clock)
+        val schedule = WorkManagerSyncSchedule({ work }, clock, EntriesModule.entries())
         schedule.keepRegular(SyncInterval.DEFAULT)
         val before = work.getWorkInfosForUniqueWork(WorkManagerSyncSchedule.REGULAR).get().single()
 
@@ -185,7 +187,7 @@ class SyncBackgroundTest {
     /** Тот же интервал повторно — задача та же самая, в том же поколении: пересоздавать нечего. */
     @Test
     fun theSameIntervalRecreatesNothing() = runBlocking {
-        val schedule = WorkManagerSyncSchedule({ work }, clock)
+        val schedule = WorkManagerSyncSchedule({ work }, clock, EntriesModule.entries())
         schedule.keepRegular(SyncInterval(240))
         val before = work.getWorkInfosForUniqueWork(WorkManagerSyncSchedule.REGULAR).get().single()
 
@@ -199,7 +201,7 @@ class SyncBackgroundTest {
     /** «Недавно» — половина выбранного интервала: при четырёх часах заход час спустя лишний, три спустя — нет. */
     @Test
     fun recentlyIsHalfOfTheChosenInterval() = runBlocking {
-        val synchronization = synchronization(WorkManagerSyncSchedule({ work }, clock))
+        val synchronization = synchronization(WorkManagerSyncSchedule({ work }, clock, EntriesModule.entries()))
         synchronization.synchronize()
         val readsAfterEntry = snapshotReads.get()
         settings.saved = AppSettings(syncInterval = SyncInterval(240))
@@ -214,7 +216,7 @@ class SyncBackgroundTest {
     /** За остатком приходят один раз, при связи, с пометкой «за остатком». */
     @Test
     fun comingBackForTheBacklogIsOneRoundWithConnection() {
-        val schedule = WorkManagerSyncSchedule({ work }, clock)
+        val schedule = WorkManagerSyncSchedule({ work }, clock, EntriesModule.entries())
 
         schedule.comeBackFor(now.plusSeconds(60))
         schedule.comeBackFor(now)
@@ -227,7 +229,7 @@ class SyncBackgroundTest {
     /** Человек только что заходил, и снимок лёг: регулярный заход сервер не спрашивает. */
     @Test
     fun aRegularRoundRightAfterEntryIsSkipped() = runBlocking {
-        val synchronization = synchronization(WorkManagerSyncSchedule({ work }, clock))
+        val synchronization = synchronization(WorkManagerSyncSchedule({ work }, clock, EntriesModule.entries()))
         synchronization.synchronize()
         val readsAfterEntry = snapshotReads.get()
 
@@ -243,7 +245,7 @@ class SyncBackgroundTest {
      */
     @Test
     fun aRoundForTheBacklogRetriesUntilTheQueueIsEmpty() = runBlocking {
-        val synchronization = synchronization(WorkManagerSyncSchedule({ work }, clock))
+        val synchronization = synchronization(WorkManagerSyncSchedule({ work }, clock, EntriesModule.entries()))
         val stuck = Uuid.random()
         database.syncOperations().enqueue(stuck, PackageSyncCommand.Consume(PACK, dose("1"), INTAKE), now)
         database.syncOperations().settle(stuck, SyncOperationStatus.PENDING, "ждёт", now, notBefore = now.plusSeconds(600))

@@ -36,7 +36,7 @@ class NotificationOwnershipTest {
             "di/NotificationModule.kt",
             "feature/notification/ReminderOutbox.kt",
             // Ответ из шторки гасит свою карточку сразу: человек нажал, и ждать прохода нечего.
-            "platform/notifications/NotificationActionReceiver.kt"
+            "app/notifications/NotificationActionReceiver.kt"
         )
     )
 

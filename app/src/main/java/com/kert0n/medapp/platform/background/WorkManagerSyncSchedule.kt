@@ -5,12 +5,13 @@ import androidx.work.Constraints
 import androidx.work.ExistingPeriodicWorkPolicy
 import androidx.work.ExistingWorkPolicy
 import androidx.work.NetworkType
-import androidx.work.OneTimeWorkRequestBuilder
-import androidx.work.PeriodicWorkRequestBuilder
+import androidx.work.OneTimeWorkRequest
+import androidx.work.PeriodicWorkRequest
 import androidx.work.WorkManager
 import androidx.work.workDataOf
 import com.kert0n.medapp.feature.delivery.SyncSchedule
 import com.kert0n.medapp.feature.settings.SyncInterval
+import com.kert0n.medapp.platform.AppEntries
 import java.time.Clock
 import java.time.Duration
 import java.time.Instant
@@ -29,7 +30,8 @@ import kotlinx.coroutines.flow.first
  */
 class WorkManagerSyncSchedule @Inject constructor(
     private val workManager: Provider<WorkManager>,
-    private val clock: Clock
+    private val clock: Clock,
+    private val entries: AppEntries
 ) : SyncSchedule {
 
     /**
@@ -41,18 +43,18 @@ class WorkManagerSyncSchedule @Inject constructor(
     override suspend fun keepRegular(interval: SyncInterval) {
         val standing = work.getWorkInfosForUniqueWorkFlow(REGULAR).first().firstOrNull { !it.state.isFinished }
         if (standing?.periodicityInfo?.repeatIntervalMillis == interval.duration.toMillis()) return
-        val request = PeriodicWorkRequestBuilder<SyncWorker>(interval.duration)
+        val request = PeriodicWorkRequest.Builder(entries.sync, interval.duration)
             .setConstraints(online)
             .build()
         work.enqueueUniquePeriodicWork(REGULAR, ExistingPeriodicWorkPolicy.UPDATE, request)
     }
 
     override fun comeBackFor(dueAt: Instant) {
-        val request = OneTimeWorkRequestBuilder<SyncWorker>()
+        val request = OneTimeWorkRequest.Builder(entries.sync)
             .setInitialDelay(Duration.between(clock.instant(), dueAt).coerceAtLeast(Duration.ZERO))
             .setConstraints(online)
             .setBackoffCriteria(BackoffPolicy.EXPONENTIAL, COME_BACK_BACKOFF)
-            .setInputData(workDataOf(SyncWorker.COME_BACK to true))
+            .setInputData(workDataOf(COME_BACK_INPUT to true))
             .build()
         work.enqueueUniqueWork(COME_BACK, ExistingWorkPolicy.KEEP, request)
     }
@@ -65,6 +67,9 @@ class WorkManagerSyncSchedule @Inject constructor(
 
         const val REGULAR = "sync-regular"
         const val COME_BACK = "sync-come-back"
+
+        /** Признак захода за остатком во входных данных задачи; читает его вход, которого будят. */
+        const val COME_BACK_INPUT = "come_back"
     }
 }
 

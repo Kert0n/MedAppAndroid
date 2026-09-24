@@ -6,6 +6,7 @@ import android.content.Context
 import android.content.Intent
 import android.os.Build
 import com.kert0n.medapp.domain.notification.ReminderAlarms
+import com.kert0n.medapp.platform.AppEntries
 import dagger.hilt.android.qualifiers.ApplicationContext
 import java.time.Instant
 import javax.inject.Inject
@@ -22,7 +23,10 @@ import javax.inject.Singleton
  * ничего: ни идентификаторов, ни текстов (G3).
  */
 @Singleton
-class AlarmManagerReminders @Inject constructor(@ApplicationContext private val context: Context) : ReminderAlarms {
+class AlarmManagerReminders @Inject constructor(
+    @ApplicationContext private val context: Context,
+    private val entries: AppEntries
+) : ReminderAlarms {
 
     private val manager get() = context.getSystemService(AlarmManager::class.java)
 
@@ -49,17 +53,20 @@ class AlarmManagerReminders @Inject constructor(@ApplicationContext private val 
     fun isScheduled(exact: Boolean): Boolean = pending(exact, PendingIntent.FLAG_NO_CREATE) != null
 
     private fun pending(exact: Boolean, flags: Int): PendingIntent? =
-        PendingIntent.getBroadcast(context, if (exact) REQUEST_EXACT else REQUEST_INEXACT, wakeIntent(context, exact), flags or PendingIntent.FLAG_IMMUTABLE)
+        PendingIntent.getBroadcast(context, if (exact) REQUEST_EXACT else REQUEST_INEXACT, wakeIntent(context, entries, exact), flags or PendingIntent.FLAG_IMMUTABLE)
 
     companion object {
         /** Постановок две — и кода запроса два: по одному на точность. */
         const val REQUEST_INEXACT = 0
         const val REQUEST_EXACT = 1
 
+        /** Действие будильника; вход, которому он едет, другого не принимает. */
+        const val ACTION = "com.kert0n.medapp.REMINDERS_DUE"
+
         /** Намерение постановки: приёмник, действие и точность в тождестве — и ничего больше. */
-        fun wakeIntent(context: Context, exact: Boolean): Intent =
-            Intent(context, ReminderWakeReceiver::class.java)
-                .setAction(ReminderWakeReceiver.ACTION)
+        fun wakeIntent(context: Context, entries: AppEntries, exact: Boolean): Intent =
+            Intent(context, entries.reminderWake)
+                .setAction(ACTION)
                 .setIdentifier(if (exact) "exact" else "inexact")
     }
 }
