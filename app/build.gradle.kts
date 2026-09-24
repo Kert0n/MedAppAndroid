@@ -80,11 +80,19 @@ val verifyReleaseSecrets = tasks.register("verifyReleaseSecrets") {
                     "Значение по умолчанию существует только для debug."
             )
         }
+        // Адреса приходят секретами, и release ходит по ним без исключений для открытого HTTP.
+        val notHttps = listOf("MEDAPP_BASE_URL", "MEDAPP_MARKING_URL")
+            .filterNot { secretOrNull(it).orEmpty().startsWith("https://") }
+        if (notHttps.isNotEmpty()) {
+            throw GradleException("Release-сборка требует адреса HTTPS: ${notHttps.joinToString()}.")
+        }
     }
 }
 
-tasks.matching { it.name == "assembleRelease" || it.name == "bundleRelease" }
-    .configureEach { dependsOn(verifyReleaseSecrets) }
+/** Всё, что собирает или ставит release, проходит проверку секретов — не только assemble и bundle. */
+tasks.matching { task ->
+    task.name in setOf("assembleRelease", "bundleRelease", "packageRelease", "installRelease")
+}.configureEach { dependsOn(verifyReleaseSecrets) }
 
 /**
  * Предупреждение обработчика аннотаций — провал сборки. Room предупреждал о строке с `@Relation`
