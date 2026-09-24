@@ -21,6 +21,8 @@ data class MedKitPresentationDTO(
     val createdAt: Instant,
     val syncedAt: Instant?,
     val isShared: Boolean,
+    /** Полка на сервере — ответ самой полки; участники тут ни при чём. */
+    val isPublished: Boolean,
     val acceptsInvitations: Boolean,
     val contents: MedKitContents,
     /** Решение о полке, которое ещё едет серверу: его видно там же, где полку (PLAN E5, E6). */

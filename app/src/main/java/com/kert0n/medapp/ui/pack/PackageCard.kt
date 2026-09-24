@@ -54,8 +54,8 @@ fun PackageCard(
     // Три состояния — три цвета, и у каждого своё дело (решение владельца 2026-09-17):
     // красный — просрочка («не пей»), янтарный — решение в пути («подожди»), призрак — коробки
     // здесь больше нет. Цвет ни в одном из них не единственный: рядом значок и слова.
-    val withdrawn = !pkg.status.allowsUse
-    val pending = !withdrawn && (pkg.hasUnconfirmedChanges || pkg.status == PackageStatus.CHANGING)
+    val withdrawn = !pkg.usable
+    val pending = !withdrawn && pkg.awaitsServer
     val accents = LocalAccents.current
     ElevatedCard(
         // **Призрак не нажимается.** Выброшенная коробка — состояние конечное, и открыть её

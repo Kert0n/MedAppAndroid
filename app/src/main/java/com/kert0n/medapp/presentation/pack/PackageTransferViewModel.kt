@@ -22,12 +22,9 @@ import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlin.uuid.Uuid
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.MutableStateFlow
-import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.flatMapLatest
-import kotlinx.coroutines.flow.stateIn
-import kotlinx.coroutines.launch
 
 /**
  * Перенос упаковки на другую полку (PLAN H3 №11). Перенос двигает место, а не остаток: из
@@ -80,7 +77,7 @@ class PackageTransferViewModel @AssistedInject constructor(
             // Перенос может лишить другого участника доступа: сервер сохранит его бронь, только
             // если он видит целевую полку, а видит ли — знает он, а не мы (PLAN E6). Поэтому
             // предупреждение общее и стоит **до** подтверждения, а не после.
-            hasClaimsOfOthers = pack?.availability?.reservedByOthers?.isZero == false,
+            hasClaimsOfOthers = pack?.availability?.claimedByOthers == true,
             isGone = pack == null,
             refusal = progress.refusal,
             isDone = progress.done,

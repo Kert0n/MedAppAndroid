@@ -56,5 +56,9 @@ data class PackagePresentationDTO(
     val holdingCourseId: Uuid?,
     val lastUsedAt: Instant?,
     val status: PackageStatus,
-    val syncedAt: Instant?
+    val syncedAt: Instant?,
+    /** Коробкой пользуются — ответ самой коробки. */
+    val usable: Boolean,
+    /** Решение о коробке ждёт сервера — ответ самой коробки. */
+    val awaitsServer: Boolean
 )

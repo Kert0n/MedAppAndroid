@@ -2,7 +2,6 @@ package com.kert0n.medapp.presentation.pack
 
 import com.kert0n.medapp.domain.pack.PackageProjection
 import com.kert0n.medapp.presentation.value.MoneyPresentationDTO
-import com.kert0n.medapp.presentation.value.QuantityPresentationDTO
 import com.kert0n.medapp.presentation.value.toPresentationDTO
 import java.time.Instant
 
@@ -48,5 +47,7 @@ fun PackageProjection.toPresentationDTO(syncedAt: Instant? = null): PackagePrese
         holdingCourseId = holdingCourseId,
         lastUsedAt = lastUsedAt,
         status = status,
-        syncedAt = syncedAt
+        syncedAt = syncedAt,
+        usable = usable,
+        awaitsServer = awaitsServer
     )

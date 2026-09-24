@@ -28,6 +28,9 @@ data class Prescription(
     /** Число доз меняется — назначение остаётся тем же лечением с другой длиной. */
     fun withTotalDoses(totalDoses: Doses): Prescription = copy(totalDoses = totalDoses)
 
+    /** Сколько доз ещё назначено после [taken] принятых: больше лечению не назначено (PLAN D5). */
+    fun dosesLeftAfter(taken: Int): Int = (totalDoses.count - taken).coerceAtLeast(0)
+
     /** Годится ли пачка под это назначение; `null` — годится (PLAN D5). */
     fun faultOf(pkg: PackageRef): CourseSource.Fault? = CourseSource.Fault.between(pkg, dose, form)
 

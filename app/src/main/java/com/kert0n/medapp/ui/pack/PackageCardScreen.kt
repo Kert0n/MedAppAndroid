@@ -221,7 +221,7 @@ private fun HowMuchIsThere(
         // О пометках говорит сама коробка: они переживают закрытие карточки, а отказ — нет.
         // Условие то же, что у пометки в списке (`PackageCard`): перенос или правка сведений, не
         // тронувшие числа, — тоже решение в пути, и карточка говорит о нём словами.
-        if (pack.hasUnconfirmedChanges || pack.status == PackageStatus.CHANGING) {
+        if (pack.awaitsServer) {
             Note(stringResource(R.string.pack_unconfirmed), LocalAccents.current.pending)
         }
         when (pack.status) {

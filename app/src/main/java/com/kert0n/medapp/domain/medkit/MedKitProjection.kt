@@ -19,4 +19,11 @@ data class MedKitProjection(
     val acceptsInvitations: Boolean,
     val contents: MedKitContents,
     val status: MedKitStatus = MedKitStatus.ACTIVE
-)
+) {
+
+    /** Полка на сервере — общая по публикации, сколько бы в ней ни было людей (PLAN D2). */
+    val isPublished: Boolean get() = publication == MedKit.Publication.PUBLISHED
+
+    /** Полка своя, и решения сделать её общей ещё нет: о публикации можно спросить (PLAN E5). */
+    val publishable: Boolean get() = publication == MedKit.Publication.LOCAL && status != MedKitStatus.PUBLISHING
+}

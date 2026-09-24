@@ -5,6 +5,7 @@ import com.kert0n.medapp.domain.course.ScheduledOccurrence
 import com.kert0n.medapp.domain.pack.PackageRef
 import com.kert0n.medapp.domain.value.Dose
 import com.kert0n.medapp.domain.value.QuantityUnit
+import java.time.LocalDate
 import kotlin.uuid.Uuid
 
 /**
@@ -21,6 +22,9 @@ sealed interface IntakeProjection {
 
     val taken: TakenDose?
 
+    /** Пункт принят. */
+    val isTaken: Boolean get() = status == IntakeStatus.TAKEN
+
     data class Scheduled(
         override val id: Uuid,
         val courseId: Uuid,
@@ -33,6 +37,9 @@ sealed interface IntakeProjection {
         override val taken: TakenDose?
     ) : IntakeProjection {
         override val unit: QuantityUnit get() = plannedAmount.unit
+
+        /** Пропущен в день раньше [date]: такой пункт человек ещё может разобрать (PLAN D6). */
+        fun isMissedBefore(date: LocalDate): Boolean = status == IntakeStatus.MISSED && slot.localDate.isBefore(date)
     }
 
     data class Unplanned(

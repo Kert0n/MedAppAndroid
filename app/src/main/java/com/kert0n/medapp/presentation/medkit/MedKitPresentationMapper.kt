@@ -19,6 +19,7 @@ fun MedKitProjection.toPresentationDTO(syncedAt: Instant? = null): MedKitPresent
         createdAt = createdAt,
         syncedAt = syncedAt,
         isShared = isShared,
+        isPublished = isPublished,
         acceptsInvitations = acceptsInvitations,
         contents = contents,
         status = status

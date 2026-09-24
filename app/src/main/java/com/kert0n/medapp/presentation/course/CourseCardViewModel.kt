@@ -8,7 +8,6 @@ import com.kert0n.medapp.domain.course.CourseRecordProjection
 import com.kert0n.medapp.domain.course.CoverageReduction
 import com.kert0n.medapp.domain.course.Revision
 import com.kert0n.medapp.domain.intake.IntakeProjection
-import com.kert0n.medapp.domain.intake.IntakeStatus
 import com.kert0n.medapp.domain.value.Doses
 import com.kert0n.medapp.feature.course.CourseCancellation
 import com.kert0n.medapp.feature.course.CourseOffPlanCounting
@@ -24,11 +23,8 @@ import dagger.assisted.AssistedInject
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlin.uuid.Uuid
 import kotlinx.coroutines.flow.MutableStateFlow
-import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.combine
-import kotlinx.coroutines.flow.stateIn
-import kotlinx.coroutines.launch
 
 /**
  * Карточка лечения (PLAN H3 №14). Первым — **обеспечение**: человек открывает её, чтобы узнать,
@@ -190,10 +186,7 @@ class CourseCardViewModel @AssistedInject constructor(
             isCancelling = cancelling.working,
             offPlanDoses = plan?.takenOffPlan?.count,
             // Сколько ещё можно засчитать мимо плана: больше лечению просто не назначено (D5).
-            offPlanLimit = plan?.let {
-                (prescription.totalDoses.count - intakes.count { taken -> taken.status == IntakeStatus.TAKEN })
-                    .coerceAtLeast(0)
-            },
+            offPlanLimit = plan?.let { prescription.dosesLeftAfter(intakes.count { it.isTaken }) },
             asksOffPlan = counting.asking,
             isCounting = counting.working,
             message = cancelling.message ?: counting.message

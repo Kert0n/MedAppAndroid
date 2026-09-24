@@ -4,9 +4,7 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.kert0n.medapp.domain.Unavailability
 import com.kert0n.medapp.domain.medkit.Invitation
-import com.kert0n.medapp.domain.medkit.MedKit
 import com.kert0n.medapp.domain.medkit.MedKitProjection
-import com.kert0n.medapp.domain.medkit.MedKitStatus
 import com.kert0n.medapp.feature.medkits.MedKitInvitation
 import com.kert0n.medapp.feature.medkits.MedKitPublishing
 import com.kert0n.medapp.feature.medkits.MedKitReadings
@@ -23,13 +21,10 @@ import java.time.ZoneId
 import kotlin.uuid.Uuid
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.MutableStateFlow
-import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.flatMapLatest
 import kotlinx.coroutines.flow.map
-import kotlinx.coroutines.flow.stateIn
-import kotlinx.coroutines.launch
 
 /**
  * Поделиться аптечкой (PLAN H3 №20): сделать полку общей и позвать в неё. Экран один, а лиц у него
@@ -137,7 +132,7 @@ class MedKitSharingViewModel @AssistedInject constructor(
         fun refused(refusal: MedKitSharingRefusal): Own = copy(isWorking = false, refusal = refusal)
 
         fun over(shelf: MedKitProjection, zone: ZoneId): MedKitSharingUiState = when {
-            shelf.publication == MedKit.Publication.LOCAL && shelf.status != MedKitStatus.PUBLISHING ->
+            shelf.publishable ->
                 MedKitSharingUiState.Deciding(shelf.name, isAsking, isWorking, refusal)
             // Полка уехала, а половины полки не бывает: пока не доехало содержимое, звать некуда
             // (PLAN D2, E5). Ключа в этом состоянии нет и быть не может.

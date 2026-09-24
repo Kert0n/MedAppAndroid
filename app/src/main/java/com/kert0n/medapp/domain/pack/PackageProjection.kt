@@ -36,6 +36,12 @@ data class PackageProjection(
     val status: PackageStatus = PackageStatus.ACTIVE
 ) {
 
+    /** Коробкой пользуются: из неё берут, её правят, переносят и ставят источником (PLAN E1). */
+    val usable: Boolean get() = status.allowsUse
+
+    /** Решение о коробке в пути: перенос, правка сведений или число ждут ответа сервера (PLAN E1). */
+    val awaitsServer: Boolean get() = hasUnconfirmedChanges || status == PackageStatus.CHANGING
+
     /** Коробка — источник идущего лечения: курс держит её и выделил из неё дозы (PLAN D5). */
     val isCourseSource: Boolean get() = holdingCourseId != null && !availability.myAllocation.isZero
     init {
