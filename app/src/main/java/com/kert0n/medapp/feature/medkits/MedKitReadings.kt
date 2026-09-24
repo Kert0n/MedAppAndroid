@@ -1,7 +1,6 @@
 package com.kert0n.medapp.feature.medkits
 
 import com.kert0n.medapp.domain.medkit.MedKitProjection
-import java.time.Instant
 import java.time.LocalDate
 import kotlin.uuid.Uuid
 import kotlinx.coroutines.flow.Flow
@@ -18,10 +17,4 @@ interface MedKitReadings {
     fun observeAll(today: LocalDate): Flow<List<MedKitProjection>>
 
     fun observe(id: Uuid, today: LocalDate): Flow<MedKitProjection?>
-
-    /**
-     * Когда с аптечкой последний раз сверялись — экрану состояния синхронизации (PLAN H3 №28).
-     * Момент сверки принадлежит доставке, а не аптечке, и в её проекцию не входит.
-     */
-    fun observeSyncedAt(id: Uuid): Flow<Instant?>
 }

@@ -10,7 +10,6 @@ import com.kert0n.medapp.domain.notification.NotificationKind
 import com.kert0n.medapp.domain.notification.Notifier
 import com.kert0n.medapp.domain.notification.Reminder
 import com.kert0n.medapp.domain.notification.ReminderAlarms
-import com.kert0n.medapp.feature.notification.ReminderReadings
 import com.kert0n.medapp.feature.notification.ReminderRecords
 import com.kert0n.medapp.queue.OutboxLoop
 import java.time.Clock
@@ -32,7 +31,7 @@ import kotlinx.coroutines.sync.withLock
 /**
  * **Единственный владелец показа и будильника** (PLAN D8). Обязательство уже лежит в таблице;
  * забирает его не тот, кто положил, а тот, кто следит за таблицей: сигнал
- * [ReminderReadings.changes] приходит после коммита по определению, и гонки «разбудили до
+ * [ReminderRecords.changes] приходит после коммита по определению, и гонки «разбудили до
  * фиксации» нет (F5). Поэтому сценарий, изменивший календарь, ничего не зовёт после транзакции —
  * правило, которое нельзя было проверить, заменено механизмом.
  *

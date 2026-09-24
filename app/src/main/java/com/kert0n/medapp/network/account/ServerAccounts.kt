@@ -51,7 +51,7 @@ class ServerAccounts @Inject constructor(
         when (val issued = api.token(account)) {
             is ApiResult.Success -> AccountServer.Registration.Known
             is ApiResult.Failure -> AccountServer.Registration.Failed(
-                if (issued.failure == ApiFailure.Unauthorized) ApiFailure.Conflict.asUnavailability()
+                if (issued.failure == ApiFailure.Unauthorized) Unavailability.SERVER_REFUSED_US
                 else issued.failure.asUnavailability()
             )
         }

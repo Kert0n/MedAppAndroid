@@ -42,11 +42,15 @@ class WorkManagerSyncSchedule @Inject constructor(
 
     override suspend fun keepRegular(interval: SyncInterval) {
         val standing = work.getWorkInfosForUniqueWorkFlow(REGULAR).first().firstOrNull { !it.state.isFinished }
-        if (standing?.periodicityInfo?.repeatIntervalMillis == interval.duration.toMillis()) return
+        // Имя работника лежит в самой задаче: задача прошлой сборки будит того, кого в APK может
+        // уже не быть, и оставлять её нельзя даже с тем же интервалом.
+        val ours = standing != null && entries.sync.name in standing.tags
+        if (ours && standing.periodicityInfo?.repeatIntervalMillis == interval.duration.toMillis()) return
         val request = PeriodicWorkRequest.Builder(entries.sync, interval.duration)
             .setConstraints(online)
             .build()
-        work.enqueueUniquePeriodicWork(REGULAR, ExistingPeriodicWorkPolicy.UPDATE, request)
+        val policy = if (standing == null || ours) ExistingPeriodicWorkPolicy.UPDATE else ExistingPeriodicWorkPolicy.CANCEL_AND_REENQUEUE
+        work.enqueueUniquePeriodicWork(REGULAR, policy, request)
     }
 
     override fun comeBackFor(dueAt: Instant) {

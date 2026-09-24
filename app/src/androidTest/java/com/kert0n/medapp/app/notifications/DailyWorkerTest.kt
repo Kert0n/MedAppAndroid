@@ -12,6 +12,7 @@ import androidx.work.WorkerParameters
 import androidx.work.testing.TestListenableWorkerBuilder
 import androidx.work.testing.WorkManagerTestInitHelper
 import com.kert0n.medapp.di.EntriesModule
+import com.kert0n.medapp.platform.AppEntries
 import com.kert0n.medapp.domain.intake.CourseIntake
 import com.kert0n.medapp.domain.intake.IntakeStatus
 import com.kert0n.medapp.domain.value.Doses
@@ -156,6 +157,23 @@ class DailyWorkerTest {
         assertEquals(before.id, daily.single().id)
         assertTrue(daily.single().state == WorkInfo.State.ENQUEUED || daily.single().state == WorkInfo.State.RUNNING)
         assertEquals(1, work.getWorkInfosForUniqueWork(WorkManagerDailySchedule.NOW).get().size)
+    }
+
+    /**
+     * Ежедневная задача прошлой сборки будит её работника; то же время сводки её не спасает —
+     * переехавший работник иначе не проснулся бы ни разу (замечание разбора #88).
+     */
+    @Test
+    fun dailyWorkLeftByAnEarlierBuildWakesTodaysWorker() = runBlocking {
+        val today = EntriesModule.entries()
+        val earlier = AppEntries(today.sync, today.sync, today.reminderWake, today.notificationAction)
+        WorkManagerDailySchedule({ work }, clock, earlier).keepDaily(LocalTime.of(9, 0))
+
+        WorkManagerDailySchedule({ work }, clock, today).keepDaily(LocalTime.of(9, 0))
+
+        val daily = work.getWorkInfosForUniqueWork(WorkManagerDailySchedule.DAILY).get().filter { !it.state.isFinished }
+        assertEquals(1, daily.size)
+        assertTrue(daily.single().tags.toString(), today.daily.name in daily.single().tags)
     }
 
     /** Новое время сводки переставляет задачу: она по-прежнему одна и помечена новым временем, а не прежним. */

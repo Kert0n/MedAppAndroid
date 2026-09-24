@@ -7,12 +7,21 @@ import com.kert0n.medapp.queue.SyncOperation
 import com.kert0n.medapp.queue.SyncOperationStatus
 import java.time.Instant
 import kotlin.uuid.Uuid
+import kotlinx.coroutines.flow.Flow
 
 /**
  * Хранение очереди. Номер выдаёт база при постановке, поэтому команду ставят, а не сочиняют
  * операцию целиком (PLAN E2).
  */
 interface OperationRecords : OperationReadings {
+
+    /**
+     * Что ещё касается человека — экрану состояния синхронизации (PLAN H3 №28): незакрытые
+     * операции (ждут срока, отправляются, ответ записан), отказанные — с причиной, ради которой
+     * он решает заново, — и строки, которые нечем прочитать, с причиной. Применённые и утратившие
+     * доступ сюда не входят. Сеть не спрашивается.
+     */
+    fun observeOutstanding(): Flow<List<StoredSyncOperation>>
 
     suspend fun enqueue(
         id: Uuid,

@@ -205,7 +205,6 @@ class FakeMedKits(vararg kits: MedKit) : MedKitRecords, MedKitReadings {
 
     override suspend fun find(id: Uuid): MedKit? = stored[id]
 
-    override fun observeSyncedAt(id: Uuid): Flow<Instant?> = changes.map { null }
 
     override suspend fun add(medKit: MedKit) {
         stored[medKit.id] = medKit

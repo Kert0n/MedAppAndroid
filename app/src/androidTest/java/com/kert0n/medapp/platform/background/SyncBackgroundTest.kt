@@ -17,6 +17,7 @@ import com.kert0n.medapp.feature.delivery.Synchronization
 import com.kert0n.medapp.feature.settings.AppSettings
 import com.kert0n.medapp.feature.settings.SyncInterval
 import com.kert0n.medapp.fixture.FakeSettingsStore
+import com.kert0n.medapp.platform.AppEntries
 import com.kert0n.medapp.fixture.INTAKE
 import com.kert0n.medapp.fixture.PACK
 import com.kert0n.medapp.fixture.Scenarios
@@ -182,6 +183,24 @@ class SyncBackgroundTest {
         assertEquals(1, infos.size)
         assertEquals(before.id, infos.single().id)
         assertEquals(Duration.ofHours(4).toMillis(), infos.single().periodicityInfo?.repeatIntervalMillis)
+    }
+
+    /**
+     * Задача, поставленная прошлой сборкой, будит **её** работника: имя класса хранится в задаче.
+     * Переехал работник — прежняя задача будит того, кого в APK нет, и заходы молча кончаются;
+     * тот же интервал её не спасает (замечание разбора #88).
+     */
+    @Test
+    fun workLeftByAnEarlierBuildWakesTodaysWorker() = runBlocking {
+        val today = EntriesModule.entries()
+        val earlier = AppEntries(today.daily, today.daily, today.reminderWake, today.notificationAction)
+        WorkManagerSyncSchedule({ work }, clock, earlier).keepRegular(SyncInterval.DEFAULT)
+
+        WorkManagerSyncSchedule({ work }, clock, today).keepRegular(SyncInterval.DEFAULT)
+
+        val standing = work.getWorkInfosForUniqueWork(WorkManagerSyncSchedule.REGULAR).get().filter { !it.state.isFinished }
+        assertEquals(1, standing.size)
+        assertTrue(standing.single().tags.toString(), today.sync.name in standing.single().tags)
     }
 
     /** Тот же интервал повторно — задача та же самая, в том же поколении: пересоздавать нечего. */

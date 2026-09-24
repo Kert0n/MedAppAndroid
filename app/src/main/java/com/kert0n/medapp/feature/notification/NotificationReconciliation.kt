@@ -10,7 +10,7 @@ import com.kert0n.medapp.domain.notification.Reminder
 import com.kert0n.medapp.domain.pack.ExpiryDate
 import com.kert0n.medapp.feature.course.CourseRecords
 import com.kert0n.medapp.feature.intake.IntakeRecords
-import com.kert0n.medapp.feature.operation.OperationReadings
+import com.kert0n.medapp.feature.operation.OperationRecords
 import com.kert0n.medapp.feature.packages.PackageQuery
 import com.kert0n.medapp.feature.packages.PackageReadings
 import com.kert0n.medapp.queue.Transactions
@@ -43,7 +43,7 @@ class NotificationReconciliation @Inject constructor(
     private val packages: PackageReadings,
     private val courses: CourseRecords,
     private val reminders: ReminderRecords,
-    private val operations: OperationReadings,
+    private val operations: OperationRecords,
     private val promising: ReminderPromising,
     private val withdrawal: ReminderWithdrawal,
     private val settings: NotificationSettingsSource,
