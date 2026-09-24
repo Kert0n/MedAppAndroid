@@ -22,18 +22,18 @@ class QueueServiceTest {
     private class Storage : QueueStorage {
         val enqueued = mutableListOf<QueuedCommand>()
         val shelves = mutableListOf<kotlin.uuid.Uuid>()
-        override fun changes(): kotlinx.coroutines.flow.Flow<Unit> = kotlinx.coroutines.flow.emptyFlow()
-        override suspend fun nextDueAt(now: Instant): Instant? = null
-        override suspend fun ready(now: Instant): List<StoredSyncOperation> = emptyList()
-        override suspend fun medKit(id: Uuid): com.kert0n.medapp.domain.medkit.MedKitRef? = null
-        override suspend fun operation(id: Uuid): SyncOperation? = null
-        override suspend fun knownPackage(id: Uuid): PackageSnapshot? = null
-        override suspend fun layDown(snapshot: PackageSnapshot, at: Instant) = Unit
-        override suspend fun write(operation: SyncOperation, was: SyncOperationStatus) = Unit
-        override suspend fun unclosedOfMedKit(medKitId: Uuid): List<StoredSyncOperation> = emptyList()
-        override suspend fun answered(id: Uuid, answer: Receipt, at: Instant) = Unit
-        override suspend fun defer(id: Uuid, reason: String, at: Instant, notBefore: Instant) = Unit
-        override suspend fun settle(id: Uuid, settlement: Settlement, at: Instant) = Unit
+        override fun changes(): kotlinx.coroutines.flow.Flow<Unit> = error("не для этого теста")
+        override suspend fun nextDueAt(now: Instant): Instant? = error("не для этого теста")
+        override suspend fun ready(now: Instant): List<StoredSyncOperation> = error("не для этого теста")
+        override suspend fun medKit(id: Uuid): com.kert0n.medapp.domain.medkit.MedKitRef? = error("не для этого теста")
+        override suspend fun operation(id: Uuid): SyncOperation? = error("не для этого теста")
+        override suspend fun knownPackage(id: Uuid): PackageSnapshot? = error("не для этого теста")
+        override suspend fun layDown(snapshot: PackageSnapshot, at: Instant) = error("не для этого теста")
+        override suspend fun write(operation: SyncOperation, was: SyncOperationStatus) = error("не для этого теста")
+        override suspend fun unclosedOfMedKit(medKitId: Uuid): List<StoredSyncOperation> = error("не для этого теста")
+        override suspend fun answered(id: Uuid, answer: Receipt, at: Instant) = error("не для этого теста")
+        override suspend fun defer(id: Uuid, reason: String, at: Instant, notBefore: Instant) = error("не для этого теста")
+        override suspend fun settle(id: Uuid, settlement: Settlement, at: Instant) = error("не для этого теста")
         override suspend fun enqueue(queued: QueuedCommand, shelf: kotlin.uuid.Uuid, at: Instant): SyncOperation {
             enqueued += queued
             shelves += shelf

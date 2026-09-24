@@ -77,7 +77,7 @@ class QueueOutboxTest {
         override suspend fun knownPackage(id: Uuid): PackageSnapshot? = null
         override suspend fun layDown(snapshot: PackageSnapshot, at: Instant) = Unit
         override suspend fun write(operation: SyncOperation, was: SyncOperationStatus) { operations[operation.id] = operation }
-        override suspend fun unclosedOfMedKit(medKitId: Uuid): List<StoredSyncOperation> = emptyList()
+        override suspend fun unclosedOfMedKit(medKitId: Uuid): List<StoredSyncOperation> = error("не для этого теста")
         override suspend fun answered(id: Uuid, answer: Receipt, at: Instant) = Unit
         override suspend fun defer(id: Uuid, reason: String, at: Instant, notBefore: Instant) = Unit
         override suspend fun settle(id: Uuid, settlement: Settlement, at: Instant) {

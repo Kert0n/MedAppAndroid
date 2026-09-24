@@ -241,8 +241,12 @@ class FakeMedKits(vararg kits: MedKit) : MedKitStorageRepository {
 
     override suspend fun applyServerParticipants(id: Uuid, participantCount: Long, syncedAt: Instant) = Unit
 
-    override suspend fun published(): List<Uuid> = emptyList()
-    override suspend fun loseAccess(medKitId: Uuid, at: Instant) = Unit
+    override suspend fun published(): List<Uuid> =
+        stored.values.filter { it.publication == MedKit.Publication.PUBLISHED }.map { it.id }
+
+    override suspend fun loseAccess(medKitId: Uuid, at: Instant) {
+        forget(medKitId)
+    }
 
     /** «Полку убрали, пока экран был открыт». */
     fun forget(id: Uuid): Boolean {

@@ -152,8 +152,7 @@ class QueueWorkerTest {
             operations[operation.id] = operation
         }
 
-        override suspend fun unclosedOfMedKit(medKitId: Uuid): List<StoredSyncOperation> =
-            operations.values.filter { !it.status.isClosed }.map { StoredSyncOperation.Readable(it) }
+        override suspend fun unclosedOfMedKit(medKitId: Uuid): List<StoredSyncOperation> = error("не для этого теста")
 
         /** Ответ записан — а применение бросает: так ведёт себя сломанная транзакция закрытия. */
         var settleFails = false
