@@ -125,7 +125,6 @@ class WriteContractTest {
         // Аптечка
         "MedKitReadings.observeAll" to (Shape.READ by "(LocalDate): Flow<List<MedKitProjection>>"),
         "MedKitReadings.observe" to (Shape.READ by "(Uuid, LocalDate): Flow<MedKitProjection>"),
-        "MedKitReadings.observeSyncedAt" to (Shape.READ by "(Uuid): Flow<Instant>"),
         "MedKitRecords.find" to (Shape.READ by "(Uuid): MedKit"),
         "MedKitRecords.delete" to (Shape.NAMED_FIELDS by "(Uuid): Boolean"),
         "MedKitRecords.mark" to (Shape.NAMED_FIELDS by "(Uuid, MedKitStatus): Boolean"),
@@ -147,8 +146,8 @@ class WriteContractTest {
         "IntakeRecords.record" to (Shape.ACTION by "(IntakeOutcome): Boolean"),
         "IntakeRecords.materialise" to (Shape.CREATION by "(List<CourseIntake>): List<Uuid>"),
         "IntakeRecords.prunePlanned" to (Shape.NAMED_FIELDS by "(Uuid, Set<ScheduledOccurrence>): List<Uuid>"),
-        "ReminderReadings.changes" to (Shape.READ by "(): Flow<Unit>"),
-        "ReminderReadings.groundsChanged" to (Shape.READ by "(): Flow<Unit>"),
+        "ReminderRecords.changes" to (Shape.READ by "(): Flow<Unit>"),
+        "ReminderRecords.groundsChanged" to (Shape.READ by "(): Flow<Unit>"),
         "ReminderRecords.find" to (Shape.READ by "(NotificationKey): Reminder"),
         "ReminderRecords.findAll" to (Shape.READ by "(Collection<NotificationKey>): List<Reminder>"),
         "ReminderRecords.awaiting" to (Shape.READ by "(NoticeDelivery): List<Reminder>"),

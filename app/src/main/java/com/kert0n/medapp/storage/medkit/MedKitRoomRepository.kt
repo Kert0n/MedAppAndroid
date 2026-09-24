@@ -58,8 +58,6 @@ class MedKitRoomRepository @Inject constructor(
 
     override suspend fun find(id: Uuid): MedKit? = medKits.find(id)?.toDomain()
 
-    override fun observeSyncedAt(id: Uuid): Flow<Instant?> = medKits.observe(id).map { it?.syncedAt }
-
     override suspend fun add(medKit: MedKit) = medKits.upsert(medKit.toStorageEntity(syncedAt = null))
 
     override suspend fun describe(medKitId: Uuid, name: String, location: String?): Boolean =

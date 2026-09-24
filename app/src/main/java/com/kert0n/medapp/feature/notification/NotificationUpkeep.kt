@@ -17,7 +17,7 @@ import kotlinx.coroutines.flow.stateIn
  * **Когда сверять** — и только это (PLAN D8). Обещанное следует из состояния коробок, лечений,
  * пунктов и очереди; изменилось состояние — обещанное надо сверить, кто бы его ни изменил:
  * человек правкой срока, снимок чужим расходом, работник закрытием операции. Повод приходит
- * сигналом [ReminderReadings.groundsChanged] после коммита, поэтому сценарий после своей
+ * сигналом [ReminderRecords.groundsChanged] после коммита, поэтому сценарий после своей
  * транзакции ничего не зовёт — цикл тот же, что у [ReminderOutbox] и `QueueOutbox` ([OutboxLoop]):
  * сигналы сворачиваются, сбой сверки записан и повторяется по сроку, а не ждёт чужого сигнала.
  *
@@ -30,7 +30,7 @@ import kotlinx.coroutines.flow.stateIn
  */
 @Singleton
 class NotificationUpkeep @Inject constructor(
-    reminders: ReminderReadings,
+    reminders: ReminderRecords,
     private val reconciliation: NotificationReconciliation,
     private val clock: Clock,
     @ApplicationScope scope: CoroutineScope

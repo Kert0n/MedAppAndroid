@@ -45,7 +45,6 @@ import com.kert0n.medapp.feature.packages.PackageQuery
 import com.kert0n.medapp.feature.packages.PackageReadings
 import com.kert0n.medapp.feature.packages.PackageRecords
 import com.kert0n.medapp.feature.value.VocabularyReadings
-import com.kert0n.medapp.network.server.RawResponse
 import com.kert0n.medapp.queue.QueueStorage
 import com.kert0n.medapp.queue.QueuedCommand
 import com.kert0n.medapp.queue.Receipt
@@ -209,7 +208,6 @@ class FakeMedKits(vararg kits: MedKit) : MedKitRecords, MedKitReadings {
 
     override suspend fun find(id: Uuid): MedKit? = stored[id]
 
-    override fun observeSyncedAt(id: Uuid): Flow<Instant?> = changes.map { null }
 
     override suspend fun add(medKit: MedKit) {
         stored[medKit.id] = medKit

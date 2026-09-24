@@ -4,6 +4,7 @@ import com.kert0n.medapp.domain.notification.NoticeDelivery
 import com.kert0n.medapp.domain.notification.NotificationKey
 import com.kert0n.medapp.domain.notification.NotificationKind
 import com.kert0n.medapp.domain.notification.Reminder
+import kotlinx.coroutines.flow.Flow
 
 /**
  * Обязательства перед человеком (PLAN D8): что обещано сказать, на какой момент и в каком
@@ -16,6 +17,20 @@ import com.kert0n.medapp.domain.notification.Reminder
  * владелец доставки, разбуженный [changes] уже после коммита (F5).
  */
 interface ReminderRecords : ReminderReadings {
+
+    /**
+     * Сигнал после коммита: обязательства изменились — кто-то должен их исполнить. Первое
+     * значение — «наблюдатель встал», не изменение: тому, кто ждёт сигнала, есть чего дождаться.
+     */
+    fun changes(): Flow<Unit>
+
+    /**
+     * Сигнал после коммита: изменились **основания** обязательств — коробки, лечения, пункты,
+     * очередь, — и обещанное надо сверить с ними заново. Какие это таблицы, знает хранение;
+     * сами обязательства сюда не входят, иначе сверка будила бы себя своей же записью. Первое
+     * значение — «наблюдатель встал», как у [changes].
+     */
+    fun groundsChanged(): Flow<Unit>
 
     suspend fun find(key: NotificationKey): Reminder?
 

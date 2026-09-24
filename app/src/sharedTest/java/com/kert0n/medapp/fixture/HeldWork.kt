@@ -1,16 +1,12 @@
 package com.kert0n.medapp.fixture
 
-import com.kert0n.medapp.domain.medkit.MedKit
 import com.kert0n.medapp.domain.medkit.MedKitProjection
-import com.kert0n.medapp.domain.medkit.MedKitStatus
 import com.kert0n.medapp.domain.pack.PackageProjection
 import com.kert0n.medapp.domain.value.Vocabulary
 import com.kert0n.medapp.feature.medkits.MedKitReadings
-import com.kert0n.medapp.feature.medkits.MedKitRecords
 import com.kert0n.medapp.feature.packages.PackageReadings
 import com.kert0n.medapp.feature.value.VocabularyReadings
 import com.kert0n.medapp.queue.Transactions
-import java.time.Instant
 import java.time.LocalDate
 import kotlin.uuid.Uuid
 import kotlinx.coroutines.flow.Flow
@@ -105,7 +101,6 @@ class HeldMedKits(
 
     override fun observeAll(today: LocalDate): Flow<List<MedKitProjection>> = flow { notAsked("observeAll") }
 
-    override fun observeSyncedAt(id: Uuid): Flow<Instant?> = flow { notAsked("observeSyncedAt") }
 
     private fun notAsked(method: String): Nothing =
         error("карточка читает место одним чтением полки, а спросила «$method» — модель разъехалась с проверкой")
