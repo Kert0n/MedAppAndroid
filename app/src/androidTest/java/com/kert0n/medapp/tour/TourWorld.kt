@@ -204,10 +204,13 @@ class TourWorld(private val database: MedAppDatabase, val zone: ZoneId = ZoneId.
     /**
      * Лечение, у которого приём приходится на ближайшую минуту: по нему заводится обязательство
      * напомнить, и снимок шторки показывает настоящее уведомление, а не его изображение.
+     *
+     * [inMinutes] сдвигает приём вперёд — столько времени у того, кто снимает показ руками, чтобы
+     * дойти до сцены со шторкой прежде, чем напоминание придёт.
      */
-    suspend fun intakeDueNow() {
+    suspend fun intakeDueNow(inMinutes: Long = 0) {
         val scenarios = scenarios()
-        val at = now.atZone(zone).toLocalTime().withSecond(0).withNano(0)
+        val at = now.atZone(zone).toLocalTime().plusMinutes(inMinutes).withSecond(0).withNano(0)
         val created = scenarios.courseDrafting.create("Цетрин при аллергии", "Назначил терапевт")
         val saved = scenarios.courseDrafting.edit(
             created.id, created.revision,
