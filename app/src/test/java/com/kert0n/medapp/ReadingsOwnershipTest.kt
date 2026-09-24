@@ -28,6 +28,7 @@ class ReadingsOwnershipTest {
             .filter { it.relativeTo(sources).invariantSeparatorsPath.let { p -> p.startsWith("presentation/") || p.startsWith("ui/") } }
             .map { it.readText() }
             .toList()
+        val read = screens.flatMap { callsOnPorts(it) }.toSet()
         val strays = sources.resolve("feature").walkTopDown()
             .filter { it.name.endsWith("Readings.kt") }
             .flatMap { file ->
@@ -35,11 +36,21 @@ class ReadingsOwnershipTest {
                 Regex("(?m)^\\s+(?:suspend )?fun (\\w+)\\(").findAll(file.readText()).map { "$port.${it.groupValues[1]}" }
             }
             .filter { member ->
-                val call = Regex("\\.${member.substringAfter('.')}\\(")
-                val composer = composedForTheScreen[member]?.let { File(sources, it).readText() }
-                screens.none { it.contains(call) } && composer?.contains(call) != true
+                val composer = composedForTheScreen[member]?.let { callsOnPorts(File(sources, it).readText()) }.orEmpty()
+                member !in read && member !in composer
             }
             .toSortedSet()
         assertEquals("чтения, которых экран не зовёт", sortedSetOf<String>(), strays)
+    }
+
+    /**
+     * Вызовы на портах чтения в тексте: `порт.метод` для каждого поля или параметра, объявленного
+     * типом `…Readings`, — чтобы одноимённый метод другого порта не засчитывался за этот.
+     */
+    private fun callsOnPorts(text: String): Set<String> {
+        val holders = Regex("\\b(\\w+)\\s*:\\s*(\\w+Readings)\\b").findAll(text).associate { it.groupValues[1] to it.groupValues[2] }
+        return holders.flatMap { (name, port) ->
+            Regex("\\b${name}\\.(\\w+)\\(").findAll(text).map { "$port.${it.groupValues[1]}" }.toList()
+        }.toSet()
     }
 }
