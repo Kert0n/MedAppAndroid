@@ -98,6 +98,12 @@ class Reminder(
      * отдельный от «сказали», и гасят её, пока она не погашена (C1 «Карточка без основания
      * гасится, пока не погашена»).
      */
+    /** Обещание ещё не сказано. */
+    val isDue: Boolean get() = state == State.DUE
+
+    /** Повода больше нет: обещание отозвано и ждёт гашения. */
+    val isWithdrawn: Boolean get() = state == State.WITHDRAWN
+
     val cardIsUp: Boolean get() = shownAt != null && state != State.SHOWN
 
     /**

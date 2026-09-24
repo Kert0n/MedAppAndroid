@@ -1,6 +1,6 @@
 package com.kert0n.medapp.domain.course
 
-import com.kert0n.medapp.domain.value.Doses
+import com.kert0n.medapp.domain.intake.IntakeRejected
 import com.kert0n.medapp.domain.value.requireOptionalText
 import com.kert0n.medapp.domain.value.requireText
 import java.time.Instant
@@ -42,6 +42,9 @@ class CourseRecord(
 
     /** Лечение идёт: план для него ещё существует. */
     val isOpen: Boolean get() = outcome == null
+
+    /** Закрытый эпизод ответов на свой план не принимает: приём после закрытия — внеплановый факт (D6). */
+    fun refusesAnswers(): IntakeRejected.Reason? = IntakeRejected.Reason.EPISODE_CLOSED.takeIf { !isOpen }
 
     /** Как запись видит экран и аналитика: величина, наружу уходит она, а не сущность. */
     fun projection(): CourseRecordProjection =

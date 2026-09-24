@@ -28,4 +28,5 @@ class UnplannedIntake(
     override fun hashCode(): Int = id.hashCode()
 
     override fun toString(): String = "UnplannedIntake(id=$id, at=${dose.at})"
+
 }

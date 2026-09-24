@@ -233,12 +233,12 @@ class ReminderOutbox @Inject constructor(
      * ключом. Удалить его значило бы потерять живое; гашение воскрешённого безвредно.
      */
     private suspend fun dismissGroundless(): Int {
-        val groundless = reminders.groundless().filter { it.state == Reminder.State.WITHDRAWN || it.cardIsUp }
+        val groundless = reminders.groundless().filter { it.isWithdrawn || it.cardIsUp }
         for (reminder in groundless) notifier.dismiss(reminder.key)
-        val withdrawn = groundless.filter { it.state == Reminder.State.WITHDRAWN }.map { it.key }
+        val withdrawn = groundless.filter { it.isWithdrawn }.map { it.key }
         if (withdrawn.isNotEmpty()) {
             transactions.run {
-                reminders.deleteAll(reminders.findAll(withdrawn).filter { it.state == Reminder.State.WITHDRAWN }.map { it.key })
+                reminders.deleteAll(reminders.findAll(withdrawn).filter { it.isWithdrawn }.map { it.key })
             }
         }
         return groundless.size

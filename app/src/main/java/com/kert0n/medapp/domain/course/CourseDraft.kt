@@ -125,7 +125,7 @@ class CourseDraft(
      * значило бы обещать то, чего не будет.
      */
     fun setTotalDoses(totalDoses: Doses, at: Instant): Result<CourseDraft> {
-        if (!Prescription.allows(totalDoses)) return rejected(CourseRejected.Reason.TOTAL_DOSES_TOO_MANY)
+        Prescription.refusesTotal(totalDoses)?.let { return rejected(it) }
         return Result.success(
             changed(
                 totalDoses = totalDoses,
@@ -218,7 +218,7 @@ class CourseDraft(
         val totalDoses = totalDoses?.takeUnless { it.isNone }
             ?: return rejected(CourseRejected.Reason.TOTAL_DOSES_MISSING)
         // Черновик, записанный до правила, мог назначить больше: начатым такое лечение не бывает.
-        if (!Prescription.allows(totalDoses)) return rejected(CourseRejected.Reason.TOTAL_DOSES_TOO_MANY)
+        Prescription.refusesTotal(totalDoses)?.let { return rejected(it) }
         // С отключённым источником лечение не начинается: человек его убирает или чинит (PLAN D5).
         medicine.firstFault?.let { return rejected(it.rejection) }
         val prescription = Prescription(

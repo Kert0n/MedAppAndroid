@@ -1,15 +1,15 @@
 package com.kert0n.medapp.feature.medkits
 
+import com.kert0n.medapp.domain.medkit.MedKit
 import com.kert0n.medapp.domain.medkit.MedKitStatus
 import com.kert0n.medapp.domain.pack.PackageStatus
 import com.kert0n.medapp.feature.packages.PackageRecords
 import com.kert0n.medapp.feature.packages.PackageRelocation
 import com.kert0n.medapp.feature.packages.PackageRemoval
 import com.kert0n.medapp.feature.readThisTransaction
+import com.kert0n.medapp.queue.Clearing
 import com.kert0n.medapp.queue.QueueService
-import com.kert0n.medapp.queue.QueuedCommand
 import com.kert0n.medapp.queue.Transactions
-import com.kert0n.medapp.queue.medkit.MedKitSyncCommand
 import java.time.Clock
 import javax.inject.Inject
 import kotlin.uuid.Uuid
@@ -51,18 +51,18 @@ class MedKitRemoval @Inject constructor(
 
     suspend fun remove(medKitId: Uuid, fate: Fate): Outcome = transactions.run {
         val medKit = medKits.find(medKitId) ?: return@run Outcome.MED_KIT_GONE
-        if (!medKit.status.allowsDecision) return@run Outcome.BUSY
+        if (!medKit.decidable) return@run Outcome.BUSY
         val now = clock.instant()
         if (fate == Fate.LeaveToOthers) {
-            if (!medKit.answersToServer) return@run Outcome.NOT_SHARED
-            val leave = QueuedCommand(Uuid.random(), MedKitSyncCommand.Leave(medKitId))
-            queue.change(medKit.ref, listOf(leave), now) {
+            if (!medKit.mayBeLeftToOthers) return@run Outcome.NOT_SHARED
+            val leave = queue.leaving(medKit.ref)
+            queue.change(medKit.ref, leave.errands, now) {
                 // Коробки остаются остальным, а у нас до ответа только видны. Ждущую своего решения
                 // не трогаем — её отпустит её же команда (PLAN E1, E6). Пометки, поставленные
                 // здесь, принадлежат выходу: снимет их его ответ, а не первая доехавшая команда.
                 for (pkg in packages.contentsOf(medKitId)) {
-                    if (pkg.status.allowsUse) {
-                        packages.mark(pkg.id, PackageStatus.LOST, by = leave.id).readThisTransaction("пачка")
+                    if (pkg.usable) {
+                        packages.mark(pkg.id, PackageStatus.LOST, by = leave.by).readThisTransaction("пачка")
                     }
                 }
                 medKits.mark(medKitId, MedKitStatus.REMOVING)
@@ -70,42 +70,42 @@ class MedKitRemoval @Inject constructor(
             return@run Outcome.MARKED
         }
         val target = (fate as? Fate.MoveTo)?.let { medKits.find(it.medKitId) ?: return@run Outcome.TARGET_GONE }
-        if (target != null && target.id == medKit.id) return@run Outcome.TARGET_IS_THE_SAME
-        // В полку, о которой уже принято решение, не кладут: она вот-вот уйдёт или уже рассказала
-        // серверу о своём содержимом (PLAN E1, E5, E6).
-        if (target != null && !target.status.allowsDecision) return@run Outcome.TARGET_BUSY
-        if (medKit.answersToServer && target != null && !target.answersToServer) {
-            val contents = packages.contentsOf(medKitId)
-            // Коробку, которая ждёт своего ответа, унести нечем, а полка уйдёт у всех — и унесёт
-            // её с собой. Лучше подождать ответа по коробке, чем выбросить её молча (PLAN E6).
-            if (contents.any { !it.status.allowsUse }) return@run Outcome.CONTENTS_BUSY
-            val withdrawals = contents.associateWith { relocation.withdrawal(it) }
-            val delete = QueuedCommand(
-                Uuid.random(),
-                MedKitSyncCommand.Delete(medKitId),
-                dependsOn = withdrawals.values.mapTo(HashSet()) { it.id }
-            )
-            queue.change(medKit.ref, withdrawals.values + delete, now) {
-                for ((pkg, withdrawal) in withdrawals) relocation.carryHome(pkg, target.ref, now, by = withdrawal.id)
-                medKits.mark(medKitId, MedKitStatus.REMOVING)
-            }
-            return@run Outcome.MARKED
+        when (target?.refusesContentsFrom(medKit.ref)) {
+            MedKit.ReceivingRefusal.SAME_SHELF -> return@run Outcome.TARGET_IS_THE_SAME
+            MedKit.ReceivingRefusal.BUSY -> return@run Outcome.TARGET_BUSY
+            null -> Unit
         }
-        if (medKit.answersToServer) {
-            val delete = QueuedCommand(Uuid.random(), MedKitSyncCommand.Delete(medKitId, target?.id))
-            // Коробки выбрасываемой полки выведены из оборота, переносимые — только помечены: ими
-            // пользуются, пока сервер переставляет. Ждущую своего решения коробку не трогаем — её
-            // отпустит её же команда (PLAN E1, E6).
-            val fate = if (target == null) PackageStatus.REMOVING else PackageStatus.CHANGING
-            queue.change(medKit.ref, listOf(delete), now) {
-                for (pkg in packages.contentsOf(medKitId)) {
-                    if (pkg.status.allowsUse) {
-                        packages.mark(pkg.id, fate, by = delete.id).readThisTransaction("пачка")
+        when (val clearing = queue.clearing(medKit.ref, target?.ref)) {
+            is Clearing.Home -> {
+                val contents = packages.contentsOf(medKitId)
+                // Коробку, которая ждёт своего ответа, унести нечем, а полка уйдёт у всех — и унесёт
+                // её с собой. Лучше подождать ответа по коробке, чем выбросить её молча (PLAN E6).
+                if (contents.any { !it.usable }) return@run Outcome.CONTENTS_BUSY
+                val homecoming = queue.homecoming(medKit.ref, contents)
+                queue.change(medKit.ref, homecoming.errands, now) {
+                    for ((pkg, withdrawal) in homecoming.withdrawals) {
+                        relocation.carryHome(pkg, clearing.target, now, by = withdrawal.by)
                     }
+                    medKits.mark(medKitId, MedKitStatus.REMOVING)
                 }
-                medKits.mark(medKitId, MedKitStatus.REMOVING)
+                return@run Outcome.MARKED
             }
-            return@run Outcome.MARKED
+            is Clearing.ByServer -> {
+                // Коробки выбрасываемой полки выведены из оборота, переносимые — только помечены: ими
+                // пользуются, пока сервер переставляет. Ждущую своего решения коробку не трогаем — её
+                // отпустит её же команда (PLAN E1, E6).
+                val fate = if (target == null) PackageStatus.REMOVING else PackageStatus.CHANGING
+                queue.change(medKit.ref, clearing.laying.errands, now) {
+                    for (pkg in packages.contentsOf(medKitId)) {
+                        if (pkg.usable) {
+                            packages.mark(pkg.id, fate, by = clearing.laying.by).readThisTransaction("пачка")
+                        }
+                    }
+                    medKits.mark(medKitId, MedKitStatus.REMOVING)
+                }
+                return@run Outcome.MARKED
+            }
+            Clearing.Local -> Unit
         }
         for (pkg in packages.contentsOf(medKitId)) {
             if (target == null) {

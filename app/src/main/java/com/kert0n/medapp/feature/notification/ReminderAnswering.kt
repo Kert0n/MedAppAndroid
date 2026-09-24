@@ -68,9 +68,9 @@ class ReminderAnswering @Inject constructor(
     /** Отказ человека: пункт становится пропуском, и напоминать о нём больше нечего. */
     suspend fun skip(intakeId: Uuid): Response = transactions.run {
         when (declining.decline(intakeId, clock.instant())) {
-            IntakeDeclining.Outcome.DECLINED, IntakeDeclining.Outcome.ALREADY_ANSWERED -> Response.Done
+            IntakeDeclining.Outcome.Declined, IntakeDeclining.Outcome.AlreadyAnswered -> Response.Done
             // Курса или пункта больше нет — напоминать не о чем, и говорить человеку нечего.
-            IntakeDeclining.Outcome.EPISODE_CLOSED, IntakeDeclining.Outcome.GONE -> {
+            is IntakeDeclining.Outcome.Rejected, IntakeDeclining.Outcome.Gone -> {
                 withdrawal.withdraw(intakeId)
                 Response.Done
             }
@@ -91,7 +91,7 @@ class ReminderAnswering @Inject constructor(
         // Читаем и пишем одной транзакцией: пока человек жал кнопку, лечение могли отменить, и
         // отсрочка, положенная поверх снятого, воскресила бы его (F5).
         val deferred = transactions.run {
-            val reminder = reminders.find(key)?.takeIf { it.state != Reminder.State.WITHDRAWN }
+            val reminder = reminders.find(key)?.takeIf { !it.isWithdrawn }
             reminder?.also {
                 it.defer(at)
                 reminders.saveAll(listOf(it))

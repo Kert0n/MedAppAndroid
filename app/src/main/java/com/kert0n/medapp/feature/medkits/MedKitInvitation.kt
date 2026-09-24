@@ -3,6 +3,7 @@ package com.kert0n.medapp.feature.medkits
 import com.kert0n.medapp.di.InvitationTerm
 import com.kert0n.medapp.domain.Unavailability
 import com.kert0n.medapp.domain.medkit.Invitation
+import com.kert0n.medapp.domain.medkit.MedKit
 import com.kert0n.medapp.domain.medkit.MedKitInvitations
 import com.kert0n.medapp.queue.SnapshotApplier
 import java.time.Clock
@@ -34,8 +35,11 @@ class MedKitInvitation @Inject constructor(
         val medKit = medKits.find(medKitId) ?: return Outcome.MedKitGone
         // Полка, которая к серверу только едет, местной не считается: решение о ней уже принято, и
         // человеку остаётся дождаться ответа, а не публиковать её заново (PLAN E5).
-        if (!medKit.acceptsCommands) return Outcome.NotShared
-        if (!medKit.acceptsInvitations) return Outcome.Busy
+        when (medKit.refusesInvitation()) {
+            MedKit.InvitationRefusal.NOT_SHARED -> return Outcome.NotShared
+            MedKit.InvitationRefusal.BUSY -> return Outcome.Busy
+            null -> Unit
+        }
         return when (val issue = invitations.issue(medKit)) {
             is MedKitInvitations.Issue.Issued -> Outcome.Invited(Invitation(issue.key, clock.instant(), term))
             // Полка ушла из списка, только если снимок лёг; не лёг — она ещё видна, и сказать «её нет»

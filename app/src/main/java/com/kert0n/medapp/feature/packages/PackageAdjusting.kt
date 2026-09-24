@@ -8,10 +8,9 @@ import com.kert0n.medapp.domain.value.Quantity
 import com.kert0n.medapp.feature.packages.PackageAdjustment
 import com.kert0n.medapp.feature.packages.PackageRecords
 import com.kert0n.medapp.feature.readThisTransaction
+import com.kert0n.medapp.queue.Laying
 import com.kert0n.medapp.queue.QueueService
-import com.kert0n.medapp.queue.QueuedCommand
 import com.kert0n.medapp.queue.Transactions
-import com.kert0n.medapp.queue.pack.PackageSyncCommand
 import java.time.Clock
 import java.time.Instant
 import javax.inject.Inject
@@ -41,13 +40,17 @@ class PackageAdjusting @Inject constructor(
 
     suspend fun adjust(packageId: Uuid, action: Action): Outcome = transactions.run {
         val pkg = packages.find(packageId) ?: return@run Outcome.GONE
-        if (!pkg.status.allowsUse) return@run Outcome.UNUSABLE
+        if (!pkg.usable) return@run Outcome.UNUSABLE
         val now = clock.instant()
-        val ended = if (packages.answersToServer(packageId)) announce(pkg, action, now) else apply(pkg, action, now)
+        val laying = when (action) {
+            is Action.Recount -> queue.adjustment(pkg, seen = action.seen, actual = action.actual)
+            is Action.Dispose -> queue.adjustment(pkg, seen = action.seen, actual = action.seen.minusOrZero(action.amount))
+        }
+        val ended = if (laying is Laying.Awaiting) announce(pkg, laying, now) else apply(pkg, action, now)
         // Кончившуюся коробку лечение уже потеряло своей дверью; кончающуюся на полке потеряет
         // ответ. Зажимать есть что только у оставшейся — и по тому же числу, что на экране (D4).
         val after = if (ended) null else packages.projection(pkg.id)?.availability
-        if (after != null && !after.effective.isZero) following.follow(pkg.id, now)
+        if (after != null && !after.isSpent) following.follow(pkg.id, now)
         if (ended) Outcome.ENDED else Outcome.ADJUSTED
     }
 
@@ -66,14 +69,9 @@ class PackageAdjusting @Inject constructor(
      * Полка, отвечающая серверу: команда-разница и пометка. Коробка при этом остаётся: ноль в
      * проекции значит «кончится, когда полка согласится», а строка живёт до ответа (PLAN E1).
      */
-    private suspend fun announce(pkg: Package, action: Action, now: Instant): Boolean {
-        val command = when (action) {
-            is Action.Recount -> PackageSyncCommand.CorrectStock(pkg.id, seen = action.seen, actual = action.actual)
-            is Action.Dispose -> PackageSyncCommand.CorrectStock(pkg.id, seen = action.seen, actual = action.seen.minusOrZero(action.amount))
-        }
-        val announced = QueuedCommand(Uuid.random(), command)
-        queue.change(pkg.medKit, listOf(announced), now) {
-            packages.mark(pkg.id, PackageStatus.CHANGING, by = announced.id).readThisTransaction("пачка")
+    private suspend fun announce(pkg: Package, laying: Laying.Awaiting, now: Instant): Boolean {
+        queue.change(pkg.medKit, laying.errands, now) {
+            packages.mark(pkg.id, PackageStatus.CHANGING, by = laying.by).readThisTransaction("пачка")
             true
         }
         // Коробка кончится, когда полка согласится: до ответа строка живёт, и терять её нечем.

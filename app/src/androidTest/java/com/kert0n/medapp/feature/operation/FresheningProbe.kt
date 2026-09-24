@@ -53,7 +53,6 @@ import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.runBlocking
 import org.junit.After
 import org.junit.Assert.assertEquals
-import org.junit.Assert.assertNotNull
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Assume.assumeTrue
@@ -259,7 +258,7 @@ class FresheningProbe {
         val freshening = Freshening(
             Rereading(MedAppRegister(api, snapshots, clock), database.snapshotStorage(), clock),
             FakeConnection(online = true),
-            packages,
+            queue,
             transactions,
             clock,
             kotlinx.coroutines.CoroutineScope(kotlinx.coroutines.SupervisorJob() + kotlinx.coroutines.Dispatchers.IO)

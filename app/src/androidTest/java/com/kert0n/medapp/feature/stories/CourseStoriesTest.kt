@@ -122,7 +122,7 @@ class CourseStoriesTest {
         // День 1 — принял; день 2 — пропустил; день 3 — не ответил; дни 4–6 — принял.
         evening.intakeConfirmation.confirm(plan[0].id, first, dose("2"), evening.now).confirmed()
         val day2 = Scenarios(database, at(day1.plusDays(1), 21, 5))
-        assertEquals(IntakeDeclining.Outcome.DECLINED, day2.intakeDeclining.decline(planned(course).first().id, day2.now))
+        assertEquals(IntakeDeclining.Outcome.Declined, day2.intakeDeclining.decline(planned(course).first().id, day2.now))
         val day4 = Scenarios(database, at(day1.plusDays(3), 21, 5))
         day4.dailyRound.run()
         val missedByNoAnswer = intakes(course).first { it.plannedAt == at(day1.plusDays(2), 21) }

@@ -4,6 +4,7 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.kert0n.medapp.domain.course.CourseSource
 import com.kert0n.medapp.domain.course.Revision
+import com.kert0n.medapp.domain.course.SourceFit
 import com.kert0n.medapp.domain.pack.PackageProjection
 import com.kert0n.medapp.domain.value.DosageForm
 import com.kert0n.medapp.domain.value.Dose
@@ -26,7 +27,6 @@ import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlin.uuid.Uuid
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.MutableStateFlow
-import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.distinctUntilChanged
@@ -34,8 +34,6 @@ import kotlinx.coroutines.flow.filterNotNull
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.flatMapLatest
 import kotlinx.coroutines.flow.map
-import kotlinx.coroutines.flow.stateIn
-import kotlinx.coroutines.launch
 
 /**
  * Выбор источника (PLAN H3 №17): какие коробки можно подключить к лечению. Подключается коробка
@@ -207,25 +205,24 @@ class SourcePickingViewModel @AssistedInject constructor(
     ) {
 
         /**
-         * Можно ли взять эту коробку, и если нет — почему. Порядок вопросов тот же, каким
-         * отвечает подключение: непригодную не берут вовсе, уже взятую не берут второй раз, без
-         * формы не с чем сверять, а дальше решает правило домена (PLAN D5).
-         *
-         * Случай «у коробки не указана форма» экран узнаёт сам: домен различает его внутри
-         * `attach` (`FORM_UNKNOWN`), а снаружи такого вопроса не задаёт.
+         * Можно ли взять эту коробку, и если нет — почему. Отвечает домен тем же ответом, каким
+         * отвечает подключение ([SourceFit]); своё у экрана — только неполное назначение и
+         * коробка, которую держит другое лечение, — её узнают после непригодной и уже взятой.
          */
         fun attachability(pack: PackageProjection, titles: Map<Uuid, String>): Attachability {
             val dose = dose ?: return Attachability.PrescriptionIncomplete
             val form = form ?: return Attachability.PrescriptionIncomplete
-            if (!pack.status.allowsUse) return Attachability.Unusable
-            if (sources.any { it.pkg.id == pack.id }) return Attachability.Attached
+            val fit = SourceFit.of(pack.ref, pack.usable, sources.any { it.pkg.id == pack.id }, dose, form)
+            if (fit == SourceFit.Unusable) return Attachability.Unusable
+            if (fit == SourceFit.Attached) return Attachability.Attached
             pack.holdingCourseId?.takeIf { it != courseId }?.let {
                 return Attachability.HeldByCourse(titles[it])
             }
-            if (pack.ref.form == null) return Attachability.NeedsForm
-            return CourseSource.Fault.between(pack.ref, dose, form)
-                ?.let { Attachability.Mismatch(it) }
-                ?: Attachability.Attachable
+            return when (fit) {
+                SourceFit.NeedsForm -> Attachability.NeedsForm
+                is SourceFit.Mismatch -> Attachability.Mismatch(fit.fault)
+                else -> Attachability.Attachable
+            }
         }
     }
 

@@ -1,7 +1,8 @@
 package com.kert0n.medapp.fixture
 
 import com.kert0n.medapp.feature.operation.Freshening
-import com.kert0n.medapp.feature.packages.PackageRecords
+import com.kert0n.medapp.queue.QueueService
+import com.kert0n.medapp.queue.pack.PackageSnapshot
 import java.time.Clock
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -12,12 +13,13 @@ import kotlinx.coroutines.Dispatchers
  */
 fun onlineFreshening(
     server: RereadingServer,
-    packages: PackageRecords,
-    clock: Clock = Clock.systemUTC()
+    clock: Clock = Clock.systemUTC(),
+    knows: Collection<PackageSnapshot> = emptyList(),
+    queue: QueueService = QueueService(DirectTransactions, FakeQueue(knows))
 ): Freshening = Freshening(
     server.rereading,
     FakeConnection(online = true),
-    packages,
+    queue,
     DirectTransactions,
     clock,
     CoroutineScope(kotlinx.coroutines.SupervisorJob() + Dispatchers.Default)
@@ -28,13 +30,16 @@ fun onlineFreshening(
  * перечитывание не предмет, — они видят экран таким, каким он был до него (PLAN E4).
  */
 fun offlineFreshening(
-    packages: PackageRecords,
     clock: Clock = Clock.systemUTC()
 ): Freshening = Freshening(
     RereadingServer(clock).rereading,
     FakeConnection(online = false),
-    packages,
+    QueueService(DirectTransactions, FakeQueue()),
     DirectTransactions,
     clock,
     CoroutineScope(Dispatchers.Unconfined)
 )
+
+/** Коробка, которую сервер уже создал: у неё есть серверная версия. Данные, а не правило. */
+fun onServer(pkg: com.kert0n.medapp.domain.pack.Package): PackageSnapshot =
+    PackageSnapshot(pkg, com.kert0n.medapp.queue.pack.PackageSyncState(pkg.id, com.kert0n.medapp.queue.ResourceVersion(1)))

@@ -120,7 +120,7 @@ class Course(
      */
     fun setTotalDoses(totalDoses: Doses, at: Instant): Result<Course> {
         if (totalDoses.isNone) return rejected(CourseRejected.Reason.TOTAL_DOSES_MISSING)
-        if (!Prescription.allows(totalDoses)) return rejected(CourseRejected.Reason.TOTAL_DOSES_TOO_MANY)
+        Prescription.refusesTotal(totalDoses)?.let { return rejected(it) }
         if (totalDoses == this.totalDoses) return Result.success(this)
         return Result.success(
             changed(prescription = prescription.withTotalDoses(totalDoses), revision = revision.next(), updatedAt = at)

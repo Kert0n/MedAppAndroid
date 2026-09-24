@@ -6,6 +6,7 @@ import com.kert0n.medapp.domain.intake.CourseIntake
 import com.kert0n.medapp.domain.intake.IntakeProjection
 import com.kert0n.medapp.domain.intake.IntakeRejected
 import com.kert0n.medapp.domain.intake.IntakeStatus
+import com.kert0n.medapp.domain.pack.Package
 import com.kert0n.medapp.domain.pack.PackageAfter
 import com.kert0n.medapp.domain.value.Dose
 import com.kert0n.medapp.domain.value.Quantity
@@ -19,11 +20,9 @@ import com.kert0n.medapp.feature.notification.ReminderWithdrawal
 import com.kert0n.medapp.feature.packages.PackageRecords
 import com.kert0n.medapp.feature.readThisTransaction
 import com.kert0n.medapp.queue.QueueService
-import com.kert0n.medapp.queue.QueuedCommand
+import com.kert0n.medapp.queue.Spending
 import com.kert0n.medapp.queue.Transactions
 import com.kert0n.medapp.queue.intake.IntakeAccounting
-import com.kert0n.medapp.queue.intake.IntakeSyncState
-import com.kert0n.medapp.queue.pack.PackageSyncCommand
 import java.time.Clock
 import java.time.Instant
 import javax.inject.Inject
@@ -73,28 +72,19 @@ class IntakeConfirmation @Inject constructor(
         // Идентификатор пришёл снаружи — с экрана или из шторки: пропавший пункт — исход, не падение.
         val intake = intakes.find(intakeId) as? CourseIntake ?: return Outcome.Gone
         val record = checkNotNull(courses.findRecord(intake.courseId)) { "у пункта курса есть запись эпизода" }
-        if (intake.status == IntakeStatus.TAKEN) {
+        if (intake.isTaken) {
             val sync = checkNotNull(accounts.of(intake.id)) { "принятый пункт записан" }
             return Outcome.Confirmed(intake.projection(), sync.accounting, episodeClosed = !record.isOpen)
         }
-        if (!record.isOpen) return rejected(IntakeRejected.Reason.EPISODE_CLOSED)
+        record.refusesAnswers()?.let { return Outcome.Rejected(it) }
         val course = courses.openPlan(intake.courseId)
-        val pkg = packages.find(packageId) ?: return rejected(IntakeRejected.Reason.PACKAGE_UNUSABLE)
-        if (amount.unit != intake.unit) return rejected(IntakeRejected.Reason.UNIT_MISMATCH)
-        // Акт по пачке — первым: он сверяет единицу коробки, а сравнивать числа разных единиц
-        // нечем. Единица источника, проверенная при подключении, могла прийти другой снимком.
-        val taken = pkg.take(amount, at).getOrElse { return rejected((it as IntakeRejected).reason) }
-        // Кому отвечает эта коробка: серверу — только когда он её знает, иначе расход местный и
-        // команды не ставит, а расскажет о нём её же создание (PLAN E6).
-        val spendsLocally = !packages.answersToServer(packageId)
-        // Своя коробка списывается здесь же, и списать больше, чем в ней есть, нечем; у общей
-        // истина по количеству — сервер, и нехватку отвечает он (PLAN E3).
-        if (spendsLocally && !pkg.quantity.covers(amount)) {
-            return rejected(IntakeRejected.Reason.INSUFFICIENT)
-        }
-        // Пункт курса принимают из пачки курса; из любой другой это внеплановый факт, и пункт им
-        // не закрывается (PLAN D5).
-        if (!course.isSource(pkg.ref)) return rejected(IntakeRejected.Reason.PACKAGE_NOT_A_SOURCE)
+        val pkg = Package.present(packages.find(packageId)).getOrElse { return rejected(it) }
+        // Кому отвечает эта коробка, говорит очередь: серверу — только когда он её знает, иначе
+        // расход местный, а расскажет о нём её же создание (PLAN E6).
+        val spending = queue.spending(pkg)
+        val spendsLocally = spending == Spending.LOCAL
+        // Отвечать ли пункту этим приёмом, решает сам пункт: единица, остаток, источник.
+        val taken = intake.take(amount, at, pkg, course, countedHere = spendsLocally).getOrElse { return rejected(it) }
         // Вопрос — после отказов и до всякой записи, в том числе отметки пропусков: не записано
         // ничего, пока человек не ответит. Просрочена ли — на день приёма, а не на сегодня.
         val warnings = listOfNotNull(
@@ -108,10 +98,7 @@ class IntakeConfirmation @Inject constructor(
         val confirmed = intake.confirm(taken)
 
         val others = intakes.ofCourse(course.id).filterIsInstance<CourseIntake>().filter { it != intake }
-        val progress = CourseProgress(
-            taken = others.filter { it.status == IntakeStatus.TAKEN }.mapTo(HashSet()) { it.slot } + confirmed.slot,
-            missed = others.filter { it.status == IntakeStatus.MISSED }.mapTo(HashSet()) { it.slot }
-        )
+        val progress = CourseProgress.of(others + confirmed)
         val completion = CourseCompletion(course, progress)
         val finished = completion.reached
 
@@ -141,18 +128,9 @@ class IntakeConfirmation @Inject constructor(
             else -> (reallocation?.course ?: course).allocatedOf(pkg.ref)
         }
 
-        val consume = QueuedCommand(Uuid.random(), PackageSyncCommand.Consume(pkg.id, amount, intake.id, claimAfter))
-        val release = QueuedCommand(Uuid.random(), PackageSyncCommand.ReleaseClaim(pkg.id), dependsOn = setOf(consume.id))
-            .takeIf { claimAfter?.isZero == true }
-        val sync = if (spendsLocally) {
-            IntakeSyncState(intake.id, IntakeAccounting.LOCAL_APPLIED)
-        } else {
-            IntakeSyncState(intake.id, IntakeAccounting.PENDING, consume.id)
-        }
-        val outcome = IntakeOutcome(confirmed, setOf(IntakeStatus.PLANNED, IntakeStatus.MISSED), sync, reallocation, recordedAt = now)
-        // Местному расходу везти нечего: сервер о коробке не знает — расскажет о ней её создание (E6).
-        val commands = if (spendsLocally) emptyList() else listOfNotNull(consume, release)
-        val recorded = queue.change(pkg.medKit, commands, now) { intakes.record(outcome) }
+        val consumption = queue.consumption(spending, intake.id, pkg, amount, claimAfter)
+        val outcome = IntakeOutcome(confirmed, setOf(IntakeStatus.PLANNED, IntakeStatus.MISSED), consumption.sync, reallocation, recordedAt = now)
+        val recorded = queue.change(pkg.medKit, consumption.errands, now) { intakes.record(outcome) }
         recorded.readThisTransaction("пункт и пачка")
 
         // Ответ дан — напоминать больше нечего. Той же транзакцией: откат уносит отзыв вместе с
@@ -164,10 +142,10 @@ class IntakeConfirmation @Inject constructor(
         } else {
             calendar.prune(course, course.remainingOccurrences(progress), now)
         }
-        return Outcome.Confirmed(confirmed.projection(), sync.accounting, episodeClosed = finished)
+        return Outcome.Confirmed(confirmed.projection(), consumption.sync.accounting, episodeClosed = finished)
     }
 
-    private fun rejected(reason: IntakeRejected.Reason): Outcome = Outcome.Rejected(reason)
+    private fun rejected(refusal: Throwable): Outcome = Outcome.Rejected((refusal as IntakeRejected).reason)
 
     /**
      * Чем кончилось — четыре исхода, которые экран делает по-разному (PLAN D6). Записано — принятый

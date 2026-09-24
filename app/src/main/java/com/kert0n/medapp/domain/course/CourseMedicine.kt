@@ -61,13 +61,13 @@ class CourseMedicine(sources: List<CourseSource> = emptyList()) {
         form: DosageForm
     ): Result<CourseMedicine> {
         val ref = pkg.ref
-        val rejection = when {
-            !pkg.status.allowsUse -> CourseRejected.Reason.PACKAGE_UNUSABLE
-            holds(ref) -> CourseRejected.Reason.ALREADY_ATTACHED
-            // Пачка без формы не годится ни под какое назначение: сказать, тот ли это препарат,
-            // нечем, и сначала форму надо заполнить.
-            ref.form == null -> CourseRejected.Reason.FORM_UNKNOWN
-            else -> CourseSource.Fault.between(ref, dose, form)?.rejection
+        val rejection = when (val fit = SourceFit.of(ref, pkg.usable, holds(ref), dose, form)) {
+            SourceFit.Unusable -> CourseRejected.Reason.PACKAGE_UNUSABLE
+            SourceFit.Attached -> CourseRejected.Reason.ALREADY_ATTACHED
+            // Пачка без формы не годится ни под какое назначение: сначала форму надо заполнить.
+            SourceFit.NeedsForm -> CourseRejected.Reason.FORM_UNKNOWN
+            is SourceFit.Mismatch -> fit.fault.rejection
+            SourceFit.Fits -> null
         }
         if (rejection != null) return Result.failure(CourseRejected(rejection))
         return Result.success(withSources(sources + CourseSource(ref, doses)))

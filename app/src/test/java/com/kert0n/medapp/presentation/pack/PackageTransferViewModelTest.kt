@@ -28,7 +28,6 @@ import java.math.BigDecimal
 import java.time.Clock
 import java.time.Instant
 import java.time.ZoneId
-import kotlin.uuid.Uuid
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
@@ -59,7 +58,7 @@ class PackageTransferViewModelTest {
     private fun viewModel(
         transactions: Transactions = DirectTransactions,
         lying: Package = pack(id = PACK, quantity = tablets("20")),
-        freshening: com.kert0n.medapp.feature.operation.Freshening = com.kert0n.medapp.fixture.offlineFreshening(stored, clock)
+        freshening: com.kert0n.medapp.feature.operation.Freshening = com.kert0n.medapp.fixture.offlineFreshening(clock)
     ) = PackageTransferViewModel(
         relocation = PackageRelocation(stored, medKits, FakeCourses(), queue, transactions, clock),
         freshening = freshening,
@@ -228,12 +227,13 @@ class PackageTransferViewModelTest {
     @Test
     fun aSharedBoxIsMovedOnlyAfterTheServerAnswers() {
         // Коробка в базе до открытия экрана: перечитывают то, что открыли, а не то, что появится.
-        stored.lying(pack(id = PACK, quantity = tablets("20"), medKit = medKits.medKits.first { it.id == SHARED_KIT }.ref))
+        val box = pack(id = PACK, quantity = tablets("20"), medKit = medKits.medKits.first { it.id == SHARED_KIT }.ref)
+        stored.lying(box)
         val server = com.kert0n.medapp.fixture.RereadingServer(clock)
         server.hold()
         val model = viewModel(
             lying = pack(id = PACK, quantity = tablets("20"), medKit = com.kert0n.medapp.fixture.medKit(id = com.kert0n.medapp.fixture.SHARED_KIT, publication = com.kert0n.medapp.domain.medkit.MedKit.Publication.PUBLISHED, participantCount = 2).ref),
-            freshening = com.kert0n.medapp.fixture.onlineFreshening(server, stored, clock)
+            freshening = com.kert0n.medapp.fixture.onlineFreshening(server, clock, knows = listOf(com.kert0n.medapp.fixture.onServer(box)))
         )
 
         watching(model.state) { state ->

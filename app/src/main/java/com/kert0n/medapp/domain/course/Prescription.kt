@@ -28,6 +28,9 @@ data class Prescription(
     /** Число доз меняется — назначение остаётся тем же лечением с другой длиной. */
     fun withTotalDoses(totalDoses: Doses): Prescription = copy(totalDoses = totalDoses)
 
+    /** Сколько доз ещё назначено после [taken] принятых: больше лечению не назначено (PLAN D5). */
+    fun dosesLeftAfter(taken: Int): Int = (totalDoses.count - taken).coerceAtLeast(0)
+
     /** Годится ли пачка под это назначение; `null` — годится (PLAN D5). */
     fun faultOf(pkg: PackageRef): CourseSource.Fault? = CourseSource.Fault.between(pkg, dose, form)
 
@@ -42,7 +45,8 @@ data class Prescription(
          */
         const val MAX_TOTAL_DOSES = 10_000
 
-        /** Назначают ли столько доз: черновик и идущее лечение спрашивают это здесь, а не решают сами. */
-        fun allows(totalDoses: Doses): Boolean = totalDoses.count <= MAX_TOTAL_DOSES
+        /** Назначают ли столько доз: черновик, идущее лечение и форма спрашивают это здесь, а не решают сами. */
+        fun refusesTotal(totalDoses: Doses): CourseRejected.Reason? =
+            CourseRejected.Reason.TOTAL_DOSES_TOO_MANY.takeIf { totalDoses.count > MAX_TOTAL_DOSES }
     }
 }

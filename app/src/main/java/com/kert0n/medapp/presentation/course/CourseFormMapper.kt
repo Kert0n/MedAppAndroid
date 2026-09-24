@@ -1,6 +1,5 @@
 package com.kert0n.medapp.presentation.course
 
-import com.kert0n.medapp.domain.course.CourseRejected
 import com.kert0n.medapp.domain.course.CourseDraftProjection
 import com.kert0n.medapp.domain.course.CourseProjection
 import com.kert0n.medapp.domain.course.CourseRecordProjection
@@ -69,9 +68,9 @@ fun CourseFormPresentationDTO.parsed(vocabulary: Vocabulary): ParsedInput<Course
     val totalDoses = totalDoses.trim().ifEmpty { null }?.let { typed ->
         val count = typed.toIntOrNull()?.takeIf { it > 0 }?.let(::Doses)
             ?: return rejected(CourseFormError.Input.TOTAL_DOSES_INVALID)
-        // Правило держит назначение; здесь оно повторено, чтобы ответ пришёл на наборе, а не на
-        // записи. Отказ — тот же, каким ответил бы домен.
-        if (!Prescription.allows(count)) return rejected(CourseFormError.Rejected(CourseRejected.Reason.TOTAL_DOSES_TOO_MANY))
+        // Правило держит назначение; экран спрашивает его на наборе, а не на записи, и отказ тот
+        // же, каким ответил бы домен.
+        Prescription.refusesTotal(count)?.let { return rejected(CourseFormError.Rejected(it)) }
         count
     }
 
@@ -107,7 +106,7 @@ fun CourseFormPresentationDTO.expectedEnd(): LocalDate? {
     val schedule = (scheduleParsed() as? ParsedInput.Parsed)?.value ?: return null
     // Сверх того, что назначают, конца нет: лечения такого не будет, а считать его поштучно на
     // каждую цифру — занимать под него память.
-    val count = totalDoses.trim().toIntOrNull()?.takeIf { it > 0 && Prescription.allows(Doses(it)) } ?: return null
+    val count = totalDoses.trim().toIntOrNull()?.takeIf { it > 0 && Prescription.refusesTotal(Doses(it)) == null } ?: return null
     return schedule.next(schedule.beginning, count).lastOrNull()?.localDate
 }
 

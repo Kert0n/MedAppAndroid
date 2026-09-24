@@ -33,10 +33,16 @@ reviews:
         apply the transition, re-read after each write (readThisTransaction). Outcomes are enums
         that the screen can tell apart. feature declares the ports it needs in feature/<concept>,
         cut by consumer (*Records for the scenario, *Readings for screens), and never imports
-        storage, network, platform, ui or app. Text for humans does not belong here.
+        storage, network, platform, ui or app. Text for humans does not belong here. A scenario leads, it
+        does not decide: it branches only on an answer of a thing (refuses…(), Result, a queue Laying)
+        and never reads a thing's status value, compares states or shelf ids, or assembles errands
+        (QueuedCommand, *SyncCommand) — the queue hands those out.
     - path: "app/src/main/java/com/kert0n/medapp/{presentation,ui}/**"
       instructions: >-
-        Screen rules: one ViewModel, one state, one DTO per screen — never a domain entity inside
+        Screens check input only (empty, zero, not a number); every rule about data — is the box usable,
+        does it fit as a source, same unit, how many doses are left, is the shelf published — is asked
+        of the domain, and DTOs carry the thing's answers instead of its status. Screen rules: one
+        ViewModel, one state, one DTO per screen — never a domain entity inside
         state (entities are equal by id and hide content changes). ViewModel receives route data as
         primitives (Uuid?) via assisted injection, never Screen keys. presentation and ui must not
         import network, storage, platform or queue: saved data is read through a scenario's

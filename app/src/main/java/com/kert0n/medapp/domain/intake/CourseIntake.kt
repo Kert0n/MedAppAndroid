@@ -1,11 +1,14 @@
 package com.kert0n.medapp.domain.intake
 
+import com.kert0n.medapp.domain.course.Course
 import com.kert0n.medapp.domain.course.Revision
-import com.kert0n.medapp.domain.pack.PackageRef
 import com.kert0n.medapp.domain.course.ScheduledOccurrence
+import com.kert0n.medapp.domain.pack.Package
+import com.kert0n.medapp.domain.pack.PackageRef
 import com.kert0n.medapp.domain.value.Dose
 import com.kert0n.medapp.domain.value.QuantityUnit
 import java.time.Instant
+import java.time.LocalDate
 import kotlin.uuid.Uuid
 
 /**
@@ -74,6 +77,15 @@ class CourseIntake(
      * Подтверждается неотвеченный или непринятый пункт — отказ и неответ подтверждаются одинаково;
      * повторное подтверждение — второй факт со своим идентификатором, и здесь оно отвергается (E2).
      */
+    /** Пункт ждёт ответа. */
+    val isPlanned: Boolean get() = status == IntakeStatus.PLANNED
+
+    /** Пункт принят. */
+    val isTaken: Boolean get() = status == IntakeStatus.TAKEN
+
+    /** Неответ, чей день уже кончился к [today]: он становится пропуском (PLAN D6). */
+    fun isOverdueOn(today: LocalDate): Boolean = isPlanned && slot.localDate.isBefore(today)
+
     fun confirm(taken: TakenDose): CourseIntake {
         check(answer == null || answer is IntakeAnswer.Missed) {
             "подтверждается неотвеченный приём, а не $status"
@@ -115,4 +127,16 @@ class CourseIntake(
     override fun hashCode(): Int = id.hashCode()
 
     override fun toString(): String = "CourseIntake(id=$id, status=$status, courseId=$courseId)"
+
+    /**
+     * Ответить на пункт приёмом из [from]: доза должна быть в единице пункта, а коробка — источником
+     * плана [plan]; из любой другой это внеплановый факт, и пункт им не закрывается (PLAN D5).
+     * Остаток коробки проверяет она сама.
+     */
+    fun take(amount: Dose, at: Instant, from: Package, plan: Course, countedHere: Boolean): Result<TakenDose> {
+        if (amount.unit != unit) return Result.failure(IntakeRejected(IntakeRejected.Reason.UNIT_MISMATCH))
+        val taken = from.take(amount, at, countedHere).getOrElse { return Result.failure(it) }
+        if (!plan.isSource(from.ref)) return Result.failure(IntakeRejected(IntakeRejected.Reason.PACKAGE_NOT_A_SOURCE))
+        return Result.success(taken)
+    }
 }

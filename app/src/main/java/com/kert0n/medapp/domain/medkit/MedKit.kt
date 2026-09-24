@@ -117,6 +117,47 @@ class MedKit(
         return changed(status = MedKitStatus.REMOVING)
     }
 
+    /**
+     * Об аптечке можно принять решение: одно решение за раз — помеченную второй раз не публикуют,
+     * не убирают и ничего в неё не кладут (PLAN E1, E5).
+     */
+    val decidable: Boolean get() = status.allowsDecision
+
+    /** Сведения полки правят, пока она не уходит; публикуемую править можно (PLAN E1). */
+    val editable: Boolean get() = status.allowsUse
+
+    /**
+     * Что мешает принять содержимое с полки [origin]: это та же полка, или о ней самой уже
+     * принимается решение — она вот-вот уйдёт или назвала серверу своё содержимое (PLAN E1, E5, E6).
+     */
+    fun refusesContentsFrom(origin: MedKitRef): ReceivingRefusal? = when {
+        id == origin.id -> ReceivingRefusal.SAME_SHELF
+        !decidable -> ReceivingRefusal.BUSY
+        else -> null
+    }
+
+    enum class ReceivingRefusal { SAME_SHELF, BUSY }
+
+    /** Что мешает сделать полку общей: о ней уже принимается решение, или она и так общая (PLAN E5). */
+    fun refusesPublication(): PublicationRefusal? = refusesPublication(publication, status)
+
+    /** Оставить остальным можно только общую полку: у местной остальных нет (PLAN E6). */
+    val mayBeLeftToOthers: Boolean get() = publication == Publication.PUBLISHED
+
+    /**
+     * Что мешает пригласить: в местную приглашать некуда, а едущую к серверу или занятую решением
+     * — рано ([acceptsInvitations], PLAN D2, E5).
+     */
+    fun refusesInvitation(): InvitationRefusal? = when {
+        !acceptsCommands -> InvitationRefusal.NOT_SHARED
+        !acceptsInvitations -> InvitationRefusal.BUSY
+        else -> null
+    }
+
+    enum class PublicationRefusal { BUSY, ALREADY_SHARED }
+
+    enum class InvitationRefusal { NOT_SHARED, BUSY }
+
     /** На сервер аптечка попадает один раз: обратной дороги нет (E5). */
     private fun requireLocal() {
         check(publication == Publication.LOCAL) { "аптечка уже на сервере" }
@@ -183,6 +224,13 @@ class MedKit(
          * решению о публикации. Вопрос очереди, а не учёта: до ответа на публикацию к серверу едет
          * только то, чем полка и её содержимое станут ему известны (PLAN E5).
          */
+        /** Правило публикации одним местом — и для полки, и для её проекции на экране. */
+        fun refusesPublication(publication: Publication, status: MedKitStatus): PublicationRefusal? = when {
+            !status.allowsDecision -> PublicationRefusal.BUSY
+            publication == Publication.PUBLISHED -> PublicationRefusal.ALREADY_SHARED
+            else -> null
+        }
+
         fun acceptsCommands(publication: Publication, status: MedKitStatus): Boolean =
             publication == Publication.PUBLISHED || status == MedKitStatus.PUBLISHING
     }

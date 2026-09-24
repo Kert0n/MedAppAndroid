@@ -1,14 +1,13 @@
 package com.kert0n.medapp.feature.medkits
 
+import com.kert0n.medapp.domain.medkit.MedKit
 import com.kert0n.medapp.domain.medkit.MedKitStatus
 import com.kert0n.medapp.domain.pack.PackageStatus
 import com.kert0n.medapp.feature.packages.PackageRecords
 import com.kert0n.medapp.feature.packages.PackageRelocation
 import com.kert0n.medapp.feature.readThisTransaction
 import com.kert0n.medapp.queue.QueueService
-import com.kert0n.medapp.queue.QueuedCommand
 import com.kert0n.medapp.queue.Transactions
-import com.kert0n.medapp.queue.medkit.MedKitSyncCommand
 import java.time.Clock
 import javax.inject.Inject
 import kotlin.uuid.Uuid
@@ -38,21 +37,24 @@ class MedKitPublishing @Inject constructor(
 
     suspend fun publish(medKitId: Uuid): Outcome = transactions.run {
         val medKit = medKits.find(medKitId) ?: return@run Outcome.MED_KIT_GONE
-        if (!medKit.status.allowsDecision) return@run Outcome.BUSY
-        if (medKit.answersToServer) return@run Outcome.ALREADY_SHARED
+        when (medKit.refusesPublication()) {
+            MedKit.PublicationRefusal.BUSY -> return@run Outcome.BUSY
+            MedKit.PublicationRefusal.ALREADY_SHARED -> return@run Outcome.ALREADY_SHARED
+            null -> Unit
+        }
         val now = clock.instant()
         val publishing = medKit.markPublishing()
-        val publish = QueuedCommand(Uuid.random(), MedKitSyncCommand.Publish(medKitId))
-        // Полка публикуемая уже отвечает серверу, поэтому команды её содержимого ставятся так же,
+        // Полка публикуемая уже отвечает серверу, поэтому поручения её содержимого ставятся так же,
         // как у общей: адресат у них — она сама (PLAN E1).
-        val contents = packages.contentsOf(medKitId)
-        val announcements = contents.associateWith { relocation.announcement(it, publishing.ref, after = setOf(publish.id)) }
-        queue.change(publishing.ref, listOf(publish) + announcements.values.flatMap { it.commands }, now) {
+        val contents = packages.contentsOf(medKitId).associateWith { relocation.claimOf(it) }
+        val publication = queue.publication(publishing.ref, contents)
+        val announcements = publication.announcements
+        queue.change(publishing.ref, publication.errands, now) {
             medKits.mark(medKitId, MedKitStatus.PUBLISHING).readThisTransaction("аптечка")
             // Пометку каждой коробки держит её собственное создание: полка отвечает за себя, а
             // коробка — за то, чем она станет известна серверу (PLAN E1, E5).
             for ((pkg, announcement) in announcements) {
-                packages.mark(pkg.id, PackageStatus.CHANGING, by = announcement.create.id).readThisTransaction("пачка")
+                packages.mark(pkg.id, PackageStatus.CHANGING, by = announcement.by).readThisTransaction("пачка")
             }
             true
         }

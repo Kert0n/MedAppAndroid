@@ -5,10 +5,9 @@ import com.kert0n.medapp.domain.pack.PackageFacts
 import com.kert0n.medapp.domain.pack.PackageStatus
 import com.kert0n.medapp.feature.packages.PackageRecords
 import com.kert0n.medapp.feature.readThisTransaction
+import com.kert0n.medapp.queue.Laying
 import com.kert0n.medapp.queue.QueueService
-import com.kert0n.medapp.queue.QueuedCommand
 import com.kert0n.medapp.queue.Transactions
-import com.kert0n.medapp.queue.pack.PackageSyncCommand
 import java.time.Clock
 import javax.inject.Inject
 import kotlin.uuid.Uuid
@@ -39,23 +38,16 @@ class PackageDescribing @Inject constructor(
 
     suspend fun describe(packageId: Uuid, facts: PackageFacts): Outcome = transactions.run {
         val pkg = packages.find(packageId) ?: return@run Outcome.GONE
-        if (!pkg.status.allowsUse) return@run Outcome.UNUSABLE
-        val before = pkg.facts.shared
-        val after = facts.shared
-        val announced = packages.answersToServer(packageId) && before != after
-        if (announced && before.form != null && after.form == null) return@run Outcome.FORM_CLEAR_UNSUPPORTED
+        if (!pkg.usable) return@run Outcome.UNUSABLE
+        // Личная правка серверу не едет, и поручения у неё нет: «есть ли поручение» и «уехало ли
+        // изменение» — один вопрос, и отвечает на него очередь.
+        val laying = queue.description(pkg, facts.shared)
+        if (laying == Laying.Refused) return@run Outcome.FORM_CLEAR_UNSUPPORTED
         val now = clock.instant()
-        // Личная правка серверу не едет, и команды у неё нет: «есть ли команда» и «уехало ли
-        // изменение» — один вопрос, и отвечается он одним значением.
-        val description = if (announced) {
-            QueuedCommand(Uuid.random(), PackageSyncCommand.Describe(pkg.id, before, after))
-        } else {
-            null
-        }
-        queue.change(pkg.medKit, listOfNotNull(description), now) {
+        queue.change(pkg.medKit, laying.errands, now) {
             packages.describe(pkg.id, facts).readThisTransaction("пачка")
-            description?.let {
-                packages.mark(pkg.id, PackageStatus.CHANGING, by = it.id).readThisTransaction("пачка")
+            if (laying is Laying.Awaiting) {
+                packages.mark(pkg.id, PackageStatus.CHANGING, by = laying.by).readThisTransaction("пачка")
             }
             true
         }

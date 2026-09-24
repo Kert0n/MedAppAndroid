@@ -3,7 +3,7 @@ package com.kert0n.medapp.feature.operation
 import com.kert0n.medapp.domain.medkit.MedKit
 import com.kert0n.medapp.fixture.DirectTransactions
 import com.kert0n.medapp.fixture.FakeConnection
-import com.kert0n.medapp.fixture.FakePackages
+import com.kert0n.medapp.fixture.FakeQueue
 import com.kert0n.medapp.fixture.HOME_KIT
 import com.kert0n.medapp.fixture.OTHER_PACK
 import com.kert0n.medapp.fixture.PACK
@@ -11,6 +11,10 @@ import com.kert0n.medapp.fixture.RereadingServer
 import com.kert0n.medapp.fixture.SHARED_KIT
 import com.kert0n.medapp.fixture.medKit
 import com.kert0n.medapp.fixture.pack
+import com.kert0n.medapp.queue.QueueService
+import com.kert0n.medapp.queue.ResourceVersion
+import com.kert0n.medapp.queue.pack.PackageSnapshot
+import com.kert0n.medapp.queue.pack.PackageSyncState
 import java.time.Clock
 import java.time.Duration
 import java.time.Instant
@@ -57,7 +61,16 @@ class FresheningTest {
     private val freshening = Freshening(
         server.rereading,
         connection,
-        FakePackages(pack(id = PACK, medKit = shared.ref), pack(id = OTHER_PACK, medKit = home.ref)),
+        // Реестр знает коробку общей полки — у неё есть серверная версия; домашнюю он не знает.
+        QueueService(
+            DirectTransactions,
+            FakeQueue(
+                listOf(
+                    PackageSnapshot(pack(id = PACK, medKit = shared.ref), PackageSyncState(PACK, ResourceVersion(1))),
+                    PackageSnapshot(pack(id = OTHER_PACK, medKit = home.ref), PackageSyncState(OTHER_PACK))
+                )
+            )
+        ),
         DirectTransactions,
         clock,
         application

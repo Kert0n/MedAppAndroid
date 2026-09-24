@@ -5,10 +5,9 @@ import com.kert0n.medapp.domain.pack.PackageFacts
 import com.kert0n.medapp.domain.value.Quantity
 import com.kert0n.medapp.feature.medkits.MedKitRecords
 import com.kert0n.medapp.feature.packages.PackageRecords
+import com.kert0n.medapp.queue.Laying
 import com.kert0n.medapp.queue.QueueService
-import com.kert0n.medapp.queue.QueuedCommand
 import com.kert0n.medapp.queue.Transactions
-import com.kert0n.medapp.queue.pack.PackageSyncCommand
 import java.time.Clock
 import javax.inject.Inject
 import kotlin.uuid.Uuid
@@ -38,7 +37,7 @@ class PackageAdding @Inject constructor(
             // В полку, о которой принято решение, не кладут: уборка унесла бы коробку с собой, а
             // публикация уже пересчитала своё содержимое и об этой коробке серверу не расскажет
             // (PLAN E1, E5).
-            if (!medKit.status.allowsDecision) return@run Outcome.MedKitBusy
+            if (!medKit.decidable) return@run Outcome.MedKitBusy
             val now = clock.instant()
             val pkg = Package(
                 id = Uuid.random(),
@@ -48,9 +47,9 @@ class PackageAdding @Inject constructor(
                 addedAt = now,
                 templateId = templateId
             )
-            val create = QueuedCommand(Uuid.random(), PackageSyncCommand.Create(pkg.id, medKit.id))
-            val announced = if (medKit.answersToServer) pkg.markChanging(create.id) else pkg
-            queue.change(medKit.ref, listOf(create), now) {
+            val laying = queue.adding(pkg)
+            val announced = if (laying is Laying.Awaiting) pkg.markChanging(laying.by) else pkg
+            queue.change(medKit.ref, laying.errands, now) {
                 packages.add(announced)
                 true
             }

@@ -34,14 +34,6 @@ class PackageStorageRow(
     @Relation(parentColumn = "med_kit_id", entityColumn = "id")
     val medKit: MedKitStorageEntity? = null
 ) {
-    /**
-     * Кому отвечают изменения этой коробки: серверу — только когда её полка отвечает серверу (D2)
-     * и сервер о коробке уже знает — есть серверная версия, которую принёс ответ на её создание
-     * (PLAN E6). Вопрос из двух половин, и задаётся он одним местом на всех.
-     */
-    val answersToServer: Boolean
-        get() = pack.medKitRow(medKit).toRef().answersToServer && pack.version != null
-
     fun toDomain(vocabulary: Vocabulary): Package = Package(
         id = pack.id,
         medKit = pack.medKitRow(medKit).toRef(),

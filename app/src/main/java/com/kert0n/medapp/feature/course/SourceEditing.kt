@@ -54,7 +54,7 @@ class SourceEditing @Inject constructor(
         for (source in sources) {
             val held = course.sources.firstOrNull { it.pkg.id == source.packageId }
             course = if (held == null) {
-                val pkg = packages.find(source.packageId)?.takeIf { it.status.allowsUse }
+                val pkg = packages.find(source.packageId)?.takeIf { it.usable }
                     ?: return@run Outcome.PackageUnusable(source.packageId)
                 if (courses.courseHolding(pkg.id).let { it != null && it != id }) return@run Outcome.PackageTaken(pkg.id)
                 course.attach(pkg, source.doses, now).getOrElse { failure ->

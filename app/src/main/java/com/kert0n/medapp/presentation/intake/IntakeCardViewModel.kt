@@ -4,7 +4,6 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.kert0n.medapp.domain.course.CourseSource
 import com.kert0n.medapp.domain.intake.IntakeProjection
-import com.kert0n.medapp.domain.intake.IntakeRejected
 import com.kert0n.medapp.domain.intake.IntakeStatus
 import com.kert0n.medapp.domain.pack.ExpiryDate
 import com.kert0n.medapp.domain.value.Dose
@@ -36,7 +35,6 @@ import java.time.ZoneId
 import java.time.ZonedDateTime
 import kotlin.uuid.Uuid
 import kotlinx.coroutines.flow.MutableStateFlow
-import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.distinctUntilChanged
@@ -45,7 +43,6 @@ import kotlinx.coroutines.flow.flatMapLatest
 import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.stateIn
-import kotlinx.coroutines.launch
 
 /**
  * Карточка пункта плана (PLAN H3 №18): тот же ответ, что и в строке дня, но набранный руками —
@@ -213,12 +210,11 @@ class IntakeCardViewModel @AssistedInject constructor(
 
     /** Чем кончился отказ: записанный уходит с карточки, остальное сказано словами по месту. */
     private fun told(outcome: IntakeDeclining.Outcome): Writing = when (outcome) {
-        IntakeDeclining.Outcome.DECLINED -> Writing(done = true)
+        IntakeDeclining.Outcome.Declined -> Writing(done = true)
         // Пункта больше нет: показывать нечего, и чтение скажет то же самое.
-        IntakeDeclining.Outcome.GONE -> Writing(done = true)
-        IntakeDeclining.Outcome.ALREADY_ANSWERED -> Writing(error = IntakeCardError.AlreadyAnswered)
-        IntakeDeclining.Outcome.EPISODE_CLOSED ->
-            Writing(error = IntakeCardError.Rejected(IntakeRejected.Reason.EPISODE_CLOSED))
+        IntakeDeclining.Outcome.Gone -> Writing(done = true)
+        IntakeDeclining.Outcome.AlreadyAnswered -> Writing(error = IntakeCardError.AlreadyAnswered)
+        is IntakeDeclining.Outcome.Rejected -> Writing(error = IntakeCardError.Rejected(outcome.reason))
     }
 
     private fun told(outcome: IntakeConfirmation.Outcome): Writing = when (outcome) {

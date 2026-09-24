@@ -80,7 +80,7 @@ class IntakeDecliningTest {
 
         val outcome = scenarios.intakeDeclining.decline(today.id, now)
 
-        assertEquals(IntakeDeclining.Outcome.DECLINED, outcome)
+        assertEquals(IntakeDeclining.Outcome.Declined, outcome)
         val declined = items(id).first { it.id == today.id }
         assertEquals(IntakeStatus.MISSED, declined.status)
         assertEquals(now, declined.answer?.at)
@@ -88,7 +88,7 @@ class IntakeDecliningTest {
         assertEquals(tablets("20"), database.packageRepository().find(PACK)?.quantity)
         assertEquals(Doses(5), database.courseRepository().findPlan(id)?.sources?.single()?.allocatedDoses)
         assertEquals(plannedBefore, items(id).count { it.status == IntakeStatus.PLANNED })
-        assertEquals(IntakeDeclining.Outcome.ALREADY_ANSWERED, scenarios.intakeDeclining.decline(today.id, now))
+        assertEquals(IntakeDeclining.Outcome.AlreadyAnswered, scenarios.intakeDeclining.decline(today.id, now))
     }
 
     /**
@@ -106,7 +106,7 @@ class IntakeDecliningTest {
 
         val outcome = tomorrow.intakeDeclining.decline(yesterday.id, evening)
 
-        assertEquals(IntakeDeclining.Outcome.DECLINED, outcome)
+        assertEquals(IntakeDeclining.Outcome.Declined, outcome)
         val declined = items(id).first { it.id == yesterday.id }
         assertEquals(IntakeStatus.MISSED, declined.status)
         assertEquals(evening, declined.answer?.at)
@@ -118,8 +118,8 @@ class IntakeDecliningTest {
         val today = items(id).first()
         scenarios.intakeConfirmation.confirm(today.id, PACK, dose("2"), now).confirmed()
 
-        assertEquals(IntakeDeclining.Outcome.ALREADY_ANSWERED, scenarios.intakeDeclining.decline(today.id, now))
+        assertEquals(IntakeDeclining.Outcome.AlreadyAnswered, scenarios.intakeDeclining.decline(today.id, now))
         assertEquals(IntakeStatus.TAKEN, items(id).first { it.id == today.id }.status)
-        assertEquals(IntakeDeclining.Outcome.GONE, scenarios.intakeDeclining.decline(Uuid.random(), now))
+        assertEquals(IntakeDeclining.Outcome.Gone, scenarios.intakeDeclining.decline(Uuid.random(), now))
     }
 }

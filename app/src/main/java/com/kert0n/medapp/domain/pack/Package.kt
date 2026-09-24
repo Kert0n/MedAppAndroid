@@ -91,6 +91,21 @@ class Package(
     /** Как пачку видит чужой агрегат — курс, приём: ссылка на запись, без переходов. */
     val ref: PackageRef get() = record.ref
 
+    /** Коробкой пользуются: из неё берут, её правят, переносят и ставят источником (PLAN E1). */
+    val usable: Boolean get() = status.allowsUse
+
+    /**
+     * Что мешает унести коробку с её полки: ею уже не пользуются, или о самой полке принимается
+     * решение — её публикация назвала серверу своё содержимое (PLAN E5).
+     */
+    fun refusesMoving(): MoveRefusal? = when {
+        !usable -> MoveRefusal.UNUSABLE
+        !medKit.status.allowsDecision -> MoveRefusal.ORIGIN_BUSY
+        else -> null
+    }
+
+    enum class MoveRefusal { UNUSABLE, ORIGIN_BUSY }
+
     fun isExpiredOn(date: LocalDate): Boolean = facts.isExpiredOn(date)
 
     /** Срок, если к дню [date] он уже истёк; годна или срок неизвестен — `null`. */
@@ -110,6 +125,24 @@ class Package(
         amount.unit != quantity.unit -> Result.failure(IntakeRejected(IntakeRejected.Reason.UNIT_MISMATCH))
         else -> Result.success(TakenDose(ref, amount, at))
     }
+
+    companion object {
+
+        /** Коробка, прочитанная по идентификатору снаружи: её может уже не быть (PLAN D3). */
+        fun present(found: Package?): Result<Package> =
+            found?.let { Result.success(it) } ?: Result.failure(IntakeRejected(IntakeRejected.Reason.PACKAGE_UNUSABLE))
+    }
+
+    /**
+     * Тот же акт из коробки, чей остаток считается здесь же ([countedHere]): списать больше, чем в
+     * ней есть, нечем. У коробки, которую знает сервер, истина по количеству — он, и нехватку
+     * отвечает он (PLAN E3).
+     */
+    fun take(amount: Dose, at: Instant, countedHere: Boolean): Result<TakenDose> =
+        take(amount, at).mapCatching { taken ->
+            if (countedHere && !quantity.covers(amount)) throw IntakeRejected(IntakeRejected.Reason.INSUFFICIENT)
+            taken
+        }
 
     /**
      * Расход — приём, плановый или разовый. В минус не списывает (PLAN D5). Учётная запись о нём —

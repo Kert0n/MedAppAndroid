@@ -43,8 +43,8 @@ fun CourseSource.toPresentationDTO(
  * Отключённому источнику коробка не даёт ничего: он не в той единице, чтобы считать в нём дозы.
  */
 private fun PackageProjection.gives(dose: Dose, fault: CourseSource.Fault?): Doses? {
-    if (fault != null || availability.availableToMe.unit != dose.unit) return null
-    return availability.availableToMe.dosesIn(dose)
+    if (fault != null) return null
+    return availability.dosesFor(dose)
 }
 
 /** Коробка в выборе источника: чем человек её узнаёт, сколько в ней свободно и можно ли её взять. */

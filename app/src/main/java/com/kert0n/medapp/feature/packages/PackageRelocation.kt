@@ -4,15 +4,15 @@ import com.kert0n.medapp.domain.medkit.MedKit
 import com.kert0n.medapp.domain.medkit.MedKitRef
 import com.kert0n.medapp.domain.pack.Package
 import com.kert0n.medapp.domain.pack.PackageStatus
+import com.kert0n.medapp.domain.value.Quantity
 import com.kert0n.medapp.feature.course.CourseRecords
 import com.kert0n.medapp.feature.medkits.MedKitRecords
 import com.kert0n.medapp.feature.packages.PackageAdjustment
 import com.kert0n.medapp.feature.packages.PackageRecords
 import com.kert0n.medapp.feature.readThisTransaction
+import com.kert0n.medapp.queue.Carrying
 import com.kert0n.medapp.queue.QueueService
-import com.kert0n.medapp.queue.QueuedCommand
 import com.kert0n.medapp.queue.Transactions
-import com.kert0n.medapp.queue.pack.PackageSyncCommand
 import java.time.Clock
 import java.time.Instant
 import javax.inject.Inject
@@ -48,16 +48,18 @@ class PackageRelocation @Inject constructor(
 
     suspend fun move(packageId: Uuid, targetMedKitId: Uuid): Outcome = transactions.run {
         val pkg = packages.find(packageId) ?: return@run Outcome.GONE
-        if (!pkg.status.allowsUse) return@run Outcome.UNUSABLE
-        // С полки, о которой принято решение, не переносят: её публикация уже назвала серверу своё
-        // содержимое, и коробка, ушедшая из-под неё, оказалась бы у сервера мимо своего создания —
-        // или ушла бы вместе с уборкой. Человек либо ждёт ответа, либо решает о полке заново (E5).
-        if (!pkg.medKit.status.allowsDecision) return@run Outcome.ORIGIN_BUSY
+        when (pkg.refusesMoving()) {
+            Package.MoveRefusal.UNUSABLE -> return@run Outcome.UNUSABLE
+            // Человек либо ждёт ответа по полке, либо решает о ней заново (E5).
+            Package.MoveRefusal.ORIGIN_BUSY -> return@run Outcome.ORIGIN_BUSY
+            null -> Unit
+        }
         val target = medKits.find(targetMedKitId) ?: return@run Outcome.TARGET_GONE
-        if (target.id == pkg.medKit.id) return@run Outcome.TARGET_IS_THE_SAME
-        // В полку, о которой уже принято решение, не кладут: она вот-вот уйдёт или уже рассказала
-        // серверу о своём содержимом, ничего человеку не сказав (PLAN E1, E5, E6).
-        if (!target.status.allowsDecision) return@run Outcome.TARGET_BUSY
+        when (target.refusesContentsFrom(pkg.medKit)) {
+            MedKit.ReceivingRefusal.SAME_SHELF -> return@run Outcome.TARGET_IS_THE_SAME
+            MedKit.ReceivingRefusal.BUSY -> return@run Outcome.TARGET_BUSY
+            null -> Unit
+        }
         relocate(pkg, target, clock.instant())
     }
 
@@ -74,11 +76,10 @@ class PackageRelocation @Inject constructor(
     ): Outcome {
         val from = pkg.medKit
         val to = target.ref
-        return when {
-            from.answersToServer && !to.answersToServer -> {
-                val withdrawal = withdrawal(pkg)
-                queue.change(from, listOf(withdrawal), at) {
-                    carryHome(pkg, to, at, by = withdrawal.id)
+        return when (val carrying = queue.carrying(pkg, to)) {
+            is Carrying.Home -> {
+                queue.change(from, carrying.laying.errands, at) {
+                    carryHome(pkg, to, at, by = carrying.laying.by)
                     true
                 }
                 Outcome.MOVED
@@ -86,99 +87,48 @@ class PackageRelocation @Inject constructor(
             // Коробка на общей полке: переставляет её сервер, и до его ответа она остаётся там,
             // где лежит. Иначе отказ по версии оставил бы её на чужой полке (PLAN E1, E6). Новое
             // место придёт снимком ответа — он же истина по этой коробке.
-            from.answersToServer -> {
-                // Переставляют с полки, где коробка лежит: там её команды и ждут своей очереди.
-                val move = command(PackageSyncCommand.Move(pkg.id, to.id))
-                queue.change(from, listOf(move), at) {
-                    packages.mark(pkg.id, PackageStatus.CHANGING, by = move.id)
+            is Carrying.ByServer -> {
+                queue.change(from, carrying.laying.errands, at) {
+                    packages.mark(pkg.id, PackageStatus.CHANGING, by = carrying.laying.by)
                 }
                 Outcome.MARKED
             }
             // Своя коробка на общую полку: сервер о ней ещё не знает, спорить не с кем, и место
             // меняется сразу. Серверу она едет созданием — вместе с выделением курса.
-            to.answersToServer -> {
+            Carrying.Announced -> {
                 place(pkg, to, at)
                 publish(pkg, to, at, originSurvives)
                 Outcome.MOVED
             }
-            else -> {
+            Carrying.Local -> {
                 place(pkg, to, at)
                 Outcome.MOVED
             }
         }
     }
 
-    /** Команда «унёс домой» — отдельно от записи: разбор полки ставит полку зависимой от неё. */
-    internal fun withdrawal(pkg: Package): QueuedCommand = command(PackageSyncCommand.Withdraw(pkg.id, pkg.medKit.id, pkg.quantity))
-
-    /**
-     * Локальная половина «унёс домой»: коробка на моей полке, чужих броней у местной коробки нет,
-     * а пометка держится до ответа на команду [by], которая её и поставила (PLAN E1, E6).
-     */
     internal suspend fun carryHome(pkg: Package, to: MedKitRef, at: Instant, by: Uuid) {
         place(pkg, to, at)
         packages.saveClaims(pkg.id, null)
         packages.mark(pkg.id, PackageStatus.CHANGING, by = by).readThisTransaction("пачка")
     }
 
-    /** Только место: переход пачки к прочитанному состоянию, без команд. */
     internal suspend fun place(pkg: Package, to: MedKitRef, at: Instant) {
         packages.adjust(PackageAdjustment.Transfer(pkg.id, to), at = at).readThisTransaction("пачка")
     }
 
-    /** Местная коробка на общей полке: рассказать о ней серверу, а с ней — о выделении курса. */
     private suspend fun publish(pkg: Package, to: MedKitRef, at: Instant, originSurvives: Boolean) {
-        val announcement = announcement(pkg, to, originSurvives = originSurvives)
-        queue.change(to, announcement.commands, at) {
+        // Откуда коробку принесли: не вышло — она вернётся туда (PLAN E6).
+        val announcement = queue.announcement(pkg, to, claimOf(pkg), originSurvives = originSurvives)
+        queue.change(to, announcement.errands, at) {
             // Пометку держит создание: им коробка и становится известна серверу (PLAN E6).
-            packages.mark(pkg.id, PackageStatus.CHANGING, by = announcement.create.id)
+            packages.mark(pkg.id, PackageStatus.CHANGING, by = announcement.by)
         }
     }
 
-    /**
-     * Чем коробка становится известна серверу: созданием в полке [to] и, если курс её держит,
-     * выделением — бронью следом, зависимой от создания. Иначе на сервере выделения не было бы
-     * вовсе.
-     *
-     * Зовут это двое, и событие у коробки одно и то же: её переносят на общую полку — или полка под
-     * ней сама становится общей (`feature/medkits/MedKitPublishing`). Во втором случае [after]
-     * называет команду публикации: класть коробку некуда, пока полки у сервера нет (PLAN E5, E6).
-     *
-     * [originSurvives] `false` — полку, с которой коробку принесли, разбирают прямо сейчас: адреса
-     * возврата у отказа не будет, и обещать его нечем. Тогда отказ сервера оставляет коробку там,
-     * куда её положили, а сводит это с сервером снимок (PLAN E4, E6).
-     */
-    internal suspend fun announcement(
-        pkg: Package,
-        to: MedKitRef,
-        after: Set<Uuid> = emptySet(),
-        originSurvives: Boolean = true
-    ): Announcement {
-        val create = QueuedCommand(
-            Uuid.random(),
-            // Откуда коробку принесли: не вышло — она вернётся туда. Если её никуда не несли, а
-            // общей стала полка под ней, возвращать некуда (PLAN E6).
-            PackageSyncCommand.Create(pkg.id, to.id, pkg.medKit.id.takeIf { originSurvives && it != to.id }),
-            dependsOn = after
-        )
-        val claim = courses.courseHolding(pkg.id)
-            ?.let { courses.findPlan(it) }
-            ?.allocatedOf(pkg.ref)
-            ?.takeUnless { it.isZero }
-            ?.let { QueuedCommand(Uuid.random(), PackageSyncCommand.SetClaim(pkg.id, it), dependsOn = setOf(create.id)) }
-        return Announcement(create, claim)
-    }
-
-    /**
-     * Чем коробка объявляется серверу: создание и, если курс её держит, бронь следом. Две команды
-     * лежат тут раздельно, а не списком, потому что пометку коробки держит именно создание, и
-     * вынимать его из списка по месту значило бы называть порядок дважды (PLAN E1, E6).
-     */
-    internal class Announcement(val create: QueuedCommand, val claim: QueuedCommand?) {
-        val commands: List<QueuedCommand> get() = listOfNotNull(create, claim)
-    }
-
-    private fun command(command: PackageSyncCommand) = QueuedCommand(Uuid.random(), command)
+    /** Выделение курса, который держит коробку, — бронь, которая едет вместе с её созданием. */
+    internal suspend fun claimOf(pkg: Package): Quantity? =
+        courses.courseHolding(pkg.id)?.let { courses.findPlan(it) }?.allocatedOf(pkg.ref)
 
     /**
      * Чем кончилось. Переставили — экран показывает новую полку; пометили — коробка остаётся на

@@ -1,5 +1,7 @@
 package com.kert0n.medapp.domain.pack
 
+import com.kert0n.medapp.domain.value.Dose
+import com.kert0n.medapp.domain.value.Doses
 import com.kert0n.medapp.domain.value.Quantity
 import java.time.LocalDate
 import kotlin.uuid.Uuid
@@ -27,6 +29,18 @@ data class PackageAvailability(
      */
     val isUsable: Boolean
 ) {
+
+    /** Часть коробки держат чужие брони (PLAN D4). */
+    val claimedByOthers: Boolean get() = !reservedByOthers.isZero
+
+    /**
+     * Сколько целых доз [dose] мне доступно. В другой единице доз не счесть — `null`: такая
+     * коробка источником этой дозы не бывает.
+     */
+    fun dosesFor(dose: Dose): Doses? = availableToMe.takeIf { it.unit == dose.unit }?.dosesIn(dose)
+
+    /** В коробке ничего не осталось: следить за ней курсу больше не за чем (PLAN D4). */
+    val isSpent: Boolean get() = effective.isZero
 
     constructor(
         pkg: Package,

@@ -27,7 +27,6 @@ import androidx.compose.material3.IconButton
 import androidx.compose.material3.ListItem
 import androidx.compose.material3.ListItemDefaults
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.RadioButton
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
@@ -47,7 +46,6 @@ import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import com.kert0n.medapp.R
-import com.kert0n.medapp.domain.medkit.MedKit
 import com.kert0n.medapp.presentation.medkit.MedKitPresentationDTO
 import com.kert0n.medapp.presentation.pack.MedKitContentsUiState
 import com.kert0n.medapp.presentation.pack.Narrowing
@@ -118,7 +116,7 @@ fun MedKitContentsScreen(
                         // сам экран: уехала ли полка. Участники тут ни при чём — в опубликованную
                         // полку зовут и тогда, когда в ней пока один человек.
                         ShelfMenu(
-                            isShared = it.publication == MedKit.Publication.PUBLISHED,
+                            isShared = it.isPublished,
                             onEdit = onEdit, onShare = onShare, onRemove = onAskToRemove
                         )
                     }

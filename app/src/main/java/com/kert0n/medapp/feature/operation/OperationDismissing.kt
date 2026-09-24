@@ -1,11 +1,9 @@
 package com.kert0n.medapp.feature.operation
 
 import com.kert0n.medapp.queue.QueueStorage
-import com.kert0n.medapp.queue.RefusalReason
-import com.kert0n.medapp.queue.Settlement
 import com.kert0n.medapp.queue.StoredSyncOperation
 import com.kert0n.medapp.queue.Transactions
-import com.kert0n.medapp.queue.intake.IntakeAccounting
+import com.kert0n.medapp.queue.dismissed
 import java.time.Clock
 import javax.inject.Inject
 import kotlin.uuid.Uuid
@@ -34,20 +32,7 @@ class OperationDismissing @Inject constructor(
         val stored = operations.stored(operationId) ?: return@run Outcome.GONE
         if (!stored.needsDecision) return@run Outcome.NOT_AWAITING_DECISION
         val at = clock.instant()
-        if (stored is StoredSyncOperation.Unreadable) {
-            queue.settle(
-                operationId,
-                Settlement(
-                    Settlement.Transition.Close.Refused(RefusalReason.UNREADABLE),
-                    listOf(
-                        Settlement.Effect.Account(IntakeAccounting.REMOTE_REFUSED),
-                        Settlement.Effect.Cascade(Settlement.Transition.Close.Refused(RefusalReason.SUPERSEDED), IntakeAccounting.REMOTE_REFUSED),
-                        Settlement.Effect.Settled
-                    )
-                ),
-                at
-            )
-        }
+        if (stored is StoredSyncOperation.Unreadable) queue.settle(operationId, stored.dismissed(), at)
         if (operations.dismiss(operationId, at)) Outcome.DISMISSED else Outcome.GONE
     }
 

@@ -3,7 +3,6 @@ package com.kert0n.medapp.presentation.plan
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.kert0n.medapp.domain.intake.IntakeProjection
-import com.kert0n.medapp.domain.intake.IntakeStatus
 import com.kert0n.medapp.domain.notification.NoticeDelivery
 import com.kert0n.medapp.domain.notification.NotificationKey
 import com.kert0n.medapp.domain.notification.NotificationKind
@@ -28,15 +27,12 @@ import kotlin.uuid.Uuid
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
-import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.flatMapLatest
 import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.flow.map
-import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.flow.update
-import kotlinx.coroutines.launch
 
 /**
  * **Попап пропущенного — последний шанс** (PLAN C1 «Попап пропущенного», решение владельца
@@ -92,14 +88,14 @@ class MissedIntakesViewModel @Inject constructor(
                 .flatMapLatest { (read, records) ->
                     val titles = records.associate { it.id to it.title }
                     val waiting = read.filterIsInstance<IntakeProjection.Scheduled>()
-                        .filter { it.status == IntakeStatus.MISSED && it.slot.localDate.isBefore(day.date) }
+                        .filter { it.isMissedBefore(day.date) }
                     // Плановую коробку могли выбросить, пока попап ждал: «Принял» из неё — кнопка,
                     // которая ничего не сделает, кроме отказа (снимок BigLatest). Такой строке
                     // быстрого ответа нет; нажатие на неё ведёт на карточку пункта.
                     val planned = waiting.mapNotNullTo(LinkedHashSet()) { it.plannedPackage?.id }
                     val usable: Flow<Set<Uuid>> = if (planned.isEmpty()) flowOf(emptySet())
                     else combine(planned.map { id -> packages.observe(id) }) { boxes ->
-                        boxes.filterNotNull().filter { it.status.allowsUse }.mapTo(HashSet()) { it.id }
+                        boxes.filterNotNull().filter { it.usable }.mapTo(HashSet()) { it.id }
                     }
                     usable.map { alive ->
                         waiting.mapNotNull { intake ->
