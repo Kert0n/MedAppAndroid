@@ -1,4 +1,4 @@
-package com.kert0n.medapp.network.crpt
+package com.kert0n.medapp.network.marking
 
 import android.util.Base64
 import androidx.test.platform.app.InstrumentationRegistry
@@ -6,8 +6,8 @@ import com.kert0n.medapp.BuildConfig
 import com.kert0n.medapp.domain.scan.DataMatrixCode
 import com.kert0n.medapp.domain.value.DosageForm
 import com.kert0n.medapp.domain.value.Vocabulary
-import com.kert0n.medapp.network.server.crptHttpClient
-import com.kert0n.medapp.network.server.crptJson
+import com.kert0n.medapp.network.server.markingHttpClient
+import com.kert0n.medapp.network.server.markingJson
 import io.ktor.client.engine.okhttp.OkHttp
 import io.ktor.client.request.post
 import io.ktor.client.request.setBody
@@ -29,51 +29,51 @@ import org.junit.Test
 import java.time.LocalDate
 
 /**
- * Живой ответ «Честного знака» — **по одному запросу на код** за запуск и только по `-PprobeCrpt`
- * (PLAN H5): чужой недокументированный API, обращаемся бережно. Проба печатает **форму** ответа —
+ * Живой ответ реестра маркировки — **по одному запросу на код** за запуск и только по
+ * `-PprobeMarking` (PLAN H5): сервис чужой, обращаемся бережно. Проба печатает **форму** ответа —
  * имена ключей без значений — и разрешённые поля (категория, название, аптечный блок, метки
  * атрибутов, страна); сырое тело, код, GTIN и серийный номер в отчёт не попадают ни в каком виде.
  * При «не найдено» или отказе проба не перебирает варианты, а называет ответ. Коды — из
  * `local.properties`, в git не попадают.
  */
-class CrptProbe {
+class MarkingProbe {
 
     @Test
     fun theLiveAnswersReadIntoOurShape() = runBlocking {
-        val encoded = InstrumentationRegistry.getArguments().getString("probeCrptCodes")
-        assumeTrue("проба «Честного знака» включается только -PprobeCrpt с MEDAPP_CRPT_PROBE_CODES", !encoded.isNullOrBlank())
+        val encoded = InstrumentationRegistry.getArguments().getString("probeMarkingCodes")
+        assumeTrue("проба маркировки включается только -PprobeMarking с MEDAPP_MARKING_PROBE_CODES", !encoded.isNullOrBlank())
         val codes = String(Base64.decode(encoded, Base64.DEFAULT), Charsets.UTF_8).split(';').filter { it.isNotBlank() }.map(::DataMatrixCode)
         assumeTrue("список кодов пуст", codes.isNotEmpty())
 
         val asset = InstrumentationRegistry.getInstrumentation().targetContext.assets
             .open("vocabulary.json").bufferedReader().use { it.readText() }
-        val forms = crptJson.parseToJsonElement(asset).jsonObject.getValue("formTypes").jsonArray.map { entry ->
+        val forms = markingJson.parseToJsonElement(asset).jsonObject.getValue("formTypes").jsonArray.map { entry ->
             val item = entry.jsonObject
             DosageForm(Uuid.parse(item.getValue("id").jsonPrimitive.content), item.getValue("name").jsonPrimitive.content)
         }
         val vocabulary = Vocabulary(emptyList(), forms)
 
-        val client = crptHttpClient(OkHttp.create(), BuildConfig.CRPT_BASE_URL)
+        val client = markingHttpClient(OkHttp.create(), BuildConfig.MARKING_URL)
         for ((index, code) in codes.withIndex()) {
-            val response = client.post(CrptApi.CHECK) {
+            val response = client.post {
                 contentType(ContentType.Application.Json)
-                setBody(CrptCheckRequestNetworkDTO.of(code))
+                setBody(MarkingCheckRequestNetworkDTO.of(code))
             }
             val raw = response.bodyAsText()
-            println("CRPT_PROBE[$index] status=${response.status}")
+            println("MARKING_PROBE[$index] status=${response.status}")
 
-            // 451 — доступ закрыт по месту: из сети вне России реестр не отвечает. Это названный
-            // исход, а не провал пробы; форму ответа он подтвердить не даёт.
+            // 451 — доступ закрыт по месту. Это названный исход, а не провал пробы; форму ответа он
+            // подтвердить не даёт.
             assertTrue(
                 "код $index: статус ${response.status} — ни ответ, ни «не найдено», ни отказ по месту",
-                response.status in listOf(HttpStatusCode.OK, HttpStatusCode.NotFound, HttpStatusCode.BadRequest, CrptApi.UNAVAILABLE_FOR_LEGAL_REASONS)
+                response.status in listOf(HttpStatusCode.OK, HttpStatusCode.NotFound, HttpStatusCode.BadRequest, MarkingApi.UNAVAILABLE_FOR_LEGAL_REASONS)
             )
             if (response.status == HttpStatusCode.OK) {
-                println("CRPT_PROBE[$index] shape=${shapeOf(crptJson.parseToJsonElement(raw))}")
-                val dto = crptJson.decodeFromString(CrptCheckNetworkDTO.serializer(), raw)
-                println("CRPT_PROBE[$index] codeFounded=${dto.codeFounded} category=${dto.category} name=${dto.productName} expireDate=${dto.expireDate}")
-                println("CRPT_PROBE[$index] pharmacy=${dto.pharmacy} labels=${dto.attributes.keys} country=${dto.chip("country")}")
-                println("CRPT_PROBE[$index] suggestion=${dto.toSuggestion(vocabulary, LocalDate.now(CRPT_ZONE))}")
+                println("MARKING_PROBE[$index] shape=${shapeOf(markingJson.parseToJsonElement(raw))}")
+                val dto = markingJson.decodeFromString(MarkingCheckNetworkDTO.serializer(), raw)
+                println("MARKING_PROBE[$index] codeFounded=${dto.codeFounded} category=${dto.category} name=${dto.productName} expireDate=${dto.expireDate}")
+                println("MARKING_PROBE[$index] pharmacy=${dto.pharmacy} labels=${dto.attributes.keys} country=${dto.chip("country")}")
+                println("MARKING_PROBE[$index] suggestion=${dto.toSuggestion(vocabulary, LocalDate.now(MARKING_ZONE))}")
             }
         }
     }

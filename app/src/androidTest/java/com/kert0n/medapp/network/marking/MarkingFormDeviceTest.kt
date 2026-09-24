@@ -1,4 +1,4 @@
-package com.kert0n.medapp.network.crpt
+package com.kert0n.medapp.network.marking
 
 import androidx.test.platform.app.InstrumentationRegistry
 import com.kert0n.medapp.domain.value.DosageForm
@@ -13,8 +13,8 @@ import org.junit.Assert.assertNull
 import org.junit.Test
 import java.time.LocalDate
 
-/** На устройстве CRPT-подсказка выбирает id только из встроенного production-снимка сервера. */
-class CrptFormDeviceTest {
+/** На устройстве подсказка реестра маркировки выбирает id только из встроенного production-снимка сервера. */
+class MarkingFormDeviceTest {
     private val json = Json { ignoreUnknownKeys = true; explicitNulls = false }
     private val forms = json.parseToJsonElement(
         InstrumentationRegistry.getInstrumentation().targetContext.assets
@@ -26,7 +26,7 @@ class CrptFormDeviceTest {
     private val vocabulary = Vocabulary(emptyList(), forms)
 
     private fun suggestion(text: String) = json.decodeFromString(
-        CrptCheckNetworkDTO.serializer(),
+        MarkingCheckNetworkDTO.serializer(),
         """{"codeFounded":true,"category":"drugs","screen":{"items":[{"pharmacyData":{"form":"$text"}}]}}"""
     ).toSuggestion(vocabulary, LocalDate.of(2026, 9, 17))
 

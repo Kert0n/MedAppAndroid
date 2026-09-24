@@ -1,13 +1,13 @@
-package com.kert0n.medapp.network.crpt
+package com.kert0n.medapp.network.marking
 
 /**
- * Ответы «Честного знака» — по **живому** ответу пробы 2026-09-14 (PLAN H5): документации нет,
+ * Ответы реестра маркировки — по **живому** ответу пробы 2026-09-14 (PLAN H5): документации нет,
  * форма — `screen.items[]` с карточкой (фишки: страна, производитель), аптечным блоком и
  * атрибутами. Код, GTIN и серийный номер заменены заглушками, картинки и HTML-инструкция убраны.
  */
-object CrptFixtures {
+object MarkingFixtures {
 
-    /** Разделитель полей DataMatrix — GS: так его отдаёт сканер, и так он уходит в CRPT. */
+    /** Разделитель полей DataMatrix — GS: так его отдаёт сканер, и так он уходит в реестр. */
     const val GS = "\u001d"
 
     /** Настоящий текст сканера начинается с `01`, поля `91`/`92` отделены GS. */
@@ -15,7 +15,7 @@ object CrptFixtures {
 
     /**
      * Ответ реестра **как он есть**: снят живым запросом 2026-09-17 и лежит файлом
-     * `test/resources/crpt/found.json` целиком — с картинками, HTML-инструкцией и всеми блоками,
+     * `test/resources/marking/found.json` целиком — с картинками, HTML-инструкцией и всеми блоками,
      * которых мы не читаем. Написанная от руки фикстура показывает то, что мы ожидали увидеть;
      * снятая — то, что реестр присылает на самом деле, и разойтись с ней нельзя незаметно.
      *
@@ -25,8 +25,8 @@ object CrptFixtures {
     val found: String = read("found.json")
 
     private fun read(name: String): String =
-        checkNotNull(CrptFixtures::class.java.getResourceAsStream("/crpt/$name")) {
-            "фикстура ответа реестра /crpt/$name не найдена"
+        checkNotNull(MarkingFixtures::class.java.getResourceAsStream("/marking/$name")) {
+            "фикстура ответа реестра /marking/$name не найдена"
         }.use { it.readBytes().decodeToString() }
 
     /**

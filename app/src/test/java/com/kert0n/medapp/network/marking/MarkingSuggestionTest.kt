@@ -1,4 +1,4 @@
-package com.kert0n.medapp.network.crpt
+package com.kert0n.medapp.network.marking
 
 import com.kert0n.medapp.domain.value.DosageForm
 import com.kert0n.medapp.domain.value.Vocabulary
@@ -15,7 +15,7 @@ import org.junit.Test
  * Ответ становится предложением, а не фактом (PLAN H5): непонятное остаётся незаполненным, форма —
  * из словаря или выбор, категория вне лекарств — предупреждение, количество и дозировка — строки.
  */
-class CrptSuggestionTest {
+class MarkingSuggestionTest {
 
     /** Сегодня у проверки своё: день продажи из будущего в предложение не попадает. */
     private val TODAY: LocalDate = LocalDate.of(2026, 9, 17)
@@ -28,12 +28,12 @@ class CrptSuggestionTest {
     /** Тот же нестрогий разбор, что у клиента (G3). */
     private val json = Json { ignoreUnknownKeys = true; explicitNulls = false }
 
-    private fun dto(text: String): CrptCheckNetworkDTO = json.decodeFromString(CrptCheckNetworkDTO.serializer(), text)
+    private fun dto(text: String): MarkingCheckNetworkDTO = json.decodeFromString(MarkingCheckNetworkDTO.serializer(), text)
 
     /** Живой ответ 2026-09-14: полночь 31 марта по Москве — в UTC ещё 30-е, страна — фишкой карточки. */
     @Test
     fun aFoundMedicineFillsWhatTheAnswerNamesAndNothingElse() {
-        val suggestion = dto(CrptFixtures.found).toSuggestion(words, TODAY)
+        val suggestion = dto(MarkingFixtures.found).toSuggestion(words, TODAY)
 
         assertEquals("Цетрин", suggestion.name)
         assertEquals("таблетки покрытые пленочной оболочкой", suggestion.formText)
@@ -54,7 +54,7 @@ class CrptSuggestionTest {
      */
     @Test
     fun aCompoundDosageStaysTextAndFewerBlocksAreNotAnError() {
-        val suggestion = dto(CrptFixtures.lozenge).toSuggestion(words, TODAY)
+        val suggestion = dto(MarkingFixtures.lozenge).toSuggestion(words, TODAY)
 
         assertEquals("Доритрицин", suggestion.name)
         assertEquals(tablets, suggestion.form)
@@ -67,7 +67,7 @@ class CrptSuggestionTest {
     /** Категория вне лекарств — предупреждение; форма при этом подставляется, если словарь её знает. */
     @Test
     fun aCosmeticIsNotAMedicine() {
-        val suggestion = dto(CrptFixtures.cosmetics).toSuggestion(words, TODAY)
+        val suggestion = dto(MarkingFixtures.cosmetics).toSuggestion(words, TODAY)
 
         assertFalse(suggestion.isMedicine)
         assertEquals("Крем для рук", suggestion.name)
@@ -113,7 +113,7 @@ class CrptSuggestionTest {
      */
     @Test
     fun theDayItWasSoldIsReadInMoscowDays() {
-        val suggestion = dto(CrptFixtures.found).toSuggestion(words, LocalDate.of(2026, 9, 17))
+        val suggestion = dto(MarkingFixtures.found).toSuggestion(words, LocalDate.of(2026, 9, 17))
 
         assertEquals(LocalDate.of(2025, 11, 15), suggestion.boughtOn)
     }
@@ -124,7 +124,7 @@ class CrptSuggestionTest {
      */
     @Test
     fun aSaleInTheFutureIsNotAPurchase() {
-        val suggestion = dto(CrptFixtures.found).toSuggestion(words, LocalDate.of(2025, 1, 1))
+        val suggestion = dto(MarkingFixtures.found).toSuggestion(words, LocalDate.of(2025, 1, 1))
 
         assertNull(suggestion.boughtOn)
     }

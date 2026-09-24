@@ -19,7 +19,7 @@ class BundledVocabularyAssetTest {
 
     @Test
     fun snapshotComesFromTheProductionServer() {
-        assertEquals("https://medapp.ru.net", snapshot.origin)
+        assertEquals("production", snapshot.origin)
     }
 
     @Test

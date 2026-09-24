@@ -25,19 +25,24 @@ val localProperties = Properties().apply {
 fun secretOrNull(key: String): String? =
     (localProperties.getProperty(key) ?: System.getenv(key))?.takeIf { it.isNotBlank() }
 
-/** Значение по умолчанию допустимо только в debug: release без настроенного токена не собирается. */
+/** Значение по умолчанию допустимо только в debug: release без настроенных секретов не собирается. */
 fun debugSecret(key: String, fallback: String): String = secretOrNull(key) ?: run {
     logger.warn("$key не задан: debug-сборка взяла значение по умолчанию. Настоящее значение задаётся в local.properties или в окружении CI.")
     fallback
 }
 
 /**
- * Release не должен уезжать с публичным dev-значением токена. Проверка отложена до самой
+ * Release не должен уезжать с dev-значением токена или адреса. Проверка отложена до самой
  * сборки release, а не сделана на конфигурации: иначе отсутствие секрета роняло бы и
  * debug-сборку, и разбор проекта в IDE.
  */
+/** Заглушка адреса для debug без настроенных секретов: зарезервированный домен, никуда не ведёт. */
+val PLACEHOLDER_URL = "https://medapp.invalid"
+
 val secretsMissingForRelease = listOf(
     "MEDAPP_REGISTRATION_TOKEN",
+    "MEDAPP_BASE_URL",
+    "MEDAPP_MARKING_URL",
     "MEDAPP_KEYSTORE_FILE",
     "MEDAPP_KEYSTORE_PASSWORD",
     "MEDAPP_KEY_ALIAS",
@@ -113,19 +118,18 @@ android {
         // Проверка регистрации — отдельно, по -PprobeRegistration: каждый её прогон заводит
         // на сервере новую учётку.
         if (project.hasProperty("probe") || project.hasProperty("probeRegistration")) {
-            testInstrumentationRunnerArguments["probeBaseUrl"] =
-                secretOrNull("MEDAPP_BASE_URL") ?: "https://medapp.ru.net"
+            testInstrumentationRunnerArguments["probeBaseUrl"] = secretOrNull("MEDAPP_BASE_URL").orEmpty()
         }
         if (project.hasProperty("probeRegistration")) {
             testInstrumentationRunnerArguments["probeRegistration"] = "true"
         }
-        // Проба «Честного знака» — только по явному -PprobeCrpt: чужой API, по одному запросу на код
+        // Проба реестра маркировки — только по явному -PprobeMarking: чужой API, по одному запросу на код
         // за запуск. Коды с коробок лежат в local.properties через `;` (разделители GS внутри кода —
         // экранированным U+001D), в APK и в git не попадают; в аргументы едет Base64 — управляющий
         // байт через `am instrument` не проходит.
-        if (project.hasProperty("probeCrpt")) {
-            testInstrumentationRunnerArguments["probeCrptCodes"] =
-                Base64.getEncoder().encodeToString(secretOrNull("MEDAPP_CRPT_PROBE_CODES").orEmpty().toByteArray())
+        if (project.hasProperty("probeMarking")) {
+            testInstrumentationRunnerArguments["probeMarkingCodes"] =
+                Base64.getEncoder().encodeToString(secretOrNull("MEDAPP_MARKING_PROBE_CODES").orEmpty().toByteArray())
         }
         if (project.hasProperty("probe")) {
             // Третья учётка — для историй, где полок две, а людей трое: кто целевую полку не
@@ -138,17 +142,11 @@ android {
             }
         }
 
-        // Адреса секретами не являются: у них есть законное значение по умолчанию.
-        buildConfigField(
-            "String",
-            "BASE_URL",
-            "\"${secretOrNull("MEDAPP_BASE_URL") ?: "https://medapp.ru.net"}\""
-        )
-        buildConfigField(
-            "String",
-            "CRPT_BASE_URL",
-            "\"${secretOrNull("MEDAPP_CRPT_BASE_URL") ?: "https://mobile.api.crpt.ru"}\""
-        )
+        // Адреса приходят тем же путём, что и секреты: в git их нет. Без них debug собирается на
+        // заглушке и никуда не ходит, а release не собирается вовсе (`verifyReleaseSecrets`).
+        // Адрес реестра маркировки — целиком, с путём проверки.
+        buildConfigField("String", "BASE_URL", "\"${debugSecret("MEDAPP_BASE_URL", PLACEHOLDER_URL)}\"")
+        buildConfigField("String", "MARKING_URL", "\"${debugSecret("MEDAPP_MARKING_URL", PLACEHOLDER_URL)}\"")
         // Сервер срок приглашения не отдаёт, а задаёт настройкой `medkit.share.termInMinutes`:
         // клиент показывает оценку по этому числу (PLAN B6).
         buildConfigField("long", "INVITATION_TERM_MINUTES", "60L")

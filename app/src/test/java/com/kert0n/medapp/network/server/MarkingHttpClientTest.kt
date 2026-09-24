@@ -16,14 +16,14 @@ import org.junit.Test
 /**
  * Чужой API разбирается нестрого, а заголовка авторизации MedApp у его клиента нет (PLAN G3).
  */
-class CrptHttpClientTest {
+class MarkingHttpClientTest {
 
     @Serializable
     private data class Card(val name: String)
 
     @Test
     fun unknownFieldsOfForeignApiAreTolerated() = runTest {
-        val client = crptHttpClient(
+        val client = markingHttpClient(
             MockEngine {
                 respond(
                     """{"name":"Аспирин","gtin":"04601234567890","extra":{"any":1}}""",
@@ -31,7 +31,7 @@ class CrptHttpClientTest {
                     headersOf(HttpHeaders.ContentType, "application/json")
                 )
             },
-            "https://crpt.test"
+            "https://marking.test"
         )
 
         assertEquals("Аспирин", client.get("/card").body<Card>().name)
@@ -40,12 +40,12 @@ class CrptHttpClientTest {
     @Test
     fun foreignHostNeverSeesAuthorization() = runTest {
         var authorization: String? = "не проверено"
-        val client = crptHttpClient(
+        val client = markingHttpClient(
             MockEngine { request ->
                 authorization = request.headers[HttpHeaders.Authorization]
                 respond("", HttpStatusCode.OK)
             },
-            "https://crpt.test"
+            "https://marking.test"
         )
 
         client.get("/card")

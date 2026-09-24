@@ -15,7 +15,7 @@ import com.kert0n.medapp.network.delivery.MedAppPacking
 import com.kert0n.medapp.network.medkit.ServerMedKitInvitations
 import com.kert0n.medapp.network.register.MedAppRegister
 import com.kert0n.medapp.network.server.MedAppApi
-import com.kert0n.medapp.network.server.crptHttpClient
+import com.kert0n.medapp.network.server.markingHttpClient
 import com.kert0n.medapp.network.server.medAppHttpClient
 import com.kert0n.medapp.network.value.ServerVocabularyLibrary
 import com.kert0n.medapp.queue.Courier
@@ -37,7 +37,7 @@ annotation class MedAppHttp
 
 @Qualifier
 @Retention(AnnotationRetention.BINARY)
-annotation class CrptHttp
+annotation class MarkingHttp
 
 /** Регистрационный токен сборки (PLAN G1): приходит из `local.properties` или окружения CI. */
 @Qualifier
@@ -93,8 +93,8 @@ object NetworkModule {
 
     @Provides
     @Singleton
-    @CrptHttp
-    fun crptHttp(): HttpClient = crptHttpClient(OkHttp.create(), BuildConfig.CRPT_BASE_URL)
+    @MarkingHttp
+    fun markingHttp(): HttpClient = markingHttpClient(OkHttp.create(), BuildConfig.MARKING_URL)
 
     /** Курьер поручений ходит к серверу тем же клиентом: пропуск, лог и таймауты у него те же. */
     @Provides

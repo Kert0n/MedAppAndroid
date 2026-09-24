@@ -122,7 +122,7 @@ jobs:
           MEDAPP_KEY_PASSWORD: ${{ secrets.MEDAPP_KEY_PASSWORD }}
           MEDAPP_REGISTRATION_TOKEN: ${{ secrets.MEDAPP_REGISTRATION_TOKEN }}
           MEDAPP_BASE_URL: ${{ secrets.MEDAPP_BASE_URL }}
-          MEDAPP_CRPT_BASE_URL: ${{ secrets.MEDAPP_CRPT_BASE_URL }}
+          MEDAPP_MARKING_URL: ${{ secrets.MEDAPP_MARKING_URL }}
           # Счёт публикаций ведёт сам прогон: у каждой сборки, уехавшей в latest, минорная версия
           # на единицу больше прежней, а `versionCode` растёт вместе с ней.
           MEDAPP_PUBLICATION: ${{ github.run_number }}

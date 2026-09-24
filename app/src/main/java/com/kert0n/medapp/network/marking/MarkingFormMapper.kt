@@ -1,4 +1,4 @@
-package com.kert0n.medapp.network.crpt
+package com.kert0n.medapp.network.marking
 
 import com.kert0n.medapp.domain.value.DosageForm
 import com.kert0n.medapp.domain.value.Vocabulary
@@ -14,14 +14,14 @@ import com.kert0n.medapp.domain.value.Vocabulary
  * распространённых видов остаются собой, двадцать шесть редких сводятся к «другие» (issue #36).
  * Сверх серверного здесь только то, чего в каталоге не было: падежи («таблетка»), мягкий знак
  * («мазь») и сокращения реестра. Совпадение свёрток держит таблица ожиданий из всех 208 прежних
- * подробных названий (`CrptFormMapperTest`): разойдись они — человек выбрал бы одну форму, а в
+ * подробных названий (`MarkingFormMapperTest`): разойдись они — человек выбрал бы одну форму, а в
  * каталоге сервера лекарство лежало бы под другой.
  *
  * Объект берётся **из снимка сервера** по имени: тождество формы — серверный `id`, и придумать
  * его клиенту нечем. Текст не узнан или такой формы в снимке нет — `null`, а сам текст остаётся
  * у предложения (`formText`), и человек выберет сам.
  */
-internal object CrptFormMapper {
+internal object MarkingFormMapper {
 
     /** Косая черта делит альтернативы («капсулы/таблетки»): берётся первая узнанная. */
     fun resolve(text: String, vocabulary: Vocabulary): DosageForm? =
@@ -40,7 +40,7 @@ internal object CrptFormMapper {
 
     private const val OTHER = "другие"
 
-    /** Сокращения реестра: в каталоге сервера их не было, а в ответах «Честного знака» есть. */
+    /** Сокращения реестра: в каталоге сервера их не было, а в ответах реестра маркировки есть. */
     private val ABBREVIATIONS = mapOf(
         "р-р" to "раствор", "табл" to "таблетки", "таб" to "таблетки",
         "капс" to "капсулы", "сусп" to "суспензия", "супп" to "суппозитории",
