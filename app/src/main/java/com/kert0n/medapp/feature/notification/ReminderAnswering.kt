@@ -1,16 +1,16 @@
 package com.kert0n.medapp.feature.notification
 
+import com.kert0n.medapp.domain.intake.CourseIntake
+import com.kert0n.medapp.domain.intake.IntakeRejected
 import com.kert0n.medapp.domain.notification.NotificationKey
 import com.kert0n.medapp.domain.notification.NotificationKind
 import com.kert0n.medapp.domain.notification.NotificationSettingsSource
-import com.kert0n.medapp.domain.notification.Reminder
-import com.kert0n.medapp.domain.intake.CourseIntake
-import com.kert0n.medapp.domain.intake.IntakeRejected
 import com.kert0n.medapp.domain.notification.NotificationTarget
+import com.kert0n.medapp.domain.notification.Reminder
 import com.kert0n.medapp.feature.intake.IntakeConfirmation
 import com.kert0n.medapp.feature.intake.IntakeDeclining
+import com.kert0n.medapp.feature.intake.IntakeRecords
 import com.kert0n.medapp.queue.Transactions
-import com.kert0n.medapp.storage.intake.IntakeStorageRepository
 import com.kert0n.medapp.storage.notification.ReminderStorageRepository
 import java.time.Clock
 import java.time.Duration
@@ -26,7 +26,7 @@ import kotlin.uuid.Uuid
 class ReminderAnswering @Inject constructor(
     private val declining: IntakeDeclining,
     private val confirmation: IntakeConfirmation,
-    private val intakes: IntakeStorageRepository,
+    private val intakes: IntakeRecords,
     private val promising: ReminderPromising,
     private val reminders: ReminderStorageRepository,
     private val withdrawal: ReminderWithdrawal,

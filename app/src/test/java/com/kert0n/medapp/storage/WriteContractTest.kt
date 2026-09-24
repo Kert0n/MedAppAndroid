@@ -1,8 +1,8 @@
 package com.kert0n.medapp.storage
 
+import com.kert0n.medapp.feature.intake.IntakeRecords
 import com.kert0n.medapp.feature.packages.PackageRecords
 import com.kert0n.medapp.storage.course.CourseStorageRepository
-import com.kert0n.medapp.storage.intake.IntakeStorageRepository
 import com.kert0n.medapp.storage.medkit.MedKitStorageRepository
 import java.io.File
 import java.lang.reflect.Method
@@ -134,17 +134,17 @@ class WriteContractTest {
         "MedKitStorageRepository.add" to (Shape.CREATION by "(MedKit): Unit"),
         "MedKitStorageRepository.describe" to (Shape.NAMED_FIELDS by "(Uuid, String, String): Boolean"),
         // Приём
-        "IntakeStorageRepository.observeOfCourse" to (Shape.READ by "(Uuid): Flow<List<IntakeProjection>>"),
-        "IntakeStorageRepository.observeOfPackage" to (Shape.READ by "(Uuid): Flow<List<IntakeProjection>>"),
-        "IntakeStorageRepository.observeOfIds" to (Shape.READ by "(Set<Uuid>): Flow<List<IntakeProjection>>"),
-        "IntakeStorageRepository.ofCourse" to (Shape.READ by "(Uuid): List<? extends Intake>"),
-        "IntakeStorageRepository.find" to (Shape.READ by "(Uuid): Intake"),
-        "IntakeStorageRepository.syncStateOf" to (Shape.READ by "(Uuid): IntakeSyncState"),
-        "IntakeStorageRepository.plannedBefore" to (Shape.READ by "(Instant): List<CourseIntake>"),
-        "IntakeStorageRepository.save" to (Shape.ACTION by "(RecordedIntake): Unit"),
-        "IntakeStorageRepository.record" to (Shape.ACTION by "(IntakeOutcome): Boolean"),
-        "IntakeStorageRepository.materialise" to (Shape.CREATION by "(List<CourseIntake>): List<Uuid>"),
-        "IntakeStorageRepository.prunePlanned" to (Shape.NAMED_FIELDS by "(Uuid, Set<ScheduledOccurrence>): List<Uuid>"),
+        "IntakeReadings.observeOfCourse" to (Shape.READ by "(Uuid): Flow<List<IntakeProjection>>"),
+        "IntakeReadings.observeOfPackage" to (Shape.READ by "(Uuid): Flow<List<IntakeProjection>>"),
+        "IntakeReadings.observeOfIds" to (Shape.READ by "(Set<Uuid>): Flow<List<IntakeProjection>>"),
+        "IntakeRecords.ofCourse" to (Shape.READ by "(Uuid): List<? extends Intake>"),
+        "IntakeRecords.find" to (Shape.READ by "(Uuid): Intake"),
+        "IntakeAccounts.of" to (Shape.READ by "(Uuid): IntakeSyncState"),
+        "IntakeRecords.plannedBefore" to (Shape.READ by "(Instant): List<CourseIntake>"),
+        "IntakeRecords.save" to (Shape.ACTION by "(RecordedIntake): Unit"),
+        "IntakeRecords.record" to (Shape.ACTION by "(IntakeOutcome): Boolean"),
+        "IntakeRecords.materialise" to (Shape.CREATION by "(List<CourseIntake>): List<Uuid>"),
+        "IntakeRecords.prunePlanned" to (Shape.NAMED_FIELDS by "(Uuid, Set<ScheduledOccurrence>): List<Uuid>"),
         "ReminderStorageRepository.changes" to (Shape.READ by "(): Flow<Unit>"),
         "ReminderStorageRepository.groundsChanged" to (Shape.READ by "(): Flow<Unit>"),
         "ReminderStorageRepository.find" to (Shape.READ by "(NotificationKey): Reminder"),
@@ -199,7 +199,9 @@ class WriteContractTest {
         com.kert0n.medapp.feature.packages.PackageReadings::class.java,
         CourseStorageRepository::class.java,
         MedKitStorageRepository::class.java,
-        IntakeStorageRepository::class.java,
+        IntakeRecords::class.java,
+        com.kert0n.medapp.feature.intake.IntakeReadings::class.java,
+        com.kert0n.medapp.feature.intake.IntakeAccounts::class.java,
         com.kert0n.medapp.storage.report.ReportStorageRepository::class.java,
         com.kert0n.medapp.storage.notification.ReminderStorageRepository::class.java
     )

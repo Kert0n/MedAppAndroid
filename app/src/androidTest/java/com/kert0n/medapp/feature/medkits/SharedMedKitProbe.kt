@@ -26,6 +26,7 @@ import com.kert0n.medapp.fixture.Scenarios
 import com.kert0n.medapp.fixture.confirmed
 import com.kert0n.medapp.fixture.courseRepository
 import com.kert0n.medapp.fixture.inMemoryDatabase
+import com.kert0n.medapp.fixture.intakeAccounts
 import com.kert0n.medapp.fixture.intakeRepository
 import com.kert0n.medapp.fixture.medKit
 import com.kert0n.medapp.fixture.medKitRepository
@@ -57,6 +58,7 @@ import com.kert0n.medapp.queue.SyncOperationStatus
 import com.kert0n.medapp.queue.intake.IntakeAccounting
 import com.kert0n.medapp.storage.database.RoomTransactions
 import com.kert0n.medapp.storage.medkit.toStorageEntity as toMedKitStorageEntity
+import com.kert0n.medapp.storage.operation.syncState
 import com.kert0n.medapp.storage.value.VocabularyRoomRepository
 import java.math.BigDecimal
 import java.time.Clock
@@ -623,7 +625,7 @@ class SharedMedKitProbe {
         private val calendar = CourseCalendar(database.intakeRepository(), packages, promising, withdrawal)
         private val following = com.kert0n.medapp.feature.course.CourseFollowing(courses, packages, calendar, queue, transactions)
         private val confirmation = IntakeConfirmation(
-            database.intakeRepository(), courses, packages, transactions, queue, CourseClosing(courses, following, withdrawal),
+            database.intakeRepository(), database.intakeAccounts(), courses, packages, transactions, queue, CourseClosing(courses, following, withdrawal),
             calendar, withdrawal, clock
         )
 
@@ -739,6 +741,6 @@ class SharedMedKitProbe {
         }
 
         suspend fun accountingOf(intake: Uuid): IntakeAccounting =
-            requireNotNull(database.intakes().findEntity(intake)).accounting
+            requireNotNull(database.intakes().findEntity(intake)).syncState().accounting
     }
 }

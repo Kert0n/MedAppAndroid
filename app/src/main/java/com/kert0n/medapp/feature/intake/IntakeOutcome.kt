@@ -1,4 +1,4 @@
-package com.kert0n.medapp.storage.intake
+package com.kert0n.medapp.feature.intake
 
 import com.kert0n.medapp.domain.intake.CourseIntake
 import com.kert0n.medapp.domain.intake.Intake
@@ -46,7 +46,7 @@ class IntakeOutcome(
      */
     val answeredAt: Instant = when (intake) {
         is UnplannedIntake -> intake.dose.at
-        is CourseIntake -> requireNotNull(intake.answer) { "записывается ответ, а не его отсутствие" }.at
+        is CourseIntake -> checkNotNull(intake.answer) { "у записываемого приёма есть ответ" }.at
     }
 
     /**

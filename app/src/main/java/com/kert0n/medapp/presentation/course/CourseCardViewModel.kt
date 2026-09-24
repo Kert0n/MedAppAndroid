@@ -1,23 +1,23 @@
 package com.kert0n.medapp.presentation.course
 
-import com.kert0n.medapp.presentation.act
-import com.kert0n.medapp.presentation.ScreenFailures
-import com.kert0n.medapp.presentation.stateInScreen
-import com.kert0n.medapp.presentation.ScreenReading
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.kert0n.medapp.domain.course.CourseCoverage
-import com.kert0n.medapp.domain.course.Revision
-import com.kert0n.medapp.domain.value.Doses
 import com.kert0n.medapp.domain.course.CourseProjection
-import com.kert0n.medapp.domain.course.CoverageReduction
 import com.kert0n.medapp.domain.course.CourseRecordProjection
+import com.kert0n.medapp.domain.course.CoverageReduction
+import com.kert0n.medapp.domain.course.Revision
 import com.kert0n.medapp.domain.intake.IntakeProjection
 import com.kert0n.medapp.domain.intake.IntakeStatus
+import com.kert0n.medapp.domain.value.Doses
 import com.kert0n.medapp.feature.course.CourseCancellation
 import com.kert0n.medapp.feature.course.CourseOffPlanCounting
+import com.kert0n.medapp.feature.intake.IntakeReadings
+import com.kert0n.medapp.presentation.ScreenFailures
+import com.kert0n.medapp.presentation.ScreenReading
+import com.kert0n.medapp.presentation.act
+import com.kert0n.medapp.presentation.stateInScreen
 import com.kert0n.medapp.storage.course.CourseStorageRepository
-import com.kert0n.medapp.storage.intake.IntakeStorageRepository
 import dagger.assisted.Assisted
 import dagger.assisted.AssistedFactory
 import dagger.assisted.AssistedInject
@@ -42,7 +42,7 @@ class CourseCardViewModel @AssistedInject constructor(
     private val cancellation: CourseCancellation,
     private val offPlanCounting: CourseOffPlanCounting,
     courses: CourseStorageRepository,
-    intakes: IntakeStorageRepository,
+    intakes: IntakeReadings,
     @Assisted private val courseId: Uuid,
     private val failures: ScreenFailures = ScreenFailures()
 ) : ViewModel() {

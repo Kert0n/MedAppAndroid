@@ -2,8 +2,8 @@ package com.kert0n.medapp.storage.intake
 
 import com.kert0n.medapp.domain.intake.CourseIntake
 import com.kert0n.medapp.domain.intake.IntakeAnswer
-import com.kert0n.medapp.domain.intake.TakenDose
 import com.kert0n.medapp.domain.intake.IntakeStatus
+import com.kert0n.medapp.domain.intake.TakenDose
 import com.kert0n.medapp.domain.intake.UnplannedIntake
 import com.kert0n.medapp.fixture.COURSE
 import com.kert0n.medapp.fixture.INTAKE
@@ -12,22 +12,24 @@ import com.kert0n.medapp.fixture.MILLILITRES
 import com.kert0n.medapp.fixture.OTHER_PACK
 import com.kert0n.medapp.fixture.PACK
 import com.kert0n.medapp.fixture.SHARED_KIT
+import com.kert0n.medapp.fixture.VOCABULARY
 import com.kert0n.medapp.fixture.dose
+import com.kert0n.medapp.fixture.medKit
 import com.kert0n.medapp.fixture.millilitres
 import com.kert0n.medapp.fixture.pack
-import com.kert0n.medapp.fixture.tablets
 import com.kert0n.medapp.fixture.plannedIntake
+import com.kert0n.medapp.fixture.tablets
+import com.kert0n.medapp.fixture.toStorageRow
 import com.kert0n.medapp.fixture.unplannedIntake
 import com.kert0n.medapp.queue.intake.IntakeAccounting
 import com.kert0n.medapp.queue.intake.IntakeSyncState
+import com.kert0n.medapp.storage.operation.syncState
+import com.kert0n.medapp.storage.operation.toStorageEntity
 import kotlin.uuid.Uuid
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
-import com.kert0n.medapp.fixture.VOCABULARY
-import com.kert0n.medapp.fixture.medKit
-import com.kert0n.medapp.fixture.toStorageRow
 
 /**
  * Плановый пункт и внеплановый факт лежат в одной таблице и различаются наличием курса.

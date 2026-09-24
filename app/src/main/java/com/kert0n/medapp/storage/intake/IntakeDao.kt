@@ -7,7 +7,6 @@ import androidx.room.Query
 import androidx.room.Transaction
 import androidx.room.Upsert
 import com.kert0n.medapp.domain.intake.IntakeStatus
-import com.kert0n.medapp.queue.intake.IntakeAccounting
 import java.time.Instant
 import java.time.LocalDate
 import kotlin.uuid.Uuid
@@ -138,16 +137,9 @@ interface IntakeDao {
         packageId: Uuid?,
         amount: String?,
         unitId: Uuid,
-        accounting: IntakeAccounting,
+        accounting: String,
         operationId: Uuid?
     ): Int
-
-    /**
-     * Учёт расхода у приёма, который поставил операцию [operationId]: применён или отказан — что
-     * именно, решила очередь. Меняется только ожидающий: учтённое дважды не учитывается.
-     */
-    @Query("UPDATE intakes SET accounting = :accounting WHERE operation_id = :operationId AND accounting = 'PENDING'")
-    suspend fun setAccounting(operationId: Uuid, accounting: IntakeAccounting): Int
 
     @Query("DELETE FROM intakes WHERE id = :id")
     suspend fun delete(id: Uuid)

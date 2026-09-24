@@ -9,8 +9,6 @@ import com.kert0n.medapp.domain.intake.CourseIntake
 import com.kert0n.medapp.domain.intake.Intake
 import com.kert0n.medapp.domain.intake.IntakeStatus
 import com.kert0n.medapp.domain.intake.UnplannedIntake
-import com.kert0n.medapp.queue.intake.IntakeAccounting
-import com.kert0n.medapp.queue.intake.IntakeSyncState
 import com.kert0n.medapp.storage.course.CourseRecordStorageEntity
 import com.kert0n.medapp.storage.pack.PackageRecordStorageEntity
 import com.kert0n.medapp.storage.value.toStorageAmount
@@ -80,18 +78,16 @@ class IntakeStorageEntity(
     @ColumnInfo(name = "answered_at") val answeredAt: Instant? = null,
     @ColumnInfo(name = "taken_package_id") val takenPackageId: Uuid? = null,
     @ColumnInfo(name = "taken_amount") val takenAmount: String? = null,
-    val accounting: IntakeAccounting = IntakeAccounting.NOT_APPLICABLE,
+    val accounting: String,
     @ColumnInfo(name = "operation_id") val operationId: Uuid? = null
 ) {
-    fun syncState(): IntakeSyncState = IntakeSyncState(
-        intakeId = id,
-        accounting = accounting,
-        operationId = operationId
-    )
 }
 
-fun Intake.toStorageEntity(sync: IntakeSyncState = IntakeSyncState(id)): IntakeStorageEntity {
-    require(sync.intakeId == id) { "обвязка синхронизации принадлежит своему приёму" }
+/**
+ * Приём в строку. Учёт расхода приходит готовыми колонками — это знание очереди, и понимает его
+ * журнал (`storage/operation`); приём его переносит, не толкуя.
+ */
+fun Intake.toStorageEntity(accounting: String, operationId: Uuid?): IntakeStorageEntity {
     val takenDose = taken
     val common = IntakeStorageEntity(
         id = id,
@@ -100,8 +96,8 @@ fun Intake.toStorageEntity(sync: IntakeSyncState = IntakeSyncState(id)): IntakeS
         answeredAt = answerMoment(),
         takenPackageId = takenDose?.pkg?.id,
         takenAmount = takenDose?.amount?.quantity?.toStorageAmount(),
-        accounting = sync.accounting,
-        operationId = sync.operationId
+        accounting = accounting,
+        operationId = operationId
     )
     return when (this) {
         is UnplannedIntake -> common

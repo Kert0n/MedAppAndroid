@@ -13,6 +13,7 @@ import com.kert0n.medapp.domain.value.Doses
 import com.kert0n.medapp.feature.course.CourseCalendar
 import com.kert0n.medapp.feature.course.CourseClosing
 import com.kert0n.medapp.feature.course.CourseFollowing
+import com.kert0n.medapp.feature.intake.IntakeOutcome
 import com.kert0n.medapp.feature.intake.IntakeWarning
 import com.kert0n.medapp.feature.packages.PackageAdjustment
 import com.kert0n.medapp.fixture.COURSE
@@ -32,6 +33,7 @@ import com.kert0n.medapp.fixture.courseRepository
 import com.kert0n.medapp.fixture.dose
 import com.kert0n.medapp.fixture.factsOf
 import com.kert0n.medapp.fixture.inMemoryDatabase
+import com.kert0n.medapp.fixture.intakeAccounts
 import com.kert0n.medapp.fixture.intakeRepository
 import com.kert0n.medapp.fixture.medKit
 import com.kert0n.medapp.fixture.millilitres
@@ -51,7 +53,6 @@ import com.kert0n.medapp.queue.intake.IntakeAccounting
 import com.kert0n.medapp.queue.pack.PackageSyncCommand
 import com.kert0n.medapp.storage.course.CourseRoomRepository
 import com.kert0n.medapp.storage.database.MedAppDatabase
-import com.kert0n.medapp.storage.intake.IntakeOutcome
 import com.kert0n.medapp.storage.intake.IntakeRoomRepository
 import com.kert0n.medapp.storage.medkit.toStorageEntity as toMedKitStorageEntity
 import com.kert0n.medapp.storage.pack.PackageRoomRepository
@@ -98,7 +99,7 @@ class IntakeConfirmationTest {
         val service = QueueService(transactions, database.queueStorage())
         val calendar = CourseCalendar(intakes, packages, promising, withdrawal)
         val following = CourseFollowing(courses, packages, calendar, service, transactions)
-        confirmation = IntakeConfirmation(intakes, courses, packages, transactions, service, CourseClosing(courses, following, withdrawal), calendar, withdrawal, clock)
+        confirmation = IntakeConfirmation(intakes, database.intakeAccounts(), courses, packages, transactions, service, CourseClosing(courses, following, withdrawal), calendar, withdrawal, clock)
         packages.add(pack(quantity = tablets("20")))
     }
 
@@ -256,7 +257,7 @@ class IntakeConfirmationTest {
         val calendar = CourseCalendar(intakes, packages, promising, withdrawal)
         val following = CourseFollowing(courses, packages, calendar, service, database.transactions())
         val nextMorning = IntakeConfirmation(
-            intakes, courses, packages, database.transactions(), service, CourseClosing(courses, following, withdrawal),
+            intakes, database.intakeAccounts(), courses, packages, database.transactions(), service, CourseClosing(courses, following, withdrawal),
             calendar, withdrawal, Clock.fixed(slots[1].at, ZoneOffset.UTC)
         )
 

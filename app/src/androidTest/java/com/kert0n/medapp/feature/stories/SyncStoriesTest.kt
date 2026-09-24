@@ -20,6 +20,7 @@ import com.kert0n.medapp.fixture.confirmed
 import com.kert0n.medapp.fixture.courseRepository
 import com.kert0n.medapp.fixture.dose
 import com.kert0n.medapp.fixture.inMemoryDatabase
+import com.kert0n.medapp.fixture.intakeAccounts
 import com.kert0n.medapp.fixture.intakeRepository
 import com.kert0n.medapp.fixture.medKit
 import com.kert0n.medapp.fixture.pack
@@ -177,7 +178,7 @@ class SyncStoriesTest {
         val failed = server.synchronization(database, clock).synchronize()
         assertTrue(failed.queue.settled == 0)
         assertEquals(IntakeStatus.TAKEN, requireNotNull(database.intakeRepository().find(first.id)).status)
-        assertEquals(IntakeAccounting.PENDING, database.intakeRepository().syncStateOf(first.id)?.accounting)
+        assertEquals(IntakeAccounting.PENDING, database.intakeAccounts().of(first.id)?.accounting)
         // Экран 6: остаток уже уменьшен для человека, серверное число прежнее.
         assertEquals(tablets("18"), requireNotNull(database.packageRepository().observe(PACK).first()).availability.availableToMe)
 
@@ -195,7 +196,7 @@ class SyncStoriesTest {
 
         assertEquals("списано дважды", "18", server.drugs.getValue(PACK).quantity.toPlainString())
         assertTrue(statuses().all { it == SyncOperationStatus.APPLIED })
-        assertEquals(IntakeAccounting.REMOTE_APPLIED, database.intakeRepository().syncStateOf(first.id)?.accounting)
+        assertEquals(IntakeAccounting.REMOTE_APPLIED, database.intakeAccounts().of(first.id)?.accounting)
         assertEquals(tablets("18"), requireNotNull(database.packageRepository().observe(PACK).first()).quantity)
 
         // Второй случай: сервер отвергает расход — факт цел, расхождение видно.
@@ -205,7 +206,7 @@ class SyncStoriesTest {
         server.synchronization(database, Clock.fixed(now.plusSeconds(400), ZoneOffset.UTC)).synchronize()
 
         assertEquals(IntakeStatus.TAKEN, requireNotNull(database.intakeRepository().find(second.id)).status)
-        assertEquals(IntakeAccounting.REMOTE_REFUSED, database.intakeRepository().syncStateOf(second.id)?.accounting)
+        assertEquals(IntakeAccounting.REMOTE_REFUSED, database.intakeAccounts().of(second.id)?.accounting)
         assertTrue(database.queueRepository().observeOutstanding().first().any { (it as? StoredSyncOperation.Readable)?.operation?.status == SyncOperationStatus.REFUSED })
     }
 }

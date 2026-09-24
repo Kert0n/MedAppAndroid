@@ -254,7 +254,7 @@ class Scenarios(
         courses, database.intakeRepository(), packages, courseCalendar, courseFollowing, courseClosing, transactions, clock
     )
     val intakeConfirmation = com.kert0n.medapp.feature.intake.IntakeConfirmation(
-        database.intakeRepository(), courses, packages, transactions, queue, courseClosing, courseCalendar, reminderWithdrawal, clock
+        database.intakeRepository(), database.intakeAccounts(), courses, packages, transactions, queue, courseClosing, courseCalendar, reminderWithdrawal, clock
     )
     val notificationReconciliation = com.kert0n.medapp.feature.notification.NotificationReconciliation(
         database.intakeRepository(), packages, courses, reminderStore, database.queueRepository(), reminderPromising, reminderWithdrawal,
@@ -285,3 +285,6 @@ fun com.kert0n.medapp.feature.intake.IntakeConfirmation.Outcome.confirmed(): com
 /** Отказ сценария приёма по пункту курса — его причина. */
 fun com.kert0n.medapp.feature.intake.IntakeConfirmation.Outcome.rejected(): com.kert0n.medapp.domain.intake.IntakeRejected.Reason =
     (this as? com.kert0n.medapp.feature.intake.IntakeConfirmation.Outcome.Rejected)?.reason ?: error("ожидался отказ, а не $this")
+
+/** Учёт расхода приёма — у журнала, как у приложения. */
+fun MedAppDatabase.intakeAccounts() = com.kert0n.medapp.storage.operation.IntakeAccountsRoomRepository(intakes())

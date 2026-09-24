@@ -4,6 +4,7 @@ import android.database.sqlite.SQLiteConstraintException
 import com.kert0n.medapp.domain.intake.IntakeStatus
 import com.kert0n.medapp.fixture.COURSE
 import com.kert0n.medapp.fixture.FIRST_PLANNED_AT
+import com.kert0n.medapp.fixture.FIRST_SCHEDULED_ON
 import com.kert0n.medapp.fixture.HOME_KIT
 import com.kert0n.medapp.fixture.INTAKE
 import com.kert0n.medapp.fixture.LATER
@@ -11,17 +12,22 @@ import com.kert0n.medapp.fixture.OTHER_INTAKE
 import com.kert0n.medapp.fixture.OTHER_PACK
 import com.kert0n.medapp.fixture.PACK
 import com.kert0n.medapp.fixture.TABLETS
+import com.kert0n.medapp.fixture.TABLETS_ID
+import com.kert0n.medapp.fixture.VOCABULARY
 import com.kert0n.medapp.fixture.courseRecord
 import com.kert0n.medapp.fixture.dose
 import com.kert0n.medapp.fixture.inMemoryDatabase
+import com.kert0n.medapp.fixture.intakeRepository
+import com.kert0n.medapp.fixture.medKit
 import com.kert0n.medapp.fixture.pack
 import com.kert0n.medapp.fixture.plannedIntake
 import com.kert0n.medapp.fixture.rejectedByDatabase
+import com.kert0n.medapp.fixture.save
 import com.kert0n.medapp.fixture.tablets
 import com.kert0n.medapp.queue.intake.IntakeAccounting
 import com.kert0n.medapp.storage.course.toStorageEntity as toRecordStorageEntity
 import com.kert0n.medapp.storage.database.MedAppDatabase
-import com.kert0n.medapp.fixture.save
+import com.kert0n.medapp.storage.operation.toStorageEntity
 import com.kert0n.medapp.storage.pack.ClaimsStorageEntity
 import java.time.Instant
 import kotlin.uuid.Uuid
@@ -33,11 +39,6 @@ import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Before
 import org.junit.Test
-import com.kert0n.medapp.fixture.VOCABULARY
-import com.kert0n.medapp.fixture.TABLETS_ID
-import com.kert0n.medapp.fixture.medKit
-import com.kert0n.medapp.fixture.intakeRepository
-import com.kert0n.medapp.fixture.FIRST_SCHEDULED_ON
 
 /**
  * Что переживает конец коробки, а что уходит вместе с ней (PLAN D3, D6, F2).
@@ -123,7 +124,7 @@ class HistoryDaoTest {
             packageId = PACK,
             amount = "2",
             unitId = TABLETS_ID,
-            accounting = IntakeAccounting.LOCAL_APPLIED,
+            accounting = IntakeAccounting.LOCAL_APPLIED.name,
             operationId = null
         )
         val second = intakes.answerIfStatusIs(
@@ -134,7 +135,7 @@ class HistoryDaoTest {
             packageId = null,
             amount = null,
             unitId = TABLETS_ID,
-            accounting = IntakeAccounting.NOT_APPLICABLE,
+            accounting = IntakeAccounting.NOT_APPLICABLE.name,
             operationId = null
         )
 

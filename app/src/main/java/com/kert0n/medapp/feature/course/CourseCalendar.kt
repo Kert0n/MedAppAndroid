@@ -13,11 +13,11 @@ import com.kert0n.medapp.domain.pack.Availability
 import com.kert0n.medapp.domain.pack.PackageAvailability
 import com.kert0n.medapp.domain.value.Doses
 import com.kert0n.medapp.domain.value.Quantity
+import com.kert0n.medapp.feature.intake.IntakeOutcome
+import com.kert0n.medapp.feature.intake.IntakeRecords
 import com.kert0n.medapp.feature.notification.ReminderPromising
 import com.kert0n.medapp.feature.notification.ReminderWithdrawal
 import com.kert0n.medapp.feature.packages.PackageRecords
-import com.kert0n.medapp.storage.intake.IntakeOutcome
-import com.kert0n.medapp.storage.intake.IntakeStorageRepository
 import java.time.Duration
 import java.time.Instant
 import javax.inject.Inject
@@ -34,7 +34,7 @@ import kotlin.uuid.Uuid
  * заводится.
  */
 class CourseCalendar @Inject constructor(
-    private val intakes: IntakeStorageRepository,
+    private val intakes: IntakeRecords,
     private val packages: PackageRecords,
     private val promising: ReminderPromising,
     private val withdrawal: ReminderWithdrawal

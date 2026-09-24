@@ -8,6 +8,7 @@ import com.kert0n.medapp.domain.intake.UnplannedIntake
 import com.kert0n.medapp.domain.medkit.MedKit
 import com.kert0n.medapp.domain.value.doses
 import com.kert0n.medapp.feature.course.CourseReallocation
+import com.kert0n.medapp.feature.intake.IntakeOutcome
 import com.kert0n.medapp.feature.packages.PackageAdjustment
 import com.kert0n.medapp.fixture.COURSE
 import com.kert0n.medapp.fixture.FixturePackages
@@ -26,6 +27,7 @@ import com.kert0n.medapp.fixture.courseRecord
 import com.kert0n.medapp.fixture.courseRepository
 import com.kert0n.medapp.fixture.dose
 import com.kert0n.medapp.fixture.inMemoryDatabase
+import com.kert0n.medapp.fixture.intakeAccounts
 import com.kert0n.medapp.fixture.intakeRepository
 import com.kert0n.medapp.fixture.medKit
 import com.kert0n.medapp.fixture.pack
@@ -49,7 +51,6 @@ import com.kert0n.medapp.storage.course.CourseRoomRepository
 import com.kert0n.medapp.storage.course.CourseStorageEntity
 import com.kert0n.medapp.storage.course.toStorageEntity as toCourseStorageEntity
 import com.kert0n.medapp.storage.database.MedAppDatabase
-import com.kert0n.medapp.storage.intake.IntakeOutcome
 import com.kert0n.medapp.storage.intake.IntakeRoomRepository
 import com.kert0n.medapp.storage.medkit.toStorageEntity as toMedKitStorageEntity
 import com.kert0n.medapp.storage.operation.syncState
@@ -255,7 +256,7 @@ class TransactionBoundariesTest {
         assertEquals(tablets("18"), requireNotNull(packages.find(PACK)).quantity)
         assertEquals(
             IntakeAccounting.LOCAL_APPLIED,
-            requireNotNull(intakes.syncStateOf(INTAKE)).accounting
+            requireNotNull(database.intakeAccounts().of(INTAKE)).accounting
         )
     }
 
@@ -339,7 +340,7 @@ class TransactionBoundariesTest {
         assertEquals(IntakeStatus.TAKEN, requireNotNull(intakes.find(INTAKE)).status)
         assertEquals(
             IntakeAccounting.LOCAL_APPLIED,
-            requireNotNull(intakes.syncStateOf(INTAKE)).accounting
+            requireNotNull(database.intakeAccounts().of(INTAKE)).accounting
         )
     }
 

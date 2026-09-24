@@ -3,6 +3,9 @@ package com.kert0n.medapp.di
 import com.kert0n.medapp.domain.course.PackageFollowing
 import com.kert0n.medapp.domain.value.VocabularyStore
 import com.kert0n.medapp.feature.course.CourseFollowing
+import com.kert0n.medapp.feature.intake.IntakeAccounts
+import com.kert0n.medapp.feature.intake.IntakeReadings
+import com.kert0n.medapp.feature.intake.IntakeRecords
 import com.kert0n.medapp.feature.packages.PackageReadings
 import com.kert0n.medapp.feature.packages.PackageRecords
 import com.kert0n.medapp.queue.QueueBacklog
@@ -13,11 +16,11 @@ import com.kert0n.medapp.storage.course.CourseRoomRepository
 import com.kert0n.medapp.storage.course.CourseStorageRepository
 import com.kert0n.medapp.storage.database.RoomTransactions
 import com.kert0n.medapp.storage.intake.IntakeRoomRepository
-import com.kert0n.medapp.storage.intake.IntakeStorageRepository
 import com.kert0n.medapp.storage.medkit.MedKitRoomRepository
 import com.kert0n.medapp.storage.medkit.MedKitStorageRepository
 import com.kert0n.medapp.storage.notification.ReminderRoomRepository
 import com.kert0n.medapp.storage.notification.ReminderStorageRepository
+import com.kert0n.medapp.storage.operation.IntakeAccountsRoomRepository
 import com.kert0n.medapp.storage.operation.QueueBacklogRoomStorage
 import com.kert0n.medapp.storage.operation.QueueRoomStorage
 import com.kert0n.medapp.storage.operation.SyncOperationRoomRepository
@@ -61,7 +64,13 @@ abstract class StorageModule {
 
     @Binds
     @Singleton
-    abstract fun intakes(implementation: IntakeRoomRepository): IntakeStorageRepository
+    abstract fun intakes(implementation: IntakeRoomRepository): IntakeRecords
+
+    @Binds
+    abstract fun intakesReadings(implementation: IntakeRoomRepository): IntakeReadings
+
+    @Binds
+    abstract fun intakeAccounts(implementation: IntakeAccountsRoomRepository): IntakeAccounts
 
     @Binds
     @Singleton

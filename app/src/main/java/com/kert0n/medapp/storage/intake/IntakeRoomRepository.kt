@@ -8,14 +8,19 @@ import com.kert0n.medapp.domain.intake.Intake
 import com.kert0n.medapp.domain.intake.IntakeProjection
 import com.kert0n.medapp.domain.intake.UnplannedIntake
 import com.kert0n.medapp.domain.pack.PackageAfter
+import com.kert0n.medapp.feature.intake.IntakeOutcome
+import com.kert0n.medapp.feature.intake.IntakeReadings
+import com.kert0n.medapp.feature.intake.IntakeRecords
+import com.kert0n.medapp.feature.intake.RecordedIntake
 import com.kert0n.medapp.feature.readThisTransaction
-import com.kert0n.medapp.queue.intake.IntakeSyncState
 import com.kert0n.medapp.storage.course.CourseDao
 import com.kert0n.medapp.storage.course.toSourceStorageEntities
 import com.kert0n.medapp.storage.course.toStorageEntity as toCourseStorageEntity
 import com.kert0n.medapp.storage.database.MedAppDatabase
 import com.kert0n.medapp.storage.database.chunkedForQuery
 import com.kert0n.medapp.storage.database.observing
+import com.kert0n.medapp.storage.operation.accountingColumn
+import com.kert0n.medapp.storage.operation.toStorageEntity
 import com.kert0n.medapp.storage.pack.PackageDao
 import com.kert0n.medapp.storage.pack.end
 import com.kert0n.medapp.storage.pack.save
@@ -37,7 +42,7 @@ class IntakeRoomRepository @Inject constructor(
     private val vocabulary: VocabularyDao,
     // Лениво: владелец реакции сам зависит от репозиториев (PLAN D5).
     private val following: Provider<PackageFollowing>
-) : IntakeStorageRepository {
+) : IntakeRecords, IntakeReadings {
 
     override fun observeOfCourse(courseId: Uuid): Flow<List<IntakeProjection>> =
         database.observing("intakes", "package_records") { ofCourse(courseId).map { it.projection() } }
@@ -64,8 +69,6 @@ class IntakeRoomRepository @Inject constructor(
     }
 
     override suspend fun find(id: Uuid): Intake? = intakes.find(id)?.toDomain(vocabulary.snapshot())
-
-    override suspend fun syncStateOf(id: Uuid): IntakeSyncState? = intakes.findEntity(id)?.syncState()
 
     override suspend fun save(recorded: RecordedIntake) =
         intakes.upsert(recorded.intake.toStorageEntity(recorded.sync))
@@ -114,7 +117,7 @@ class IntakeRoomRepository @Inject constructor(
                 packageId = taken?.pkg?.id,
                 amount = taken?.amount?.quantity?.toStorageAmount(),
                 unitId = intake.unit.id,
-                accounting = outcome.sync.accounting,
+                accounting = outcome.sync.accountingColumn(),
                 operationId = outcome.sync.operationId
             ) > 0
         }

@@ -1,4 +1,4 @@
-package com.kert0n.medapp.storage.intake
+package com.kert0n.medapp.feature.intake
 
 import com.kert0n.medapp.domain.intake.Intake
 import com.kert0n.medapp.domain.intake.IntakeStatus

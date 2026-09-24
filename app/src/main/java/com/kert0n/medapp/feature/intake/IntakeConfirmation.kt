@@ -13,6 +13,7 @@ import com.kert0n.medapp.feature.course.CourseCalendar
 import com.kert0n.medapp.feature.course.CourseClosing
 import com.kert0n.medapp.feature.course.CourseReallocation
 import com.kert0n.medapp.feature.course.openPlan
+import com.kert0n.medapp.feature.intake.IntakeOutcome
 import com.kert0n.medapp.feature.notification.ReminderWithdrawal
 import com.kert0n.medapp.feature.packages.PackageRecords
 import com.kert0n.medapp.feature.readThisTransaction
@@ -23,8 +24,6 @@ import com.kert0n.medapp.queue.intake.IntakeAccounting
 import com.kert0n.medapp.queue.intake.IntakeSyncState
 import com.kert0n.medapp.queue.pack.PackageSyncCommand
 import com.kert0n.medapp.storage.course.CourseStorageRepository
-import com.kert0n.medapp.storage.intake.IntakeOutcome
-import com.kert0n.medapp.storage.intake.IntakeStorageRepository
 import java.time.Clock
 import java.time.Instant
 import javax.inject.Inject
@@ -43,7 +42,8 @@ import kotlin.uuid.Uuid
  * «Принял» из шторки подтверждает заранее — руки заняты, а срок человеку сказан уведомлением.
  */
 class IntakeConfirmation @Inject constructor(
-    private val intakes: IntakeStorageRepository,
+    private val intakes: IntakeRecords,
+    private val accounts: IntakeAccounts,
     private val courses: CourseStorageRepository,
     private val packages: PackageRecords,
     private val transactions: Transactions,
@@ -74,7 +74,7 @@ class IntakeConfirmation @Inject constructor(
         val intake = intakes.find(intakeId) as? CourseIntake ?: return Outcome.Gone
         val record = checkNotNull(courses.findRecord(intake.courseId)) { "у пункта курса есть запись эпизода" }
         if (intake.status == IntakeStatus.TAKEN) {
-            val sync = checkNotNull(intakes.syncStateOf(intake.id)) { "принятый пункт записан" }
+            val sync = checkNotNull(accounts.of(intake.id)) { "принятый пункт записан" }
             return Outcome.Confirmed(intake.projection(), sync.accounting, episodeClosed = !record.isOpen)
         }
         if (!record.isOpen) return rejected(IntakeRejected.Reason.EPISODE_CLOSED)

@@ -4,9 +4,11 @@ import com.kert0n.medapp.domain.course.CourseRecord
 import com.kert0n.medapp.domain.intake.IntakeProjection
 import com.kert0n.medapp.feature.course.CourseCalendar
 import com.kert0n.medapp.feature.course.CourseCancellation
-import com.kert0n.medapp.feature.course.CourseOffPlanCounting
 import com.kert0n.medapp.feature.course.CourseClosing
 import com.kert0n.medapp.feature.course.CourseFollowing
+import com.kert0n.medapp.feature.course.CourseOffPlanCounting
+import com.kert0n.medapp.feature.intake.IntakeReadings
+import com.kert0n.medapp.feature.intake.IntakeRecords
 import com.kert0n.medapp.feature.notification.ReminderPromising
 import com.kert0n.medapp.feature.notification.ReminderWithdrawal
 import com.kert0n.medapp.fixture.COURSE
@@ -22,7 +24,6 @@ import com.kert0n.medapp.fixture.awaiting
 import com.kert0n.medapp.fixture.courseRecord
 import com.kert0n.medapp.fixture.watching
 import com.kert0n.medapp.queue.QueueService
-import com.kert0n.medapp.storage.intake.IntakeStorageRepository
 import java.time.Clock
 import java.time.Instant
 import java.time.ZoneId
@@ -53,7 +54,7 @@ class CourseCardViewModelTest {
     private val packages = FakePackages()
 
     /** Пункты карточке нужны потоком: пусто — это список без пунктов, а не молчащее чтение. */
-    private object NoIntakes : IntakeStorageRepository by UnaskedIntakes {
+    private object NoIntakes : IntakeRecords by UnaskedIntakes, IntakeReadings by UnaskedIntakes {
         override fun observeOfCourse(courseId: Uuid): Flow<List<IntakeProjection>> = flowOf(emptyList())
     }
 

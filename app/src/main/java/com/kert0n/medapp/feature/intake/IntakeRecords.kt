@@ -1,47 +1,23 @@
-package com.kert0n.medapp.storage.intake
+package com.kert0n.medapp.feature.intake
 
 import androidx.annotation.CheckResult
 import com.kert0n.medapp.domain.course.ScheduledOccurrence
 import com.kert0n.medapp.domain.intake.CourseIntake
 import com.kert0n.medapp.domain.intake.Intake
-import com.kert0n.medapp.domain.intake.IntakeProjection
-import com.kert0n.medapp.queue.intake.IntakeSyncState
 import java.time.Instant
 import kotlin.uuid.Uuid
-import kotlinx.coroutines.flow.Flow
 
 /**
  * Хранение приёмов. Учёт расхода едет рядом отдельным значением: правила о приёме его не
  * читают, и в доменный тип он не входит (PLAN D6).
  */
-interface IntakeStorageRepository {
-
-    /** Поток несёт проекции — величины для экрана; сущности отдают `find`/`ofCourse` в транзакции сценария. */
-    fun observeOfCourse(courseId: Uuid): Flow<List<IntakeProjection>>
-
-    /**
-     * История коробки — факты приёма из неё, курсовые и разовые вместе, по моменту приёма
-     * (PLAN D6). Читается по записи о коробке: кончившаяся коробка историю не теряет, а
-     * одноимённая — другая запись, и её приёмы сюда не попадают.
-     */
-    fun observeOfPackage(packageId: Uuid): Flow<List<IntakeProjection>>
-
-    /**
-     * Приёмы, названные номерами. Обязательство знает только номер приёма
-     * (`NotificationTarget.Intake`), а показать его человеку нужно лечением, дозой и пачкой —
-     * оттого чтение и спрашивается номерами, а не курсом (PLAN D8, H3 «Уведомления на экране»).
-     *
-     * Пустой набор — пустой список, а не все приёмы: «ни о чём не спросили» и «спросили обо всём»
-     * различаются.
-     */
-    fun observeOfIds(ids: Set<Uuid>): Flow<List<IntakeProjection>>
+interface IntakeRecords {
 
     /** Пункты курса одним чтением — из них сценарий собирает прогресс внутри своей транзакции. */
     suspend fun ofCourse(courseId: Uuid): List<Intake>
 
     suspend fun find(id: Uuid): Intake?
 
-    suspend fun syncStateOf(id: Uuid): IntakeSyncState?
 
     /**
      * Запись приёма как есть — например, при приведении к серверному снимку (PLAN E4). Ответ

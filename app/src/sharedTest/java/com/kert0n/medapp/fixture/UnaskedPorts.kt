@@ -11,10 +11,10 @@ import com.kert0n.medapp.domain.notification.NotificationSettings
 import com.kert0n.medapp.domain.notification.NotificationSettingsSource
 import com.kert0n.medapp.domain.notification.PendingNotice
 import com.kert0n.medapp.domain.notification.Reminder
-import com.kert0n.medapp.queue.intake.IntakeSyncState
-import com.kert0n.medapp.storage.intake.IntakeOutcome
-import com.kert0n.medapp.storage.intake.RecordedIntake
-import com.kert0n.medapp.storage.intake.IntakeStorageRepository
+import com.kert0n.medapp.feature.intake.IntakeOutcome
+import com.kert0n.medapp.feature.intake.IntakeReadings
+import com.kert0n.medapp.feature.intake.IntakeRecords
+import com.kert0n.medapp.feature.intake.RecordedIntake
 import com.kert0n.medapp.storage.notification.ReminderStorageRepository
 import java.time.Instant
 import kotlin.uuid.Uuid
@@ -30,7 +30,7 @@ import kotlinx.coroutines.flow.flow
  * выдуманном ответе. Потоки падают так же — **при подписке**: пустой поток не отвечал бы
  * ничего, и проверка ждала бы до таймаута, вместо того чтобы назвать метод (разбор #51).
  */
-object UnaskedIntakes : IntakeStorageRepository {
+object UnaskedIntakes : IntakeRecords, IntakeReadings {
 
     override fun observeOfCourse(courseId: Uuid): Flow<List<IntakeProjection>> = flow { unasked("observeOfCourse") }
 
@@ -42,7 +42,6 @@ object UnaskedIntakes : IntakeStorageRepository {
 
     override suspend fun find(id: Uuid): Intake? = unasked("find")
 
-    override suspend fun syncStateOf(id: Uuid): IntakeSyncState? = unasked("syncStateOf")
 
     override suspend fun save(recorded: RecordedIntake) = unasked("save")
 

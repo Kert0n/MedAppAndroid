@@ -1,12 +1,12 @@
 package com.kert0n.medapp.storage.report
 
-import com.kert0n.medapp.fixture.confirmed
 import androidx.room.withTransaction
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import com.kert0n.medapp.domain.course.CourseDraft
 import com.kert0n.medapp.domain.intake.CourseIntake
-import com.kert0n.medapp.domain.intake.TakenDose
 import com.kert0n.medapp.domain.intake.IntakeStatus
+import com.kert0n.medapp.domain.intake.TakenDose
+import com.kert0n.medapp.domain.pack.PackageStatus
 import com.kert0n.medapp.domain.report.DayPlan
 import com.kert0n.medapp.domain.report.FutureSpending
 import com.kert0n.medapp.domain.report.Spending
@@ -17,19 +17,19 @@ import com.kert0n.medapp.feature.course.CourseDrafting
 import com.kert0n.medapp.feature.intake.UnplannedIntakeRecording
 import com.kert0n.medapp.feature.packages.PackageAdjusting
 import com.kert0n.medapp.fixture.MOSCOW
-import com.kert0n.medapp.fixture.SHARED_KIT
-import com.kert0n.medapp.fixture.medKit
-import com.kert0n.medapp.domain.pack.PackageStatus
 import com.kert0n.medapp.fixture.OTHER_PACK
 import com.kert0n.medapp.fixture.PACK
+import com.kert0n.medapp.fixture.SHARED_KIT
 import com.kert0n.medapp.fixture.Scenarios
 import com.kert0n.medapp.fixture.TABLET_FORM
 import com.kert0n.medapp.fixture.activeCourse
+import com.kert0n.medapp.fixture.confirmed
 import com.kert0n.medapp.fixture.courseRecord
 import com.kert0n.medapp.fixture.courseRepository
 import com.kert0n.medapp.fixture.dose
 import com.kert0n.medapp.fixture.inMemoryDatabase
 import com.kert0n.medapp.fixture.intakeRepository
+import com.kert0n.medapp.fixture.medKit
 import com.kert0n.medapp.fixture.pack
 import com.kert0n.medapp.fixture.packageRepository
 import com.kert0n.medapp.fixture.plannedIntake
@@ -39,7 +39,7 @@ import com.kert0n.medapp.fixture.tablets
 import com.kert0n.medapp.queue.intake.IntakeAccounting
 import com.kert0n.medapp.queue.intake.IntakeSyncState
 import com.kert0n.medapp.storage.database.MedAppDatabase
-import com.kert0n.medapp.storage.intake.toStorageEntity
+import com.kert0n.medapp.storage.operation.toStorageEntity
 import java.time.Instant
 import java.time.LocalDate
 import kotlin.uuid.Uuid
@@ -171,7 +171,7 @@ class ReportRoomRepositoryTest {
             requireNotNull(database.intakeRepository().find(recorded.intake.id))
                 .toStorageEntity(IntakeSyncState(recorded.intake.id, IntakeAccounting.PENDING, operation))
         )
-        database.intakes().setAccounting(operation, IntakeAccounting.REMOTE_REFUSED)
+        database.syncOperations().setIntakeAccounting(operation, IntakeAccounting.REMOTE_REFUSED)
 
         assertEquals(tablets("1"), spent().packages.single().total)
     }

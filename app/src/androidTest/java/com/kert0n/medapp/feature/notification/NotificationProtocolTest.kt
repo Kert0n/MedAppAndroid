@@ -1,7 +1,6 @@
 package com.kert0n.medapp.feature.notification
 
 import androidx.test.ext.junit.runners.AndroidJUnit4
-import com.kert0n.medapp.domain.value.Doses
 import com.kert0n.medapp.domain.intake.CourseIntake
 import com.kert0n.medapp.domain.intake.IntakeStatus
 import com.kert0n.medapp.domain.notification.NotificationKey
@@ -9,23 +8,25 @@ import com.kert0n.medapp.domain.notification.NotificationKind
 import com.kert0n.medapp.domain.notification.NotificationTarget
 import com.kert0n.medapp.domain.notification.Reminder
 import com.kert0n.medapp.domain.pack.ExpiryDate
+import com.kert0n.medapp.domain.value.Doses
 import com.kert0n.medapp.feature.course.CourseDrafting
+import com.kert0n.medapp.feature.intake.IntakeReadings
+import com.kert0n.medapp.feature.intake.IntakeRecords
 import com.kert0n.medapp.fixture.Mechanisms
 import com.kert0n.medapp.fixture.PACK
 import com.kert0n.medapp.fixture.Scenarios
 import com.kert0n.medapp.fixture.TABLET_FORM
 import com.kert0n.medapp.fixture.confirmed
 import com.kert0n.medapp.fixture.courseRepository
-import com.kert0n.medapp.fixture.intakeRepository
-import com.kert0n.medapp.fixture.packageRepository
-import com.kert0n.medapp.fixture.queueRepository
 import com.kert0n.medapp.fixture.dose
 import com.kert0n.medapp.fixture.inMemoryDatabase
+import com.kert0n.medapp.fixture.intakeRepository
 import com.kert0n.medapp.fixture.pack
+import com.kert0n.medapp.fixture.packageRepository
+import com.kert0n.medapp.fixture.queueRepository
 import com.kert0n.medapp.fixture.schedule
 import com.kert0n.medapp.fixture.tablets
 import com.kert0n.medapp.storage.database.MedAppDatabase
-import com.kert0n.medapp.storage.intake.IntakeStorageRepository
 import java.time.Instant
 import java.time.LocalDate
 import java.time.LocalTime
@@ -133,7 +134,7 @@ class NotificationProtocolTest {
         val real = database.intakeRepository()
         val answering = CoroutineScope(SupervisorJob() + Dispatchers.IO)
         var answer: kotlinx.coroutines.Job? = null
-        val readBeforeTheAnswer = object : IntakeStorageRepository by real {
+        val readBeforeTheAnswer = object : IntakeRecords by real, IntakeReadings by real {
             override suspend fun plannedBefore(until: Instant): List<CourseIntake> {
                 val before = real.plannedBefore(until)
                 if (answer == null && until == Instant.ofEpochMilli(Long.MAX_VALUE)) {

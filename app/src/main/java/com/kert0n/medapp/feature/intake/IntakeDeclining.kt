@@ -4,11 +4,10 @@ import com.kert0n.medapp.domain.intake.CourseIntake
 import com.kert0n.medapp.domain.intake.IntakeStatus
 import com.kert0n.medapp.feature.course.CourseCalendar
 import com.kert0n.medapp.feature.course.openPlan
+import com.kert0n.medapp.feature.intake.IntakeOutcome
+import com.kert0n.medapp.feature.notification.ReminderWithdrawal
 import com.kert0n.medapp.queue.Transactions
 import com.kert0n.medapp.storage.course.CourseStorageRepository
-import com.kert0n.medapp.storage.intake.IntakeOutcome
-import com.kert0n.medapp.storage.intake.IntakeStorageRepository
-import com.kert0n.medapp.feature.notification.ReminderWithdrawal
 import java.time.Clock
 import java.time.Instant
 import javax.inject.Inject
@@ -25,7 +24,7 @@ import kotlin.uuid.Uuid
  * и от пункта прошлого дня, который иначе стал бы неответом.
  */
 class IntakeDeclining @Inject constructor(
-    private val intakes: IntakeStorageRepository,
+    private val intakes: IntakeRecords,
     private val courses: CourseStorageRepository,
     private val calendar: CourseCalendar,
     private val reminders: ReminderWithdrawal,

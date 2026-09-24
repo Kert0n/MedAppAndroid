@@ -143,7 +143,7 @@ class QueueRoomStorage @Inject constructor(
             is Settlement.Effect.MedKitDismantled -> dismantled(effect.medKitId, effect.transferTo, at)
             is Settlement.Effect.MedKitLeft -> left(effect.medKitId, at)
             is Settlement.Effect.MedKitPublished -> publishedOnServer(effect.medKitId, at)
-            is Settlement.Effect.Account -> intakes.setAccounting(id, effect.accounting)
+            is Settlement.Effect.Account -> queue.setIntakeAccounting(id, effect.accounting)
             is Settlement.Effect.Cascade -> cascade(id, effect, at)
             is Settlement.Effect.Settled -> settled(id)
             is Settlement.Effect.Withdrawn -> withdrawn(id, effect.packageId, at)
@@ -348,7 +348,7 @@ class QueueRoomStorage @Inject constructor(
             // Зависимая закрывается тем же переходом, что и своя; закрытая — не применим.
             val closed = dependent.toState().closed(effect.close, at) ?: continue
             (queue.save(dependent.id, closed, dependent.prepared, was = dependent.status) == 1).readThisTransaction("зависимая операция")
-            intakes.setAccounting(dependent.id, effect.accounting)
+            queue.setIntakeAccounting(dependent.id, effect.accounting)
             settled(dependent.id)
         }
     }

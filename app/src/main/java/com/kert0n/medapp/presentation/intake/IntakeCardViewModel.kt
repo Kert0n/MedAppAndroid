@@ -10,6 +10,7 @@ import com.kert0n.medapp.domain.pack.ExpiryDate
 import com.kert0n.medapp.domain.value.Dose
 import com.kert0n.medapp.feature.intake.IntakeConfirmation
 import com.kert0n.medapp.feature.intake.IntakeDeclining
+import com.kert0n.medapp.feature.intake.IntakeReadings
 import com.kert0n.medapp.feature.intake.IntakeWarning
 import com.kert0n.medapp.feature.operation.Freshening
 import com.kert0n.medapp.feature.packages.PackageReadings
@@ -25,7 +26,6 @@ import com.kert0n.medapp.presentation.value.QuantityPresentationDTO
 import com.kert0n.medapp.presentation.value.toDomain
 import com.kert0n.medapp.presentation.value.toPresentationDTO
 import com.kert0n.medapp.storage.course.CourseStorageRepository
-import com.kert0n.medapp.storage.intake.IntakeStorageRepository
 import com.kert0n.medapp.storage.value.VocabularyStorageRepository
 import dagger.assisted.Assisted
 import dagger.assisted.AssistedFactory
@@ -70,7 +70,7 @@ class IntakeCardViewModel @AssistedInject constructor(
     private val today: Today,
     private val clock: Clock,
     courses: CourseStorageRepository,
-    intakes: IntakeStorageRepository,
+    intakes: IntakeReadings,
     packages: PackageReadings,
     @Assisted private val intakeId: Uuid,
     private val failures: ScreenFailures = ScreenFailures()
