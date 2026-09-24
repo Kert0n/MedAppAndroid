@@ -59,15 +59,14 @@ class AccountRegistration @Inject constructor(
         }
 
     /**
-     * Подтверждение — тоже запись, и она может не лечь. Учётка при этом рабочая: следующая
-     * настройка повторит регистрацию теми же данными, а не заведёт вторую.
+     * Подтверждение — тоже запись, и она может не лечь. Тогда работать ещё нечем — пропуск
+     * выдаётся только подтверждённой учётке, — но данные те же: следующая настройка повторит
+     * регистрацию ими, получит `409` и подтвердит, а не заведёт вторую.
      */
     private suspend fun register(account: AccountCredentials): AccountReadiness =
         when (val registered = server.register(account)) {
-            AccountServer.Registration.Known -> {
-                credentials.confirm()
-                AccountReadiness.Ready
-            }
+            AccountServer.Registration.Known ->
+                if (credentials.confirm() == CredentialsSaved.SAVED) AccountReadiness.Ready else notStored
             is AccountServer.Registration.Failed -> AccountReadiness.NotReady(registered.reason)
         }
 

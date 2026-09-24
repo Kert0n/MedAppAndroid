@@ -35,7 +35,8 @@ class WorkManagerDailySchedule @Inject constructor(
 
     override suspend fun keepDaily(at: LocalTime) {
         val standing = work.getWorkInfosForUniqueWorkFlow(DAILY).first().firstOrNull { !it.state.isFinished }
-        if (standing != null && atTag(at) in standing.tags) return
+        // Задача прошлой сборки будит её работника — оставлять её нельзя и с тем же временем.
+        if (standing != null && atTag(at) in standing.tags && entries.daily.name in standing.tags) return
         val now = clock.instant().atZone(clock.zone)
         var first = now.with(at)
         if (!first.isAfter(now)) first = first.plusDays(1)
