@@ -5,6 +5,7 @@ import com.kert0n.medapp.feature.notification.ReminderPromising
 import com.kert0n.medapp.feature.notification.ReminderWithdrawal
 import com.kert0n.medapp.feature.settings.AppSettings
 import com.kert0n.medapp.feature.settings.SettingsChanging
+import com.kert0n.medapp.feature.settings.SyncInterval
 import com.kert0n.medapp.fixture.DirectTransactions
 import com.kert0n.medapp.fixture.FakeCourses
 import com.kert0n.medapp.fixture.FakeDailySchedule
@@ -18,7 +19,6 @@ import com.kert0n.medapp.fixture.UnaskedIntakes
 import com.kert0n.medapp.fixture.UnaskedReminders
 import com.kert0n.medapp.fixture.awaiting
 import com.kert0n.medapp.fixture.watching
-import com.kert0n.medapp.queue.SyncInterval
 import java.time.Clock
 import java.time.Instant
 import java.time.ZoneOffset

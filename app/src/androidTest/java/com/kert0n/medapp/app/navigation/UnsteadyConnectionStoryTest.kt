@@ -17,6 +17,7 @@ import com.kert0n.medapp.HiltTestActivity
 import com.kert0n.medapp.domain.medkit.MedKit
 import com.kert0n.medapp.domain.value.Quantity
 import com.kert0n.medapp.feature.connectivity.Connection
+import com.kert0n.medapp.feature.delivery.Synchronization
 import com.kert0n.medapp.feature.medkits.MedKitInvitation
 import com.kert0n.medapp.feature.medkits.MedKitPublishing
 import com.kert0n.medapp.feature.packages.PackageReadings
@@ -34,7 +35,6 @@ import com.kert0n.medapp.network.value.toDosageForm
 import com.kert0n.medapp.network.value.toQuantityUnit
 import com.kert0n.medapp.platform.connectivity.SyncTriggers
 import com.kert0n.medapp.queue.QueueOutbox
-import com.kert0n.medapp.queue.Synchronization
 import com.kert0n.medapp.storage.database.MedAppDatabase
 import com.kert0n.medapp.storage.medkit.toStorageEntity
 import com.kert0n.medapp.storage.value.toStorageEntity

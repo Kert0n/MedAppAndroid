@@ -7,7 +7,7 @@ import androidx.test.platform.app.InstrumentationRegistry
 import com.kert0n.medapp.domain.notification.NotificationSettings
 import com.kert0n.medapp.feature.settings.AppSettings
 import com.kert0n.medapp.feature.settings.SettingsSaved
-import com.kert0n.medapp.queue.SyncInterval
+import com.kert0n.medapp.feature.settings.SyncInterval
 import java.io.File
 import java.time.LocalTime
 import kotlin.uuid.Uuid
@@ -15,8 +15,8 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.cancel
-import kotlinx.coroutines.job
 import kotlinx.coroutines.cancelAndJoin
+import kotlinx.coroutines.job
 import kotlinx.coroutines.test.runTest
 import org.junit.After
 import org.junit.Assert.assertArrayEquals

@@ -1,16 +1,16 @@
 package com.kert0n.medapp.di
 
 import com.kert0n.medapp.domain.notification.Freshness
-import com.kert0n.medapp.domain.notification.Notifier
 import com.kert0n.medapp.domain.notification.NotificationReadiness
-import com.kert0n.medapp.platform.notifications.NotificationChannels
+import com.kert0n.medapp.domain.notification.Notifier
 import com.kert0n.medapp.domain.notification.ReminderAlarms
-import com.kert0n.medapp.platform.notifications.AlarmManagerReminders
-import com.kert0n.medapp.platform.notifications.WorkManagerDailySchedule
 import com.kert0n.medapp.feature.notification.DailySchedule
 import com.kert0n.medapp.feature.time.ClockShifts
-import com.kert0n.medapp.platform.time.TimeShifts
+import com.kert0n.medapp.platform.notifications.AlarmManagerReminders
+import com.kert0n.medapp.platform.notifications.NotificationChannels
 import com.kert0n.medapp.platform.notifications.SystemNotifier
+import com.kert0n.medapp.platform.notifications.WorkManagerDailySchedule
+import com.kert0n.medapp.platform.time.TimeShifts
 import dagger.Binds
 import dagger.Module
 import dagger.hilt.InstallIn
@@ -36,7 +36,7 @@ abstract class NotificationModule {
 
     @Binds
     @Singleton
-    abstract fun freshness(implementation: com.kert0n.medapp.queue.Synchronization): Freshness
+    abstract fun freshness(implementation: com.kert0n.medapp.feature.delivery.Synchronization): Freshness
 
     @Binds
     @Singleton

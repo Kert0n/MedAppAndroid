@@ -2,8 +2,8 @@ package com.kert0n.medapp.feature.operation
 
 import com.kert0n.medapp.domain.Unavailability
 import com.kert0n.medapp.domain.attempt
+import com.kert0n.medapp.feature.delivery.Synchronization
 import com.kert0n.medapp.queue.SnapshotApplier
-import com.kert0n.medapp.queue.Synchronization
 import java.time.Instant
 import javax.inject.Inject
 import javax.inject.Singleton

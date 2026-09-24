@@ -2,15 +2,15 @@ package com.kert0n.medapp.fixture
 
 import android.content.Context
 import androidx.hilt.work.HiltWorkerFactory
+import androidx.test.platform.app.InstrumentationRegistry
 import androidx.work.Configuration
 import androidx.work.ListenableWorker
 import androidx.work.WorkManager
 import androidx.work.WorkerFactory
 import androidx.work.WorkerParameters
 import androidx.work.testing.WorkManagerTestInitHelper
-import androidx.test.platform.app.InstrumentationRegistry
 import com.kert0n.medapp.di.WorkModule
-import com.kert0n.medapp.queue.SyncSchedule
+import com.kert0n.medapp.feature.delivery.SyncSchedule
 import dagger.Module
 import dagger.Provides
 import dagger.hilt.EntryPoint

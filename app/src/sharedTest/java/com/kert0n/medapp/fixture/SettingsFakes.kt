@@ -1,14 +1,14 @@
 package com.kert0n.medapp.fixture
 
 import android.content.Context
+import com.kert0n.medapp.feature.delivery.SyncSchedule
 import com.kert0n.medapp.feature.notification.DailySchedule
 import com.kert0n.medapp.feature.settings.AppLanguage
 import com.kert0n.medapp.feature.settings.AppLanguages
 import com.kert0n.medapp.feature.settings.AppSettings
 import com.kert0n.medapp.feature.settings.SettingsSaved
 import com.kert0n.medapp.feature.settings.SettingsStore
-import com.kert0n.medapp.queue.SyncInterval
-import com.kert0n.medapp.queue.SyncSchedule
+import com.kert0n.medapp.feature.settings.SyncInterval
 import java.time.Instant
 import java.time.LocalTime
 import kotlinx.coroutines.flow.Flow

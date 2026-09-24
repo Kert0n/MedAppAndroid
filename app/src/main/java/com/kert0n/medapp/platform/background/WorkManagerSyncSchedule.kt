@@ -9,8 +9,8 @@ import androidx.work.OneTimeWorkRequestBuilder
 import androidx.work.PeriodicWorkRequestBuilder
 import androidx.work.WorkManager
 import androidx.work.workDataOf
-import com.kert0n.medapp.queue.SyncInterval
-import com.kert0n.medapp.queue.SyncSchedule
+import com.kert0n.medapp.feature.delivery.SyncSchedule
+import com.kert0n.medapp.feature.settings.SyncInterval
 import java.time.Clock
 import java.time.Duration
 import java.time.Instant

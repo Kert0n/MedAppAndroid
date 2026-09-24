@@ -1,15 +1,15 @@
 package com.kert0n.medapp.platform.connectivity
 
-import com.kert0n.medapp.domain.attempt
 import androidx.lifecycle.DefaultLifecycleObserver
 import androidx.lifecycle.LifecycleOwner
 import androidx.lifecycle.ProcessLifecycleOwner
 import com.kert0n.medapp.di.ApplicationScope
+import com.kert0n.medapp.domain.attempt
 import com.kert0n.medapp.feature.connectivity.Connection
 import com.kert0n.medapp.feature.connectivity.returns
+import com.kert0n.medapp.feature.delivery.Synchronization
 import com.kert0n.medapp.feature.notification.DailyRound
 import com.kert0n.medapp.feature.notification.ReminderOutbox
-import com.kert0n.medapp.queue.Synchronization
 import java.util.concurrent.atomic.AtomicBoolean
 import javax.inject.Inject
 import javax.inject.Singleton

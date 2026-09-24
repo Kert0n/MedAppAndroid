@@ -1,7 +1,7 @@
 package com.kert0n.medapp.feature.settings
 
 import com.kert0n.medapp.domain.notification.NotificationSettings
-import com.kert0n.medapp.queue.SyncInterval
+import com.kert0n.medapp.feature.settings.SyncInterval
 
 /**
  * Всё, что человек решил о поведении приложения, одной величиной (PLAN D8, E4): уведомления —

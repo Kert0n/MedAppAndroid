@@ -1,5 +1,6 @@
 package com.kert0n.medapp.queue
 
+import com.kert0n.medapp.feature.settings.SyncInterval
 import java.time.Duration
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue

@@ -1,5 +1,6 @@
 package com.kert0n.medapp.fixture
 
+import com.kert0n.medapp.feature.delivery.Synchronization
 import com.kert0n.medapp.network.delivery.MedAppCourier
 import com.kert0n.medapp.network.delivery.MedAppDoor
 import com.kert0n.medapp.network.delivery.MedAppPacking
@@ -9,7 +10,6 @@ import com.kert0n.medapp.network.server.MedAppApi
 import com.kert0n.medapp.network.server.medAppHttpClient
 import com.kert0n.medapp.network.value.VocabularyResolver
 import com.kert0n.medapp.queue.SnapshotApplier
-import com.kert0n.medapp.queue.Synchronization
 import com.kert0n.medapp.storage.database.MedAppDatabase
 import com.kert0n.medapp.storage.database.RoomTransactions
 import com.kert0n.medapp.storage.operation.QueueBacklogRoomStorage

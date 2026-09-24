@@ -11,7 +11,9 @@ import androidx.work.WorkerFactory
 import androidx.work.WorkerParameters
 import androidx.work.testing.TestListenableWorkerBuilder
 import androidx.work.workDataOf
+import com.kert0n.medapp.feature.delivery.Synchronization
 import com.kert0n.medapp.feature.settings.AppSettings
+import com.kert0n.medapp.feature.settings.SyncInterval
 import com.kert0n.medapp.fixture.FakeSettingsStore
 import com.kert0n.medapp.fixture.INTAKE
 import com.kert0n.medapp.fixture.PACK
@@ -31,9 +33,7 @@ import com.kert0n.medapp.network.server.medAppHttpClient
 import com.kert0n.medapp.network.value.VocabularyResolver
 import com.kert0n.medapp.queue.QueueWorker
 import com.kert0n.medapp.queue.SnapshotApplier
-import com.kert0n.medapp.queue.SyncInterval
 import com.kert0n.medapp.queue.SyncOperationStatus
-import com.kert0n.medapp.queue.Synchronization
 import com.kert0n.medapp.queue.pack.PackageSyncCommand
 import com.kert0n.medapp.storage.database.MedAppDatabase
 import com.kert0n.medapp.storage.database.RoomTransactions

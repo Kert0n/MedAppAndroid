@@ -1,5 +1,6 @@
-package com.kert0n.medapp.queue
+package com.kert0n.medapp.feature.delivery
 
+import com.kert0n.medapp.feature.settings.SyncInterval
 import java.time.Instant
 
 /**

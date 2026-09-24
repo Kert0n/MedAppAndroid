@@ -2,9 +2,9 @@ package com.kert0n.medapp.presentation.settings
 
 import com.kert0n.medapp.domain.notification.NotificationSettings
 import com.kert0n.medapp.feature.settings.AppSettings
+import com.kert0n.medapp.feature.settings.SyncInterval
 import com.kert0n.medapp.feature.settings.SyncIntervalStep
 import com.kert0n.medapp.presentation.ParsedInput
-import com.kert0n.medapp.queue.SyncInterval
 import java.time.LocalTime
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue

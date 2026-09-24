@@ -1,4 +1,4 @@
-package com.kert0n.medapp.queue
+package com.kert0n.medapp.feature.settings
 
 import java.time.Duration
 

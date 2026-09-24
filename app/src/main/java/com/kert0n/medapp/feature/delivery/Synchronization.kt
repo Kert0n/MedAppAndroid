@@ -1,8 +1,11 @@
-package com.kert0n.medapp.queue
+package com.kert0n.medapp.feature.delivery
 
-import com.kert0n.medapp.domain.attempt
 import com.kert0n.medapp.di.ApplicationScope
+import com.kert0n.medapp.domain.attempt
 import com.kert0n.medapp.domain.notification.Freshness
+import com.kert0n.medapp.queue.QueueBacklog
+import com.kert0n.medapp.queue.QueueWorker
+import com.kert0n.medapp.queue.SnapshotApplier
 import java.time.Clock
 import java.time.Duration
 import java.time.Instant
@@ -10,15 +13,15 @@ import javax.inject.Inject
 import javax.inject.Singleton
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Deferred
+import kotlinx.coroutines.async
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
-import kotlinx.coroutines.async
 import kotlinx.coroutines.flow.update
-import kotlinx.coroutines.withTimeoutOrNull
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
+import kotlinx.coroutines.withTimeoutOrNull
 
 /**
  * Заход синхронизации: отдать серверу своё и прочитать у него правду (PLAN E4). Поводов много —
