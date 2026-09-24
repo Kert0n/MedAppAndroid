@@ -86,7 +86,7 @@ class PackageCardViewModelTest {
         packages: PackageReadings = stored,
         records: PackageRecords = stored,
         transactions: Transactions = DirectTransactions,
-        freshening: com.kert0n.medapp.feature.operation.Freshening = offlineFreshening(records, clock),
+        freshening: com.kert0n.medapp.feature.operation.Freshening = offlineFreshening(clock),
         medKits: MedKitReadings = this.medKits
     ) = PackageCardViewModel(
         removal = PackageRemoval(records, queue, transactions, clock),
@@ -131,11 +131,12 @@ class PackageCardViewModelTest {
      */
     @Test
     fun theCardWaitsUntilThePlaceOfTheBoxIsRead() {
-        stored.lying(pack(id = PACK, medKit = medKit(id = SHARED_KIT, name = "Дача", publication = MedKit.Publication.PUBLISHED, participantCount = 2).ref))
+        val box = pack(id = PACK, medKit = medKit(id = SHARED_KIT, name = "Дача", publication = MedKit.Publication.PUBLISHED, participantCount = 2).ref)
+        stored.lying(box)
         val server = com.kert0n.medapp.fixture.RereadingServer(clock)
         server.hold()
         val held = HeldMedKits(medKits)
-        val model = viewModel(freshening = com.kert0n.medapp.fixture.onlineFreshening(server, stored, clock), medKits = held)
+        val model = viewModel(freshening = com.kert0n.medapp.fixture.onlineFreshening(server, clock, knows = listOf(com.kert0n.medapp.fixture.onServer(box))), medKits = held)
 
         watching(model.state) { state ->
             // Место ещё не спрашивали: коробки нет, и спрашивать не о чем.
@@ -160,10 +161,11 @@ class PackageCardViewModelTest {
      */
     @Test
     fun aSharedBoxWaitsForTheServerOnce() {
-        stored.lying(pack(id = PACK, medKit = medKit(id = SHARED_KIT, publication = MedKit.Publication.PUBLISHED, participantCount = 2).ref))
+        val box = pack(id = PACK, medKit = medKit(id = SHARED_KIT, publication = MedKit.Publication.PUBLISHED, participantCount = 2).ref)
+        stored.lying(box)
         val server = com.kert0n.medapp.fixture.RereadingServer(clock)
         server.hold()
-        val model = viewModel(freshening = com.kert0n.medapp.fixture.onlineFreshening(server, stored, clock))
+        val model = viewModel(freshening = com.kert0n.medapp.fixture.onlineFreshening(server, clock, knows = listOf(com.kert0n.medapp.fixture.onServer(box))))
 
         watching(model.state) { state ->
             state.awaiting { it.isFreshening }

@@ -1,7 +1,6 @@
 package com.kert0n.medapp.presentation.medkit
 
 import com.kert0n.medapp.domain.medkit.MedKitContents
-import com.kert0n.medapp.feature.medkits.MedKitReadings
 import com.kert0n.medapp.feature.medkits.MedKitRecords
 import com.kert0n.medapp.feature.time.Today
 import com.kert0n.medapp.fixture.FakeMedKits
@@ -34,7 +33,7 @@ class MedKitListViewModelTest {
 
     private fun viewModel(
         freshening: com.kert0n.medapp.feature.operation.Freshening =
-            com.kert0n.medapp.fixture.offlineFreshening(com.kert0n.medapp.fixture.FakePackages(), clock)
+            com.kert0n.medapp.fixture.offlineFreshening(clock)
     ) = MedKitListViewModel(freshening, medKits, Today(clock, QuietClock))
 
     /**
@@ -70,7 +69,7 @@ class MedKitListViewModelTest {
     fun theListWaitsForTheServerBeforeOfferingShelves() {
         val server = com.kert0n.medapp.fixture.RereadingServer(clock)
         server.hold()
-        val model = viewModel(com.kert0n.medapp.fixture.onlineFreshening(server, com.kert0n.medapp.fixture.FakePackages(), clock))
+        val model = viewModel(com.kert0n.medapp.fixture.onlineFreshening(server, clock))
 
         watching(model.state) { state ->
             kotlinx.coroutines.withTimeout(5_000) { while (server.asked.isEmpty()) kotlinx.coroutines.delay(10) }
@@ -100,7 +99,7 @@ class MedKitListViewModelTest {
         Thread.setDefaultUncaughtExceptionHandler { _, e -> escaped += e }
         val failed = try {
             val model = MedKitListViewModel(
-                com.kert0n.medapp.fixture.offlineFreshening(com.kert0n.medapp.fixture.FakePackages(), clock),
+                com.kert0n.medapp.fixture.offlineFreshening(clock),
                 broken,
                 Today(clock, QuietClock)
             )

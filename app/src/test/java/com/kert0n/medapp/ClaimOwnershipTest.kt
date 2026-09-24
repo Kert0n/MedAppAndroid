@@ -10,16 +10,16 @@ import org.junit.Test
  * (PLAN D5, E2).
  *
  * Правило одно: `Course.claimChangesSince(before)` — что изменилось у каждой пачки между двумя
- * состояниями лечения. Его зовёт единственный, кто ставит `SetClaim`/`ReleaseClaim` в очередь, —
- * `CourseFollowing.announceClaims`; начало лечения считает от `Course.unallocated()`, конец — к
- * нему, правка и зажим — между двумя редакциями. Стоит второму сценарию посчитать разницу
+ * состояниями лечения. Поручения по нему выдаёт очередь (`QueueService.claims`), а просит их
+ * единственный сценарий — `CourseFollowing.announceClaims`; начало лечения считает от
+ * `Course.unallocated()`, конец — к нему, правка и зажим — между двумя редакциями. Стоит второму сценарию посчитать разницу
  * самому — и два счётчика разойдутся: один поставит бронь по ненулевым выделениям, другой снимет
  * по всем источникам, третий забудет про пачку, которую человек убрал из состава.
  *
  * Названы поимённо два исключения, где команда брони — **не разница**, а часть чужого
- * объявления: `IntakeConfirmation` везёт снятие брони зависимым от расхода последней дозы
- * (полка узнаёт о конце коробки одним ответом), `PackageRelocation` — бронь новой коробки
- * зависимой от её создания на новой полке.
+ * объявления, и выдаёт их тоже очередь: снятие брони зависимым от расхода последней дозы
+ * (`QueueService.consumption` — полка узнаёт о конце коробки одним ответом) и бронь новой коробки
+ * зависимой от её создания на новой полке (`QueueService.announcement`).
  */
 class ClaimOwnershipTest {
 
@@ -32,15 +32,17 @@ class ClaimOwnershipTest {
         "queue/pack/PackageSyncCommand.kt",
         "queue/pack/ClaimChanges.kt",
         "storage/operation/SyncCommandStorageConverter.kt",
-        "feature/intake/IntakeConfirmation.kt",
-        "feature/packages/PackageRelocation.kt"
+        "queue/QueueService.kt"
     )
 
     /** Кому позволено считать разницу: правилу и его владельцу. */
     private val mayDiff: Set<String> = setOf(
         "queue/pack/ClaimChanges.kt",
-        "feature/course/CourseFollowing.kt"
+        "queue/QueueService.kt"
     )
+
+    /** Кому позволено просить поручения разницы: одному сценарию. */
+    private val mayAskClaims: Set<String> = setOf("feature/course/CourseFollowing.kt")
 
     private val sources: File = listOf(
         File("src/main/java/com/kert0n/medapp"),
@@ -49,7 +51,7 @@ class ClaimOwnershipTest {
 
     @Test
     fun theOwnersAreWhereWeThinkTheyAre() {
-        for (allowed in mayCommand + mayDiff) {
+        for (allowed in mayCommand + mayDiff + mayAskClaims) {
             val file = File(sources, allowed)
             assertTrue("нет файла $allowed — проверка сторожила бы пустоту", file.isFile && file.length() > 0)
         }
@@ -70,6 +72,15 @@ class ClaimOwnershipTest {
             "разницу броней считают мимо владельца",
             mayDiff.toSortedSet(),
             callersOf(Regex("\\bclaimChangesSince\\s*\\("))
+        )
+    }
+
+    @Test
+    fun onlyTheOwnerAsksForTheDifference() {
+        assertEquals(
+            "поручения разницы броней просят мимо владельца",
+            mayAskClaims.toSortedSet(),
+            callersOf(Regex("\\bqueue\\.claims\\s*\\("))
         )
     }
 

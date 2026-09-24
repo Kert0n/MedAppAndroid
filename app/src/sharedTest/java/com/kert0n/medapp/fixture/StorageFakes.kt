@@ -45,7 +45,6 @@ import com.kert0n.medapp.feature.packages.PackageQuery
 import com.kert0n.medapp.feature.packages.PackageReadings
 import com.kert0n.medapp.feature.packages.PackageRecords
 import com.kert0n.medapp.feature.value.VocabularyReadings
-import com.kert0n.medapp.network.server.RawResponse
 import com.kert0n.medapp.queue.QueueStorage
 import com.kert0n.medapp.queue.QueuedCommand
 import com.kert0n.medapp.queue.Receipt
@@ -107,9 +106,6 @@ class FakePackages(vararg packs: Package) : PackageRecords, PackageReadings {
         change(packageId) { it.describe(facts) }
 
     override suspend fun end(ending: PackageEnding, at: Instant): Boolean = forget(ending.pkg.id)
-
-    override suspend fun answersToServer(packageId: Uuid): Boolean =
-        stored[packageId]?.medKit?.answersToServer == true
 
     override suspend fun availabilityFor(course: Course): Availability =
         Availability.from(course.sources.mapNotNull { stored[it.pkg.id]?.availability() })
@@ -277,7 +273,13 @@ class FakeVocabulary(
  * отправку, исход, повтор — принадлежит очереди и проверяется на ней (`QueueOutboxTest` и
  * соседи), поэтому здесь эти двери честно падают, а не отвечают выдуманным.
  */
-class FakeQueue : QueueStorage {
+class FakeQueue(knows: Collection<PackageSnapshot> = emptyList()) : QueueStorage {
+
+    /**
+     * Какие коробки знает реестр — **данные** проверки, а не правило: решает по ним настоящий
+     * `QueueService`. По умолчанию реестр не знает ничего, и всё ложится местно.
+     */
+    private val known: Map<Uuid, PackageSnapshot> = knows.associateBy { it.pack.id }
 
     /** Что уехало бы серверу: тест спрашивает хранилище, а не следит за вызовами. */
     val enqueued = mutableListOf<QueuedCommand>()
@@ -302,7 +304,7 @@ class FakeQueue : QueueStorage {
     override suspend fun nextDueAt(now: Instant): Instant? = null
 
     override suspend fun operation(id: Uuid): SyncOperation? = error("путь доставки проверяется на очереди, а не на экране")
-    override suspend fun knownPackage(id: Uuid): PackageSnapshot? = error("путь доставки проверяется на очереди, а не на экране")
+    override suspend fun knownPackage(id: Uuid): PackageSnapshot? = known[id]
     override suspend fun layDown(snapshot: PackageSnapshot, at: Instant) = error("путь доставки проверяется на очереди, а не на экране")
     override suspend fun write(operation: SyncOperation, was: SyncOperationStatus) = error("путь доставки проверяется на очереди, а не на экране")
     override suspend fun unclosedOfMedKit(medKitId: Uuid): List<StoredSyncOperation> = error("путь доставки проверяется на очереди, а не на экране")
@@ -451,3 +453,4 @@ class FakeSyncOperations(troubles: List<OutstandingOperation> = emptyList()) : O
 
     override suspend fun dismiss(id: Uuid, at: Instant): Boolean = error("разбор проверяется на своём сценарии")
 }
+

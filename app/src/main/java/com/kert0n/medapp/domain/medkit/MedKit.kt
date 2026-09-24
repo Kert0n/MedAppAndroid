@@ -117,6 +117,30 @@ class MedKit(
         return changed(status = MedKitStatus.REMOVING)
     }
 
+    /** Что мешает сделать полку общей: о ней уже принимается решение, или она и так общая (PLAN E5). */
+    fun refusesPublication(): PublicationRefusal? = when {
+        !status.allowsDecision -> PublicationRefusal.BUSY
+        publication == Publication.PUBLISHED -> PublicationRefusal.ALREADY_SHARED
+        else -> null
+    }
+
+    /** Оставить остальным можно только общую полку: у местной остальных нет (PLAN E6). */
+    val mayBeLeftToOthers: Boolean get() = publication == Publication.PUBLISHED
+
+    /**
+     * Что мешает пригласить: в местную приглашать некуда, а едущую к серверу или занятую решением
+     * — рано ([acceptsInvitations], PLAN D2, E5).
+     */
+    fun refusesInvitation(): InvitationRefusal? = when {
+        !acceptsCommands -> InvitationRefusal.NOT_SHARED
+        !acceptsInvitations -> InvitationRefusal.BUSY
+        else -> null
+    }
+
+    enum class PublicationRefusal { BUSY, ALREADY_SHARED }
+
+    enum class InvitationRefusal { NOT_SHARED, BUSY }
+
     /** На сервер аптечка попадает один раз: обратной дороги нет (E5). */
     private fun requireLocal() {
         check(publication == Publication.LOCAL) { "аптечка уже на сервере" }

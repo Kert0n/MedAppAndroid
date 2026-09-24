@@ -8,9 +8,7 @@ import com.kert0n.medapp.domain.pack.PackageRef
 import com.kert0n.medapp.feature.packages.PackageRecords
 import com.kert0n.medapp.feature.readThisTransaction
 import com.kert0n.medapp.queue.QueueService
-import com.kert0n.medapp.queue.QueuedCommand
 import com.kert0n.medapp.queue.Transactions
-import com.kert0n.medapp.queue.pack.claimChangesSince
 import java.time.Instant
 import javax.inject.Inject
 import kotlin.uuid.Uuid
@@ -121,10 +119,9 @@ class CourseFollowing @Inject constructor(
      * снятие уже уехало зависимым от расхода: второй раз его не ставят.
      */
     suspend fun announceClaims(before: Course, after: Course, at: Instant, except: PackageRef? = null) {
-        for (command in after.claimChangesSince(before)) {
-            if (command.packageId == except?.id) continue
-            val pkg = packages.find(command.packageId) ?: continue
-            queue.change(pkg.medKit, listOf(QueuedCommand(Uuid.random(), command)), at) { true }
+        for ((packageId, errands) in queue.claims(before, after, except?.id)) {
+            val pkg = packages.find(packageId) ?: continue
+            queue.change(pkg.medKit, errands, at) { true }
         }
     }
 }

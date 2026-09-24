@@ -80,7 +80,6 @@ class WriteContractTest {
         "PackageRecords.projection" to (Shape.READ by "(Uuid): PackageProjection"),
         "PackageReadings.list" to (Shape.READ by "(PackageQuery, LocalDate): Flow<List<PackageProjection>>"),
         "PackageRecords.contentsOf" to (Shape.READ by "(Uuid): List<Package>"),
-        "PackageRecords.answersToServer" to (Shape.READ by "(Uuid): Boolean"),
         "PackageRecords.availabilityFor" to (Shape.READ by "(Course): Availability"),
         "PackageRecords.add" to (Shape.CREATION by "(Package): Unit"),
         "PackageRecords.describe" to (Shape.NAMED_FIELDS by "(Uuid, PackageFacts): Boolean"),

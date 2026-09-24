@@ -5,18 +5,19 @@ import androidx.lifecycle.viewModelScope
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import com.kert0n.medapp.domain.intake.CourseIntake
 import com.kert0n.medapp.domain.intake.IntakeStatus
+import com.kert0n.medapp.domain.medkit.MedKit
 import com.kert0n.medapp.domain.pack.ExpiryDate
 import com.kert0n.medapp.domain.value.Doses
 import com.kert0n.medapp.feature.course.CourseDrafting
 import com.kert0n.medapp.feature.course.SourceEditing
-import com.kert0n.medapp.feature.packages.PackageReadings
-import com.kert0n.medapp.feature.packages.PackageRecords
 import com.kert0n.medapp.feature.plan.DayPlanning
 import com.kert0n.medapp.feature.time.Today
 import com.kert0n.medapp.fixture.AllAllowed
+import com.kert0n.medapp.fixture.HOME_KIT
 import com.kert0n.medapp.fixture.OTHER_PACK
 import com.kert0n.medapp.fixture.PACK
 import com.kert0n.medapp.fixture.QuietClock
+import com.kert0n.medapp.fixture.SHARED_KIT
 import com.kert0n.medapp.fixture.Scenarios
 import com.kert0n.medapp.fixture.TABLET_FORM
 import com.kert0n.medapp.fixture.awaiting
@@ -24,8 +25,10 @@ import com.kert0n.medapp.fixture.courseRepository
 import com.kert0n.medapp.fixture.dose
 import com.kert0n.medapp.fixture.inMemoryDatabase
 import com.kert0n.medapp.fixture.intakeRepository
+import com.kert0n.medapp.fixture.medKit
 import com.kert0n.medapp.fixture.pack
 import com.kert0n.medapp.fixture.packageRepository
+import com.kert0n.medapp.fixture.queueService
 import com.kert0n.medapp.fixture.reportRepository
 import com.kert0n.medapp.fixture.schedule
 import com.kert0n.medapp.fixture.tablets
@@ -35,7 +38,10 @@ import com.kert0n.medapp.presentation.intake.IntakeCardViewModel
 import com.kert0n.medapp.presentation.plan.DayItemPresentationDTO
 import com.kert0n.medapp.presentation.plan.DayPagePresentationDTO
 import com.kert0n.medapp.presentation.plan.DayPlanViewModel
+import com.kert0n.medapp.queue.ResourceVersion
+import com.kert0n.medapp.queue.pack.PackageSyncState
 import com.kert0n.medapp.storage.database.MedAppDatabase
+import com.kert0n.medapp.storage.medkit.toStorageEntity
 import com.kert0n.medapp.storage.value.VocabularyRoomRepository
 import java.time.Clock
 import java.time.Instant
@@ -97,7 +103,7 @@ class IntakeAnsweringTest {
     private fun cardModel(
         intakeId: Uuid,
         freshening: com.kert0n.medapp.feature.operation.Freshening =
-            com.kert0n.medapp.fixture.offlineFreshening(database.packageRepository(), clock)
+            com.kert0n.medapp.fixture.offlineFreshening(clock)
     ) = IntakeCardViewModel(
         confirmation = scenarios.intakeConfirmation,
         declining = scenarios.intakeDeclining,
@@ -112,16 +118,24 @@ class IntakeAnsweringTest {
     ).also { opened += it }
 
     /** Лечение на четыре приёма по две таблетки из коробки на двадцать; первый пункт — сегодня. */
-    private suspend fun started(expiresOn: LocalDate? = null): Uuid {
-        database.packageRepository().add(
-            pack(
-                id = PACK,
-                name = "Нурофен",
-                quantity = tablets("20"),
-                form = TABLET_FORM,
-                expiresOn = expiresOn?.let { ExpiryDate(it) }
-            )
+    private val shared = medKit(id = SHARED_KIT, name = "Дача", publication = MedKit.Publication.PUBLISHED, participantCount = 2)
+
+    private suspend fun started(expiresOn: LocalDate? = null, onServer: Boolean = false): Uuid {
+        val box = pack(
+            id = PACK,
+            name = "Нурофен",
+            quantity = tablets("20"),
+            form = TABLET_FORM,
+            expiresOn = expiresOn?.let { ExpiryDate(it) },
+            medKit = if (onServer) shared.ref else medKit(id = HOME_KIT).ref
         )
+        if (onServer) {
+            // Общая полка, и сервер коробку уже знает: у неё есть серверная версия.
+            database.medKits().upsert(shared.toStorageEntity())
+            database.packageRepository().add(box, PackageSyncState(PACK, ResourceVersion(1), ResourceVersion(1), syncedAt = clock.instant()))
+        } else {
+            database.packageRepository().add(box)
+        }
         val created = scenarios.courseDrafting.create("Нурофен")
         val saved = scenarios.courseDrafting.edit(
             created.id, created.revision,
@@ -390,18 +404,15 @@ class IntakeAnsweringTest {
 
     /**
      * Карточка пункта перечитывает коробки-источники своего лечения, как только знает, какие они, и
-     * пока сервер не ответил, ждёт: пачку выбирают по свежему числу (PLAN E4). Какой полки коробка
-     * и знает ли её сервер, здесь подменено: предмет проверки — ожидание карточки, а не полка.
+     * пока сервер не ответил, ждёт: пачку выбирают по свежему числу (PLAN E4). Коробка лежит на
+     * общей полке, и сервер её знает — перечитывать её решает настоящая очередь над базой.
      */
     @Test
     fun theCardWaitsForItsSourcesFromTheServer() = runBlocking {
-        val intakeId = firstIntake(started()).id
+        val intakeId = firstIntake(started(onServer = true)).id
         val server = com.kert0n.medapp.fixture.RereadingServer(clock)
         server.hold()
-        val known = object : PackageRecords by database.packageRepository() {
-            override suspend fun answersToServer(packageId: Uuid): Boolean = true
-        }
-        val model = cardModel(intakeId, com.kert0n.medapp.fixture.onlineFreshening(server, known, clock))
+        val model = cardModel(intakeId, com.kert0n.medapp.fixture.onlineFreshening(server, clock, queue = database.queueService()))
 
         watching(model.state) { state ->
             state.awaiting(PATIENTLY) { it.title.isNotEmpty() }

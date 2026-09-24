@@ -6,7 +6,6 @@ import com.kert0n.medapp.domain.pack.ExpiryDate
 import com.kert0n.medapp.feature.course.CourseCalendar
 import com.kert0n.medapp.feature.course.CourseFollowing
 import com.kert0n.medapp.feature.intake.IntakeOutcome
-import com.kert0n.medapp.feature.intake.IntakeReadings
 import com.kert0n.medapp.feature.intake.IntakeRecords
 import com.kert0n.medapp.feature.intake.UnplannedIntakeRecording
 import com.kert0n.medapp.feature.notification.ReminderPromising
@@ -108,7 +107,7 @@ class UnplannedIntakeViewModelTest {
     private fun viewModel(
         packages: FakePackages = this.packages,
         freshening: com.kert0n.medapp.feature.operation.Freshening =
-            com.kert0n.medapp.fixture.offlineFreshening(packages, clock)
+            com.kert0n.medapp.fixture.offlineFreshening(clock)
     ) = UnplannedIntakeViewModel(
         recording = UnplannedIntakeRecording(
             intakes = intakes,
@@ -266,10 +265,11 @@ class UnplannedIntakeViewModelTest {
      */
     @Test
     fun theSheetWaitsForTheServerBeforeOfferingTheBox() {
-        packages.lying(pack(id = PACK, quantity = tablets("20"), medKit = com.kert0n.medapp.fixture.medKit(id = com.kert0n.medapp.fixture.SHARED_KIT, publication = com.kert0n.medapp.domain.medkit.MedKit.Publication.PUBLISHED, participantCount = 2).ref))
+        val box = pack(id = PACK, quantity = tablets("20"), medKit = com.kert0n.medapp.fixture.medKit(id = com.kert0n.medapp.fixture.SHARED_KIT, publication = com.kert0n.medapp.domain.medkit.MedKit.Publication.PUBLISHED, participantCount = 2).ref)
+        packages.lying(box)
         val server = com.kert0n.medapp.fixture.RereadingServer(clock)
         server.hold()
-        val model = viewModel(freshening = com.kert0n.medapp.fixture.onlineFreshening(server, packages, clock))
+        val model = viewModel(freshening = com.kert0n.medapp.fixture.onlineFreshening(server, clock, knows = listOf(com.kert0n.medapp.fixture.onServer(box))))
 
         watching(model.state) { state ->
             kotlinx.coroutines.withTimeout(5_000) { while (server.asked.isEmpty()) kotlinx.coroutines.delay(10) }

@@ -65,9 +65,6 @@ class PackageRoomRepository @Inject constructor(
     override suspend fun describe(packageId: Uuid, facts: PackageFacts): Boolean =
         change(packageId) { it.describe(facts) }
 
-    override suspend fun answersToServer(packageId: Uuid): Boolean =
-        packages.find(packageId)?.answersToServer ?: false
-
     override suspend fun availabilityFor(course: Course): Availability = database.withTransaction {
         packages.availabilityOf(listOf(course), queue, intakes, vocabulary.snapshot()).getValue(course.id)
     }

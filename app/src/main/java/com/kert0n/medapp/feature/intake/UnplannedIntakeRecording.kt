@@ -10,11 +10,9 @@ import com.kert0n.medapp.feature.intake.IntakeOutcome
 import com.kert0n.medapp.feature.packages.PackageRecords
 import com.kert0n.medapp.feature.readThisTransaction
 import com.kert0n.medapp.queue.QueueService
-import com.kert0n.medapp.queue.QueuedCommand
+import com.kert0n.medapp.queue.Spending
 import com.kert0n.medapp.queue.Transactions
 import com.kert0n.medapp.queue.intake.IntakeAccounting
-import com.kert0n.medapp.queue.intake.IntakeSyncState
-import com.kert0n.medapp.queue.pack.PackageSyncCommand
 import java.time.Clock
 import java.time.Instant
 import javax.inject.Inject
@@ -50,7 +48,8 @@ class UnplannedIntakeRecording @Inject constructor(
     ): Outcome = transactions.run {
         val pkg = packages.find(packageId) ?: return@run Outcome.Rejected(IntakeRejected.Reason.PACKAGE_UNUSABLE)
         val taken = pkg.take(amount, at).getOrElse { return@run Outcome.Rejected((it as IntakeRejected).reason) }
-        val spendsLocally = !packages.answersToServer(packageId)
+        val spending = queue.spending(pkg)
+        val spendsLocally = spending == Spending.LOCAL
         if (spendsLocally && !pkg.quantity.covers(amount)) return@run Outcome.Rejected(IntakeRejected.Reason.INSUFFICIENT)
         // Занятое — моё выделение и чужие брони, посчитанные от того же числа, которое человек
         // видит на экране: решает он по нему (PLAN D4).
@@ -65,16 +64,9 @@ class UnplannedIntakeRecording @Inject constructor(
 
         val now = clock.instant()
         val intake = UnplannedIntake(Uuid.random(), taken)
-        val consume = QueuedCommand(Uuid.random(), PackageSyncCommand.Consume(pkg.id, amount, intake.id, claimAfter = null))
-        val sync = if (spendsLocally) {
-            IntakeSyncState(intake.id, IntakeAccounting.LOCAL_APPLIED)
-        } else {
-            IntakeSyncState(intake.id, IntakeAccounting.PENDING, consume.id)
-        }
-        val outcome = IntakeOutcome(intake, expected = emptySet(), sync = sync, recordedAt = now)
-        // Местному расходу везти нечего: сервер о коробке не знает — расскажет о ней её создание (E6).
-        val commands = if (spendsLocally) emptyList() else listOf(consume)
-        val recorded = queue.change(pkg.medKit, commands, now) { intakes.record(outcome) }
+        val consumption = queue.consumption(spending, intake.id, pkg, amount, claimAfter = null)
+        val outcome = IntakeOutcome(intake, expected = emptySet(), sync = consumption.sync, recordedAt = now)
+        val recorded = queue.change(pkg.medKit, consumption.errands, now) { intakes.record(outcome) }
         recorded.readThisTransaction("пачка")
 
         // Что осталось — то же, что увидит человек: на своей полке расход уже списан, на общей он
@@ -82,7 +74,7 @@ class UnplannedIntakeRecording @Inject constructor(
         // дверь конца (PLAN D4, E1).
         val after = packages.projection(pkg.id)?.availability
         if (after != null && !after.effective.isZero) following.follow(pkg.id, now)
-        Outcome.Recorded(intake.projection(), sync.accounting)
+        Outcome.Recorded(intake.projection(), consumption.sync.accounting)
     }
 
     /**

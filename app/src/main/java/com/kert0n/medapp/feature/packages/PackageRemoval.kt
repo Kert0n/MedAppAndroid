@@ -4,10 +4,9 @@ import com.kert0n.medapp.domain.pack.Package
 import com.kert0n.medapp.domain.pack.PackageStatus
 import com.kert0n.medapp.feature.packages.PackageRecords
 import com.kert0n.medapp.feature.readThisTransaction
+import com.kert0n.medapp.queue.Laying
 import com.kert0n.medapp.queue.QueueService
-import com.kert0n.medapp.queue.QueuedCommand
 import com.kert0n.medapp.queue.Transactions
-import com.kert0n.medapp.queue.pack.PackageSyncCommand
 import java.time.Clock
 import java.time.Instant
 import javax.inject.Inject
@@ -36,13 +35,15 @@ class PackageRemoval @Inject constructor(
         val pkg = packages.find(packageId) ?: return@run Outcome.GONE
         if (!pkg.status.allowsUse) return@run Outcome.UNUSABLE
         val now = clock.instant()
-        if (pkg.medKit.answersToServer) {
-            val delete = QueuedCommand(Uuid.random(), PackageSyncCommand.Delete(pkg.id))
-            queue.change(pkg.medKit, listOf(delete), now) { packages.mark(pkg.id, PackageStatus.REMOVING, by = delete.id) }
-            Outcome.MARKED
-        } else {
-            discard(pkg, now)
-            Outcome.REMOVED
+        when (val laying = queue.removal(pkg)) {
+            is Laying.Awaiting -> {
+                queue.change(pkg.medKit, laying.errands, now) { packages.mark(pkg.id, PackageStatus.REMOVING, by = laying.by) }
+                Outcome.MARKED
+            }
+            else -> {
+                discard(pkg, now)
+                Outcome.REMOVED
+            }
         }
     }
 
