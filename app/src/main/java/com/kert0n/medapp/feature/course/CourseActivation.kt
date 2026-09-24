@@ -37,7 +37,7 @@ class CourseActivation @Inject constructor(
             ?: return@run if (courses.findPlan(id) != null) Outcome.AlreadyStarted else Outcome.Gone
         if (draft.revision != expected) return@run Outcome.Stale
         for (source in draft.sources) {
-            val pkg = packages.find(source.pkg.id)?.takeIf { it.status.allowsUse }
+            val pkg = packages.find(source.pkg.id)?.takeIf { it.usable }
                 ?: return@run Outcome.PackageUnusable(source.pkg.id)
             if (courses.courseHolding(pkg.id) != null) return@run Outcome.PackageTaken(pkg.id)
         }

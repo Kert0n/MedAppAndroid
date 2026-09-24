@@ -91,6 +91,21 @@ class Package(
     /** Как пачку видит чужой агрегат — курс, приём: ссылка на запись, без переходов. */
     val ref: PackageRef get() = record.ref
 
+    /** Коробкой пользуются: из неё берут, её правят, переносят и ставят источником (PLAN E1). */
+    val usable: Boolean get() = status.allowsUse
+
+    /**
+     * Что мешает унести коробку с её полки: ею уже не пользуются, или о самой полке принимается
+     * решение — её публикация назвала серверу своё содержимое (PLAN E5).
+     */
+    fun refusesMoving(): MoveRefusal? = when {
+        !usable -> MoveRefusal.UNUSABLE
+        !medKit.status.allowsDecision -> MoveRefusal.ORIGIN_BUSY
+        else -> null
+    }
+
+    enum class MoveRefusal { UNUSABLE, ORIGIN_BUSY }
+
     fun isExpiredOn(date: LocalDate): Boolean = facts.isExpiredOn(date)
 
     /** Срок, если к дню [date] он уже истёк; годна или срок неизвестен — `null`. */

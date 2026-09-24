@@ -37,7 +37,7 @@ class PackageAdding @Inject constructor(
             // В полку, о которой принято решение, не кладут: уборка унесла бы коробку с собой, а
             // публикация уже пересчитала своё содержимое и об этой коробке серверу не расскажет
             // (PLAN E1, E5).
-            if (!medKit.status.allowsDecision) return@run Outcome.MedKitBusy
+            if (!medKit.decidable) return@run Outcome.MedKitBusy
             val now = clock.instant()
             val pkg = Package(
                 id = Uuid.random(),

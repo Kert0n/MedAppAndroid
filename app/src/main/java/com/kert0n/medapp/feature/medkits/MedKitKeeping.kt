@@ -47,7 +47,7 @@ class MedKitKeeping @Inject constructor(
      */
     suspend fun describe(medKitId: Uuid, name: String, location: String?): Outcome = transactions.run {
         val medKit = medKits.find(medKitId) ?: return@run Outcome.GONE
-        if (!medKit.status.allowsUse) return@run Outcome.BUSY
+        if (!medKit.editable) return@run Outcome.BUSY
         medKits.describe(medKitId, name, location).readThisTransaction("аптечка")
         Outcome.SAVED
     }

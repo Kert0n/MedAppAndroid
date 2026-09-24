@@ -37,7 +37,7 @@ class IntakeDeclining @Inject constructor(
         val intake = intakes.find(intakeId) as? CourseIntake ?: return@run Outcome.Gone
         val record = courses.findRecord(intake.courseId) ?: return@run Outcome.Gone
         record.refusesAnswers()?.let { return@run Outcome.Rejected(it) }
-        if (intake.status != IntakeStatus.PLANNED) return@run Outcome.AlreadyAnswered
+        if (!intake.isPlanned) return@run Outcome.AlreadyAnswered
         val course = courses.openPlan(intake.courseId)
         val now = clock.instant()
         // Сначала сам пункт: отмеченный неответом прошлый пункт отказа уже не принял бы, и момент

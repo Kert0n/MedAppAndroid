@@ -72,7 +72,7 @@ class IntakeConfirmation @Inject constructor(
         // Идентификатор пришёл снаружи — с экрана или из шторки: пропавший пункт — исход, не падение.
         val intake = intakes.find(intakeId) as? CourseIntake ?: return Outcome.Gone
         val record = checkNotNull(courses.findRecord(intake.courseId)) { "у пункта курса есть запись эпизода" }
-        if (intake.status == IntakeStatus.TAKEN) {
+        if (intake.isTaken) {
             val sync = checkNotNull(accounts.of(intake.id)) { "принятый пункт записан" }
             return Outcome.Confirmed(intake.projection(), sync.accounting, episodeClosed = !record.isOpen)
         }
@@ -98,10 +98,7 @@ class IntakeConfirmation @Inject constructor(
         val confirmed = intake.confirm(taken)
 
         val others = intakes.ofCourse(course.id).filterIsInstance<CourseIntake>().filter { it != intake }
-        val progress = CourseProgress(
-            taken = others.filter { it.status == IntakeStatus.TAKEN }.mapTo(HashSet()) { it.slot } + confirmed.slot,
-            missed = others.filter { it.status == IntakeStatus.MISSED }.mapTo(HashSet()) { it.slot }
-        )
+        val progress = CourseProgress.of(others + confirmed)
         val completion = CourseCompletion(course, progress)
         val finished = completion.reached
 

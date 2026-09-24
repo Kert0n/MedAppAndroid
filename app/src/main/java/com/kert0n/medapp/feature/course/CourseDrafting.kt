@@ -59,7 +59,7 @@ class CourseDrafting @Inject constructor(
                 is Edit.SetTotalDoses -> edited.setTotalDoses(edit.totalDoses, now).getOrElse { return@run rejected(it) }
                 is Edit.Attach -> {
                     // Источник — только коробка, которая у человека есть и которой можно пользоваться.
-                    val pkg = packages.find(edit.packageId)?.takeIf { it.status.allowsUse }
+                    val pkg = packages.find(edit.packageId)?.takeIf { it.usable }
                         ?: return@run Outcome.PackageUnusable
                     edited.attach(pkg, edit.doses, now).getOrElse { return@run rejected(it) }
                 }

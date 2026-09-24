@@ -73,7 +73,7 @@ class UnplannedIntakeRecording @Inject constructor(
         // лежит в проекции командой. Ноль — коробка кончилась или кончится по ответу, и её теряет
         // дверь конца (PLAN D4, E1).
         val after = packages.projection(pkg.id)?.availability
-        if (after != null && !after.effective.isZero) following.follow(pkg.id, now)
+        if (after != null && !after.isSpent) following.follow(pkg.id, now)
         Outcome.Recorded(intake.projection(), consumption.sync.accounting)
     }
 

@@ -35,6 +35,9 @@ data class PackageProjection(
     val lastUsedAt: Instant?,
     val status: PackageStatus = PackageStatus.ACTIVE
 ) {
+
+    /** Коробка — источник идущего лечения: курс держит её и выделил из неё дозы (PLAN D5). */
+    val isCourseSource: Boolean get() = holdingCourseId != null && !availability.myAllocation.isZero
     init {
         require(availability.packageId == id) { "доступность принадлежит своей пачке" }
         require(ref.id == id) { "ссылка принадлежит своей пачке" }

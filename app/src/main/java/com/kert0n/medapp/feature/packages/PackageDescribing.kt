@@ -38,7 +38,7 @@ class PackageDescribing @Inject constructor(
 
     suspend fun describe(packageId: Uuid, facts: PackageFacts): Outcome = transactions.run {
         val pkg = packages.find(packageId) ?: return@run Outcome.GONE
-        if (!pkg.status.allowsUse) return@run Outcome.UNUSABLE
+        if (!pkg.usable) return@run Outcome.UNUSABLE
         // Личная правка серверу не едет, и поручения у неё нет: «есть ли поручение» и «уехало ли
         // изменение» — один вопрос, и отвечает на него очередь.
         val laying = queue.description(pkg, facts.shared)

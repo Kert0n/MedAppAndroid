@@ -28,6 +28,9 @@ data class PackageAvailability(
     val isUsable: Boolean
 ) {
 
+    /** В коробке ничего не осталось: следить за ней курсу больше не за чем (PLAN D4). */
+    val isSpent: Boolean get() = effective.isZero
+
     constructor(
         pkg: Package,
         effective: Quantity,

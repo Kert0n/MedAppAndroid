@@ -9,10 +9,7 @@ import com.kert0n.medapp.domain.notification.NotificationKey
 import com.kert0n.medapp.domain.notification.NotificationKind
 import com.kert0n.medapp.domain.notification.NotificationTarget
 import com.kert0n.medapp.domain.notification.Reminder
-import com.kert0n.medapp.domain.pack.Availability
-import com.kert0n.medapp.domain.pack.PackageAvailability
 import com.kert0n.medapp.domain.value.Doses
-import com.kert0n.medapp.domain.value.Quantity
 import com.kert0n.medapp.feature.intake.IntakeOutcome
 import com.kert0n.medapp.feature.intake.IntakeRecords
 import com.kert0n.medapp.feature.notification.ReminderPromising
@@ -79,7 +76,7 @@ class CourseCalendar @Inject constructor(
      * не позже последнего записанного планового: дальше сверять не с чем.
      */
     suspend fun prune(course: Course, remaining: Sequence<ScheduledOccurrence>, now: Instant): Int {
-        val planned = intakes.ofCourse(course.id).filterIsInstance<CourseIntake>().filter { it.status == IntakeStatus.PLANNED }
+        val planned = intakes.ofCourse(course.id).filterIsInstance<CourseIntake>().filter { it.isPlanned }
         val started = planned.filter { it.plannedAt.isBefore(now) }.map { it.slot }
         val last = planned.maxOfOrNull { it.plannedAt }
         val kept = if (last == null) emptySet() else remaining.takeWhile { !it.at.isAfter(last) }.toSet()
@@ -117,7 +114,7 @@ class CourseCalendar @Inject constructor(
         val zone = course.schedule.zone
         val today = now.atZone(zone).toLocalDate()
         val overdue = intakes.ofCourse(course.id).filterIsInstance<CourseIntake>()
-            .filter { it.status == IntakeStatus.PLANNED && it.slot.localDate.isBefore(today) }
+            .filter { it.isOverdueOn(today) }
         val missed = overdue.filter { intake ->
             val endOfDay = intake.slot.localDate.plusDays(1).atStartOfDay(zone).toInstant()
             intakes.record(IntakeOutcome(intake.miss(endOfDay), expected = setOf(IntakeStatus.PLANNED), recordedAt = now))

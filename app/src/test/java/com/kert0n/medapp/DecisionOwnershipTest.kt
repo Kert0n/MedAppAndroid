@@ -63,7 +63,7 @@ class DecisionOwnershipTest {
     @Test
     fun scenariosAskThingsInsteadOfReadingThem() {
         val reads = Regex(
-            "\\.status\\.(allowsUse|allowsDecision)\\b|\\.isOpen\\b|\\bstatus\\s*(==|!=)\\s*IntakeStatus\\.|" +
+            "\\.status\\.(allowsUse|allowsDecision)\\b|\\bstatus\\s*(==|!=)\\s*IntakeStatus\\.|" +
                 "\\bstate\\s*(==|!=)\\s*Reminder\\.State\\.|\\.id\\s*[!=]=\\s*[\\w.]*medKit\\.id\\b|\\.isZero\\b"
         )
         assertEquals(

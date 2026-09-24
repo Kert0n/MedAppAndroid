@@ -8,6 +8,7 @@ import com.kert0n.medapp.domain.pack.PackageRef
 import com.kert0n.medapp.domain.value.Dose
 import com.kert0n.medapp.domain.value.QuantityUnit
 import java.time.Instant
+import java.time.LocalDate
 import kotlin.uuid.Uuid
 
 /**
@@ -76,6 +77,15 @@ class CourseIntake(
      * Подтверждается неотвеченный или непринятый пункт — отказ и неответ подтверждаются одинаково;
      * повторное подтверждение — второй факт со своим идентификатором, и здесь оно отвергается (E2).
      */
+    /** Пункт ждёт ответа. */
+    val isPlanned: Boolean get() = status == IntakeStatus.PLANNED
+
+    /** Пункт принят. */
+    val isTaken: Boolean get() = status == IntakeStatus.TAKEN
+
+    /** Неответ, чей день уже кончился к [today]: он становится пропуском (PLAN D6). */
+    fun isOverdueOn(today: LocalDate): Boolean = isPlanned && slot.localDate.isBefore(today)
+
     fun confirm(taken: TakenDose): CourseIntake {
         check(answer == null || answer is IntakeAnswer.Missed) {
             "подтверждается неотвеченный приём, а не $status"

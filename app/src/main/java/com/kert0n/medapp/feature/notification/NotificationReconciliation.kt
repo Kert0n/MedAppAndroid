@@ -8,7 +8,6 @@ import com.kert0n.medapp.domain.notification.NotificationSettingsSource
 import com.kert0n.medapp.domain.notification.NotificationTarget
 import com.kert0n.medapp.domain.notification.Reminder
 import com.kert0n.medapp.domain.pack.ExpiryDate
-import com.kert0n.medapp.feature.course.CourseReadings
 import com.kert0n.medapp.feature.course.CourseRecords
 import com.kert0n.medapp.feature.intake.IntakeRecords
 import com.kert0n.medapp.feature.operation.OperationReadings
@@ -81,7 +80,7 @@ class NotificationReconciliation @Inject constructor(
             // и снятое здесь обещание ниже воскреснет с новым сроком.
             val wanted = (desired + intakeDue).mapTo(HashSet()) { it.key }
             val stale = reminders.ofKinds(FROM_STATE)
-                .filter { it.key !in wanted || (digest != null && it.key == digest.key && it.state == Reminder.State.DUE && it.dueAt != digest.dueAt) }
+                .filter { it.key !in wanted || (digest != null && it.key == digest.key && it.isDue && it.dueAt != digest.dueAt) }
                 .map { it.key }
             val silenced = if (current.remoteChangeEnabled) emptyList() else reminders.ofKinds(listOf(NotificationKind.COVERAGE_SHORT)).map { it.key }
             // Сначала снять, потом обещать: воскрешение снятого даёт ему новый срок.
@@ -150,7 +149,7 @@ class NotificationReconciliation @Inject constructor(
         val sourcesEnabled = (current ?: settings.current()).expirySourceRemindersEnabled
         return packages.list(PackageQuery(), today).first().mapNotNull { pkg ->
             val expiresOn = pkg.facts.expiresOn ?: return@mapNotNull null
-            val isSource = pkg.holdingCourseId != null && !pkg.availability.myAllocation.isZero
+            val isSource = pkg.isCourseSource
             val kind = when (expiresOn.stageOn(today)) {
                 ExpiryDate.Stage.SOURCE_3D -> NotificationKind.EXPIRY_SOURCE_3D.takeIf { isSource && sourcesEnabled }
                 ExpiryDate.Stage.SOURCE_1D -> NotificationKind.EXPIRY_SOURCE_1D.takeIf { isSource && sourcesEnabled }

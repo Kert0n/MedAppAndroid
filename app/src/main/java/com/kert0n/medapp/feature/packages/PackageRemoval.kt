@@ -33,7 +33,7 @@ class PackageRemoval @Inject constructor(
 
     suspend fun remove(packageId: Uuid): Outcome = transactions.run {
         val pkg = packages.find(packageId) ?: return@run Outcome.GONE
-        if (!pkg.status.allowsUse) return@run Outcome.UNUSABLE
+        if (!pkg.usable) return@run Outcome.UNUSABLE
         val now = clock.instant()
         when (val laying = queue.removal(pkg)) {
             is Laying.Awaiting -> {

@@ -91,7 +91,7 @@ class ReminderAnswering @Inject constructor(
         // Читаем и пишем одной транзакцией: пока человек жал кнопку, лечение могли отменить, и
         // отсрочка, положенная поверх снятого, воскресила бы его (F5).
         val deferred = transactions.run {
-            val reminder = reminders.find(key)?.takeIf { it.state != Reminder.State.WITHDRAWN }
+            val reminder = reminders.find(key)?.takeIf { !it.isWithdrawn }
             reminder?.also {
                 it.defer(at)
                 reminders.saveAll(listOf(it))

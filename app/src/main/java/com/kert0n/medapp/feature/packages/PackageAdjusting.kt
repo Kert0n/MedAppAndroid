@@ -40,7 +40,7 @@ class PackageAdjusting @Inject constructor(
 
     suspend fun adjust(packageId: Uuid, action: Action): Outcome = transactions.run {
         val pkg = packages.find(packageId) ?: return@run Outcome.GONE
-        if (!pkg.status.allowsUse) return@run Outcome.UNUSABLE
+        if (!pkg.usable) return@run Outcome.UNUSABLE
         val now = clock.instant()
         val laying = when (action) {
             is Action.Recount -> queue.adjustment(pkg, seen = action.seen, actual = action.actual)
@@ -50,7 +50,7 @@ class PackageAdjusting @Inject constructor(
         // Кончившуюся коробку лечение уже потеряло своей дверью; кончающуюся на полке потеряет
         // ответ. Зажимать есть что только у оставшейся — и по тому же числу, что на экране (D4).
         val after = if (ended) null else packages.projection(pkg.id)?.availability
-        if (after != null && !after.effective.isZero) following.follow(pkg.id, now)
+        if (after != null && !after.isSpent) following.follow(pkg.id, now)
         if (ended) Outcome.ENDED else Outcome.ADJUSTED
     }
 
