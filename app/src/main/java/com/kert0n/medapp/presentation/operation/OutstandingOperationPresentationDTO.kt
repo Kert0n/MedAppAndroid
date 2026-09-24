@@ -1,6 +1,6 @@
 package com.kert0n.medapp.presentation.operation
 
-import com.kert0n.medapp.storage.server.OutstandingOperation
+import com.kert0n.medapp.storage.operation.OutstandingOperation
 import java.time.Instant
 import kotlin.uuid.Uuid
 

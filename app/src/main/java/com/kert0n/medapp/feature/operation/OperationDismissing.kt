@@ -6,7 +6,7 @@ import com.kert0n.medapp.queue.Settlement
 import com.kert0n.medapp.queue.StoredSyncOperation
 import com.kert0n.medapp.queue.Transactions
 import com.kert0n.medapp.queue.intake.IntakeAccounting
-import com.kert0n.medapp.storage.server.SyncOperationStorageRepository
+import com.kert0n.medapp.storage.operation.SyncOperationStorageRepository
 import java.time.Clock
 import javax.inject.Inject
 import kotlin.uuid.Uuid

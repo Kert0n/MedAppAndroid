@@ -1,18 +1,14 @@
 package com.kert0n.medapp.queue
 
-import com.kert0n.medapp.domain.value.Attempts
-import com.kert0n.medapp.domain.value.Vocabulary
-import org.junit.Assert.assertFalse
-import java.math.BigDecimal
-import com.kert0n.medapp.queue.pack.prepare
-import com.kert0n.medapp.fixture.pack
 import com.kert0n.medapp.domain.medkit.MedKit
 import com.kert0n.medapp.domain.medkit.MedKitRef
-import com.kert0n.medapp.network.pack.PackageSnapshot
-import com.kert0n.medapp.network.pack.toDomain
-import com.kert0n.medapp.fixture.medKit
-import com.kert0n.medapp.domain.pack.Package
 import com.kert0n.medapp.domain.pack.Claims
+import com.kert0n.medapp.domain.pack.Package
+import com.kert0n.medapp.domain.value.Attempts
+import com.kert0n.medapp.domain.value.Vocabulary
+import com.kert0n.medapp.domain.value.VocabularyMiss
+import com.kert0n.medapp.domain.value.VocabularyStore
+import com.kert0n.medapp.fixture.DirectTransactions
 import com.kert0n.medapp.fixture.EARLIER
 import com.kert0n.medapp.fixture.HOME_KIT
 import com.kert0n.medapp.fixture.INTAKE
@@ -23,28 +19,34 @@ import com.kert0n.medapp.fixture.SHARED_KIT
 import com.kert0n.medapp.fixture.TABLETS
 import com.kert0n.medapp.fixture.TABLET_FORM
 import com.kert0n.medapp.fixture.dose
+import com.kert0n.medapp.fixture.medKit
+import com.kert0n.medapp.fixture.pack
 import com.kert0n.medapp.fixture.tablets
+import com.kert0n.medapp.network.delivery.CourierDoor
+import com.kert0n.medapp.network.delivery.MedAppCourier
+import com.kert0n.medapp.network.delivery.MedAppPacking
+import com.kert0n.medapp.network.delivery.toPreparedRequest
 import com.kert0n.medapp.network.pack.PackageSnapshotNetworkDTO
-import com.kert0n.medapp.queue.medkit.MedKitSyncCommand
-import com.kert0n.medapp.queue.medkit.toPreparedRequest
-import com.kert0n.medapp.queue.pack.PackageSyncCommand
-import com.kert0n.medapp.network.pack.PackageSyncState
-import com.kert0n.medapp.queue.pack.toPreparedRequest
+import com.kert0n.medapp.network.pack.PackageSnapshotResolver
+import com.kert0n.medapp.network.pack.toDomain
 import com.kert0n.medapp.network.server.ApiFailure
 import com.kert0n.medapp.network.server.ApiResult
 import com.kert0n.medapp.network.server.MedAppApi
 import com.kert0n.medapp.network.server.RawResponse
-import com.kert0n.medapp.network.server.ResourceVersion
 import com.kert0n.medapp.network.server.medAppHttpClient
 import com.kert0n.medapp.network.server.medAppJson
-import com.kert0n.medapp.network.value.VocabularyMiss
 import com.kert0n.medapp.network.value.VocabularyResolver
-import com.kert0n.medapp.network.value.VocabularyStore
+import com.kert0n.medapp.queue.medkit.MedKitSyncCommand
+import com.kert0n.medapp.queue.pack.PackageSnapshot
+import com.kert0n.medapp.queue.pack.PackageSyncCommand
+import com.kert0n.medapp.queue.pack.PackageSyncState
+import com.kert0n.medapp.queue.pack.prepare
 import io.ktor.client.engine.mock.MockEngine
 import io.ktor.client.engine.mock.respond
 import io.ktor.http.HttpHeaders
 import io.ktor.http.HttpStatusCode
 import io.ktor.http.headersOf
+import java.math.BigDecimal
 import java.time.Clock
 import java.time.Instant
 import java.time.ZoneOffset
@@ -53,6 +55,7 @@ import kotlin.uuid.Uuid
 import kotlinx.coroutines.async
 import kotlinx.coroutines.test.runTest
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNotNull
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertSame
@@ -94,7 +97,7 @@ class QueueWorkerTest {
         var frozen = 0
         var known = PackageSyncState(PACK, ResourceVersion(3))
         var knownPack: Package = pack(quantity = tablets("20"))
-        val takenWith = mutableListOf<PackageSnapshot?>()
+        val takenWith = mutableListOf<PackageSnapshot>()
 
         /** Аптечки, которые «есть в базе»: снимок, называющий другую, положить некуда. */
         val knownMedKits = mutableSetOf(HOME_KIT)
@@ -132,32 +135,24 @@ class QueueWorkerTest {
         /** Операции, на которых взятие бросает: база отказала, снимок не собрался — что угодно. */
         val takeFailsFor = mutableSetOf<Uuid>()
 
-        override suspend fun take(id: Uuid, fresh: PackageSnapshot?, at: Instant): Take? {
+        override suspend fun operation(id: Uuid): SyncOperation? {
             if (id in takeFailsFor) throw IllegalStateException("взятие $id сорвалось")
-            val operation = operations[id] ?: return null
-            if (operation.status.isClosed) return null
-            takenWith += fresh
-            fresh?.let(::learn)
-            val prepared = operation.prepared ?: run {
-                frozen++
-                when (val command = operation.command) {
-                    // У аптечки предусловий нет: замораживать нечего, кроме самого пути.
-                    is MedKitSyncCommand -> command.toPreparedRequest(at)
-                    is PackageSyncCommand -> when (val prepared = command.prepare(operation.id, knownPack, known, at)) {
-                        is Preparation.Request -> prepared.request
-                        is Preparation.Refuse -> return Take.Closed(Delivery.Refused(prepared.reason, PackageState.None)).also { settle(id, it.delivery.settlement(operation.command), at) }
-                        Preparation.AlreadyApplied -> return Take.Closed(Delivery.Applied(PackageState.None)).also { settle(id, it.delivery.settlement(operation.command), at) }
-                    }
-                    else -> command.unknownRoot()
-                }
-            }
-            // Операция, найденная в отправке, — прошлый полёт умер вместе с процессом: исход неизвестен.
-            val flightLost = operation.status == SyncOperationStatus.SENDING && operation.prepared != null
-            return Take.Sending(
-                operation.with(status = SyncOperationStatus.SENDING, prepared = prepared, outcomeUnknown = operation.outcomeUnknown || flightLost)
-                    .also { operations[id] = it }
-            )
+            return operations[id]
         }
+
+        override suspend fun knownPackage(id: Uuid): PackageSnapshot? = PackageSnapshot(knownPack, known)
+
+        override suspend fun layDown(snapshot: PackageSnapshot, at: Instant) {
+            takenWith += snapshot
+            learn(snapshot)
+        }
+
+        override suspend fun write(operation: SyncOperation, was: SyncOperationStatus) {
+            if (operations[operation.id]?.prepared == null && operation.prepared != null) frozen++
+            operations[operation.id] = operation
+        }
+
+        override suspend fun unclosedOfMedKit(medKitId: Uuid): List<StoredSyncOperation> = error("не для этого теста")
 
         /** Ответ записан — а применение бросает: так ведёт себя сломанная транзакция закрытия. */
         var settleFails = false
@@ -165,7 +160,7 @@ class QueueWorkerTest {
         /** Запись ответа бросает: база полна или отказала — сервер при этом уже применил запрос. */
         var answeredFails = false
 
-        override suspend fun answered(id: Uuid, answer: RawResponse, at: Instant) {
+        override suspend fun answered(id: Uuid, answer: Receipt, at: Instant) {
             if (answeredFails) throw IllegalStateException("запись ответа сорвалась")
             val operation = operations.getValue(id)
             operations[id] = operation.with(status = SyncOperationStatus.ANSWERED, answer = answer)
@@ -236,7 +231,7 @@ class QueueWorkerTest {
             prepared: PreparedRequest? = this.prepared,
             attempts: Attempts = this.attempts,
             lastTriedAt: Instant? = this.lastTriedAt,
-            answer: RawResponse? = this.answer,
+            answer: Receipt? = this.answer,
             notBefore: Instant? = this.notBefore,
             dropPrepared: Boolean = false,
             dropAnswer: Boolean = false,
@@ -250,7 +245,7 @@ class QueueWorkerTest {
         )
     }
 
-    private class Transport(private val answer: (PreparedRequest) -> ApiResult<RawResponse>) : QueueTransport {
+    private class Transport(private val answer: (PreparedRequest) -> ApiResult<RawResponse>) : CourierDoor {
         val sent = mutableListOf<PreparedRequest>()
         var snapshots = 0
         var snapshotAnswer: ApiResult<PackageSnapshotNetworkDTO>? = null
@@ -338,8 +333,8 @@ class QueueWorkerTest {
     private fun transport(fresh: PackageSnapshotNetworkDTO = snapshot, answer: (PreparedRequest) -> ApiResult<RawResponse>) =
         Transport(answer).also { it.fresh = ApiResult.Success(fresh) }
 
-    private fun worker(storage: Storage, transport: QueueTransport, online: Boolean = true, clock: Clock = this.clock) =
-        QueueWorker(storage, transport, resolver(online), PackageSnapshotResolver(resolver(online), storage), clock)
+    private fun worker(storage: Storage, transport: CourierDoor, online: Boolean = true, clock: Clock = this.clock) =
+        QueueWorker(storage, MedAppCourier(transport, resolver(online), PackageSnapshotResolver(resolver(online), storage), clock), MedAppPacking(), DirectTransactions, clock)
 
     /** Снимок, каким его положит хранение: разрешённый, с домашней аптечкой. */
     private fun resolved(dto: PackageSnapshotNetworkDTO): PackageSnapshot =
@@ -389,7 +384,8 @@ class QueueWorkerTest {
         assertEquals(2, report.settled)
         assertEquals(1, transport.snapshots)
         assertEquals(listOf(ResourceVersion(7), ResourceVersion(8)), transport.sent.map { it.drugVersion })
-        assertEquals(listOf(resolved(snapshotWithVersion(7)), null), storage.takenWith)
+        // Вторая готовится по ответу первой: свежего снимка ей не читали, в базу ничего не клали.
+        assertEquals(listOf(resolved(snapshotWithVersion(7))), storage.takenWith)
     }
 
     /** Отправка, пережившая смерть процесса: исход неизвестен, запрос уже заморожен — уходит как есть. */
@@ -1045,7 +1041,7 @@ class QueueWorkerTest {
 
         assertEquals(0, first.settled)
         assertEquals(SyncOperationStatus.ANSWERED, storage.operations.getValue(INTAKE).status)
-        assertEquals(RawResponse(200, newUnit), storage.operations.getValue(INTAKE).answer)
+        assertEquals(Receipt(200, newUnit), storage.operations.getValue(INTAKE).answer)
         assertEquals(1, storage.deferred.size)
         assertTrue(storage.settled.isEmpty())
 
@@ -1125,7 +1121,7 @@ class QueueWorkerTest {
         val storage = Storage(listOf(
             SyncOperation(
                 id = INTAKE, command = consume, sequence = 0, createdAt = EARLIER, payloadVersion = 1, prepared = frozen,
-                status = SyncOperationStatus.ANSWERED, answer = RawResponse(200, snapshotJson)
+                status = SyncOperationStatus.ANSWERED, answer = Receipt(200, snapshotJson)
             )
         ))
         val transport = Transport { error("отправки быть не должно") }
@@ -1196,7 +1192,7 @@ class QueueWorkerTest {
     fun concurrentDrainsSendEachOperationOnce() = runTest {
         val storage = Storage(listOf(operation()))
         val gate = kotlinx.coroutines.CompletableDeferred<Unit>()
-        val transport = object : QueueTransport {
+        val transport = object : CourierDoor {
             val sent = java.util.concurrent.atomic.AtomicInteger()
             override suspend fun send(request: PreparedRequest): ApiResult<RawResponse> {
                 sent.incrementAndGet()

@@ -8,6 +8,7 @@ import com.kert0n.medapp.domain.medkit.MedKit
 import com.kert0n.medapp.domain.pack.Claims
 import com.kert0n.medapp.domain.value.Doses
 import com.kert0n.medapp.feature.packages.PackageAdjusting
+import com.kert0n.medapp.feature.packages.PackageRelocation
 import com.kert0n.medapp.fixture.HOME_KIT
 import com.kert0n.medapp.fixture.OTHER_PACK
 import com.kert0n.medapp.fixture.PACK
@@ -26,16 +27,16 @@ import com.kert0n.medapp.fixture.queueStorage
 import com.kert0n.medapp.fixture.schedule
 import com.kert0n.medapp.fixture.snapshotStorage
 import com.kert0n.medapp.fixture.tablets
-import com.kert0n.medapp.network.pack.PackageSnapshot
-import com.kert0n.medapp.network.pack.PackageSyncState
-import com.kert0n.medapp.network.server.ResourceVersion
+import com.kert0n.medapp.fixture.taking
 import com.kert0n.medapp.queue.Delivery
 import com.kert0n.medapp.queue.PackageState
+import com.kert0n.medapp.queue.ResourceVersion
 import com.kert0n.medapp.queue.ServerSnapshot
 import com.kert0n.medapp.queue.StoredSyncOperation
 import com.kert0n.medapp.queue.SyncCommand
+import com.kert0n.medapp.queue.pack.PackageSnapshot
 import com.kert0n.medapp.queue.pack.PackageSyncCommand
-import com.kert0n.medapp.feature.packages.PackageRelocation
+import com.kert0n.medapp.queue.pack.PackageSyncState
 import com.kert0n.medapp.queue.settlement
 import com.kert0n.medapp.storage.database.MedAppDatabase
 import com.kert0n.medapp.storage.medkit.toStorageEntity as toMedKitStorageEntity
@@ -149,7 +150,7 @@ class CourseFollowingTest {
         val id = treated()
         val before = plan(id)
         val claim = (database.syncOperations().all().single().toDomain(VOCABULARY) as StoredSyncOperation.Readable).operation
-        database.queueStorage().take(claim.id, null, now)
+        database.taking().take(claim.id, null, now)
 
         database.queueStorage().settle(claim.id, Delivery.Applied(PackageState.Present(snapshot("12"))).settlement(claim.command), now)
 
@@ -193,7 +194,7 @@ class CourseFollowingTest {
         val withdraw = database.syncOperations().all()
             .map { (it.toDomain(VOCABULARY) as StoredSyncOperation.Readable).operation }
             .single { it.command is PackageSyncCommand.Withdraw }
-        database.queueStorage().take(withdraw.id, snapshot("12"), now)
+        database.taking().take(withdraw.id, snapshot("12"), now)
 
         database.queueStorage().settle(withdraw.id, Delivery.Applied(PackageState.Gone).settlement(withdraw.command), now)
 

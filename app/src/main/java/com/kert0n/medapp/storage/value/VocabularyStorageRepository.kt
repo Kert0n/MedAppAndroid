@@ -2,7 +2,7 @@ package com.kert0n.medapp.storage.value
 
 import com.kert0n.medapp.domain.value.DosageForm
 import com.kert0n.medapp.domain.value.QuantityUnit
-import com.kert0n.medapp.network.value.VocabularyStore
+import com.kert0n.medapp.domain.value.VocabularyStore
 import kotlinx.coroutines.flow.Flow
 
 /**

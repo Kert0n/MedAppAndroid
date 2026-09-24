@@ -10,7 +10,7 @@ import com.kert0n.medapp.platform.settings.DevicePermissions
 import com.kert0n.medapp.presentation.settings.LanguageChoice
 import com.kert0n.medapp.presentation.settings.permissionsNow
 import com.kert0n.medapp.presentation.settings.toChoice
-import com.kert0n.medapp.storage.server.SyncOperationStorageRepository
+import com.kert0n.medapp.storage.operation.SyncOperationStorageRepository
 import dagger.hilt.android.lifecycle.HiltViewModel
 import javax.inject.Inject
 import kotlinx.coroutines.flow.MutableStateFlow

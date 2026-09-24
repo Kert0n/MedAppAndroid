@@ -3,14 +3,16 @@ package com.kert0n.medapp.di
 import android.content.Context
 import androidx.room.Room
 import com.kert0n.medapp.R
+import com.kert0n.medapp.network.value.VocabularySnapshotNetworkDTO
+import com.kert0n.medapp.network.value.bundledVocabulary
 import com.kert0n.medapp.storage.course.CourseDao
 import com.kert0n.medapp.storage.database.BundledVocabulary
 import com.kert0n.medapp.storage.database.MedAppDatabase
 import com.kert0n.medapp.storage.intake.IntakeDao
 import com.kert0n.medapp.storage.medkit.MedKitDao
-import com.kert0n.medapp.storage.pack.PackageDao
 import com.kert0n.medapp.storage.notification.ReminderDao
-import com.kert0n.medapp.storage.server.SyncOperationDao
+import com.kert0n.medapp.storage.operation.SyncOperationDao
+import com.kert0n.medapp.storage.pack.PackageDao
 import com.kert0n.medapp.storage.template.PackageTemplateDao
 import com.kert0n.medapp.storage.value.VocabularyDao
 import dagger.Module
@@ -45,7 +47,11 @@ object DatabaseModule {
     @Singleton
     fun medAppDatabase(@ApplicationContext context: Context): MedAppDatabase =
         Room.databaseBuilder(context, MedAppDatabase::class.java, MedAppDatabase.NAME)
-            .addCallback(BundledVocabulary.fromAssets(context.assets))
+            .addCallback(
+                BundledVocabulary {
+                    bundledVocabulary(context.assets.open(VocabularySnapshotNetworkDTO.ASSET).use { it.readBytes().decodeToString() })
+                }
+            )
             .addMigrations(*MedAppDatabase.MIGRATIONS)
             .build()
 

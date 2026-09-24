@@ -11,6 +11,7 @@ import com.kert0n.medapp.domain.notification.NotificationKind
 import com.kert0n.medapp.domain.notification.NotificationTarget
 import com.kert0n.medapp.domain.notification.Reminder
 import com.kert0n.medapp.domain.value.Doses
+import com.kert0n.medapp.feature.connectivity.Connection
 import com.kert0n.medapp.feature.course.SourceEditing
 import com.kert0n.medapp.feature.notification.DailyRound
 import com.kert0n.medapp.feature.notification.NotificationReconciliation
@@ -32,11 +33,10 @@ import com.kert0n.medapp.fixture.packageRepository
 import com.kert0n.medapp.fixture.storySetting
 import com.kert0n.medapp.fixture.tablets
 import com.kert0n.medapp.fixture.treatmentStarted
-import com.kert0n.medapp.network.pack.PackageSyncState
-import com.kert0n.medapp.network.server.ResourceVersion
-import com.kert0n.medapp.feature.connectivity.Connection
 import com.kert0n.medapp.platform.time.TimeShifts
+import com.kert0n.medapp.queue.ResourceVersion
 import com.kert0n.medapp.queue.Transactions
+import com.kert0n.medapp.queue.pack.PackageSyncState
 import com.kert0n.medapp.storage.database.MedAppDatabase
 import com.kert0n.medapp.storage.medkit.toStorageEntity as toMedKitStorageEntity
 import com.kert0n.medapp.storage.notification.ReminderStorageRepository

@@ -2,27 +2,33 @@ package com.kert0n.medapp.di
 
 import android.util.Log
 import com.kert0n.medapp.BuildConfig
-import com.kert0n.medapp.network.account.AccessTokens
-import com.kert0n.medapp.network.account.AccountReclaim
-import com.kert0n.medapp.network.account.AccountRegistration
-import io.ktor.client.plugins.logging.Logger
 import com.kert0n.medapp.domain.account.DeviceAccount
 import com.kert0n.medapp.domain.medkit.MedKitInvitations
 import com.kert0n.medapp.domain.value.VocabularyLibrary
+import com.kert0n.medapp.network.account.AccessTokens
+import com.kert0n.medapp.network.account.AccountReclaim
+import com.kert0n.medapp.network.account.AccountRegistration
 import com.kert0n.medapp.network.account.ServerDeviceAccount
+import com.kert0n.medapp.network.delivery.CourierDoor
+import com.kert0n.medapp.network.delivery.MedAppCourier
+import com.kert0n.medapp.network.delivery.MedAppDoor
+import com.kert0n.medapp.network.delivery.MedAppPacking
 import com.kert0n.medapp.network.medkit.ServerMedKitInvitations
+import com.kert0n.medapp.network.register.MedAppRegister
 import com.kert0n.medapp.network.server.MedAppApi
-import com.kert0n.medapp.network.value.ServerVocabularyLibrary
-import com.kert0n.medapp.queue.QueueHttpTransport
 import com.kert0n.medapp.network.server.crptHttpClient
 import com.kert0n.medapp.network.server.medAppHttpClient
-import com.kert0n.medapp.queue.QueueTransport
+import com.kert0n.medapp.network.value.ServerVocabularyLibrary
+import com.kert0n.medapp.queue.Courier
+import com.kert0n.medapp.queue.Packing
+import com.kert0n.medapp.queue.Register
 import dagger.Module
 import dagger.Provides
 import dagger.hilt.InstallIn
 import dagger.hilt.components.SingletonComponent
 import io.ktor.client.HttpClient
 import io.ktor.client.engine.okhttp.OkHttp
+import io.ktor.client.plugins.logging.Logger
 import javax.inject.Qualifier
 import javax.inject.Singleton
 
@@ -91,11 +97,23 @@ object NetworkModule {
     @CrptHttp
     fun crptHttp(): HttpClient = crptHttpClient(OkHttp.create(), BuildConfig.CRPT_BASE_URL)
 
-    /** Очередь ходит к серверу тем же клиентом: пропуск, лог и таймауты у неё те же. */
+    /** Курьер поручений ходит к серверу тем же клиентом: пропуск, лог и таймауты у него те же. */
     @Provides
     @Singleton
-    fun queueTransport(api: MedAppApi): QueueTransport =
-        QueueHttpTransport(api)
+    fun courierDoor(api: MedAppApi): CourierDoor = MedAppDoor(api)
+
+    /** Курьер — порт очереди; исполняет его сеть. */
+    @Provides
+    @Singleton
+    fun courier(implementation: MedAppCourier): Courier = implementation
+
+    /** Упаковка поручений в посылки — форма провода; очередь её носит, не читая. */
+    @Provides
+    fun packing(implementation: MedAppPacking): Packing = implementation
+
+    /** Чтение общего реестра — порт очереди; исполняет сеть. */
+    @Provides
+    fun register(implementation: MedAppRegister): Register = implementation
 
     /**
      * Доменные порты, которые выполняет сеть: знакомство устройства с сервером и пополнение

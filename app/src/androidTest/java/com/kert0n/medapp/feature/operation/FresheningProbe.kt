@@ -1,13 +1,11 @@
 package com.kert0n.medapp.feature.operation
 
 import com.kert0n.medapp.domain.medkit.MedKit
-import org.junit.Assert.assertTrue
-import kotlinx.coroutines.flow.first
-import com.kert0n.medapp.feature.intake.UnplannedIntakeRecording
-import com.kert0n.medapp.domain.value.Dose
 import com.kert0n.medapp.domain.value.DosageForm
+import com.kert0n.medapp.domain.value.Dose
 import com.kert0n.medapp.domain.value.Quantity
 import com.kert0n.medapp.domain.value.QuantityUnit
+import com.kert0n.medapp.feature.intake.UnplannedIntakeRecording
 import com.kert0n.medapp.feature.medkits.MedKitInvitation
 import com.kert0n.medapp.feature.medkits.MedKitPublishing
 import com.kert0n.medapp.feature.packages.PackageAdjusting
@@ -24,33 +22,40 @@ import com.kert0n.medapp.fixture.packageRepository
 import com.kert0n.medapp.fixture.queueService
 import com.kert0n.medapp.fixture.queueStorage
 import com.kert0n.medapp.fixture.snapshotStorage
+import com.kert0n.medapp.fixture.taking
 import com.kert0n.medapp.fixture.transactions
+import com.kert0n.medapp.network.delivery.MedAppCourier
+import com.kert0n.medapp.network.delivery.MedAppDoor
+import com.kert0n.medapp.network.delivery.MedAppPacking
 import com.kert0n.medapp.network.medkit.MembershipPostNetworkDTO
 import com.kert0n.medapp.network.medkit.ServerMedKitInvitations
+import com.kert0n.medapp.network.pack.PackageSnapshotResolver
 import com.kert0n.medapp.network.pack.PackageSyncNetworkDTO
+import com.kert0n.medapp.network.register.MedAppRegister
 import com.kert0n.medapp.network.server.ApiFailure
 import com.kert0n.medapp.network.server.ApiResult
 import com.kert0n.medapp.network.server.MedAppApi
 import com.kert0n.medapp.network.value.VocabularyResolver
 import com.kert0n.medapp.network.value.toDosageForm
 import com.kert0n.medapp.network.value.toQuantityUnit
-import com.kert0n.medapp.queue.PackageSnapshotResolver
-import com.kert0n.medapp.queue.QueueHttpTransport
 import com.kert0n.medapp.queue.QueueWorker
 import com.kert0n.medapp.queue.Rereading
 import com.kert0n.medapp.queue.SnapshotApplier
 import com.kert0n.medapp.queue.SyncOperationStatus
+import com.kert0n.medapp.storage.database.RoomTransactions
 import com.kert0n.medapp.storage.medkit.toStorageEntity
 import com.kert0n.medapp.storage.value.VocabularyRoomRepository
 import java.math.BigDecimal
 import java.time.Clock
 import java.time.Duration
 import kotlin.uuid.Uuid
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.runBlocking
 import org.junit.After
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNotNull
 import org.junit.Assert.assertNull
+import org.junit.Assert.assertTrue
 import org.junit.Assume.assumeTrue
 import org.junit.Before
 import org.junit.Test
@@ -157,7 +162,7 @@ class FresheningProbe {
     @Test
     fun aBoxThrownAwayByTheNeighbourIsGoneWhenOpened(): Unit = runBlocking {
         val shared = sharedWithBoris()
-        success(boris.deletePackage(shared.box, success(boris.packageSnapshot(shared.box)).pack.version))
+        success(boris.deletePackage(shared.box, success(boris.packageSnapshot(shared.box)).pack.version.toVersion()))
 
         anna.freshening.pack(shared.box)
 
@@ -243,8 +248,8 @@ class FresheningProbe {
         private val transactions = database.transactions()
         val vocabulary = VocabularyResolver(VocabularyRoomRepository(database.vocabulary()), api)
         private val snapshots = PackageSnapshotResolver(vocabulary, database.queueStorage())
-        private val reading = SnapshotApplier(api, database.snapshotStorage(), vocabulary, snapshots, clock)
-        private val worker = QueueWorker(database.queueStorage(), QueueHttpTransport(api), vocabulary, snapshots, clock)
+        private val reading = SnapshotApplier(MedAppRegister(api, snapshots, clock), database.snapshotStorage(), clock)
+        private val worker = QueueWorker(database.queueStorage(), MedAppCourier(MedAppDoor(api), vocabulary, snapshots, clock), MedAppPacking(), RoomTransactions(database), clock)
         val packages = database.packageRepository()
         private val medKits = database.medKitRepository()
         private val queue = database.queueService()
@@ -252,7 +257,7 @@ class FresheningProbe {
         private val relocation = PackageRelocation(packages, medKits, database.courseRepository(), queue, transactions, clock)
         private val publishing = MedKitPublishing(medKits, packages, relocation, queue, transactions, clock)
         val freshening = Freshening(
-            Rereading(api, database.snapshotStorage(), snapshots, clock),
+            Rereading(MedAppRegister(api, snapshots, clock), database.snapshotStorage(), clock),
             FakeConnection(online = true),
             packages,
             transactions,
@@ -304,7 +309,7 @@ class FresheningProbe {
             val operation = database.syncOperations().all()
                 .map { (it.toDomain(words) as com.kert0n.medapp.queue.StoredSyncOperation.Readable).operation }
                 .single { it.status == SyncOperationStatus.PENDING }.id
-            database.queueStorage().take(operation, null, clock.instant())
+            database.taking().take(operation, null, clock.instant())
         }
 
         suspend fun effective(box: Uuid): BigDecimal =

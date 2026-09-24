@@ -1,6 +1,6 @@
 package com.kert0n.medapp.queue
 
-import com.kert0n.medapp.network.pack.PackageSnapshot
+import com.kert0n.medapp.queue.pack.PackageSnapshot
 
 /**
  * Что известно о пачке на сервере после закрытия операции. Снимок — уже разрешённый

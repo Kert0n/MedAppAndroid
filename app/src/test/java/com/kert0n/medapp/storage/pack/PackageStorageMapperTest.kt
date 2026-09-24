@@ -5,26 +5,26 @@ import com.kert0n.medapp.domain.value.Money
 import com.kert0n.medapp.fixture.HOME_KIT
 import com.kert0n.medapp.fixture.PACK
 import com.kert0n.medapp.fixture.TABLETS
+import com.kert0n.medapp.fixture.TABLETS_ID
 import com.kert0n.medapp.fixture.TABLET_FORM
+import com.kert0n.medapp.fixture.VOCABULARY
 import com.kert0n.medapp.fixture.dose
 import com.kert0n.medapp.fixture.expiry
+import com.kert0n.medapp.fixture.medKit
 import com.kert0n.medapp.fixture.millilitres
 import com.kert0n.medapp.fixture.pack
 import com.kert0n.medapp.fixture.tablets
-import com.kert0n.medapp.network.pack.PackageSyncState
+import com.kert0n.medapp.fixture.toStorageRow
+import com.kert0n.medapp.queue.ResourceVersion
+import com.kert0n.medapp.queue.pack.PackageSyncState
+import com.kert0n.medapp.storage.medkit.toStorageEntity as toMedKitStorageEntity
 import com.kert0n.medapp.storage.pack.toStorageEntity
-import com.kert0n.medapp.network.server.ResourceVersion
 import java.math.BigDecimal
 import java.time.Instant
 import java.time.LocalDate
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNull
 import org.junit.Test
-import com.kert0n.medapp.fixture.VOCABULARY
-import com.kert0n.medapp.fixture.TABLETS_ID
-import com.kert0n.medapp.fixture.medKit
-import com.kert0n.medapp.fixture.toStorageRow
-import com.kert0n.medapp.storage.medkit.toStorageEntity as toMedKitStorageEntity
 
 /**
  * Круговое преобразование упаковки: серверная часть и личные сведения хранятся порознь, а

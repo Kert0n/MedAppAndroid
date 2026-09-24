@@ -33,12 +33,12 @@ import com.kert0n.medapp.fixture.schedule
 import com.kert0n.medapp.fixture.snapshotStorage
 import com.kert0n.medapp.fixture.source
 import com.kert0n.medapp.fixture.tablets
-import com.kert0n.medapp.network.pack.PackageSnapshot
-import com.kert0n.medapp.network.pack.PackageSyncState
-import com.kert0n.medapp.network.server.ResourceVersion
 import com.kert0n.medapp.presentation.pack.MedKitContentsViewModel
 import com.kert0n.medapp.presentation.pack.PackageCardViewModel
+import com.kert0n.medapp.queue.ResourceVersion
 import com.kert0n.medapp.queue.ServerSnapshot
+import com.kert0n.medapp.queue.pack.PackageSnapshot
+import com.kert0n.medapp.queue.pack.PackageSyncState
 import com.kert0n.medapp.storage.database.MedAppDatabase
 import com.kert0n.medapp.storage.intake.toStorageEntity
 import com.kert0n.medapp.storage.medkit.toStorageEntity as toMedKitStorageEntity

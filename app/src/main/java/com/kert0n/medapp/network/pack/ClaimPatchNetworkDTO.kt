@@ -1,6 +1,6 @@
 package com.kert0n.medapp.network.pack
 
-import com.kert0n.medapp.network.server.ResourceVersion
+import com.kert0n.medapp.network.server.ResourceVersionNetworkDTO
 import kotlinx.serialization.Serializable
 
 /**
@@ -10,7 +10,7 @@ import kotlinx.serialization.Serializable
 @Serializable
 data class ClaimPatchNetworkDTO(
     val amount: String,
-    val version: ResourceVersion? = null
+    val version: ResourceVersionNetworkDTO? = null
 ) {
     init {
         requirePositiveNetworkAmount(amount, "ClaimPatchNetworkDTO.amount")

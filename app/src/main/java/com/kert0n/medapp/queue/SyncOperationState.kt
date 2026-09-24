@@ -1,7 +1,6 @@
 package com.kert0n.medapp.queue
 
 import com.kert0n.medapp.domain.value.Attempts
-import com.kert0n.medapp.network.server.RawResponse
 import java.time.Instant
 
 /**
@@ -24,7 +23,7 @@ data class SyncOperationState(
     val attempts: Attempts = Attempts.none,
     val lastError: String? = null,
     val lastTriedAt: Instant? = null,
-    val answer: RawResponse? = null,
+    val answer: Receipt? = null,
     val notBefore: Instant? = null,
     val outcomeUnknown: Boolean = false,
     val refusalReason: RefusalReason? = null,
@@ -58,7 +57,7 @@ data class SyncOperationState(
         if (open && hasRequest) copy(status = SyncOperationStatus.SENDING, outcomeUnknown = outcomeUnknown || status == SyncOperationStatus.SENDING) else null
 
     /** Ответ записан до применения — только из отправки: полученное подтверждение не теряется. */
-    fun answered(answer: RawResponse, at: Instant): SyncOperationState? =
+    fun answered(answer: Receipt, at: Instant): SyncOperationState? =
         if (status == SyncOperationStatus.SENDING) copy(status = SyncOperationStatus.ANSWERED, answer = answer, lastTriedAt = at) else null
 
     /** Ответ есть, применить нечем: остаётся с ним, попытка считается — от неё растёт задержка. */

@@ -45,9 +45,22 @@ reviews:
         and counts use plurals in every language the app declares (values/ and values-en/), in the app's own text. Names of units and dosage forms are
         not the app's text: they come from the server vocabulary, are shown verbatim and are never
         declined — an expectation like "20 таблетка" is a fixture's dictionary name, not a formatting bug.
+    - path: "app/src/main/java/com/kert0n/medapp/queue/**"
+      instructions: >-
+        The queue speaks the language of errands to the shared register: what to tell the server,
+        in what order, what became of it and what that means. It never imports network: courier,
+        packing and register reading are its ports, executed by network. It decides; storage only
+        writes what it decided.
+    - path: "app/src/main/java/com/kert0n/medapp/network/delivery/**"
+      instructions: >-
+        The courier returns a status in the errand's words and repeats only the same parcel
+        mechanically (dropped connection, pass renewal on 401) within one attempt. It never rebuilds
+        a parcel, never decides to retry later and never closes an errand — that is the queue's.
     - path: "app/src/main/java/com/kert0n/medapp/storage/**"
       instructions: >-
-        Room repositories live entirely in storage and are unknown to the domain. Flows expose
+        Storage keeps the queue's types in columns (storage/operation) but never interprets them:
+        no calls to queue functions (settlement, prepare, folds). Room repositories live entirely in
+        storage and are unknown to the domain. Flows expose
         projections built by the entity itself; suspend finds return entities only inside a
         transaction. Constraints belong to the schema, not to code. Decimal amounts are stored as
         strings with a derived sort key; CAST(... AS REAL) is forbidden. Corrupt stored values

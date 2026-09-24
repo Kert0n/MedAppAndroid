@@ -22,7 +22,9 @@ import com.kert0n.medapp.network.pack.PackageSnapshotNetworkDTO
 import com.kert0n.medapp.network.pack.PackageSyncNetworkDTO
 import com.kert0n.medapp.network.template.PackageTemplateNetworkDTO
 import com.kert0n.medapp.network.value.VocabularyEntryNetworkDTO
+import com.kert0n.medapp.queue.ResourceVersion
 import io.ktor.client.HttpClient
+import io.ktor.client.network.sockets.ConnectTimeoutException
 import io.ktor.client.request.HttpRequestBuilder
 import io.ktor.client.request.basicAuth
 import io.ktor.client.request.header
@@ -36,13 +38,12 @@ import io.ktor.http.HttpMethod
 import io.ktor.http.HttpStatusCode
 import io.ktor.http.contentType
 import io.ktor.http.isSuccess
-import io.ktor.client.network.sockets.ConnectTimeoutException
 import java.io.IOException
 import java.net.ConnectException
 import java.net.UnknownHostException
-import javax.net.ssl.SSLHandshakeException
 import javax.inject.Inject
 import javax.inject.Singleton
+import javax.net.ssl.SSLHandshakeException
 import kotlin.uuid.Uuid
 import kotlinx.serialization.KSerializer
 import kotlinx.serialization.builtins.ListSerializer

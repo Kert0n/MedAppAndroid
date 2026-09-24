@@ -31,27 +31,27 @@ import com.kert0n.medapp.domain.report.CourseInProgress
 import com.kert0n.medapp.domain.value.DosageForm
 import com.kert0n.medapp.domain.value.QuantityUnit
 import com.kert0n.medapp.domain.value.Vocabulary
-import com.kert0n.medapp.network.pack.PackageSnapshot
-import com.kert0n.medapp.network.pack.PackageSyncState
 import com.kert0n.medapp.network.server.RawResponse
 import com.kert0n.medapp.queue.QueueStorage
 import com.kert0n.medapp.queue.QueuedCommand
+import com.kert0n.medapp.queue.Receipt
 import com.kert0n.medapp.queue.Settlement
 import com.kert0n.medapp.queue.StoredSyncOperation
 import com.kert0n.medapp.queue.SyncCommand
 import com.kert0n.medapp.queue.SyncOperation
 import com.kert0n.medapp.queue.SyncOperationStatus
-import com.kert0n.medapp.queue.Take
 import com.kert0n.medapp.queue.Transactions
+import com.kert0n.medapp.queue.pack.PackageSnapshot
+import com.kert0n.medapp.queue.pack.PackageSyncState
 import com.kert0n.medapp.storage.course.CourseReallocation
 import com.kert0n.medapp.storage.course.CourseStorageRepository
 import com.kert0n.medapp.storage.medkit.MedKitStorageRepository
+import com.kert0n.medapp.storage.operation.OutstandingOperation
+import com.kert0n.medapp.storage.operation.SyncOperationStorageRepository
 import com.kert0n.medapp.storage.pack.PackageAdjustment
 import com.kert0n.medapp.storage.pack.PackageQuery
 import com.kert0n.medapp.storage.pack.PackageStorageRepository
 import com.kert0n.medapp.storage.pack.SnapshotApplied
-import com.kert0n.medapp.storage.server.OutstandingOperation
-import com.kert0n.medapp.storage.server.SyncOperationStorageRepository
 import com.kert0n.medapp.storage.value.VocabularyStorageRepository
 import java.time.Instant
 import java.time.LocalDate
@@ -241,7 +241,12 @@ class FakeMedKits(vararg kits: MedKit) : MedKitStorageRepository {
 
     override suspend fun applyServerParticipants(id: Uuid, participantCount: Long, syncedAt: Instant) = Unit
 
-    override suspend fun abandonServer(at: Instant): Int = 0
+    override suspend fun published(): List<Uuid> =
+        stored.values.filter { it.publication == MedKit.Publication.PUBLISHED }.map { it.id }
+
+    override suspend fun loseAccess(medKitId: Uuid, at: Instant) {
+        forget(medKitId)
+    }
 
     /** «Полку убрали, пока экран был открыт». */
     fun forget(id: Uuid): Boolean {
@@ -299,10 +304,13 @@ class FakeQueue : QueueStorage {
 
     override suspend fun nextDueAt(now: Instant): Instant? = null
 
-    override suspend fun take(id: Uuid, fresh: PackageSnapshot?, at: Instant): Take? =
-        error("путь доставки проверяется на очереди, а не на экране")
+    override suspend fun operation(id: Uuid): SyncOperation? = error("путь доставки проверяется на очереди, а не на экране")
+    override suspend fun knownPackage(id: Uuid): PackageSnapshot? = error("путь доставки проверяется на очереди, а не на экране")
+    override suspend fun layDown(snapshot: PackageSnapshot, at: Instant) = error("путь доставки проверяется на очереди, а не на экране")
+    override suspend fun write(operation: SyncOperation, was: SyncOperationStatus) = error("путь доставки проверяется на очереди, а не на экране")
+    override suspend fun unclosedOfMedKit(medKitId: Uuid): List<StoredSyncOperation> = error("путь доставки проверяется на очереди, а не на экране")
 
-    override suspend fun answered(id: Uuid, answer: RawResponse, at: Instant): Unit =
+    override suspend fun answered(id: Uuid, answer: Receipt, at: Instant): Unit =
         error("путь доставки проверяется на очереди, а не на экране")
 
     override suspend fun defer(id: Uuid, reason: String, at: Instant, notBefore: Instant): Unit =

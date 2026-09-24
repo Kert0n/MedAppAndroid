@@ -1,7 +1,7 @@
 package com.kert0n.medapp.feature.course
 
+import com.kert0n.medapp.feature.readThisTransaction
 import com.kert0n.medapp.queue.Transactions
-import com.kert0n.medapp.queue.readThisTransaction
 import com.kert0n.medapp.storage.course.CourseStorageRepository
 import javax.inject.Inject
 import kotlin.uuid.Uuid

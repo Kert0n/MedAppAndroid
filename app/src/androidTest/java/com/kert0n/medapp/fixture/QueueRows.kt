@@ -3,8 +3,8 @@ package com.kert0n.medapp.fixture
 import com.kert0n.medapp.queue.RefusalReason
 import com.kert0n.medapp.queue.Settlement
 import com.kert0n.medapp.queue.SyncOperationStatus
-import com.kert0n.medapp.storage.server.SyncOperationDao
-import com.kert0n.medapp.storage.server.toState
+import com.kert0n.medapp.storage.operation.SyncOperationDao
+import com.kert0n.medapp.storage.operation.toState
 import java.time.Instant
 import kotlin.uuid.Uuid
 

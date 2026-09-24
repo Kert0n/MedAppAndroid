@@ -17,11 +17,11 @@ import com.kert0n.medapp.fixture.medKit
 import com.kert0n.medapp.fixture.pack
 import com.kert0n.medapp.fixture.packageRepository
 import com.kert0n.medapp.fixture.settle
-import com.kert0n.medapp.network.pack.PackageSyncState
-import com.kert0n.medapp.network.server.ResourceVersion
 import com.kert0n.medapp.queue.RefusalReason
+import com.kert0n.medapp.queue.ResourceVersion
 import com.kert0n.medapp.queue.SyncOperationStatus
 import com.kert0n.medapp.queue.pack.PackageSyncCommand
+import com.kert0n.medapp.queue.pack.PackageSyncState
 import com.kert0n.medapp.storage.database.MedAppDatabase
 import com.kert0n.medapp.storage.medkit.toStorageEntity
 import com.kert0n.medapp.storage.value.toStorageEntity

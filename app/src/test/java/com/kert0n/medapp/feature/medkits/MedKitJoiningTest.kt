@@ -7,25 +7,30 @@ import com.kert0n.medapp.domain.medkit.MedKitRef
 import com.kert0n.medapp.domain.value.DosageForm
 import com.kert0n.medapp.domain.value.QuantityUnit
 import com.kert0n.medapp.domain.value.Vocabulary
+import com.kert0n.medapp.domain.value.VocabularyStore
 import com.kert0n.medapp.fixture.HOME_KIT
 import com.kert0n.medapp.fixture.SHARED_KIT
 import com.kert0n.medapp.fixture.TABLETS
 import com.kert0n.medapp.fixture.TABLET_FORM
 import com.kert0n.medapp.fixture.medKit
-import com.kert0n.medapp.network.pack.PackageSnapshot
+import com.kert0n.medapp.network.pack.PackageSnapshotResolver
+import com.kert0n.medapp.network.register.MedAppRegister
 import com.kert0n.medapp.network.server.MedAppApi
 import com.kert0n.medapp.network.server.RawResponse
 import com.kert0n.medapp.network.server.medAppHttpClient
 import com.kert0n.medapp.network.value.VocabularyResolver
-import com.kert0n.medapp.network.value.VocabularyStore
-import com.kert0n.medapp.queue.PackageSnapshotResolver
 import com.kert0n.medapp.queue.QueueStorage
 import com.kert0n.medapp.queue.QueuedCommand
+import com.kert0n.medapp.queue.Receipt
 import com.kert0n.medapp.queue.ServerKnowledge
 import com.kert0n.medapp.queue.ServerSnapshot
 import com.kert0n.medapp.queue.Settlement
 import com.kert0n.medapp.queue.SnapshotApplier
 import com.kert0n.medapp.queue.SnapshotStorage
+import com.kert0n.medapp.queue.StoredSyncOperation
+import com.kert0n.medapp.queue.SyncOperation
+import com.kert0n.medapp.queue.SyncOperationStatus
+import com.kert0n.medapp.queue.pack.PackageSnapshot
 import io.ktor.client.engine.mock.MockEngine
 import io.ktor.client.engine.mock.respond
 import io.ktor.http.HttpHeaders
@@ -66,8 +71,12 @@ class MedKitJoiningTest {
         override fun changes() = kotlinx.coroutines.flow.emptyFlow<Unit>()
         override suspend fun nextDueAt(now: Instant): Instant? = null
         override suspend fun ready(now: Instant) = error("не для этого теста")
-        override suspend fun take(id: Uuid, fresh: PackageSnapshot?, at: Instant) = error("не для этого теста")
-        override suspend fun answered(id: Uuid, answer: RawResponse, at: Instant) = error("не для этого теста")
+        override suspend fun operation(id: Uuid): SyncOperation? = error("не для этого теста")
+        override suspend fun knownPackage(id: Uuid): PackageSnapshot? = error("не для этого теста")
+        override suspend fun layDown(snapshot: PackageSnapshot, at: Instant) = error("не для этого теста")
+        override suspend fun write(operation: SyncOperation, was: SyncOperationStatus) = error("не для этого теста")
+        override suspend fun unclosedOfMedKit(medKitId: Uuid): List<StoredSyncOperation> = error("не для этого теста")
+        override suspend fun answered(id: Uuid, answer: Receipt, at: Instant) = error("не для этого теста")
         override suspend fun defer(id: Uuid, reason: String, at: Instant, notBefore: Instant) = error("не для этого теста")
         override suspend fun settle(id: Uuid, settlement: Settlement, at: Instant) = error("не для этого теста")
         override suspend fun enqueue(queued: QueuedCommand, shelf: Uuid, at: Instant) = error("не для этого теста")
@@ -99,7 +108,7 @@ class MedKitJoiningTest {
             )
         )
         val vocabulary = VocabularyResolver(Store(), api)
-        val applier = SnapshotApplier(api, storage, vocabulary, PackageSnapshotResolver(vocabulary, Shelves()), Clock.fixed(now, ZoneOffset.UTC))
+        val applier = SnapshotApplier(MedAppRegister(api, PackageSnapshotResolver(vocabulary, Shelves()), Clock.fixed(now, ZoneOffset.UTC)), storage, Clock.fixed(now, ZoneOffset.UTC))
         return MedKitJoining(applier)
     }
 

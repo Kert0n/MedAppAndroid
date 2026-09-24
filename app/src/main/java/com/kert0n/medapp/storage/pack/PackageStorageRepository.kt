@@ -1,16 +1,16 @@
 package com.kert0n.medapp.storage.pack
 
 import androidx.annotation.CheckResult
-import com.kert0n.medapp.domain.pack.Claims
 import com.kert0n.medapp.domain.course.Course
 import com.kert0n.medapp.domain.pack.Availability
+import com.kert0n.medapp.domain.pack.Claims
 import com.kert0n.medapp.domain.pack.Package
 import com.kert0n.medapp.domain.pack.PackageEnding
-import com.kert0n.medapp.domain.pack.PackageProjection
 import com.kert0n.medapp.domain.pack.PackageFacts
+import com.kert0n.medapp.domain.pack.PackageProjection
 import com.kert0n.medapp.domain.pack.PackageStatus
-import com.kert0n.medapp.network.pack.PackageSnapshot
-import com.kert0n.medapp.network.pack.PackageSyncState
+import com.kert0n.medapp.queue.pack.PackageSnapshot
+import com.kert0n.medapp.queue.pack.PackageSyncState
 import com.kert0n.medapp.storage.course.CourseReallocation
 import java.time.Instant
 import java.time.LocalDate

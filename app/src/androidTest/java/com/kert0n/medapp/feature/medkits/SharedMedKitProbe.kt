@@ -1,30 +1,29 @@
 package com.kert0n.medapp.feature.medkits
 
-import kotlinx.coroutines.flow.first
-import com.kert0n.medapp.feature.course.SourceEditing
-import com.kert0n.medapp.fixture.confirmed
+import com.kert0n.medapp.domain.intake.CourseIntake
 import com.kert0n.medapp.domain.medkit.InvitationKey
 import com.kert0n.medapp.domain.medkit.MedKit
 import com.kert0n.medapp.domain.pack.PackageStatus
-import com.kert0n.medapp.domain.intake.CourseIntake
 import com.kert0n.medapp.domain.value.DosageForm
 import com.kert0n.medapp.domain.value.Dose
 import com.kert0n.medapp.domain.value.Doses
-import com.kert0n.medapp.feature.course.CourseActivation
-import com.kert0n.medapp.feature.course.CourseCalendar
-import com.kert0n.medapp.feature.course.CourseDrafting
 import com.kert0n.medapp.domain.value.Quantity
 import com.kert0n.medapp.domain.value.QuantityUnit
+import com.kert0n.medapp.feature.course.CourseActivation
+import com.kert0n.medapp.feature.course.CourseCalendar
 import com.kert0n.medapp.feature.course.CourseClosing
+import com.kert0n.medapp.feature.course.CourseDrafting
+import com.kert0n.medapp.feature.course.SourceEditing
 import com.kert0n.medapp.feature.intake.IntakeConfirmation
 import com.kert0n.medapp.feature.intake.UnplannedIntakeRecording
-import java.time.Instant
-import com.kert0n.medapp.fixture.MOSCOW
-import com.kert0n.medapp.fixture.schedule
-import com.kert0n.medapp.fixture.ProbeAccounts
+import com.kert0n.medapp.feature.packages.PackageRelocation
+import com.kert0n.medapp.feature.packages.PackageRemoval
 import com.kert0n.medapp.fixture.FakeNotifier
 import com.kert0n.medapp.fixture.FakeReminders
+import com.kert0n.medapp.fixture.MOSCOW
+import com.kert0n.medapp.fixture.ProbeAccounts
 import com.kert0n.medapp.fixture.Scenarios
+import com.kert0n.medapp.fixture.confirmed
 import com.kert0n.medapp.fixture.courseRepository
 import com.kert0n.medapp.fixture.inMemoryDatabase
 import com.kert0n.medapp.fixture.intakeRepository
@@ -34,33 +33,38 @@ import com.kert0n.medapp.fixture.pack
 import com.kert0n.medapp.fixture.packageRepository
 import com.kert0n.medapp.fixture.queueService
 import com.kert0n.medapp.fixture.queueStorage
+import com.kert0n.medapp.fixture.schedule
 import com.kert0n.medapp.fixture.snapshotStorage
 import com.kert0n.medapp.fixture.transactions
+import com.kert0n.medapp.network.delivery.MedAppCourier
+import com.kert0n.medapp.network.delivery.MedAppDoor
+import com.kert0n.medapp.network.delivery.MedAppPacking
 import com.kert0n.medapp.network.medkit.MembershipPostNetworkDTO
 import com.kert0n.medapp.network.medkit.ServerMedKitInvitations
+import com.kert0n.medapp.network.pack.PackageSnapshotResolver
+import com.kert0n.medapp.network.register.MedAppRegister
 import com.kert0n.medapp.network.server.ApiFailure
 import com.kert0n.medapp.network.server.ApiResult
 import com.kert0n.medapp.network.server.MedAppApi
 import com.kert0n.medapp.network.value.VocabularyResolver
 import com.kert0n.medapp.network.value.toDosageForm
 import com.kert0n.medapp.network.value.toQuantityUnit
-import com.kert0n.medapp.queue.PackageSnapshotResolver
-import com.kert0n.medapp.queue.QueueHttpTransport
 import com.kert0n.medapp.queue.QueueWorker
 import com.kert0n.medapp.queue.SnapshotApplier
 import com.kert0n.medapp.queue.StoredSyncOperation
 import com.kert0n.medapp.queue.SyncCommand
 import com.kert0n.medapp.queue.SyncOperationStatus
 import com.kert0n.medapp.queue.intake.IntakeAccounting
-import com.kert0n.medapp.feature.packages.PackageRelocation
-import com.kert0n.medapp.feature.packages.PackageRemoval
+import com.kert0n.medapp.storage.database.RoomTransactions
 import com.kert0n.medapp.storage.medkit.toStorageEntity as toMedKitStorageEntity
 import com.kert0n.medapp.storage.value.VocabularyRoomRepository
 import java.math.BigDecimal
 import java.time.Clock
 import java.time.Duration
+import java.time.Instant
 import java.time.LocalDate
 import kotlin.uuid.Uuid
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.runBlocking
 import org.junit.After
 import org.junit.Assert.assertEquals
@@ -603,9 +607,9 @@ class SharedMedKitProbe {
         private val transactions = database.transactions()
         val vocabulary = VocabularyResolver(VocabularyRoomRepository(database.vocabulary()), api)
         private val snapshots = PackageSnapshotResolver(vocabulary, database.queueStorage())
-        private val reading = SnapshotApplier(api, database.snapshotStorage(), vocabulary, snapshots, clock)
+        private val reading = SnapshotApplier(MedAppRegister(api, snapshots, clock), database.snapshotStorage(), clock)
         private val joining = MedKitJoining(reading)
-        private val worker = QueueWorker(database.queueStorage(), QueueHttpTransport(api), vocabulary, snapshots, clock)
+        private val worker = QueueWorker(database.queueStorage(), MedAppCourier(MedAppDoor(api), vocabulary, snapshots, clock), MedAppPacking(), RoomTransactions(database), clock)
         val packages = database.packageRepository()
         private val courses = database.courseRepository()
         private val queue = database.queueService()

@@ -59,10 +59,10 @@ class WireContractTest {
         assertEquals("100.000000", read.pack.amount)
         assertEquals(Uuid.parse(unit), read.pack.unitId)
         assertEquals(Uuid.parse(form), read.pack.formId)
-        assertEquals(ResourceVersion(3), read.pack.version)
+        assertEquals(ResourceVersionNetworkDTO(3), read.pack.version)
         assertEquals("40.000000", read.claims.total)
         assertEquals("20.000000", read.claims.mine)
-        assertEquals(ResourceVersion(5), read.claims.version)
+        assertEquals(ResourceVersionNetworkDTO(5), read.claims.version)
     }
 
     @Test
@@ -166,19 +166,19 @@ class WireContractTest {
         val dto = PackagePatchNetworkDTO(
             name = "Аспирин C",
             description = "",
-            version = ResourceVersion(3)
+            version = ResourceVersionNetworkDTO(3)
         )
 
         assertEquals(
             json("""{"name":"Аспирин C","description":"","version":3}"""),
             written(PackagePatchNetworkDTO.serializer(), dto)
         )
-        assertTrue(PackagePatchNetworkDTO(version = ResourceVersion(3)).isEmpty)
+        assertTrue(PackagePatchNetworkDTO(version = ResourceVersionNetworkDTO(3)).isEmpty)
     }
 
     @Test
     fun syncWithoutClaimChangeLeavesTheReservationOut() {
-        val dto = PackageSyncNetworkDTO(consumed = "2", packageVersion = ResourceVersion(3))
+        val dto = PackageSyncNetworkDTO(consumed = "2", packageVersion = ResourceVersionNetworkDTO(3))
 
         assertEquals(
             json("""{"consumed":"2","drugVersion":3}"""),
@@ -195,7 +195,7 @@ class WireContractTest {
 
     @Test
     fun claimCommandsNameThePackageTheWayTheServerDoes() {
-        val dto = ClaimPostNetworkDTO(Uuid.parse(pack), "20", ResourceVersion(5))
+        val dto = ClaimPostNetworkDTO(Uuid.parse(pack), "20", ResourceVersionNetworkDTO(5))
 
         assertEquals(
             json("""{"drugId":"$pack","amount":"20","version":5}"""),

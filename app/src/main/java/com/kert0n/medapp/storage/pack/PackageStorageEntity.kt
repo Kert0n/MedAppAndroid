@@ -9,8 +9,8 @@ import com.kert0n.medapp.domain.pack.Package
 import com.kert0n.medapp.domain.pack.PackageSharedFacts
 import com.kert0n.medapp.domain.pack.PackageStatus
 import com.kert0n.medapp.domain.value.Vocabulary
-import com.kert0n.medapp.network.pack.PackageSyncState
-import com.kert0n.medapp.network.server.ResourceVersion
+import com.kert0n.medapp.queue.ResourceVersion
+import com.kert0n.medapp.queue.pack.PackageSyncState
 import com.kert0n.medapp.storage.medkit.MedKitStorageEntity
 import com.kert0n.medapp.storage.value.DosageFormStorageEntity
 import com.kert0n.medapp.storage.value.QuantityUnitStorageEntity

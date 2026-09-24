@@ -7,18 +7,19 @@ import com.kert0n.medapp.domain.value.Quantity
 import com.kert0n.medapp.fixture.HOME_KIT
 import com.kert0n.medapp.fixture.OTHER_PACK
 import com.kert0n.medapp.fixture.PACK
+import com.kert0n.medapp.fixture.VOCABULARY
 import com.kert0n.medapp.fixture.dose
 import com.kert0n.medapp.fixture.expiry
 import com.kert0n.medapp.fixture.fileDatabase
 import com.kert0n.medapp.fixture.inMemoryDatabase
-import com.kert0n.medapp.fixture.save
 import com.kert0n.medapp.fixture.left
 import com.kert0n.medapp.fixture.medKit
 import com.kert0n.medapp.fixture.pack
 import com.kert0n.medapp.fixture.reopenFileDatabase
+import com.kert0n.medapp.fixture.save
 import com.kert0n.medapp.fixture.tablets
-import com.kert0n.medapp.network.pack.PackageSyncState
-import com.kert0n.medapp.network.server.ResourceVersion
+import com.kert0n.medapp.queue.ResourceVersion
+import com.kert0n.medapp.queue.pack.PackageSyncState
 import com.kert0n.medapp.storage.database.MedAppDatabase
 import com.kert0n.medapp.storage.medkit.toStorageEntity as toMedKitStorageEntity
 import java.math.BigDecimal
@@ -31,7 +32,6 @@ import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNull
 import org.junit.Before
 import org.junit.Test
-import com.kert0n.medapp.fixture.VOCABULARY
 
 /**
  * Локальные сведения об упаковке переживают снимок сервера: серверная часть переписывается

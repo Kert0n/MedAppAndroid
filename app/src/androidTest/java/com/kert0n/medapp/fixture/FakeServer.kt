@@ -1,14 +1,18 @@
 package com.kert0n.medapp.fixture
 
+import com.kert0n.medapp.network.delivery.MedAppCourier
+import com.kert0n.medapp.network.delivery.MedAppDoor
+import com.kert0n.medapp.network.delivery.MedAppPacking
+import com.kert0n.medapp.network.pack.PackageSnapshotResolver
+import com.kert0n.medapp.network.register.MedAppRegister
 import com.kert0n.medapp.network.server.MedAppApi
 import com.kert0n.medapp.network.server.medAppHttpClient
 import com.kert0n.medapp.network.value.VocabularyResolver
-import com.kert0n.medapp.queue.PackageSnapshotResolver
-import com.kert0n.medapp.queue.QueueHttpTransport
 import com.kert0n.medapp.queue.SnapshotApplier
 import com.kert0n.medapp.queue.Synchronization
 import com.kert0n.medapp.storage.database.MedAppDatabase
-import com.kert0n.medapp.storage.server.QueueBacklogRoomStorage
+import com.kert0n.medapp.storage.database.RoomTransactions
+import com.kert0n.medapp.storage.operation.QueueBacklogRoomStorage
 import com.kert0n.medapp.storage.value.VocabularyRoomRepository
 import io.ktor.client.engine.mock.MockEngine
 import io.ktor.client.engine.mock.respond
@@ -162,8 +166,8 @@ class FakeServer {
         val vocabulary = VocabularyResolver(VocabularyRoomRepository(database.vocabulary()), api)
         val resolver = PackageSnapshotResolver(vocabulary, database.queueStorage())
         return Synchronization(
-            com.kert0n.medapp.queue.QueueWorker(database.queueStorage(), QueueHttpTransport(api), vocabulary, resolver, clock),
-            SnapshotApplier(api, database.snapshotStorage(), vocabulary, resolver, clock),
+            com.kert0n.medapp.queue.QueueWorker(database.queueStorage(), MedAppCourier(MedAppDoor(api), vocabulary, resolver, clock), MedAppPacking(), RoomTransactions(database), clock),
+            SnapshotApplier(MedAppRegister(api, resolver, clock), database.snapshotStorage(), clock),
             QueueBacklogRoomStorage(database.syncOperations()),
             schedule,
             clock,

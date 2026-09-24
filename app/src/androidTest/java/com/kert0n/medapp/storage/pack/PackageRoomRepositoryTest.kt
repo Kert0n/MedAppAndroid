@@ -1,8 +1,9 @@
 package com.kert0n.medapp.storage.pack
 
+import com.kert0n.medapp.domain.medkit.MedKit
 import com.kert0n.medapp.domain.pack.Claims
+import com.kert0n.medapp.domain.value.Money
 import com.kert0n.medapp.fixture.COURSE
-import com.kert0n.medapp.fixture.settle
 import com.kert0n.medapp.fixture.HOME_KIT
 import com.kert0n.medapp.fixture.INTAKE
 import com.kert0n.medapp.fixture.OTHER_INTAKE
@@ -10,29 +11,28 @@ import com.kert0n.medapp.fixture.OTHER_PACK
 import com.kert0n.medapp.fixture.PACK
 import com.kert0n.medapp.fixture.activeCourse
 import com.kert0n.medapp.fixture.dose
-import com.kert0n.medapp.domain.medkit.MedKit
 import com.kert0n.medapp.fixture.inMemoryDatabase
-import com.kert0n.medapp.domain.value.Money
+import com.kert0n.medapp.fixture.left
 import com.kert0n.medapp.fixture.medKit
 import com.kert0n.medapp.fixture.millilitres
-import com.kert0n.medapp.fixture.left
 import com.kert0n.medapp.fixture.pack
-import com.kert0n.medapp.fixture.projected
 import com.kert0n.medapp.fixture.packageRepository
+import com.kert0n.medapp.fixture.projected
 import com.kert0n.medapp.fixture.queueRepository
+import com.kert0n.medapp.fixture.settle
 import com.kert0n.medapp.fixture.source
 import com.kert0n.medapp.fixture.tablets
-import com.kert0n.medapp.queue.pack.PackageSyncCommand
-import com.kert0n.medapp.network.pack.PackageSnapshot
-import com.kert0n.medapp.network.pack.PackageSyncState
-import com.kert0n.medapp.network.server.ResourceVersion
+import com.kert0n.medapp.queue.ResourceVersion
 import com.kert0n.medapp.queue.SyncOperationStatus
+import com.kert0n.medapp.queue.pack.PackageSnapshot
+import com.kert0n.medapp.queue.pack.PackageSyncCommand
+import com.kert0n.medapp.queue.pack.PackageSyncState
 import com.kert0n.medapp.storage.course.ActivePackageAssignmentStorageEntity
 import com.kert0n.medapp.storage.course.toSourceStorageEntities
 import com.kert0n.medapp.storage.course.toStorageEntity as toCourseStorageEntity
 import com.kert0n.medapp.storage.database.MedAppDatabase
 import com.kert0n.medapp.storage.medkit.toStorageEntity as toMedKitStorageEntity
-import com.kert0n.medapp.storage.server.SyncOperationRoomRepository
+import com.kert0n.medapp.storage.operation.SyncOperationRoomRepository
 import java.math.BigDecimal
 import java.time.Instant
 import java.time.LocalDate

@@ -3,7 +3,9 @@ package com.kert0n.medapp.network.pack
 import com.kert0n.medapp.domain.pack.Package
 import com.kert0n.medapp.domain.pack.PackageFacts
 import com.kert0n.medapp.domain.pack.PackageSharedFacts
-import com.kert0n.medapp.network.server.ResourceVersion
+import com.kert0n.medapp.network.server.toNetworkDTO
+import com.kert0n.medapp.queue.ResourceVersion
+import com.kert0n.medapp.queue.pack.PackageSyncState
 
 /**
  * Сравнивает сохранённую доменную форму с тем, что известно о пачке, и оставляет только
@@ -49,7 +51,7 @@ fun PackageSharedFacts.toPatchNetworkDTO(
     manufacturer = clearableText(known.manufacturer, manufacturer),
     country = clearableText(known.country, country),
     description = clearableText(known.description, description),
-    version = version
+    version = version?.toNetworkDTO()
 )
 
 /**

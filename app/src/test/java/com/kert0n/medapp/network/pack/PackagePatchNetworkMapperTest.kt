@@ -1,17 +1,16 @@
 package com.kert0n.medapp.network.pack
 
-import com.kert0n.medapp.network.server.ResourceVersion
 import com.kert0n.medapp.domain.value.Money
-
 import com.kert0n.medapp.fixture.CAPSULE_FORM
 import com.kert0n.medapp.fixture.CAPSULE_FORM_ID
 import com.kert0n.medapp.fixture.PACK
 import com.kert0n.medapp.fixture.TABLET_FORM
-import com.kert0n.medapp.fixture.factsOf
 import com.kert0n.medapp.fixture.expiry
-import com.kert0n.medapp.fixture.withShared
+import com.kert0n.medapp.fixture.factsOf
 import com.kert0n.medapp.fixture.pack
-
+import com.kert0n.medapp.fixture.withShared
+import com.kert0n.medapp.queue.ResourceVersion
+import com.kert0n.medapp.queue.pack.PackageSyncState
 import java.math.BigDecimal
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse

@@ -5,17 +5,18 @@ import com.kert0n.medapp.domain.medkit.InvitationKey
 import com.kert0n.medapp.domain.scan.CodeFormat
 import com.kert0n.medapp.domain.scan.ScannedCode
 import com.kert0n.medapp.feature.medkits.MedKitJoining
+import com.kert0n.medapp.fixture.FakeQueue
+import com.kert0n.medapp.fixture.FakeVocabulary
 import com.kert0n.medapp.fixture.MainDispatcherRule
 import com.kert0n.medapp.fixture.SHARED_KIT
 import com.kert0n.medapp.fixture.awaiting
 import com.kert0n.medapp.fixture.watching
-import com.kert0n.medapp.presentation.ParsedInput
-import com.kert0n.medapp.fixture.FakeQueue
-import com.kert0n.medapp.fixture.FakeVocabulary
+import com.kert0n.medapp.network.pack.PackageSnapshotResolver
+import com.kert0n.medapp.network.register.MedAppRegister
 import com.kert0n.medapp.network.server.MedAppApi
 import com.kert0n.medapp.network.server.medAppHttpClient
 import com.kert0n.medapp.network.value.VocabularyResolver
-import com.kert0n.medapp.queue.PackageSnapshotResolver
+import com.kert0n.medapp.presentation.ParsedInput
 import com.kert0n.medapp.queue.ServerKnowledge
 import com.kert0n.medapp.queue.ServerSnapshot
 import com.kert0n.medapp.queue.SnapshotApplier
@@ -74,7 +75,7 @@ class MedKitJoiningViewModelTest {
             )
             val vocabulary = VocabularyResolver(FakeVocabulary(), api)
             MedKitJoining(
-                SnapshotApplier(api, Laid(), vocabulary, PackageSnapshotResolver(vocabulary, FakeQueue()), clock)
+                SnapshotApplier(MedAppRegister(api, PackageSnapshotResolver(vocabulary, FakeQueue()), clock), Laid(), clock)
             )
         }
     }

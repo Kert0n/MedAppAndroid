@@ -24,9 +24,9 @@ import com.kert0n.medapp.storage.pack.PackageRecordStorageEntity
 import com.kert0n.medapp.storage.pack.PackageStorageEntity
 import com.kert0n.medapp.storage.notification.ReminderDao
 import com.kert0n.medapp.storage.notification.ReminderStorageEntity
-import com.kert0n.medapp.storage.server.SyncOperationDao
-import com.kert0n.medapp.storage.server.SyncOperationDependencyStorageEntity
-import com.kert0n.medapp.storage.server.SyncOperationStorageEntity
+import com.kert0n.medapp.storage.operation.SyncOperationDao
+import com.kert0n.medapp.storage.operation.SyncOperationDependencyStorageEntity
+import com.kert0n.medapp.storage.operation.SyncOperationStorageEntity
 import com.kert0n.medapp.storage.template.PackageTemplateDao
 import com.kert0n.medapp.storage.template.PackageTemplateStorageEntity
 import com.kert0n.medapp.storage.value.DosageFormStorageEntity

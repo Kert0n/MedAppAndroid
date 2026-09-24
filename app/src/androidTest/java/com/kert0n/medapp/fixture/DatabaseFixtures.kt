@@ -82,10 +82,17 @@ fun MedAppDatabase.intakeRepository() = com.kert0n.medapp.storage.intake.IntakeR
 )
 
 fun MedAppDatabase.medKitRepository() = com.kert0n.medapp.storage.medkit.MedKitRoomRepository(
-    this, medKits(), packages(), courses(), syncOperations(), queueStorage(), vocabulary(), javax.inject.Provider { courseFollowing() }
+    this, medKits(), packages(), courses(), vocabulary(), javax.inject.Provider { courseFollowing() }
 )
 
-fun MedAppDatabase.queueRepository() = com.kert0n.medapp.storage.server.SyncOperationRoomRepository(
+/** Взятие в отправку над настоящей базой — той же транзакцией Room, что у работника. */
+fun MedAppDatabase.taking() = com.kert0n.medapp.queue.Taking(queueStorage(), transactions(), com.kert0n.medapp.network.delivery.MedAppPacking())
+
+/** Уход с серверных полок, когда учётку заменили, — над настоящей базой. */
+fun MedAppDatabase.abandonment() =
+    com.kert0n.medapp.feature.account.ServerAbandonment(medKitRepository(), queueStorage(), transactions())
+
+fun MedAppDatabase.queueRepository() = com.kert0n.medapp.storage.operation.SyncOperationRoomRepository(
     this, syncOperations(), vocabulary()
 )
 
@@ -98,13 +105,13 @@ fun MedAppDatabase.reportRepository() = com.kert0n.medapp.storage.report.ReportR
 fun MedAppDatabase.transactions() = com.kert0n.medapp.storage.database.RoomTransactions(this)
 
 /** Порт очереди для работника — транзакции взятия и применения исхода. */
-fun MedAppDatabase.queueStorage() = com.kert0n.medapp.storage.server.QueueRoomStorage(
+fun MedAppDatabase.queueStorage() = com.kert0n.medapp.storage.operation.QueueRoomStorage(
     this, syncOperations(), packages(), intakes(), medKits(), courses(), vocabulary(),
     javax.inject.Provider { courseFollowing() }
 )
 
 /** Порт полного снимка — укладка целиком одной транзакцией; полка с сервера зовётся как в ресурсах. */
-fun MedAppDatabase.snapshotStorage() = com.kert0n.medapp.storage.server.SnapshotRoomStorage(
+fun MedAppDatabase.snapshotStorage() = com.kert0n.medapp.storage.snapshot.SnapshotRoomStorage(
     this, medKits(), packages(), courses(), intakes(), vocabulary(), syncOperations(),
     arrivedName = "Общая аптечка",
     following = javax.inject.Provider { courseFollowing() }
@@ -130,7 +137,7 @@ fun MedAppDatabase.courseFollowing(): com.kert0n.medapp.feature.course.CourseFol
  */
 suspend fun com.kert0n.medapp.storage.pack.PackageDao.save(
     pkg: com.kert0n.medapp.domain.pack.Package,
-    sync: com.kert0n.medapp.network.pack.PackageSyncState = com.kert0n.medapp.network.pack.PackageSyncState(pkg.id)
+    sync: com.kert0n.medapp.queue.pack.PackageSyncState = com.kert0n.medapp.queue.pack.PackageSyncState(pkg.id)
 ) = save(
     pkg.record.toRecordStorageEntity(),
     pkg.toPackageStorageEntity(sync),

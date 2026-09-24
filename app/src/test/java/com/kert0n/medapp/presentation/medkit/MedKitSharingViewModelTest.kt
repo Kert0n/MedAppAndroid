@@ -14,6 +14,7 @@ import com.kert0n.medapp.fixture.FakeCourses
 import com.kert0n.medapp.fixture.FakeMedKits
 import com.kert0n.medapp.fixture.FakePackages
 import com.kert0n.medapp.fixture.FakeQueue
+import com.kert0n.medapp.fixture.FakeVocabulary
 import com.kert0n.medapp.fixture.HOME_KIT
 import com.kert0n.medapp.fixture.HeldTransactions
 import com.kert0n.medapp.fixture.MainDispatcherRule
@@ -23,17 +24,17 @@ import com.kert0n.medapp.fixture.awaiting
 import com.kert0n.medapp.fixture.medKit
 import com.kert0n.medapp.fixture.pack
 import com.kert0n.medapp.fixture.watching
+import com.kert0n.medapp.network.pack.PackageSnapshotResolver
+import com.kert0n.medapp.network.register.MedAppRegister
 import com.kert0n.medapp.network.server.MedAppApi
 import com.kert0n.medapp.network.server.medAppHttpClient
 import com.kert0n.medapp.network.value.VocabularyResolver
-import com.kert0n.medapp.queue.PackageSnapshotResolver
 import com.kert0n.medapp.queue.QueueService
+import com.kert0n.medapp.queue.ServerKnowledge
 import com.kert0n.medapp.queue.ServerSnapshot
 import com.kert0n.medapp.queue.SnapshotApplier
 import com.kert0n.medapp.queue.SnapshotStorage
-import com.kert0n.medapp.queue.ServerKnowledge
 import com.kert0n.medapp.queue.Transactions
-import com.kert0n.medapp.fixture.FakeVocabulary
 import io.ktor.client.engine.mock.MockEngine
 import java.time.Clock
 import java.time.Duration
@@ -106,7 +107,7 @@ class MedKitSharingViewModelTest {
     private fun snapshots(): SnapshotApplier {
         val api = MedAppApi(medAppHttpClient(MockEngine { error("снимок этой проверке не нужен") }, "https://medapp.test"))
         val vocabulary = VocabularyResolver(FakeVocabulary(), api)
-        return SnapshotApplier(api, Untouched, vocabulary, PackageSnapshotResolver(vocabulary, FakeQueue()), clock)
+        return SnapshotApplier(MedAppRegister(api, PackageSnapshotResolver(vocabulary, FakeQueue()), clock), Untouched, clock)
     }
 
     private object Untouched : SnapshotStorage {

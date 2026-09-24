@@ -4,6 +4,7 @@ import androidx.room.Room
 import androidx.test.platform.app.InstrumentationRegistry
 import com.kert0n.medapp.domain.value.DosageForm
 import com.kert0n.medapp.domain.value.QuantityUnit
+import com.kert0n.medapp.network.value.bundledVocabulary
 import com.kert0n.medapp.storage.database.BundledVocabulary
 import com.kert0n.medapp.storage.database.MedAppDatabase
 import kotlin.uuid.Uuid
@@ -37,7 +38,7 @@ class VocabularyDaoTest {
     fun openDatabase() {
         val context = InstrumentationRegistry.getInstrumentation().targetContext
         database = Room.inMemoryDatabaseBuilder(context, MedAppDatabase::class.java)
-            .addCallback(BundledVocabulary { snapshot })
+            .addCallback(BundledVocabulary { bundledVocabulary(snapshot) })
             .build()
         repository = VocabularyRoomRepository(database.vocabulary())
     }

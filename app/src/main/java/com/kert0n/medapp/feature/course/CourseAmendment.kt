@@ -1,7 +1,7 @@
 package com.kert0n.medapp.feature.course
 
-import com.kert0n.medapp.domain.course.CourseProgress
 import com.kert0n.medapp.domain.course.CourseCompletion
+import com.kert0n.medapp.domain.course.CourseProgress
 import com.kert0n.medapp.domain.course.CourseProjection
 import com.kert0n.medapp.domain.course.CourseRecord
 import com.kert0n.medapp.domain.course.CourseRejected
@@ -11,8 +11,8 @@ import com.kert0n.medapp.domain.intake.CourseIntake
 import com.kert0n.medapp.domain.value.DosageForm
 import com.kert0n.medapp.domain.value.Dose
 import com.kert0n.medapp.domain.value.Doses
+import com.kert0n.medapp.feature.readThisTransaction
 import com.kert0n.medapp.queue.Transactions
-import com.kert0n.medapp.queue.readThisTransaction
 import com.kert0n.medapp.storage.course.CourseStorageRepository
 import com.kert0n.medapp.storage.intake.IntakeStorageRepository
 import com.kert0n.medapp.storage.pack.PackageStorageRepository

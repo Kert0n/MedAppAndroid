@@ -20,7 +20,7 @@ import com.kert0n.medapp.storage.database.chunkedForQuery
 import com.kert0n.medapp.storage.intake.IntakeDao
 import com.kert0n.medapp.storage.pack.PackageDao
 import com.kert0n.medapp.storage.pack.projectionsOf
-import com.kert0n.medapp.storage.server.SyncOperationDao
+import com.kert0n.medapp.storage.operation.SyncOperationDao
 import java.time.Instant
 import kotlin.uuid.Uuid
 import kotlinx.coroutines.flow.Flow

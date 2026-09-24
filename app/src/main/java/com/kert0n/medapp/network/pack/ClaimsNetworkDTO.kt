@@ -1,6 +1,6 @@
 package com.kert0n.medapp.network.pack
 
-import com.kert0n.medapp.network.server.ResourceVersion
+import com.kert0n.medapp.network.server.ResourceVersionNetworkDTO
 import kotlinx.serialization.Serializable
 
 /**
@@ -11,7 +11,7 @@ import kotlinx.serialization.Serializable
 data class ClaimsNetworkDTO(
     val total: String,
     val mine: String? = null,
-    val version: ResourceVersion
+    val version: ResourceVersionNetworkDTO
 ) {
     init {
         requireNetworkAmount(total, "ClaimsNetworkDTO.total")

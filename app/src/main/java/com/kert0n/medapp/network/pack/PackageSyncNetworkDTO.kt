@@ -1,6 +1,6 @@
 package com.kert0n.medapp.network.pack
 
-import com.kert0n.medapp.network.server.ResourceVersion
+import com.kert0n.medapp.network.server.ResourceVersionNetworkDTO
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
 
@@ -13,7 +13,7 @@ import kotlinx.serialization.Serializable
 @Serializable
 data class PackageSyncNetworkDTO(
     val consumed: String? = null,
-    @SerialName("drugVersion") val packageVersion: ResourceVersion? = null,
+    @SerialName("drugVersion") val packageVersion: ResourceVersionNetworkDTO? = null,
     @SerialName("reservation") val claim: Claim? = null
 ) {
     init {
@@ -27,7 +27,7 @@ data class PackageSyncNetworkDTO(
     @Serializable
     data class Claim(
         val amount: String,
-        val version: ResourceVersion? = null
+        val version: ResourceVersionNetworkDTO? = null
     ) {
         init {
             requirePositiveNetworkAmount(amount, "PackageSyncNetworkDTO.Claim.amount")

@@ -1,12 +1,7 @@
 package com.kert0n.medapp.queue
 
-import com.kert0n.medapp.network.pack.PackageSnapshot
-import com.kert0n.medapp.network.pack.PackageSnapshotNetworkDTO
-import com.kert0n.medapp.network.server.ApiFailure
-import com.kert0n.medapp.network.server.ApiResult
-import com.kert0n.medapp.network.server.RawResponse
-import com.kert0n.medapp.network.value.VocabularyResolver
 import com.kert0n.medapp.queue.medkit.MedKitSyncCommand
+import com.kert0n.medapp.queue.pack.PackageSnapshot
 import com.kert0n.medapp.queue.pack.PackageSyncCommand
 import java.time.Clock
 import java.time.Instant
@@ -29,10 +24,10 @@ import kotlinx.coroutines.sync.withLock
  * готовятся по ответу предыдущей — он уже лёг в базу. Запрос, замороженный раньше, — повтор с
  * неизвестным исходом либо отправка, пережившая смерть процесса, — уходит как есть.
  *
- * Полученный ответ записывается до того, как применён: если применить его нечем — словарь не
+ * Полученная квитанция записывается до того, как применена: если применить её нечем — словарь не
  * знает единицы, аптечка снимка неизвестна, снимок следом не прочитался, — операция ждёт с
- * ответом в руках и закрывается из него, не спрашивая сервер второй раз. Что снимок называет,
- * разрешает [PackageSnapshotResolver] одним исходом; хранение получает уже разрешённый снимок.
+ * квитанцией в руках и закрывается из неё, не спрашивая сервер второй раз. Везёт и читает
+ * [Courier]: он же собирает снимок в домен, и хранение получает уже собранный снимок.
  *
  * Один проход — [drain]: пока есть связь, по одной операции в порядке очереди. Обрыв оставляет
  * операцию на повтор тем же запросом и останавливает проход; ограничение частоты соблюдает
@@ -46,9 +41,9 @@ import kotlinx.coroutines.sync.withLock
 @Singleton
 class QueueWorker @Inject constructor(
     private val storage: QueueStorage,
-    private val transport: QueueTransport,
-    private val vocabulary: VocabularyResolver,
-    private val snapshots: PackageSnapshotResolver,
+    private val courier: Courier,
+    private val packing: Packing,
+    private val transactions: Transactions,
     private val clock: Clock
 ) {
 
@@ -58,11 +53,14 @@ class QueueWorker @Inject constructor(
      */
     private val single = Mutex()
 
+    /** Взятие в отправку — своей транзакцией, по свежему состоянию. */
+    private val taking = Taking(storage, transactions, packing)
+
     /**
-     * Заход разбора текущего прохода: промах словаря дочитывается один раз на проход, а не на
-     * каждую операцию. Проход один — [single], — поэтому и заход у него один.
+     * Поездка курьера текущего прохода: промах словаря дочитывается один раз на проход, а не на
+     * каждую операцию. Проход один — [single], — поэтому и поездка у него одна.
      */
-    private var words: VocabularyResolver.Session = vocabulary.session()
+    private var trip: Courier.Pass = courier.pass()
 
     /**
      * Проход: пока в базе есть готовая операция — берётся первая по номеру, и так до тех пор,
@@ -75,17 +73,17 @@ class QueueWorker @Inject constructor(
      */
     suspend fun drain(): Report = single.withLock {
         val drain = Drain()
-        words = vocabulary.session()
+        trip = courier.pass()
         while (true) {
             val entry = storage.ready(clock.instant()).firstOrNull { it.id !in drain.skippedIds } ?: break
             val operation = when (entry) {
                 is StoredSyncOperation.Readable -> entry.operation
                 // Словаря не хватило: дочитывается один раз за проход, и строка читается снова.
                 is StoredSyncOperation.Stale -> {
-                    if (words.refreshOnce()) continue
+                    if (trip.refreshVocabularyOnce()) continue
                     // Сервер словаря не дал — строка ждёт следующего захода; дал, а её единицы в
                     // нём нет — ждать нечего, и строка пропущена.
-                    if (words.refreshFailed) drain.hold(entry.id) else drain.skip(entry.id, entry.miss.message.orEmpty())
+                    if (trip.vocabularyRefreshFailed) drain.hold(entry.id) else drain.skip(entry.id, entry.miss.message.orEmpty())
                     continue
                 }
                 is StoredSyncOperation.Unreadable -> {
@@ -124,7 +122,7 @@ class QueueWorker @Inject constructor(
         } else {
             null
         }
-        val taken = when (val take = storage.take(operation.id, fresh, clock.instant())) {
+        val taken = when (val take = taking.take(operation.id, fresh, clock.instant())) {
             null -> return Step.Skipped
             is Take.Closed -> {
                 packageId?.let(pass.freshPackages::add)
@@ -135,57 +133,52 @@ class QueueWorker @Inject constructor(
         pass.sentIds += taken.id
         packageId?.let(pass.freshPackages::add)
         val request = checkNotNull(taken.prepared) { "взятая в отправку операция несёт запрос" }
-        return when (val result = transport.send(request)) {
-            is ApiResult.Success -> {
-                // Ответ записан до применения: полученное подтверждение не теряется — и при
-                // сбое применения операция ждёт с ним в руках, а не уходит на повтор.
-                storage.answered(taken.id, result.value, clock.instant())
+        return when (val status = trip.send(request)) {
+            is DeliveryStatus.Received -> {
+                // Квитанция записана до применения: полученное подтверждение не теряется — и при
+                // сбое применения операция ждёт с ней в руках, а не уходит на повтор.
+                storage.answered(taken.id, status.receipt, clock.instant())
                 pass.answeredIds += taken.id
-                resolve(taken.command, result.value)
+                resolve(taken.command, status.receipt)
             }
-            is ApiResult.Failure -> when (val failure = result.failure) {
-                // Версия устарела — сервер отверг запрос до применения; 409 о версии не говорит.
-                ApiFailure.PreconditionFailed -> Step.Settled(stale(taken, request))
-                ApiFailure.Conflict -> Step.Settled(conflict(taken.command))
-                ApiFailure.PreconditionRequired -> Step.Settled(refused(taken.command, RefusalReason.INVALID))
-                is ApiFailure.Invalid ->
-                    Step.Settled(refused(taken.command, (taken.command as? PackageSyncCommand)?.onInvalid ?: RefusalReason.INVALID))
-                ApiFailure.NotFound -> Step.Settled(notFound(taken, request))
-                // Пропуска нет окончательно: перевыпуск и один повтор уже были в HTTP-слое
-                // (PLAN B5), и сервер этой учётке не отвечает. Проход останавливается, а операция
-                // ждёт по задержке — иначе она осталась бы готовой сейчас же, и собственная
-                // запись разбудила бы следующий круг.
-                ApiFailure.Unauthorized, ApiFailure.RegistrationRefused ->
-                    Step.Settled(Delivery.Retry("нет пропуска"), stop = true)
-                is ApiFailure.TooManyRequests ->
-                    Step.Settled(Delivery.Retry("429"), retryAfter = failure.retryAfter, stop = true)
-                ApiFailure.Unavailable -> Step.Settled(Delivery.Retry("связи нет", attempted = false), stop = true)
-                ApiFailure.OutcomeUnknown -> Step.Settled(Delivery.Retry("ответ потерян", outcomeUnknown = true))
-                is ApiFailure.Protocol -> Step.Settled(Delivery.Retry(failure.reason, outcomeUnknown = true))
-            }
+            // Версия устарела — реестр отверг поручение до применения; «номер занят» о версии не говорит.
+            DeliveryStatus.Outdated -> Step.Settled(stale(taken, request))
+            DeliveryStatus.Taken -> Step.Settled(conflict(taken.command))
+            DeliveryStatus.VersionMissing -> Step.Settled(refused(taken.command, RefusalReason.INVALID))
+            DeliveryStatus.Invalid ->
+                Step.Settled(refused(taken.command, (taken.command as? PackageSyncCommand)?.onInvalid ?: RefusalReason.INVALID))
+            DeliveryStatus.Absent -> Step.Settled(notFound(taken, request))
+            // Пропуска нет окончательно: перевыпуск и один повтор уже были у курьера (PLAN B5), и
+            // реестр этой учётке не отвечает. Проход останавливается, а операция ждёт по задержке —
+            // иначе она осталась бы готовой сейчас же, и собственная запись разбудила бы следующий круг.
+            DeliveryStatus.NoPass -> Step.Settled(Delivery.Retry("нет пропуска"), stop = true)
+            is DeliveryStatus.Throttled -> Step.Settled(Delivery.Retry("429"), retryAfter = status.retryAfter, stop = true)
+            DeliveryStatus.Unreachable -> Step.Settled(Delivery.Retry("связи нет", attempted = false), stop = true)
+            DeliveryStatus.OutcomeUnknown -> Step.Settled(Delivery.Retry("ответ потерян", outcomeUnknown = true))
+            is DeliveryStatus.Garbled -> Step.Settled(Delivery.Retry(status.reason, outcomeUnknown = true))
         }
     }
 
-    /** Ответ уже записан — применить его; сервер о нём больше не спрашивают. */
+    /** Квитанция уже записана — применить её; реестр о ней больше не спрашивают. */
     private suspend fun resume(operation: SyncOperation): Step =
         resolve(operation.command, checkNotNull(operation.answer) { "операция с ответом несёт его" })
 
     /**
-     * Применение записанного ответа: разбор по форме, которую ждала команда, и истина по пачке —
-     * из ответа либо чтением следом. Ответ не по форме — исход неизвестен, повтор тем же
-     * запросом. Применить нечем — операция ждёт с ответом в руках.
+     * Применение записанной квитанции: курьер читает её по форме, которую ждала команда, и истина
+     * по пачке — из квитанции либо чтением следом. Квитанция не по форме — исход неизвестен, повтор
+     * тем же запросом. Применить нечем — операция ждёт с квитанцией в руках.
      */
-    private suspend fun resolve(command: SyncCommand, answer: RawResponse): Step {
-        val read = when (val parsed = command.expects.read(answer)) {
-            is ApiResult.Success -> parsed.value
-            is ApiResult.Failure ->
-                return Step.Settled(Delivery.Retry((parsed.failure as ApiFailure.Protocol).reason, outcomeUnknown = true))
-        }
+    private suspend fun resolve(command: SyncCommand, receipt: Receipt): Step {
+        val read = trip.read(receipt, command.expects)
         return when (command) {
             is PackageSyncCommand -> when (read) {
-                is QueueAnswer.Snapshot -> known(read.snapshot) { Step.Settled(Delivery.Applied(PackageState.Present(it))) }
-                QueueAnswer.Gone -> Step.Settled(Delivery.Applied(PackageState.Gone))
-                is QueueAnswer.Claim, QueueAnswer.Nothing ->
+                is Answer.Garbled -> garbled(read)
+                is Answer.Snapshot -> Step.Settled(Delivery.Applied(PackageState.Present(read.snapshot)))
+                // Команда применена, а коробка уже на полке, где нас нет: ответ окончательный (E6).
+                Answer.Elsewhere -> Step.Settled(Delivery.Applied(PackageState.Elsewhere))
+                is Answer.Unresolved -> Step.Deferred(read.reason, stop = read.stop)
+                Answer.Gone -> Step.Settled(Delivery.Applied(PackageState.Gone))
+                Answer.Claim, Answer.Nothing ->
                     if (command is PackageSyncCommand.Delete || command is PackageSyncCommand.Withdraw) {
                         Step.Settled(Delivery.Applied(PackageState.Gone))
                     } else {
@@ -198,19 +191,13 @@ class QueueWorker @Inject constructor(
                         }
                     }
             }
-            is MedKitSyncCommand -> Step.Settled(Delivery.Applied(PackageState.None))
+            is MedKitSyncCommand -> if (read is Answer.Garbled) garbled(read) else Step.Settled(Delivery.Applied(PackageState.None))
             else -> command.unknownRoot()
         }
     }
 
-    /** Снимок из ответа ложится в базу только разрешённым: неизвестное дочитывается или ждёт. */
-    private suspend fun known(snapshot: PackageSnapshotNetworkDTO, then: (PackageSnapshot) -> Step): Step =
-        when (val resolution = snapshots.resolve(snapshot, clock.instant(), words = words)) {
-            is PackageSnapshotResolver.Resolution.Resolved -> then(resolution.snapshot)
-            // Команда применена, а коробка уже на полке, где нас нет: ответ окончательный (E6).
-            is PackageSnapshotResolver.Resolution.Elsewhere -> Step.Settled(Delivery.Applied(PackageState.Elsewhere))
-            is PackageSnapshotResolver.Resolution.Unresolved -> Step.Deferred(resolution.reason, stop = resolution.stop)
-        }
+    /** Квитанция не по форме: исход неизвестен, повтор тем же запросом. */
+    private fun garbled(read: Answer.Garbled): Step = Step.Settled(Delivery.Retry(read.reason, outcomeUnknown = true))
 
     /**
      * Версия устарела — сервер отверг запрос до применения, в журнал он не попал: гонка длиной в
@@ -249,11 +236,10 @@ class QueueWorker @Inject constructor(
             ConflictPolicy.REPREPARE -> snapshotThen(command.packageId) { Delivery.Stale(it) }
             ConflictPolicy.REFUSE -> refused(command, RefusalReason.INVALID)
         }
-        is MedKitSyncCommand -> when (val ours = transport.medKitIsOurs(command.medKitId)) {
-            is ApiResult.Success ->
-                if (ours.value) Delivery.Applied(PackageState.None)
-                else Delivery.Refused(RefusalReason.INVALID, PackageState.None)
-            is ApiResult.Failure -> Delivery.Retry("занятый номер аптечки не проверен")
+        is MedKitSyncCommand -> when (trip.medKitIsOurs(command.medKitId)) {
+            true -> Delivery.Applied(PackageState.None)
+            false -> Delivery.Refused(RefusalReason.INVALID, PackageState.None)
+            null -> Delivery.Retry("занятый номер аптечки не проверен")
         }
         else -> command.unknownRoot()
     }
@@ -304,22 +290,20 @@ class QueueWorker @Inject constructor(
         }
 
     /**
-     * Что у сервера сейчас по этой пачке — разрешённым снимком: неизвестное дочитывается или ждёт.
+     * Что у реестра сейчас по этой пачке — собранным снимком: неизвестное дочитывается или ждёт.
      * Пачки нет — доступа к ней нет; связи нет — проход останавливается; иначе — повтор позже.
      */
-    private suspend fun snapshotRead(packageId: Uuid): Read = when (val read = transport.packageSnapshot(packageId)) {
-        is ApiResult.Success -> when (val resolution = snapshots.resolve(read.value, clock.instant(), words = words)) {
-            is PackageSnapshotResolver.Resolution.Resolved -> Read.Snapshot(resolution.snapshot)
-            // Коробка на полке, где нас нет: отправлять некуда — это утрата доступа, а не повтор (E6).
-            is PackageSnapshotResolver.Resolution.Elsewhere -> Read.Failed(Delivery.AccessLost)
-            is PackageSnapshotResolver.Resolution.Unresolved -> Read.Failed(Delivery.Retry(resolution.reason), stop = resolution.stop)
-        }
-        is ApiResult.Failure -> when (val failure = read.failure) {
-            ApiFailure.NotFound -> Read.Failed(Delivery.AccessLost)
-            ApiFailure.Unauthorized, ApiFailure.RegistrationRefused -> Read.Failed(Delivery.Retry("нет пропуска"), stop = true)
-            is ApiFailure.TooManyRequests -> Read.Failed(Delivery.Retry("429"), stop = true)
-            ApiFailure.Unavailable -> Read.Failed(Delivery.Retry("связи нет", attempted = false), stop = true)
-            else -> Read.Failed(Delivery.Retry("снимок не прочитан: $failure"))
+    private suspend fun snapshotRead(packageId: Uuid): Read = when (val read = trip.packageSnapshot(packageId)) {
+        is Fetched.Snapshot -> Read.Snapshot(read.snapshot)
+        // Коробка на полке, где нас нет: отправлять некуда — это утрата доступа, а не повтор (E6).
+        Fetched.Elsewhere -> Read.Failed(Delivery.AccessLost)
+        is Fetched.Unresolved -> Read.Failed(Delivery.Retry(read.reason), stop = read.stop)
+        is Fetched.Declined -> when (val status = read.status) {
+            DeliveryStatus.Absent -> Read.Failed(Delivery.AccessLost)
+            DeliveryStatus.NoPass -> Read.Failed(Delivery.Retry("нет пропуска"), stop = true)
+            is DeliveryStatus.Throttled -> Read.Failed(Delivery.Retry("429"), stop = true)
+            DeliveryStatus.Unreachable -> Read.Failed(Delivery.Retry("связи нет", attempted = false), stop = true)
+            else -> Read.Failed(Delivery.Retry("снимок не прочитан: $status"))
         }
     }
 

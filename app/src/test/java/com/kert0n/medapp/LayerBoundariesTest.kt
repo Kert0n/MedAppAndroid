@@ -32,12 +32,24 @@ class LayerBoundariesTest {
     private val maySee: Map<String, Set<String>> = mapOf(
         // Домен не знает ни Android, ни Room, ни Ktor, ни остальных корней.
         "domain" to emptySet(),
-        // Сеть говорит с сервером на языке домена; про очередь она не знает.
-        "network" to setOf("domain"),
-        // Очередь видит сеть и домен, но не Room.
-        "queue" to setOf("domain", "network"),
-        // Хранение реализует порты очереди и сети — обвязка доставки лежит в его же строках.
-        "storage" to setOf("domain", "network", "queue"),
+        // Провод: запросы и ответы. Исполняет курьера очереди — собрать посылку, довезти её,
+        // механически повторив ту же, и вернуть статус на языке поручения.
+        "network" to setOf("domain", "queue"),
+        // Поручения общему реестру: что сказать серверу, в каком порядке, какова судьба и что она
+        // значит. Про провод и таблицы очередь не знает — курьера и журнал она объявляет портами.
+        "queue" to setOf("domain"),
+        // Данные: как сохранить и отдать требуемое. Порты сценария исполняет, очередь не видит.
+        "storage" to setOf("domain", "feature"),
+        // Журнал поручений: раскладывает типы очереди по колонкам и собирает обратно, но не толкует.
+        "storage/operation" to setOf("domain", "queue", "feature"),
+        // Уходит в PR B вместе с портами пачки и приёма (решение владельца 2026-09-24): знание о
+        // сервере в строках пачки и приёма и свёртка поручений в проекции для экрана.
+        "storage/pack" to setOf("domain", "feature", "queue"),
+        "storage/intake" to setOf("domain", "feature", "queue"),
+        // Исполнители портов очереди, которые переедут к сценарию вместе с транзакцией и укладкой
+        // снимка в PR B: `RoomTransactions` (Transactions) и `SnapshotRoomStorage` (SnapshotStorage).
+        "storage/database" to setOf("domain", "feature", "queue"),
+        "storage/snapshot" to setOf("domain", "feature", "queue"),
         // Сценарий стоит над логиками, но в сеть не ходит: сетевое действие называет домен портом.
         "feature" to setOf("domain", "queue", "storage"),
         // Android-службы без экранов: фон, ключи, уведомления — и порты, которые они исполняют.
@@ -101,6 +113,29 @@ class LayerBoundariesTest {
     }
 
     /**
+     * Хранение хранит поручения, но не понимает их: из очереди оно берёт **типы** — что раскладывать
+     * по колонкам, — и никогда **функции**. Свёртка, подготовка запроса и толкование исхода —
+     * решения очереди; хранение, которое их зовёт, восстанавливает очередь за неё, и тогда у одного
+     * правила два исполнителя. Функция узнаётся по имени со строчной буквы после пакета очереди.
+     */
+    @Test
+    fun storageKeepsTheQueueTypesButNotItsDecisions() {
+        val offenders = sources.resolve("storage").walkTopDown()
+            .filter { it.extension == "kt" }
+            .flatMap { file ->
+                file.readLines().withIndex().flatMap { (index, line) ->
+                    QUEUE_NAME.findAll(line)
+                        .map { it.groupValues[1] }
+                        .filter { it.first().isLowerCase() }
+                        .map { "${file.relativeTo(sources).invariantSeparatorsPath}:${index + 1}: $it" }
+                }
+            }
+            .toList()
+
+        assertEquals("хранение зовёт решения очереди", emptyList<String>(), offenders)
+    }
+
+    /**
      * Домен независим от Android, Room и Ktor (AGENTS «Инварианты», PLAN H1): он импортирует
      * только `java.*`, `kotlin.*` и себя. Правило о корнях проекта держит [dependenciesPointInwards],
      * но чужая библиотека — не корень, и без этой проверки `android.os.Build` в домене прошёл бы.
@@ -154,6 +189,8 @@ class LayerBoundariesTest {
         val invariant = Regex("этой же транзакцией|записан|^у .+ есть ")
         val offenders = sources.resolve("feature").walkTopDown()
             .filter { it.extension == "kt" }
+            // Само правило F5 держит свой `checkNotNull` — оно и есть «прочитано этой же транзакцией».
+            .filter { it.name != "ReadThisTransaction.kt" }
             .flatMap { file ->
                 file.readLines().withIndex()
                     .filter { (_, line) -> "requireNotNull(" in line || "checkNotNull(" in line }
@@ -206,6 +243,8 @@ class LayerBoundariesTest {
 
     private companion object {
         val NAMED = Regex("""com\.kert0n\.medapp\.([a-z]+)\.""")
+        /** Последнее имя после пакета очереди (и его подпакетов): тип — с заглавной, функция — нет. */
+        val QUEUE_NAME = Regex("""com\.kert0n\.medapp\.queue(?:\.[a-z][A-Za-z0-9]*)*\.([A-Za-z][A-Za-z0-9]*)(?![A-Za-z0-9.])""")
         val CHECK_MESSAGE = Regex("""checkNotNull\(.*\)\s*\{\s*"([^"]*)"""")
     }
 }

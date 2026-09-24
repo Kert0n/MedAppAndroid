@@ -32,6 +32,16 @@ class Vocabulary(units: Collection<QuantityUnit>, forms: Collection<DosageForm>)
 
     fun form(id: Uuid): DosageForm? = forms[id]
 
+    /** Единица из снимка — или промах, который разбор наверх не глотает. */
+    fun unitOrMiss(id: Uuid): QuantityUnit = unit(id) ?: throw VocabularyMiss(VocabularyMiss.Kind.UNIT, id)
+
+    fun formOrMiss(id: Uuid): DosageForm = form(id) ?: throw VocabularyMiss(VocabularyMiss.Kind.FORM, id)
+
+    /** Все единицы снимка — тому, кто кладёт словарь в базу целиком. */
+    val allUnits: Collection<QuantityUnit> get() = units.values
+
+    val allForms: Collection<DosageForm> get() = forms.values
+
     /**
      * Форма по её точному имени. Нужна тем, кто узнал **название** вида из чужого текста и
      * должен взять объект у сервера, а не завести свой: тождество формы — серверный `id`, и
