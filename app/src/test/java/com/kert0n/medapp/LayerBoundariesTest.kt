@@ -34,34 +34,30 @@ class LayerBoundariesTest {
         "domain" to emptySet(),
         // Провод: запросы и ответы. Исполняет курьера очереди — собрать посылку, довезти её,
         // механически повторив ту же, и вернуть статус на языке поручения.
-        "network" to setOf("domain", "queue"),
+        "network" to setOf("domain", "queue", "feature"),
         // Поручения общему реестру: что сказать серверу, в каком порядке, какова судьба и что она
         // значит. Про провод и таблицы очередь не знает — курьера и журнал она объявляет портами.
         "queue" to setOf("domain"),
         // Данные: как сохранить и отдать требуемое. Порты сценария исполняет, очередь не видит.
         "storage" to setOf("domain", "feature"),
-        // Журнал поручений: раскладывает типы очереди по колонкам и собирает обратно, но не толкует.
+        // Исполнители портов очереди: журнал поручений (раскладывает типы очереди по колонкам и
+        // собирает обратно, не толкуя), одна транзакция (`RoomTransactions`) и укладка снимка.
         "storage/operation" to setOf("domain", "queue", "feature"),
-        // Уходит в PR B вместе с портами пачки и приёма (решение владельца 2026-09-24): знание о
-        // сервере в строках пачки и приёма и свёртка поручений в проекции для экрана.
-        "storage/pack" to setOf("domain", "feature", "queue"),
-        "storage/intake" to setOf("domain", "feature", "queue"),
-        // Исполнители портов очереди, которые переедут к сценарию вместе с транзакцией и укладкой
-        // снимка в PR B: `RoomTransactions` (Transactions) и `SnapshotRoomStorage` (SnapshotStorage).
-        "storage/database" to setOf("domain", "feature", "queue"),
-        "storage/snapshot" to setOf("domain", "feature", "queue"),
-        // Сценарий стоит над логиками, но в сеть не ходит: сетевое действие называет домен портом.
-        "feature" to setOf("domain", "queue", "storage"),
-        // Android-службы без экранов: фон, ключи, уведомления — и порты, которые они исполняют.
-        "platform" to setOf("domain", "network", "queue", "storage", "feature"),
-        // Представление строит состояние экрана из доменных величин, зовёт сценарии и читает порты.
-        "presentation" to setOf("domain", "feature", "storage", "platform"),
+        "storage/database" to setOf("domain", "queue"),
+        "storage/snapshot" to setOf("domain", "queue"),
+        // Сценарии: кого позвать, чтобы выполнить просьбу, и что ему отдать. Порты хранения,
+        // расписания и устройства объявляет сам, в хранение, сеть и платформу не ходит.
+        "feature" to setOf("domain", "queue"),
+        // Функции устройства: исполняет порты сценария и домена, никого не зовёт.
+        "platform" to setOf("domain", "feature"),
+        // Компоненты экрана: собирает данные экрана из портов чтения сценария, проверяет только ввод.
+        "presentation" to setOf("domain", "feature"),
         // Составляющие экрана рисуют доменные значения и готовые DTO представления.
         "ui" to setOf("domain", "presentation"),
         // Маршруты — часть экрана, а не точки входа: объектов в них не ездит (PLAN H3, G3).
         "app/navigation" to setOf("domain", "presentation", "ui"),
         // Точка входа собирает всё вместе.
-        "app" to setOf("domain", "presentation", "ui", "feature", "platform", "queue", "storage")
+        "app" to setOf("domain", "presentation", "ui", "feature", "platform", "queue")
     )
 
     private val sources: File = listOf(
@@ -110,6 +106,39 @@ class LayerBoundariesTest {
         }
 
         assertEquals(emptyList<String>(), broken.distinct().sorted())
+    }
+
+    /**
+     * Разрешённое ребро без единого пользователя — ложь таблицы: так `presentation → storage`
+     * однажды разрешили авансом, и дальше рост шёл «внутри разрешённого». Карта говорит ровно то,
+     * что код делает, и новое ребро появляется в ней вместе с первым пользователем.
+     */
+    @Test
+    fun everyAllowedEdgeHasAUser() {
+        val used = HashMap<String, MutableSet<String>>()
+        for (file in sources.walkTopDown().filter { it.extension == "kt" }) {
+            val from = file.root() ?: continue
+            used.getOrPut(from) { HashSet() } += file.namedRoots().filter { it != "di" && it != from.substringBefore('/') }
+        }
+        val idle = maySee.flatMap { (from, allowed) ->
+            (allowed - used[from].orEmpty()).map { "$from → $it" }
+        }
+        assertEquals("разрешено, но никто не пользуется", emptyList<String>(), idle.sorted())
+    }
+
+    /**
+     * Каталог называет понятие, а не собеседника: `storage/server` зеркалил `network/server`,
+     * пережил переезд очереди и притянул «всё, что про сервер». Внутри хранения, сценариев и
+     * представления каталог с именем другого слоя или собеседника — провал.
+     */
+    @Test
+    fun directoriesAreNotNamedAfterTheirNeighbours() {
+        val neighbours = setOf("server", "network", "queue", "sync", "storage", "platform")
+        val named = listOf("storage", "feature", "presentation").flatMap { root ->
+            sources.resolve(root).walkTopDown().drop(1).filter { it.isDirectory && it.name in neighbours }
+                .map { it.relativeTo(sources).path }.toList()
+        }
+        assertEquals(emptyList<String>(), named)
     }
 
     /**
