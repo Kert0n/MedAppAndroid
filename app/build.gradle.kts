@@ -158,6 +158,23 @@ android {
         // Сервер срок приглашения не отдаёт, а задаёт настройкой `medkit.share.termInMinutes`:
         // клиент показывает оценку по этому числу (PLAN B6).
         buildConfigField("long", "INVITATION_TERM_MINUTES", "60L")
+        // Запрет снимка экрана на ключе приглашения (PLAN G3) снимается только сборкой для записи
+        // показа (`-Pmedapp.recording=true`, `docs/demo/съёмка-с-телефона.md`): иначе запись экрана
+        // выходит на этом месте чёрной. Любая другая сборка ключ прячет.
+        buildConfigField("boolean", "SCREEN_SECRECY", "${providers.gradleProperty("medapp.recording").orNull != "true"}")
+    }
+
+    // Посев показа кладёт мир в настоящее приложение, а ставится оно на телефон подписанным
+    // release: проверки тогда собираются под release (`-Pmedapp.testBuildType=release`), с той же
+    // подписью, иначе система не даст им войти в процесс приложения.
+    testBuildType = providers.gradleProperty("medapp.testBuildType").orNull ?: "debug"
+    // Проверкам экрана нужно окно `HiltTestActivity` из debug: в такую release-сборку оно едет тоже,
+    // в обычную — нет.
+    if (testBuildType == "release") {
+        sourceSets.getByName("release") {
+            kotlin.directories.add("src/debug/java")
+            manifest.srcFile("src/debug/AndroidManifest.xml")
+        }
     }
 
     /**

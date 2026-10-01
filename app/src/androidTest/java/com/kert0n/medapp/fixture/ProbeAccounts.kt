@@ -87,6 +87,7 @@ object ProbeAccounts {
         return result is ApiResult.Failure && result.failure is ApiFailure.TooManyRequests
     }
 
-    private fun api(account: AccountCredentials): MedAppApi? =
+    /** Клиент проб на названную учётку — и на собственную учётку устройства (`PhoneStage`). */
+    fun api(account: AccountCredentials): MedAppApi? =
         baseUrl?.let { MedAppApi(medAppHttpClient(OkHttp.create(), it, tokens = AccessTokens(Fixed(account)))) }
 }

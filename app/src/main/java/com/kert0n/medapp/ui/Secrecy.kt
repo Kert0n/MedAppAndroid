@@ -8,6 +8,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.window.DialogWindowProvider
+import com.kert0n.medapp.BuildConfig
 
 /**
  * Пока это на экране, снимок экрана и показ в списке недавних запрещены (`FLAG_SECURE`, PLAN G3).
@@ -19,6 +20,8 @@ import androidx.compose.ui.window.DialogWindowProvider
  */
 @Composable
 fun SecretOnScreen() {
+    // Сборка для записи показа: запрет выключен, чтобы ключ и QR попали в запись экрана.
+    if (!BuildConfig.SCREEN_SECRECY) return
     val view = LocalView.current
     DisposableEffect(view) {
         val window = (view.parent as? DialogWindowProvider)?.window ?: view.context.activity()?.window
